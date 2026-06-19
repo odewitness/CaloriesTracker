@@ -74,8 +74,8 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
-        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
           {pages[tab]}
         </div>
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Search, ScanLine } from 'lucide-react'
+import { X, Search, ScanLine, Camera } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
+import BarcodeScanner from './BarcodeScanner'
 
 const MEALS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 
@@ -36,6 +37,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const [meal, setMeal] = useState(initialMeal || 'Déjeuner')
   const [barcode, setBarcode] = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -71,11 +73,12 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     timerRef.current = setTimeout(() => doSearch(v), 250)
   }
 
-  const fetchBarcode = async () => {
-    if (!barcode.trim()) return
+  const fetchBarcode = async (codeOverride) => {
+    const code = (codeOverride ?? barcode).trim()
+    if (!code) return
     setBarcodeLoading(true)
     try {
-      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode.trim()}.json`)
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
       const data = await res.json()
       if (data.status === 1 && data.product) {
         const p = data.product
@@ -110,6 +113,12 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     const defaultPortion = food.portions?.[0]?.g || 100
     setQty(defaultPortion)
     setStep('configure')
+  }
+
+  const handleScanDetected = (code) => {
+    setScannerOpen(false)
+    setBarcode(code)
+    fetchBarcode(code)
   }
 
   const confirm = async () => {
@@ -180,13 +189,21 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                 />
               </div>
               <button
-                onClick={fetchBarcode}
+                onClick={() => setScannerOpen(true)}
+                style={{ background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 9, padding: '0 12px', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                aria-label="Activer la caméra"
+              >
+                <Camera size={18} />
+              </button>
+              <button
+                onClick={() => fetchBarcode()}
                 disabled={barcodeLoading}
                 style={{ background: 'var(--green)', color: 'white', borderRadius: 9, padding: '0 14px', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', flexShrink: 0, opacity: barcodeLoading ? 0.6 : 1 }}
               >
-                {barcodeLoading ? '...' : 'Scan'}
+                {barcodeLoading ? '...' : 'OK'}
               </button>
             </div>
+
 
             {/* Results */}
             <div style={{ maxHeight: 340, overflowY: 'auto' }}>
@@ -271,6 +288,13 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
           </>
         )}
       </div>
+
+      {scannerOpen && (
+        <BarcodeScanner
+          onDetected={handleScanDetected}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
     </div>
   )
 }
