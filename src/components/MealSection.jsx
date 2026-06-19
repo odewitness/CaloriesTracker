@@ -8,6 +8,19 @@ function EditRow({ entry, onSave, onCancel }) {
   const [gluc, setGluc] = useState(entry.glucides)
   const [lip, setLip]   = useState(entry.lipides)
 
+  // Quand le grammage change, on recalcule kcal/macros au prorata
+  // à partir des valeurs d'origine de l'entrée (entry.qty_g -> entry.energie_kcal etc.)
+  const handleQtyChange = (val) => {
+    setQty(val)
+    const newQty = parseFloat(val)
+    if (!newQty || !entry.qty_g) return
+    const f = newQty / entry.qty_g
+    setKcal(parseFloat((entry.energie_kcal * f).toFixed(1)))
+    setProt(parseFloat((entry.proteines * f).toFixed(2)))
+    setGluc(parseFloat((entry.glucides * f).toFixed(2)))
+    setLip(parseFloat((entry.lipides * f).toFixed(2)))
+  }
+
   const save = () => onSave({
     qty_g: parseFloat(qty) || 0,
     energie_kcal: parseFloat(kcal) || 0,
@@ -31,7 +44,7 @@ function EditRow({ entry, onSave, onCancel }) {
     <div style={{ padding: '10px 14px', background: 'var(--green-light)', borderTop: '0.5px solid var(--border)' }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-dark)', marginBottom: 8 }}>{entry.food_name}</div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 10 }}>
-        {field('g', qty, setQty, 'var(--text)')}
+        {field('g', qty, handleQtyChange, 'var(--text)')}
         {field('kcal', kcal, setKcal, 'var(--text)')}
         {field('Prot.', prot, setProt, 'var(--green)')}
         {field('Gluc.', gluc, setGluc, 'var(--amber)')}
