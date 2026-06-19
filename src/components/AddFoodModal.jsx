@@ -41,8 +41,6 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
-  useEffect(() => { searchRef.current?.focus() }, [])
-
   const doSearch = useCallback(async (q) => {
     if (!q || q.length < 2) { setResults([]); return }
     setSearching(true)
