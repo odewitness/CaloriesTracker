@@ -2,14 +2,36 @@ import React, { useEffect, useRef, useState } from 'react'
 import Quagga from '@ericblade/quagga2'
 import { X, CameraOff } from 'lucide-react'
 
+// Validates EAN-13 / EAN-8 / UPC-A check digit to reject misreads
+function isValidChecksum(code) {
+  if (!/^\d+$/.test(code)) return false
+  const digits = code.split('').map(Number)
+  const checkDigit = digits.pop()
+  // EAN-13 / EAN-8 / UPC-A all use the same weighted mod-10 algorithm,
+  // alternating weights 3/1 from the rightmost digit before the check digit.
+  let sum = 0
+  for (let i = 0; i < digits.length; i++) {
+    const weight = (digits.length - i) % 2 === 0 ? 1 : 3
+    sum += digits[i] * weight
+  }
+  const expected = (10 - (sum % 10)) % 10
+  return expected === checkDigit
+}
+
+const REQUIRED_MATCHES = 3
+
 export default function BarcodeScanner({ onDetected, onClose }) {
   const videoRef = useRef(null)
   const [error, setError] = useState(null)
   const [ready, setReady] = useState(false)
   const detectedRef = useRef(false)
+  const candidatesRef = useRef({}) // code -> consecutive count
+  const lastCodeRef = useRef(null)
 
   useEffect(() => {
     detectedRef.current = false
+    candidatesRef.current = {}
+    lastCodeRef.current = null
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("Ton navigateur ne supporte pas l'accès à la caméra.")
@@ -23,14 +45,16 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           target: videoRef.current,
           constraints: {
             facingMode: 'environment',
-            width: { ideal: 720 },
-            height: { ideal: 480 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           },
         },
         locator: { patchSize: 'medium', halfSample: true },
         numOfWorkers: navigator.hardwareConcurrency || 2,
+        frequency: 10,
         decoder: {
           readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader'],
+          multiple: false,
         },
         locate: true,
       },
@@ -54,7 +78,24 @@ export default function BarcodeScanner({ onDetected, onClose }) {
     const handleDetected = (result) => {
       if (detectedRef.current) return
       const code = result?.codeResult?.code
-      if (code) {
+      if (!code) return
+
+      // Reject codes that fail the standard checksum — these are misreads
+      if (!isValidChecksum(code)) {
+        candidatesRef.current = {}
+        lastCodeRef.current = null
+        return
+      }
+
+      // Require the same valid code to be read several times in a row
+      if (code === lastCodeRef.current) {
+        candidatesRef.current[code] = (candidatesRef.current[code] || 1) + 1
+      } else {
+        candidatesRef.current = { [code]: 1 }
+        lastCodeRef.current = code
+      }
+
+      if (candidatesRef.current[code] >= REQUIRED_MATCHES) {
         detectedRef.current = true
         onDetected(code)
       }
@@ -67,6 +108,7 @@ export default function BarcodeScanner({ onDetected, onClose }) {
       try { Quagga.stop() } catch (e) {}
     }
   }, [onDetected])
+
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000', zIndex: 300, display: 'flex', flexDirection: 'column' }}>
