@@ -150,6 +150,52 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+/* Full-page modal (ex: ajout d'aliment) — utilisé quand le contenu a besoin
+   de toute la hauteur visible (recherche + clavier), contrairement aux
+   feuilles .modal-sheet qui remontent du bas par-dessus la page. */
+.page-modal {
+  position: fixed;
+  inset: 0;
+  background: var(--white);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  animation: pageModalIn .18s ease;
+}
+
+@keyframes pageModalIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(14px + env(safe-area-inset-top)) 12px 12px;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+.page-modal-header h2 {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+
 .modal-sheet {
   background: var(--white);
   border-radius: var(--radius) var(--radius) 0 0;
