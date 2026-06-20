@@ -9,7 +9,7 @@ const VITAMINS = [
   { key: 'vit_e',     label: 'Vitamine E',   ref: 9,     lss: 300,   unit: 'mg',  color: 'var(--blue)'   },
   { key: 'calcium',   label: 'Calcium',      ref: 950,   lss: 2500,  unit: 'mg',  color: 'var(--blue)'   },
   { key: 'fer',       label: 'Fer',          ref: 16,    lss: 40,    unit: 'mg',  color: 'var(--coral)'  },
-  { key: 'magnesium', label: 'Magnésium',    ref: 300,   lss: 250,   unit: 'mg',  color: 'var(--green)'  },
+  { key: 'magnesium', label: 'Magnésium',    ref: 300,   lss: null,  unit: 'mg',  color: 'var(--green)'  },
   { key: 'potassium', label: 'Potassium',    ref: 3500,  lss: null,  unit: 'mg',  color: 'var(--amber)'  },
 ]
 
@@ -73,7 +73,7 @@ export default function VitaminPanel({ totals, hasEntries }) {
                     <div style={{
                       width: hasData ? `${barPct}%` : '0%',
                       height: '100%',
-                      background: barColor,
+                      background: STATUS_COLOR[status],
                       borderRadius: 3,
                       transition: 'width .4s',
                     }} />
