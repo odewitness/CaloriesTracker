@@ -2,14 +2,14 @@ import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 const VITAMINS = [
-  { key: 'vit_c',    label: 'Vitamine C',  ref: 80,   unit: 'mg',  color: 'var(--green)' },
+  { key: 'vit_c',    label: 'Vitamine C',  ref: 110,   unit: 'mg',  color: 'var(--green)' },
   { key: 'vit_d',    label: 'Vitamine D',  ref: 15,   unit: 'µg',  color: 'var(--amber)' },
-  { key: 'vit_b12',  label: 'Vitamine B12',ref: 2.4,  unit: 'µg',  color: 'var(--purple)' },
-  { key: 'vit_a',    label: 'Vitamine A',  ref: 800,  unit: 'µg',  color: 'var(--coral)' },
-  { key: 'vit_e',    label: 'Vitamine E',  ref: 12,   unit: 'mg',  color: 'var(--blue)' },
-  { key: 'calcium',  label: 'Calcium',     ref: 1000, unit: 'mg',  color: 'var(--blue)' },
+  { key: 'vit_b12',  label: 'Vitamine B12',ref: 4,  unit: 'µg',  color: 'var(--purple)' },
+  { key: 'vit_a',    label: 'Vitamine A',  ref: 650,  unit: 'µg',  color: 'var(--coral)' },
+  { key: 'vit_e',    label: 'Vitamine E',  ref: 9,   unit: 'mg',  color: 'var(--blue)' },
+  { key: 'calcium',  label: 'Calcium',     ref: 950, unit: 'mg',  color: 'var(--blue)' },
   { key: 'fer',      label: 'Fer',         ref: 16,   unit: 'mg',  color: 'var(--coral)' },
-  { key: 'magnesium',label: 'Magnésium',   ref: 375,  unit: 'mg',  color: 'var(--green)' },
+  { key: 'magnesium',label: 'Magnésium',   ref: 300,  unit: 'mg',  color: 'var(--green)' },
   { key: 'potassium',label: 'Potassium',   ref: 3500, unit: 'mg',  color: 'var(--amber)' },
 ]
 
