@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Search, ScanLine, Camera } from 'lucide-react'
+import { X, Search, ScanLine, Camera, ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import BarcodeScanner from './BarcodeScanner'
-
-const MEALS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 
 function MacroPreview({ food, qty }) {
   const f = qty / 100
@@ -36,15 +34,23 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState(null)
   const [qty, setQty] = useState(100)
-  const [meal, setMeal] = useState(initialMeal || 'Déjeuner')
+  const meal = initialMeal || 'Déjeuner' // fixé par le "+" sur lequel on a cliqué
   const [barcode, setBarcode] = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
-  // Note : pas d'autofocus ici — ça ouvrait le clavier automatiquement à
-  // l'ouverture de la modal sur mobile. L'utilisateur tape quand il veut.
+  // Pas d'autofocus à l'ouverture — évite l'ouverture automatique du clavier sur mobile.
+  // Le focus est déclenché uniquement quand l'utilisateur revient à l'étape search
+  // depuis l'étape configure (retour arrière).
+  useEffect(() => {
+    if (step !== 'search') return
+    // On ne focus que si on revient depuis configure (selected existe déjà)
+    if (!selected) return
+    const t = setTimeout(() => searchRef.current?.focus(), 50)
+    return () => clearTimeout(t)
+  }, [step])
 
   const doSearch = useCallback(async (q) => {
     if (!q || q.length < 2) { setResults([]); return }
@@ -52,8 +58,13 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     const { data, error } = await supabase.rpc('search_ciqual', { query: q, lim: 25 })
     if (error) console.error('search_ciqual error:', error)
     if (!data || data.length === 0) {
-      // fallback: also check custom foods (scoped to this user)
-      const { data: custom } = await supabase.from('aliments_custom').select('*').eq('user_id', user.id).ilike('nom', `%${q}%`).limit(10)
+      // fallback : aliments custom scopés à l'utilisateur
+      const { data: custom } = await supabase
+        .from('aliments_custom')
+        .select('*')
+        .eq('user_id', user.id)
+        .ilike('nom', `%${q}%`)
+        .limit(10)
       setResults((custom || []).map(c => ({
         ...c, alim_nom: c.nom, categorie: c.categorie || 'Personnalisé',
         energie_kcal: c.energie_kcal, proteines: c.proteines, glucides: c.glucides,
@@ -61,20 +72,34 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
         _source: 'custom'
       })))
     } else {
-      // merge with custom (scoped to this user)
-      const { data: custom } = await supabase.from('aliments_custom').select('*').eq('user_id', user.id).ilike('nom', `%${q}%`).limit(5)
+      // merge avec custom scopés à l'utilisateur
+      const { data: custom } = await supabase
+        .from('aliments_custom')
+        .select('*')
+        .eq('user_id', user.id)
+        .ilike('nom', `%${q}%`)
+        .limit(5)
       const customMapped = (custom || []).map(c => ({
         ...c, alim_nom: c.nom, categorie: c.categorie || 'Personnalisé', _source: 'custom'
       }))
       setResults([...data, ...customMapped])
     }
     setSearching(false)
-  }, [])
+  }, [user])
 
   const handleQuery = (v) => {
     setQuery(v)
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => doSearch(v), 250)
+  }
+
+  // Entrée = lance la recherche immédiatement et ferme le clavier
+  const handleSearchKeyDown = (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    clearTimeout(timerRef.current)
+    doSearch(query)
+    e.currentTarget.blur()
   }
 
   const fetchBarcode = async (codeOverride) => {
@@ -154,19 +179,24 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-sheet">
-        <div className="modal-handle" />
+    <div className="page-modal">
+      <div className="page-modal-header">
+        {step === 'configure' ? (
+          <button className="btn-icon" onClick={() => setStep('search')} style={{ color: 'var(--text-muted)' }}>
+            <ArrowLeft size={20} />
+          </button>
+        ) : (
+          <div style={{ width: 32, flexShrink: 0 }} />
+        )}
+        <h2>{step === 'search' ? 'Ajouter un aliment' : selected?.alim_nom}</h2>
+        <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
+      </div>
 
+      <div className="page-modal-body">
         {step === 'search' && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Ajouter un aliment</h2>
-              <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
-            </div>
-
             {/* Search input */}
-            <div style={{ position: 'relative', marginBottom: 10 }}>
+            <div style={{ position: 'relative', marginBottom: 10, flexShrink: 0 }}>
               <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 ref={searchRef}
@@ -175,11 +205,14 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                 placeholder="Poulet, riz, pomme..."
                 value={query}
                 onChange={e => handleQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                enterKeyHint="search"
+                inputMode="search"
               />
             </div>
 
             {/* Barcode row */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexShrink: 0 }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <ScanLine size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
                 <input
@@ -189,7 +222,13 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                   type="number"
                   value={barcode}
                   onChange={e => setBarcode(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && fetchBarcode()}
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    fetchBarcode()
+                    e.currentTarget.blur()
+                  }}
+                  enterKeyHint="go"
                 />
               </div>
               <button
@@ -208,9 +247,8 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
               </button>
             </div>
 
-
-            {/* Results */}
-            <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+            {/* Results — scrollable, prend tout l'espace restant */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               {searching && <div className="loader"><div className="spinner" /> Recherche...</div>}
               {!searching && results.length === 0 && query.length >= 2 && (
                 <div className="empty">Aucun résultat pour « {query} »</div>
@@ -241,13 +279,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
 
         {step === 'configure' && selected && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <button className="btn-icon" onClick={() => setStep('search')} style={{ color: 'var(--text-muted)', flexShrink: 0 }}>←</button>
-              <div>
-                <h2 style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{selected.alim_nom}</h2>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selected.categorie}</div>
-              </div>
-            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{selected.categorie}</div>
 
             {/* Portions chips */}
             {selected.portions?.length > 0 && (
@@ -279,12 +311,9 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
             {/* Macro preview */}
             <MacroPreview food={selected} qty={qty} />
 
-            {/* Meal select */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Repas</div>
-              <select className="input" value={meal} onChange={e => setMeal(e.target.value)}>
-                {MEALS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+            {/* Repas ciblé (non modifiable — déjà choisi via le bouton "+") */}
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+              Ajout à : <strong style={{ color: 'var(--text)' }}>{meal}</strong>
             </div>
 
             <button className="btn-primary" onClick={confirm}>Ajouter au journal</button>
