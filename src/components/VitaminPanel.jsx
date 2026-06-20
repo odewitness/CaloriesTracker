@@ -29,13 +29,14 @@ export default function VitaminPanel({ totals }) {
         <div style={{ padding: '0 16px 14px' }}>
           {VITAMINS.map(v => {
             const val = totals[v.key] || 0
-            const pct = Math.min(100, Math.round((val / v.ref) * 100))
-            const badge = pct >= 100 ? '#1D9E75' : pct >= 50 ? 'var(--amber)' : 'var(--coral)'
+            const pct = Math.round((val / v.ref) * 100)
+            const barPct = Math.min(100, pct)
+            const badge = pct > 150 ? 'var(--coral)' : pct >= 100 ? '#1D9E75' : pct >= 50 ? 'var(--amber)' : 'var(--coral)'
             return (
               <div key={v.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
                 <span style={{ fontSize: 12, color: 'var(--text)', width: 90, flexShrink: 0 }}>{v.label}</span>
                 <div style={{ flex: 1, height: 6, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', background: v.color, borderRadius: 3, transition: 'width .4s' }} />
+                  <div style={{ width: `${barPct}%`, height: '100%', background: v.color, borderRadius: 3, transition: 'width .4s' }} />
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 600, color: badge, width: 34, textAlign: 'right', flexShrink: 0 }}>{pct}%</span>
               </div>
