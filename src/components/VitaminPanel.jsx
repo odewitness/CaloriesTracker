@@ -13,12 +13,11 @@ const VITAMINS = [
   { key: 'potassium', label: 'Potassium',    ref: 3500,  lss: null,  unit: 'mg',  color: 'var(--amber)'  },
 ]
 
-// Renvoie la couleur du badge et de la barre selon les seuils
 function getStatus(val, ref, lss) {
-  if (lss !== null && val >= lss) return 'excess'   // ≥ LSS : danger
-  if (val >= ref)                  return 'ok'       // ≥ RNP : bon
-  if (val >= ref * 0.5)            return 'mid'      // 50–99 % RNP : moyen
-  return 'low'                                       // < 50 % RNP : insuffisant
+  if (lss !== null && val >= lss) return 'excess'
+  if (val >= ref)                  return 'ok'
+  if (val >= ref * 0.5)            return 'mid'
+  return 'low'
 }
 
 const STATUS_COLOR = {
@@ -28,14 +27,7 @@ const STATUS_COLOR = {
   low:    'var(--coral)',
 }
 
-const STATUS_LABEL = {
-  excess: '⚠︎',
-  ok:     null,
-  mid:    null,
-  low:    null,
-}
-
-export default function VitaminPanel({ totals }) {
+export default function VitaminPanel({ totals, hasEntries }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -51,18 +43,15 @@ export default function VitaminPanel({ totals }) {
       {open && (
         <div style={{ padding: '0 16px 14px' }}>
           {VITAMINS.map(v => {
-            const val = totals[v.key] || 0
-            const hasData = val > 0
+            const val = totals[v.key] ?? 0
 
-            // % par rapport à la RNP (peut dépasser 100)
+            // N/D uniquement si aucune entrée dans le journal du jour —
+            // une valeur à 0 sur un aliment loggé est une vraie donnée (aliment non source de ce nutriment)
+            const hasData = hasEntries
+
             const pct = Math.round((val / v.ref) * 100)
-            // largeur de la barre principale, plafonnée à la RNP (100 %)
-            // sauf si pas de LSS : on laisse déborder jusqu'à 100 % visuellement
             const barPct = Math.min(100, pct)
 
-            // Position du marqueur LSS sur la barre (en % de la largeur totale)
-            // La barre représente 0→RNP sur 100% de sa largeur.
-            // Le marqueur LSS se place à (LSS/RNP)*100%, plafonné à 100%.
             const lssMarkerPct = v.lss !== null
               ? Math.min(100, (v.lss / v.ref) * 100)
               : null
@@ -71,32 +60,25 @@ export default function VitaminPanel({ totals }) {
             const barColor = status === 'excess' ? 'var(--coral)' : v.color
             const badgeColor = STATUS_COLOR[status]
 
-            // Tooltip : valeur brute + unité
             const tooltip = hasData
               ? `${val.toFixed(val < 1 ? 3 : 1)} ${v.unit} / RNP ${v.ref} ${v.unit}${v.lss ? ` / LSS ${v.lss} ${v.unit}` : ''}`
               : 'Données non disponibles'
 
             return (
               <div key={v.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }} title={tooltip}>
-                {/* Label */}
                 <span style={{ fontSize: 12, color: 'var(--text)', width: 90, flexShrink: 0 }}>{v.label}</span>
 
-                {/* Barre + marqueur LSS */}
                 <div style={{ flex: 1, position: 'relative', height: 6 }}>
-                  {/* Track */}
                   <div style={{ position: 'absolute', inset: 0, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
-                    {/* Remplissage */}
                     <div style={{
                       width: hasData ? `${barPct}%` : '0%',
                       height: '100%',
                       background: barColor,
                       borderRadius: 3,
                       transition: 'width .4s',
-                      opacity: hasData ? 1 : 0.3,
                     }} />
                   </div>
 
-                  {/* Marqueur LSS — trait vertical semi-transparent */}
                   {lssMarkerPct !== null && lssMarkerPct < 100 && (
                     <div style={{
                       position: 'absolute',
@@ -112,7 +94,6 @@ export default function VitaminPanel({ totals }) {
                   )}
                 </div>
 
-                {/* Badge % ou N/D */}
                 <span style={{
                   fontSize: 11,
                   fontWeight: 600,
@@ -121,15 +102,12 @@ export default function VitaminPanel({ totals }) {
                   textAlign: 'right',
                   flexShrink: 0,
                 }}>
-                  {hasData
-                    ? `${STATUS_LABEL[status] ? STATUS_LABEL[status] + ' ' : ''}${pct}%`
-                    : 'N/D'}
+                  {hasData ? `${status === 'excess' ? '⚠︎ ' : ''}${pct}%` : 'N/D'}
                 </span>
               </div>
             )
           })}
 
-          {/* Légende */}
           <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{ width: 2, height: 10, background: 'var(--coral)', borderRadius: 1, opacity: 0.55 }} />

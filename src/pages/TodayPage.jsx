@@ -99,7 +99,7 @@ export default function TodayPage() {
           <>
             <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
             <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
-            <VitaminPanel totals={totals} />
+            <VitaminPanel totals={totals} hasEntries={entries.length > 0} />
 
             <div style={{ marginTop: 16 }}>
               <div className="section-title">Repas du jour</div>
