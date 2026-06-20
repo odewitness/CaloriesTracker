@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 const VITAMINS = [
-  { key: 'vit_c',     label: 'Vitamine C',   ref: 110,   lss: 1000,  unit: 'mg',  color: 'var(--green)'  },
+  { key: 'vit_c',     label: 'Vitamine C',   ref: 110,   lss: null,  unit: 'mg',  color: 'var(--green)'  },
   { key: 'vit_d',     label: 'Vitamine D',   ref: 15,    lss: 100,   unit: 'µg',  color: 'var(--amber)'  },
   { key: 'vit_b12',   label: 'Vitamine B12', ref: 4,     lss: null,  unit: 'µg',  color: 'var(--purple)' },
   { key: 'vit_a',     label: 'Vitamine A',   ref: 650,   lss: 3000,  unit: 'µg',  color: 'var(--coral)'  },
