@@ -21,13 +21,28 @@ function EditRow({ entry, onSave, onCancel }) {
     setLip(parseFloat((entry.lipides * f).toFixed(2)))
   }
 
-  const save = () => onSave({
-    qty_g: parseFloat(qty) || 0,
-    energie_kcal: parseFloat(kcal) || 0,
-    proteines: parseFloat(prot) || 0,
-    glucides: parseFloat(gluc) || 0,
-    lipides: parseFloat(lip) || 0,
-  })
+  const save = () => {
+    const newQty = parseFloat(qty) || 0
+    const f = entry.qty_g ? newQty / entry.qty_g : 1
+    onSave({
+      qty_g: newQty,
+      energie_kcal: parseFloat(kcal) || 0,
+      proteines: parseFloat(prot) || 0,
+      glucides: parseFloat(gluc) || 0,
+      lipides: parseFloat(lip) || 0,
+      // vitamines & minéraux recalculés au prorata du nouveau grammage
+      fibres:    parseFloat(((entry.fibres    || 0) * f).toFixed(2)),
+      vit_c:     parseFloat(((entry.vit_c     || 0) * f).toFixed(3)),
+      vit_d:     parseFloat(((entry.vit_d     || 0) * f).toFixed(4)),
+      vit_b12:   parseFloat(((entry.vit_b12   || 0) * f).toFixed(4)),
+      vit_a:     parseFloat(((entry.vit_a     || 0) * f).toFixed(3)),
+      vit_e:     parseFloat(((entry.vit_e     || 0) * f).toFixed(3)),
+      calcium:   parseFloat(((entry.calcium   || 0) * f).toFixed(2)),
+      fer:       parseFloat(((entry.fer       || 0) * f).toFixed(3)),
+      magnesium: parseFloat(((entry.magnesium || 0) * f).toFixed(2)),
+      potassium: parseFloat(((entry.potassium || 0) * f).toFixed(2)),
+    })
+  }
 
   const field = (label, val, set, color) => (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
