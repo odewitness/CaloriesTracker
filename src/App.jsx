@@ -1,10 +1,13 @@
 import React, { useState } from 'react'
 import { ToastProvider } from './lib/toast'
+import { AuthProvider, useAuth } from './lib/AuthContext'
+import AuthPage from './pages/AuthPage'
 import TodayPage from './pages/TodayPage'
 import MealsPage from './pages/MealsPage'
 import ManualPage from './pages/ManualPage'
 import HistoryPage from './pages/HistoryPage'
 import SettingsPage from './pages/SettingsPage'
+import ProfilePage from './pages/ProfilePage'
 
 const TABS = [
   { id: 'today',   label: "Aujourd'hui", icon: HomeIcon },
@@ -12,6 +15,7 @@ const TABS = [
   { id: 'manual',  label: 'Manuel',      icon: PencilIcon },
   { id: 'history', label: 'Historique',  icon: ChartIcon },
   { id: 'settings',label: 'Objectifs',   icon: SettingsIcon },
+  { id: 'profile', label: 'Profil',      icon: ProfileIcon },
 ]
 
 function HomeIcon({ active }) {
@@ -61,7 +65,16 @@ function SettingsIcon({ active }) {
   )
 }
 
-export default function App() {
+function ProfileIcon({ active }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  )
+}
+
+function AppShell() {
   const [tab, setTab] = useState('today')
 
   const pages = {
@@ -70,28 +83,51 @@ export default function App() {
     manual:   <ManualPage />,
     history:  <HistoryPage />,
     settings: <SettingsPage />,
+    profile:  <ProfilePage />,
   }
 
   return (
-    <ToastProvider>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
-          {pages[tab]}
-        </div>
-
-        <nav className="bottom-nav">
-          {TABS.map(t => {
-            const Icon = t.icon
-            const active = tab === t.id
-            return (
-              <button key={t.id} className={`nav-item ${active ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-                <Icon active={active} />
-                <span>{t.label}</span>
-              </button>
-            )
-          })}
-        </nav>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+        {pages[tab]}
       </div>
-    </ToastProvider>
+
+      <nav className="bottom-nav">
+        {TABS.map(t => {
+          const Icon = t.icon
+          const active = tab === t.id
+          return (
+            <button key={t.id} className={`nav-item ${active ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+              <Icon active={active} />
+              <span>{t.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+    </div>
+  )
+}
+
+function Gate() {
+  const { session, authLoading } = useAuth()
+
+  if (authLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div className="loader"><div className="spinner" /> Chargement...</div>
+      </div>
+    )
+  }
+
+  return session ? <AppShell /> : <AuthPage />
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <ToastProvider>
+        <Gate />
+      </ToastProvider>
+    </AuthProvider>
   )
 }

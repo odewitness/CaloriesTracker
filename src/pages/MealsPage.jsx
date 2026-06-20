@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronRight, Check, X, Pencil, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
+import { useAuth } from '../lib/AuthContext'
 import AddFoodModal from '../components/AddFoodModal'
 
 const MEALS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
@@ -174,17 +175,19 @@ function EditRepasModal({ repas, onSave, onClose }) {
 
 export default function MealsPage() {
   const toast = useToast()
+  const { user } = useAuth()
   const [repasList, setRepasList] = useState([])
   const [loading, setLoading] = useState(true)
   const [editTarget, setEditTarget] = useState(null) // null = closed, {} = new, repas = edit
   const [addToJournalTarget, setAddToJournalTarget] = useState(null)
   const [journalMeal, setJournalMeal] = useState('Déjeuner')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [user])
 
   const load = async () => {
+    if (!user) { setRepasList([]); setLoading(false); return }
     setLoading(true)
-    const { data } = await supabase.from('repas_types').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('repas_types').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
     setRepasList(data || [])
     setLoading(false)
   }
@@ -192,18 +195,18 @@ export default function MealsPage() {
   const handleSave = async ({ nom, description, items, nb_portions }) => {
     if (editTarget?.id) {
       // update
-      const { error } = await supabase.from('repas_types').update({ nom, description, items, nb_portions, updated_at: new Date().toISOString() }).eq('id', editTarget.id)
+      const { error } = await supabase.from('repas_types').update({ nom, description, items, nb_portions, updated_at: new Date().toISOString() }).eq('id', editTarget.id).eq('user_id', user.id)
       if (!error) { toast('✓ Repas modifié !'); load() }
     } else {
       // insert
-      const { error } = await supabase.from('repas_types').insert([{ nom, description, items, nb_portions }])
+      const { error } = await supabase.from('repas_types').insert([{ nom, description, items, nb_portions, user_id: user.id }])
       if (!error) { toast('✓ Repas créé !'); load() }
     }
     setEditTarget(null)
   }
 
   const handleDelete = async (id) => {
-    await supabase.from('repas_types').delete().eq('id', id)
+    await supabase.from('repas_types').delete().eq('id', id).eq('user_id', user.id)
     setRepasList(r => r.filter(x => x.id !== id))
     toast('Supprimé')
   }
@@ -215,7 +218,7 @@ export default function MealsPage() {
   const confirmAddToJournal = async () => {
     if (!addToJournalTarget) return
     const today = new Date().toISOString().slice(0, 10)
-    const rows = addToJournalTarget.items.map(item => ({ ...item, date: today, meal: journalMeal }))
+    const rows = addToJournalTarget.items.map(item => ({ ...item, date: today, meal: journalMeal, user_id: user.id }))
     const { error } = await supabase.from('journal').insert(rows)
     if (!error) toast(`✓ ${addToJournalTarget.nom} ajouté au journal !`)
     else toast('Erreur')

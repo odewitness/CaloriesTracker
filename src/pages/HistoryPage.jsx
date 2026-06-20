@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSettings } from '../hooks/useSettings'
+import { useAuth } from '../lib/AuthContext'
 import { TrendingDown, Flame, Target } from 'lucide-react'
 
 function DayCard({ dateStr, entries, goalKcal }) {
@@ -42,13 +43,15 @@ function DayCard({ dateStr, entries, goalKcal }) {
 
 export default function HistoryPage() {
   const { settings } = useSettings()
+  const { user } = useAuth()
   const [days, setDays] = useState({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
+      if (!user) { setDays({}); setLoading(false); return }
       const from = new Date(); from.setDate(from.getDate() - 30)
-      const { data } = await supabase.from('journal').select('*').gte('date', from.toISOString().slice(0, 10)).order('date', { ascending: false })
+      const { data } = await supabase.from('journal').select('*').eq('user_id', user.id).gte('date', from.toISOString().slice(0, 10)).order('date', { ascending: false })
       const grouped = {}
       for (const e of (data || [])) {
         if (!grouped[e.date]) grouped[e.date] = []
@@ -58,7 +61,7 @@ export default function HistoryPage() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [user])
 
   const dateKeys = Object.keys(days).sort((a, b) => b.localeCompare(a))
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
+import { useAuth } from '../lib/AuthContext'
 import { PlusCircle } from 'lucide-react'
 
 const FIELDS_LEFT = [
@@ -16,6 +17,7 @@ const FIELDS_RIGHT = [
 
 export default function ManualPage() {
   const toast = useToast()
+  const { user } = useAuth()
   const [form, setForm] = useState({ nom: '', marque: '', categorie: 'Personnalisé', energie_kcal: '', proteines: '', glucides: '', lipides: '', fibres: '', sel: '' })
   const [portions, setPortions] = useState([{ label: '', g: '' }])
   const [saving, setSaving] = useState(false)
@@ -41,6 +43,7 @@ export default function ManualPage() {
       lipides: parseFloat(form.lipides) || 0,
       fibres: parseFloat(form.fibres) || 0,
       portions: cleanPortions,
+      user_id: user.id,
     }])
     setSaving(false)
     if (!error) {
