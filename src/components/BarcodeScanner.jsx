@@ -18,7 +18,13 @@ function isValidChecksum(code) {
   return expected === checkDigit
 }
 
-const REQUIRED_MATCHES = 3
+// Le checksum (voir isValidChecksum) filtre déjà quasiment tous les
+// mauvais scans : la probabilité qu'une lecture erronée tombe pile sur
+// un checksum valide est très faible. Demander plusieurs lectures
+// identiques d'affilée n'apporte donc pas grand-chose en fiabilité,
+// mais ajoute beaucoup de latence perçue. 1 = scan quasi instantané
+// (comme Yazio). Remonte à 2 si jamais tu observes des faux positifs.
+const REQUIRED_MATCHES = 1
 
 export default function BarcodeScanner({ onDetected, onClose }) {
   const videoRef = useRef(null)
@@ -45,13 +51,14 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           target: videoRef.current,
           constraints: {
             facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { min: 480, ideal: 720, max: 1280 },
+            height: { min: 480, ideal: 720, max: 1280 },
+            advanced: [{ focusMode: 'continuous' }, { zoom: 1 }],
           },
         },
-        locator: { patchSize: 'medium', halfSample: true },
+        locator: { patchSize: 'large', halfSample: true },
         numOfWorkers: navigator.hardwareConcurrency || 2,
-        frequency: 10,
+        frequency: 30,
         decoder: {
           readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader'],
           multiple: false,
@@ -97,6 +104,7 @@ export default function BarcodeScanner({ onDetected, onClose }) {
 
       if (candidatesRef.current[code] >= REQUIRED_MATCHES) {
         detectedRef.current = true
+        if (navigator.vibrate) navigator.vibrate(60)
         onDetected(code)
       }
     }
