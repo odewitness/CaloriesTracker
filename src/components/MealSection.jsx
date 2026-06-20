@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
 
 function EditRow({ entry, onSave, onCancel }) {
-  const [qty, setQty] = useState(entry.qty_g)
+  const [qty, setQty] = useState(String(entry.qty_g))
   const [kcal, setKcal] = useState(entry.energie_kcal)
   const [prot, setProt] = useState(entry.proteines)
   const [gluc, setGluc] = useState(entry.glucides)
@@ -13,7 +13,7 @@ function EditRow({ entry, onSave, onCancel }) {
   const handleQtyChange = (val) => {
     setQty(val)
     const newQty = parseFloat(val)
-    if (!newQty || !entry.qty_g) return
+    if (!newQty || newQty <= 0 || !entry.qty_g) return
     const f = newQty / entry.qty_g
     setKcal(parseFloat((entry.energie_kcal * f).toFixed(1)))
     setProt(parseFloat((entry.proteines * f).toFixed(2)))
@@ -21,33 +21,18 @@ function EditRow({ entry, onSave, onCancel }) {
     setLip(parseFloat((entry.lipides * f).toFixed(2)))
   }
 
-  const save = () => {
-    const newQty = parseFloat(qty) || 0
-    const f = entry.qty_g ? newQty / entry.qty_g : 1
-    onSave({
-      qty_g: newQty,
-      energie_kcal: parseFloat(kcal) || 0,
-      proteines: parseFloat(prot) || 0,
-      glucides: parseFloat(gluc) || 0,
-      lipides: parseFloat(lip) || 0,
-      // vitamines & minéraux recalculés au prorata du nouveau grammage
-      fibres:    parseFloat(((entry.fibres    || 0) * f).toFixed(2)),
-      vit_c:     parseFloat(((entry.vit_c     || 0) * f).toFixed(3)),
-      vit_d:     parseFloat(((entry.vit_d     || 0) * f).toFixed(4)),
-      vit_b12:   parseFloat(((entry.vit_b12   || 0) * f).toFixed(4)),
-      vit_a:     parseFloat(((entry.vit_a     || 0) * f).toFixed(3)),
-      vit_e:     parseFloat(((entry.vit_e     || 0) * f).toFixed(3)),
-      calcium:   parseFloat(((entry.calcium   || 0) * f).toFixed(2)),
-      fer:       parseFloat(((entry.fer       || 0) * f).toFixed(3)),
-      magnesium: parseFloat(((entry.magnesium || 0) * f).toFixed(2)),
-      potassium: parseFloat(((entry.potassium || 0) * f).toFixed(2)),
-    })
-  }
+  const save = () => onSave({
+    qty_g: parseFloat(qty) || 0,
+    energie_kcal: parseFloat(kcal) || 0,
+    proteines: parseFloat(prot) || 0,
+    glucides: parseFloat(gluc) || 0,
+    lipides: parseFloat(lip) || 0,
+  })
 
-  const field = (label, val, set, color) => (
+  const field = (label, val, set, color, numeric = true) => (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
       <input
-        type="number" value={val}
+        type="text" inputMode={numeric ? "decimal" : "text"} value={val}
         onChange={e => set(e.target.value)}
         style={{ width: 58, textAlign: 'center', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 4px', fontSize: 13, fontWeight: 600, color, background: 'var(--gray-bg)', fontFamily: 'var(--font)', outline: 'none' }}
       />

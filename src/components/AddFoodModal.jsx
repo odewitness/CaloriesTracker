@@ -6,7 +6,7 @@ import { useAuth } from '../lib/AuthContext'
 import BarcodeScanner from './BarcodeScanner'
 
 function MacroPreview({ food, qty }) {
-  const f = qty / 100
+  const f = (parseFloat(qty) || 0) / 100
   const items = [
     { label: 'kcal', val: Math.round((food.energie_kcal || 0) * f), color: 'var(--text)' },
     { label: 'Prot.', val: `${((food.proteines || 0) * f).toFixed(1)}g`, color: 'var(--green)' },
@@ -33,7 +33,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [qty, setQty] = useState(100)
+  const [qty, setQty] = useState("100")
   const meal = initialMeal || 'Déjeuner' // fixé par le "+" sur lequel on a cliqué
   const [barcode, setBarcode] = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
@@ -140,7 +140,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const selectFood = (food) => {
     setSelected(food)
     const defaultPortion = food.portions?.[0]?.g || 100
-    setQty(defaultPortion)
+    setQty(String(defaultPortion))
     setStep('configure')
   }
 
@@ -152,13 +152,13 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
 
   const confirm = async () => {
     if (!selected) return
-    const f = qty / 100
+    const f = (parseFloat(qty) || 0) / 100
     const entry = {
       meal,
       food_name: selected.alim_nom,
       food_source: selected._source || 'ciqual',
       food_ref_id: selected.alim_code || selected.id || null,
-      qty_g: qty,
+      qty_g: parseFloat(qty) || 0,
       energie_kcal: parseFloat(((selected.energie_kcal || 0) * f).toFixed(1)),
       proteines: parseFloat(((selected.proteines || 0) * f).toFixed(2)),
       glucides: parseFloat(((selected.glucides || 0) * f).toFixed(2)),
@@ -287,11 +287,11 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                 <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 6 }}>Portions courantes</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {selected.portions.map((p, i) => (
-                    <button key={i} className="chip" onClick={() => setQty(p.g)}>
+                    <button key={i} className="chip" onClick={() => setQty(String(p.g))}>
                       {p.label} · {p.g}g
                     </button>
                   ))}
-                  <button className="chip" onClick={() => setQty(100)}>100g</button>
+                  <button className="chip" onClick={() => setQty('100')}>100g</button>
                 </div>
               </div>
             )}
@@ -300,10 +300,10 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <input
                 className="input-sm"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={qty}
-                min={1}
-                onChange={e => setQty(parseFloat(e.target.value) || 0)}
+                onChange={e => setQty(e.target.value)}
               />
               <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
             </div>
