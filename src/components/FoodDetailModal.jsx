@@ -84,32 +84,34 @@ export default function FoodDetailModal({ entry, onUpdate, onClose }) {
         <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
       </div>
 
-      <div className="page-modal-body">
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{entry.meal}</div>
+      <div className="page-modal-body" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{entry.meal}</div>
 
-        {/* Grammage modifiable */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <input
-            className="input-sm"
-            type="text"
-            inputMode="decimal"
-            value={qty}
-            onChange={e => setQty(e.target.value)}
-            style={{ width: 90 }}
-          />
-          <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
+          {/* Grammage modifiable */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <input
+              className="input-sm"
+              type="text"
+              inputMode="decimal"
+              value={qty}
+              onChange={e => setQty(e.target.value)}
+              style={{ width: 90 }}
+            />
+            <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
+          </div>
+
+          <MacroGrid live={live} />
+
+          {dirty && (
+            <button className="btn-primary" onClick={save} disabled={saving} style={{ marginBottom: 16, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Sauvegarde...' : '💾 Enregistrer le grammage'}
+            </button>
+          )}
+
+          <VitaminPanel totals={live} hasEntries={true} />
+          <NutrientDetails totals={live} hasEntries={true} />
         </div>
-
-        <MacroGrid live={live} />
-
-        {dirty && (
-          <button className="btn-primary" onClick={save} disabled={saving} style={{ marginBottom: 16, opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Sauvegarde...' : '💾 Enregistrer le grammage'}
-          </button>
-        )}
-
-        <VitaminPanel totals={live} hasEntries={true} />
-        <NutrientDetails totals={live} hasEntries={true} />
       </div>
     </div>
   )
