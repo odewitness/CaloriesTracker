@@ -100,30 +100,26 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
   return (
     <div className="page-content" style={{ width: '33.333%', flexShrink: 0, boxSizing: 'border-box' }}>
       <DateHeader date={date} onNavigate={onNavigate} />
-      {loading ? (
-        <div className="loader"><div className="spinner" /> Chargement...</div>
-      ) : (
-        <>
-          <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
-          <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
-          <VitaminPanel totals={totals} hasEntries={entries.length > 0} />
-          <NutrientDetails totals={totals} hasEntries={entries.length > 0} />
-          <div style={{ marginTop: 16 }}>
-            <div className="section-title">Repas du jour</div>
-            {MEALS.map(m => (
-              <MealSection
-                key={m}
-                name={m}
-                entries={entries.filter(e => e.meal === m)}
-                onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd })}
-                onDelete={handleDelete}
-                onUpdate={handleUpdate}
+      <>
+        <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
+        <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
+        <VitaminPanel totals={totals} hasEntries={entries.length > 0} />
+        <NutrientDetails totals={totals} hasEntries={entries.length > 0} />
+        <div style={{ marginTop: 16 }}>
+          <div className="section-title">Repas du jour</div>
+          {MEALS.map(m => (
+            <MealSection
+              key={m}
+              name={m}
+              entries={entries.filter(e => e.meal === m)}
+              onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd })}
+              onDelete={handleDelete}
+              onUpdate={handleUpdate}
                 onOpenDetail={onOpenDetail}
               />
             ))}
-          </div>
-        </>
-      )}
+        </div>
+      </>
     </div>
   )
 }
