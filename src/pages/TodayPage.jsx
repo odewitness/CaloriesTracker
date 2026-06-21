@@ -141,6 +141,8 @@ export default function TodayPage() {
   const isHorizontal = useRef(false)
   const [dragPx, setDragPx] = useState(0)
   const [animating, setAnimating] = useState(false)
+  // settled = true → on vient de finir une nav, on bloque la transition le temps du reset
+  const settled = useRef(false)
   const SWIPE_THRESHOLD = 0.15  // 15% de la largeur écran
 
   const onTouchStart = useCallback((e) => {
@@ -164,13 +166,19 @@ export default function TodayPage() {
 
   const commitNav = useCallback((dir) => {
     // dir = -1 (suivant) ou +1 (précédent)
-    const targetPx = dir * window.innerWidth
+    // 1. Animer jusqu'au slot voisin
     setAnimating(true)
-    setDragPx(targetPx)
+    setDragPx(dir * window.innerWidth)
     setTimeout(() => {
+      // 2. Changer la date ET couper la transition AVANT de reset dragPx
+      //    → le slider se retrouve visuellement au même endroit grâce au recalcul
+      //      des slots (datePrev/dateNext recalculés), donc aucun saut visible
+      settled.current = true
       setDate(d => dateOffset(d, -dir))
       setDragPx(0)
       setAnimating(false)
+      // 3. Ré-autoriser la transition au prochain frame
+      requestAnimationFrame(() => { settled.current = false })
     }, 280)
   }, [])
 
@@ -226,9 +234,7 @@ export default function TodayPage() {
             display: 'flex',
             width: '300%',
             transform: `translateX(${sliderTranslate}%)`,
-            transition: animating || dragPx === 0
-              ? 'transform .28s cubic-bezier(.25,.46,.45,.94)'
-              : 'none',
+            transition: animating ? 'transform .28s cubic-bezier(.25,.46,.45,.94)' : 'none',
             willChange: 'transform',
           }}
         >
