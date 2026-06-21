@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 
 function EditRow({ entry, onSave, onCancel }) {
   const [qty, setQty] = useState(String(entry.qty_g))
@@ -7,6 +8,12 @@ function EditRow({ entry, onSave, onCancel }) {
   const [prot, setProt] = useState(entry.proteines)
   const [gluc, setGluc] = useState(entry.glucides)
   const [lip, setLip]   = useState(entry.lipides)
+
+  // Les ~55 autres nutriments (sucres détaillés, acides gras, vitamines, minéraux...)
+  // ne sont pas affichés ici pour ne pas surcharger cette mini-UI d'édition rapide,
+  // mais on les garde synchronisés au prorata du grammage pour ne pas les figer/perdre
+  // quand on ajuste juste la quantité.
+  const extraRef = useRef({})
 
   // Quand le grammage change, on recalcule kcal/macros au prorata
   // à partir des valeurs d'origine de l'entrée (entry.qty_g -> entry.energie_kcal etc.)
@@ -19,6 +26,13 @@ function EditRow({ entry, onSave, onCancel }) {
     setProt(parseFloat((entry.proteines * f).toFixed(2)))
     setGluc(parseFloat((entry.glucides * f).toFixed(2)))
     setLip(parseFloat((entry.lipides * f).toFixed(2)))
+
+    const next = {}
+    for (const key of ALL_NUTRIENT_KEYS) {
+      const raw = entry[key]
+      next[key] = raw != null ? parseFloat((raw * f).toFixed(4)) : null
+    }
+    extraRef.current = next
   }
 
   const save = () => onSave({
@@ -27,6 +41,7 @@ function EditRow({ entry, onSave, onCancel }) {
     proteines: parseFloat(prot) || 0,
     glucides: parseFloat(gluc) || 0,
     lipides: parseFloat(lip) || 0,
+    ...extraRef.current,
   })
 
   const field = (label, val, set, color, numeric = true) => (

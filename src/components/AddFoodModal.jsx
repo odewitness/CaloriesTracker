@@ -3,6 +3,7 @@ import { X, Search, ScanLine, Camera, ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import BarcodeScanner from './BarcodeScanner'
 
 function MacroPreview({ food, qty }) {
@@ -124,6 +125,35 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
           vit_d: parseFloat(((n['vitamin-d_100g'] || 0) * 1000000).toFixed(2)),
           calcium: parseFloat(((n['calcium_100g'] || 0) * 1000).toFixed(1)),
           fer: parseFloat(((n['iron_100g'] || 0) * 1000).toFixed(2)),
+          // Sucres : OFF ne donne que le total — pas de détail fructose/glucose/etc.
+          sucres: parseFloat((n['sugars_100g'] || 0).toFixed(1)),
+          // Acides gras : OFF donne saturés + parfois mono/poly-insaturés + cholestérol,
+          // jamais le détail par longueur de chaîne (oméga-3/6 etc. restent à 0 via OFF).
+          acides_gras_satures: parseFloat((n['saturated-fat_100g'] || 0).toFixed(2)),
+          ag_monoinsatures: parseFloat((n['monounsaturated-fat_100g'] || 0).toFixed(2)),
+          ag_polyinsatures: parseFloat((n['polyunsaturated-fat_100g'] || 0).toFixed(2)),
+          cholesterol: parseFloat(((n['cholesterol_100g'] || 0) * 1000).toFixed(1)),
+          sel: parseFloat((n['salt_100g'] || 0).toFixed(2)),
+          magnesium: parseFloat(((n['magnesium_100g'] || 0) * 1000).toFixed(1)),
+          potassium: parseFloat(((n['potassium_100g'] || 0) * 1000).toFixed(1)),
+          zinc: parseFloat(((n['zinc_100g'] || 0) * 1000).toFixed(2)),
+          sodium: parseFloat(((n['sodium_100g'] || 0) * 1000).toFixed(1)),
+          cuivre: parseFloat(((n['copper_100g'] || 0) * 1000).toFixed(2)),
+          iode: parseFloat(((n['iodine_100g'] || 0) * 1000000).toFixed(1)),
+          manganese: parseFloat(((n['manganese_100g'] || 0) * 1000).toFixed(2)),
+          phosphore: parseFloat(((n['phosphorus_100g'] || 0) * 1000).toFixed(1)),
+          selenium: parseFloat(((n['selenium_100g'] || 0) * 1000000).toFixed(1)),
+          vit_b1: parseFloat(((n['vitamin-b1_100g'] || 0) * 1000).toFixed(3)),
+          vit_b2: parseFloat(((n['vitamin-b2_100g'] || 0) * 1000).toFixed(3)),
+          vit_b3: parseFloat(((n['vitamin-pp_100g'] || 0) * 1000).toFixed(2)),
+          vit_b5: parseFloat(((n['pantothenic-acid_100g'] || 0) * 1000).toFixed(2)),
+          vit_b6: parseFloat(((n['vitamin-b6_100g'] || 0) * 1000).toFixed(3)),
+          vit_b12: parseFloat(((n['vitamin-b12_100g'] || 0) * 1000000).toFixed(3)),
+          vit_a: parseFloat(((n['vitamin-a_100g'] || 0) * 1000000).toFixed(2)),
+          vit_e: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
+          vit_e_totale: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
+          vit_k1: parseFloat(((n['vitamin-k_100g'] || 0) * 1000000).toFixed(2)),
+          folates: parseFloat(((n['folates_100g'] || 0) * 1000000).toFixed(1)),
           portions: p.serving_size ? [{ label: 'Portion recommandée', g: parseFloat(p.serving_size) || 100 }] : [],
           _source: 'off'
         }
@@ -164,15 +194,13 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       glucides: parseFloat(((selected.glucides || 0) * f).toFixed(2)),
       lipides: parseFloat(((selected.lipides || 0) * f).toFixed(2)),
       fibres: parseFloat(((selected.fibres || 0) * f).toFixed(2)),
-      vit_c: parseFloat(((selected.vit_c || 0) * f).toFixed(3)),
-      vit_d: parseFloat(((selected.vit_d || 0) * f).toFixed(4)),
-      calcium: parseFloat(((selected.calcium || 0) * f).toFixed(2)),
-      fer: parseFloat(((selected.fer || 0) * f).toFixed(3)),
-      magnesium: parseFloat(((selected.magnesium || 0) * f).toFixed(2)),
-      potassium: parseFloat(((selected.potassium || 0) * f).toFixed(2)),
-      vit_b12: parseFloat(((selected.vit_b12 || 0) * f).toFixed(4)),
-      vit_a: parseFloat(((selected.vit_a || 0) * f).toFixed(3)),
-      vit_e: parseFloat(((selected.vit_e || 0) * f).toFixed(3)),
+    }
+    // Tous les autres nutriments (sucres détaillés, acides gras détaillés,
+    // vitamines, minéraux...) sont scalés génériquement au prorata du
+    // grammage — évite de lister ~50 champs à la main à chaque ajout.
+    for (const key of ALL_NUTRIENT_KEYS) {
+      const raw = selected[key]
+      entry[key] = raw != null ? parseFloat((raw * f).toFixed(4)) : null
     }
     await onAdd(entry)
     onClose()

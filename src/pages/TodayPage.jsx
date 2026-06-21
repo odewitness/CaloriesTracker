@@ -3,11 +3,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import CalorieRing from '../components/CalorieRing'
 import MacroBar from '../components/MacroBar'
 import VitaminPanel from '../components/VitaminPanel'
+import NutrientDetails from '../components/NutrientDetails'
 import MealSection from '../components/MealSection'
 import AddFoodModal from '../components/AddFoodModal'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useToast } from '../lib/toast'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 
 const MEALS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 
@@ -34,22 +36,15 @@ export default function TodayPage() {
   const isToday = fmt(date) === fmt(new Date())
 
   const totals = useMemo(() => {
-    const t = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0, vit_c: 0, vit_d: 0, calcium: 0, fer: 0, magnesium: 0, potassium: 0, vit_b12: 0, vit_a: 0, vit_e: 0 }
+    const t = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 }
+    for (const key of ALL_NUTRIENT_KEYS) t[key] = 0
     for (const e of entries) {
       t.kcal += e.energie_kcal || 0
       t.prot += e.proteines || 0
       t.gluc += e.glucides || 0
       t.lip  += e.lipides || 0
       t.fib  += e.fibres || 0
-      t.vit_c += e.vit_c || 0
-      t.vit_d += e.vit_d || 0
-      t.calcium += e.calcium || 0
-      t.fer += e.fer || 0
-      t.magnesium += e.magnesium || 0
-      t.potassium += e.potassium || 0
-      t.vit_b12 += e.vit_b12 || 0
-      t.vit_a += e.vit_a || 0
-      t.vit_e += e.vit_e || 0
+      for (const key of ALL_NUTRIENT_KEYS) t[key] += e[key] || 0
     }
     return t
   }, [entries])
@@ -100,6 +95,7 @@ export default function TodayPage() {
             <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
             <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
             <VitaminPanel totals={totals} hasEntries={entries.length > 0} />
+            <NutrientDetails totals={totals} hasEntries={entries.length > 0} />
 
             <div style={{ marginTop: 16 }}>
               <div className="section-title">Repas du jour</div>

@@ -3,6 +3,7 @@ import { Plus, Trash2, ChevronRight, Check, X, Pencil, UtensilsCrossed } from 'l
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import AddFoodModal from '../components/AddFoodModal'
 
 const MEALS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
@@ -78,14 +79,22 @@ function EditRepasModal({ repas, onSave, onClose }) {
     setItems(prev => prev.map((item, idx) => {
       if (idx !== i) return item
       const f = qty / item.qty_g
-      return {
+      const updated = {
         ...item,
         qty_g: qty,
         energie_kcal: parseFloat((item.energie_kcal * f).toFixed(1)),
         proteines: parseFloat((item.proteines * f).toFixed(2)),
         glucides: parseFloat((item.glucides * f).toFixed(2)),
         lipides: parseFloat((item.lipides * f).toFixed(2)),
+        fibres: parseFloat(((item.fibres || 0) * f).toFixed(2)),
       }
+      // Tous les autres nutriments (sucres détaillés, acides gras, vitamines,
+      // minéraux...) suivent le même prorata générique.
+      for (const key of ALL_NUTRIENT_KEYS) {
+        const raw = item[key]
+        updated[key] = raw != null ? parseFloat((raw * f).toFixed(4)) : null
+      }
+      return updated
     }))
   }
 
