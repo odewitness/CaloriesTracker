@@ -98,7 +98,7 @@ export const SATURATED_FAT_KEY = 'acides_gras_satures'
 // gérées séparément partout) — base commune pour sommer les totaux et reproportionner
 // au prorata du grammage sans dupliquer la liste dans 6 fichiers.
 export const ALL_NUTRIENT_KEYS = Array.from(new Set([
-  'sucres', 'sel', 'vit_e', SATURATED_FAT_KEY,
+  'sucres', 'sel', SATURATED_FAT_KEY,
   ...SUGAR_FIELDS.map(f => f.key),
   ...FAT_FIELDS.map(f => f.key),
   ...VITAMIN_FIELDS.map(f => f.key),
