@@ -18,13 +18,16 @@ function isValidChecksum(code) {
   return expected === checkDigit
 }
 
-// Le checksum (voir isValidChecksum) filtre déjà quasiment tous les
-// mauvais scans : la probabilité qu'une lecture erronée tombe pile sur
-// un checksum valide est très faible. Demander plusieurs lectures
-// identiques d'affilée n'apporte donc pas grand-chose en fiabilité,
-// mais ajoute beaucoup de latence perçue. 1 = scan quasi instantané
-// (comme Yazio). Remonte à 2 si jamais tu observes des faux positifs.
-const REQUIRED_MATCHES = 1
+// Le checksum (voir isValidChecksum) filtre déjà la grande majorité des
+// mauvais scans, mais pas tous : un code mal lu a statistiquement ~1
+// chance sur 10 de retomber quand même sur un checksum valide. Avec
+// REQUIRED_MATCHES = 1, ce genre de faux positif est accepté instantanément
+// et donne l'impression que le scanner "invente" un produit au hasard.
+// 2 lectures identiques d'affilée (quelques dizaines de ms à 30fps) reste
+// quasi instantané comme Yazio, tout en rendant un faux positif
+// quasiment impossible (il faudrait lire deux fois EXACTEMENT le même
+// mauvais code à la suite).
+const REQUIRED_MATCHES = 2
 
 export default function BarcodeScanner({ onDetected, onClose }) {
   const videoRef = useRef(null)
