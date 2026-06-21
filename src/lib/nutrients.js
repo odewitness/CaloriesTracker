@@ -95,6 +95,14 @@ export const DETAIL_ONLY_FIELDS = [
 // cf. rapport Anses « Actualisation des repères du PNNS : recommandations d'apport de sucres » (2016)
 export const SUCRES_ANSES_REF = 100 // g/j
 
+// Recommandations Anses sur les lipides — exprimées en % de l'apport énergétique (AE)
+// et non en grammes absolus, car le besoin en lipides dépend de l'énergie totale
+// consommée. cf. avis Anses 2010 "Actualisation des ANC pour les acides gras" (saisine 2006-SA-0359).
+// 1 g de lipides ≈ 9 kcal — sert à convertir les grammes saisis en % AE du jour.
+export const KCAL_PER_G_LIPIDES = 9
+export const LIPIDES_AE_TARGET = { min: 35, max: 40 } // % AE recommandé (zone cible, pas un max strict)
+export const AGS_AE_MAX = 12 // % AE max recommandé pour les AG saturés totaux
+
 // "Acides gras saturés" garde son nom historique (acides_gras_satures) pour ne pas
 // casser les données déjà en base — on l'ajoute manuellement à la liste plutôt que
 // dans FAT_FIELDS pour ne pas dupliquer le libellé "Saturés" géré ailleurs.
