@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import CalorieRing from '../components/CalorieRing'
 import MacroBar from '../components/MacroBar'
@@ -35,6 +35,42 @@ export default function TodayPage() {
   const { settings } = useSettings()
   const [modal, setModal] = useState(null) // null | mealName
   const [detailEntry, setDetailEntry] = useState(null) // null | entrée du journal
+
+  // ── Swipe horizontal pour changer de jour ──────────────────────────────
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
+  const [swipeDx, setSwipeDx] = useState(0)   // décalage live en px pendant le drag
+  const [swiping, setSwiping] = useState(false)
+  const SWIPE_THRESHOLD = 60  // px minimum pour valider le changement de jour
+  const DRAG_MAX = 120        // px max de résistance visuelle
+
+  const onTouchStart = useCallback((e) => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+    setSwiping(false)
+    setSwipeDx(0)
+  }, [])
+
+  const onTouchMove = useCallback((e) => {
+    if (touchStartX.current === null) return
+    const dx = e.touches[0].clientX - touchStartX.current
+    const dy = e.touches[0].clientY - touchStartY.current
+    // Ignore si le geste est surtout vertical (scroll)
+    if (!swiping && Math.abs(dy) > Math.abs(dx)) return
+    setSwiping(true)
+    // Résistance élastique aux bords
+    const clamped = Math.sign(dx) * Math.min(Math.abs(dx), DRAG_MAX)
+    setSwipeDx(clamped)
+  }, [swiping])
+
+  const onTouchEnd = useCallback(() => {
+    if (!swiping) { setSwipeDx(0); return }
+    if (swipeDx < -SWIPE_THRESHOLD) navigate(1)
+    else if (swipeDx > SWIPE_THRESHOLD) navigate(-1)
+    setSwipeDx(0)
+    setSwiping(false)
+    touchStartX.current = null
+  }, [swiping, swipeDx])
 
   const isToday = fmt(date) === fmt(new Date())
 
@@ -77,7 +113,17 @@ export default function TodayPage() {
 
   return (
     <>
-      <div className="page-content">
+      <div
+        className="page-content"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          transform: swipeDx ? `translateX(${swipeDx}px)` : 'none',
+          transition: swipeDx === 0 ? 'transform .25s cubic-bezier(.25,.46,.45,.94)' : 'none',
+          willChange: 'transform',
+        }}
+      >
         {/* Date navigator */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <button className="btn-icon" onClick={() => navigate(-1)}><ChevronLeft size={20} color="var(--text-muted)" /></button>
