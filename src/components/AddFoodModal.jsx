@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Search, ScanLine, Camera, ArrowLeft } from 'lucide-react'
+import { X, Search, ScanLine, Camera, ArrowLeft, Star } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { useFavoris, foodIdentity } from '../hooks/useFavoris'
+import { useRecentFoods } from '../hooks/useRecentFoods'
 import BarcodeScanner from './BarcodeScanner'
 
 function MacroPreview({ food, qty }) {
@@ -26,9 +28,38 @@ function MacroPreview({ food, qty }) {
   )
 }
 
+function FoodRow({ food, isFav, onSelect, onToggleFav }) {
+  return (
+    <div
+      onClick={() => onSelect(food)}
+      style={{ display: 'flex', alignItems: 'center', padding: '10px 4px', borderBottom: '0.5px solid var(--border)', cursor: 'pointer', gap: 8 }}
+    >
+      <button
+        onClick={e => { e.stopPropagation(); onToggleFav(food) }}
+        className="btn-icon"
+        style={{ flexShrink: 0, color: isFav ? 'var(--amber)' : 'var(--text-hint)' }}
+        aria-label={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+      >
+        <Star size={16} fill={isFav ? 'var(--amber)' : 'none'} />
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>{food.alim_nom}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+          {food.categorie}
+          {food._source === 'custom' && <span style={{ marginLeft: 6, background: 'var(--purple-light)', color: 'var(--purple)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Perso</span>}
+          {food._source === 'off' && <span style={{ marginLeft: 6, background: 'var(--blue-light)', color: 'var(--blue)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>OFF</span>}
+        </div>
+      </div>
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-dark)', flexShrink: 0 }}>{food.energie_kcal} kcal/100g</span>
+    </div>
+  )
+}
+
 export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const toast = useToast()
   const { user } = useAuth()
+  const { favoris, isFavorite, toggleFavorite } = useFavoris()
+  const { recents } = useRecentFoods()
   const [step, setStep] = useState('search') // search | configure
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -41,6 +72,9 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const [scannerOpen, setScannerOpen] = useState(false)
   const searchRef = useRef(null)
   const timerRef = useRef(null)
+
+  const favKeys = new Set(favoris.map(f => `${f.food_source}:${f.food_ref_id ?? f.food_name}`))
+  const recentsFiltered = recents.filter(r => !favKeys.has(foodIdentity(r).key))
 
   // Pas d'autofocus à l'ouverture — évite l'ouverture automatique du clavier sur mobile.
   // Le focus est déclenché uniquement quand l'utilisateur revient à l'étape search
@@ -217,7 +251,19 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
           <div style={{ width: 32, flexShrink: 0 }} />
         )}
         <h2>{step === 'search' ? 'Ajouter un aliment' : selected?.alim_nom}</h2>
-        <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {step === 'configure' && selected && (
+            <button
+              className="btn-icon"
+              onClick={() => toggleFavorite(selected)}
+              style={{ color: isFavorite(selected) ? 'var(--amber)' : 'var(--text-muted)' }}
+              aria-label={isFavorite(selected) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            >
+              <Star size={18} fill={isFavorite(selected) ? 'var(--amber)' : 'none'} />
+            </button>
+          )}
+          <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
+        </div>
       </div>
 
       <div className="page-modal-body">
@@ -278,29 +324,58 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
             {/* Results — scrollable, prend tout l'espace restant */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               {searching && <div className="loader"><div className="spinner" /> Recherche...</div>}
-              {!searching && results.length === 0 && query.length >= 2 && (
+
+              {!searching && query.length >= 2 && results.length === 0 && (
                 <div className="empty">Aucun résultat pour « {query} »</div>
               )}
-              {!searching && results.length === 0 && query.length < 2 && (
-                <div className="empty">Tape au moins 2 caractères</div>
-              )}
-              {results.map((food, i) => (
-                <div
+
+              {!searching && query.length >= 2 && results.map((food, i) => (
+                <FoodRow
                   key={food.id || food.alim_code || i}
-                  onClick={() => selectFood(food)}
-                  style={{ display: 'flex', alignItems: 'center', padding: '10px 4px', borderBottom: '0.5px solid var(--border)', cursor: 'pointer', gap: 10 }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{food.alim_nom}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                      {food.categorie}
-                      {food._source === 'custom' && <span style={{ marginLeft: 6, background: 'var(--purple-light)', color: 'var(--purple)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Perso</span>}
-                      {food._source === 'off' && <span style={{ marginLeft: 6, background: 'var(--blue-light)', color: 'var(--blue)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>OFF</span>}
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-dark)', flexShrink: 0 }}>{food.energie_kcal} kcal/100g</span>
-                </div>
+                  food={food}
+                  isFav={isFavorite(food)}
+                  onSelect={selectFood}
+                  onToggleFav={toggleFavorite}
+                />
               ))}
+
+              {!searching && query.length < 2 && (
+                <>
+                  {favoris.length > 0 && (
+                    <>
+                      <div className="section-title" style={{ marginTop: 4 }}>★ Favoris</div>
+                      {favoris.map(f => (
+                        <FoodRow
+                          key={f.id}
+                          food={f.food_data}
+                          isFav={true}
+                          onSelect={selectFood}
+                          onToggleFav={() => toggleFavorite(f.food_data)}
+                        />
+                      ))}
+                    </>
+                  )}
+
+                  {recentsFiltered.length > 0 && (
+                    <>
+                      <div className="section-title" style={{ marginTop: favoris.length > 0 ? 16 : 4 }}>Récents (3 derniers jours)</div>
+                      {recentsFiltered.map((food, i) => (
+                        <FoodRow
+                          key={i}
+                          food={food}
+                          isFav={false}
+                          onSelect={selectFood}
+                          onToggleFav={toggleFavorite}
+                        />
+                      ))}
+                    </>
+                  )}
+
+                  {favoris.length === 0 && recentsFiltered.length === 0 && (
+                    <div className="empty">Tape au moins 2 caractères</div>
+                  )}
+                </>
+              )}
             </div>
           </>
         )}
