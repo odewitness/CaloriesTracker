@@ -77,7 +77,7 @@ function EditRow({ entry, onSave, onCancel }) {
   )
 }
 
-export default function MealSection({ name, entries, onAdd, onDelete, onUpdate }) {
+export default function MealSection({ name, entries, onAdd, onDelete, onUpdate, onOpenDetail }) {
   const [editId, setEditId] = useState(null)
   const totalKcal = entries.reduce((s, e) => s + (e.energie_kcal || 0), 0)
 
@@ -110,7 +110,10 @@ export default function MealSection({ name, entries, onAdd, onDelete, onUpdate }
             <EditRow entry={entry} onSave={p => handleSave(entry.id, p)} onCancel={() => setEditId(null)} />
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', gap: 10 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                onClick={() => onOpenDetail(entry)}
+                style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+              >
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{entry.food_name}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                   {entry.qty_g}g &nbsp;·&nbsp;

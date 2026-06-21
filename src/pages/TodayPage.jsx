@@ -6,6 +6,7 @@ import VitaminPanel from '../components/VitaminPanel'
 import NutrientDetails from '../components/NutrientDetails'
 import MealSection from '../components/MealSection'
 import AddFoodModal from '../components/AddFoodModal'
+import FoodDetailModal from '../components/FoodDetailModal'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useToast } from '../lib/toast'
@@ -33,6 +34,7 @@ export default function TodayPage() {
   const { entries, loading, addEntry, deleteEntry, updateEntry } = useJournal(fmt(date))
   const { settings } = useSettings()
   const [modal, setModal] = useState(null) // null | mealName
+  const [detailEntry, setDetailEntry] = useState(null) // null | entrée du journal
 
   const isToday = fmt(date) === fmt(new Date())
 
@@ -112,6 +114,7 @@ export default function TodayPage() {
                   onAdd={(meal) => setModal(meal)}
                   onDelete={handleDelete}
                   onUpdate={handleUpdate}
+                  onOpenDetail={setDetailEntry}
                 />
               ))}
             </div>
@@ -124,6 +127,15 @@ export default function TodayPage() {
           initialMeal={modal}
           onAdd={handleAdd}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {detailEntry && (
+        <FoodDetailModal
+          key={detailEntry.id}
+          entry={detailEntry}
+          onUpdate={handleUpdate}
+          onClose={() => setDetailEntry(null)}
         />
       )}
     </>
