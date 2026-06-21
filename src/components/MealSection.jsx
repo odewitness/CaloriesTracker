@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, ChevronDown } from 'lucide-react'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
 
@@ -81,6 +81,7 @@ function EditRow({ entry, onSave, onCancel }) {
 
 export default function MealSection({ name, entries, onAdd, onDelete, onUpdate, onOpenDetail }) {
   const [editId, setEditId] = useState(null)
+  const [collapsed, setCollapsed] = useState(false)
   const totalKcal = entries.reduce((s, e) => s + (e.energie_kcal || 0), 0)
 
   const handleSave = async (id, patch) => {
@@ -92,20 +93,35 @@ export default function MealSection({ name, entries, onAdd, onDelete, onUpdate, 
     <div className="card" style={{ marginBottom: 10, overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px' }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>{name}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{Math.round(totalKcal)} kcal</div>
-        </div>
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, textAlign: 'left' }}
+        >
+          <ChevronDown
+            size={16}
+            color="var(--text-hint)"
+            style={{ flexShrink: 0, transition: 'transform .2s', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+          />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>{name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
+              {Math.round(totalKcal)} kcal
+              {collapsed && entries.length > 0 && (
+                <span style={{ color: 'var(--text-hint)' }}> · {entries.length} aliment{entries.length > 1 ? 's' : ''}</span>
+              )}
+            </div>
+          </div>
+        </button>
         <button
           onClick={() => onAdd(name)}
-          style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--green-light)', color: 'var(--green-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--green-light)', color: 'var(--green-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
         >
           <Plus size={18} />
         </button>
       </div>
 
       {/* Items */}
-      {entries.map(entry => (
+      {!collapsed && entries.map(entry => (
         <div key={entry.id}>
           <div className="divider" />
           {editId === entry.id ? (
@@ -132,7 +148,7 @@ export default function MealSection({ name, entries, onAdd, onDelete, onUpdate, 
         </div>
       ))}
 
-      {entries.length === 0 && (
+      {!collapsed && entries.length === 0 && (
         <div style={{ padding: '10px 14px 12px', fontSize: 13, color: 'var(--text-hint)' }}>
           Aucun aliment — appuie sur + pour ajouter
         </div>
