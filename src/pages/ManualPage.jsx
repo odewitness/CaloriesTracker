@@ -1,8 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { PlusCircle, ChevronDown } from 'lucide-react'
+import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple } from 'lucide-react'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 
 const FIELDS_LEFT = [
@@ -30,6 +30,8 @@ const EXTRA_SECTIONS = [
   { title: 'Vitamines', fields: VITAMIN_DETAIL_FIELDS },
   { title: 'Minéraux', fields: MINERAL_FIELDS },
 ]
+
+const EMPTY_FORM = { nom: '', marque: '', categorie: 'Personnalisé', energie_kcal: '', proteines: '', glucides: '', lipides: '', fibres: '', sel: '', sucres: '', acides_gras_satures: '' }
 
 function ExtraSection({ title, fields, extra, setExtraField }) {
   const [open, setOpen] = useState(false)
@@ -64,13 +66,47 @@ function ExtraSection({ title, fields, extra, setExtraField }) {
   )
 }
 
+function FoodCard({ aliment, onEdit, onDelete }) {
+  return (
+    <div className="card" style={{ marginBottom: 10, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{aliment.nom}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+          {aliment.marque ? `${aliment.marque} · ` : ''}{Math.round(aliment.energie_kcal || 0)} kcal/100g
+          &nbsp;·&nbsp;<span className="c-prot">P {Math.round(aliment.proteines || 0)}g</span>
+          &nbsp;<span className="c-gluc">G {Math.round(aliment.glucides || 0)}g</span>
+          &nbsp;<span className="c-lip">L {Math.round(aliment.lipides || 0)}g</span>
+        </div>
+      </div>
+      <button className="btn-icon" onClick={() => onEdit(aliment)} style={{ color: 'var(--text-hint)' }}><Pencil size={16} /></button>
+      <button className="btn-icon" onClick={() => onDelete(aliment.id)} style={{ color: 'var(--text-hint)' }}><Trash2 size={16} /></button>
+    </div>
+  )
+}
+
 export default function ManualPage() {
   const toast = useToast()
   const { user } = useAuth()
-  const [form, setForm] = useState({ nom: '', marque: '', categorie: 'Personnalisé', energie_kcal: '', proteines: '', glucides: '', lipides: '', fibres: '', sel: '', sucres: '', acides_gras_satures: '' })
+
+  const [view, setView] = useState('list') // list | form
+  const [aliments, setAliments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState(null) // null = création, id = édition
+
+  const [form, setForm] = useState(EMPTY_FORM)
   const [extra, setExtra] = useState({}) // tous les nutriments détaillés (sucres/AG/vitamines/minéraux), clé → string
   const [portions, setPortions] = useState([{ label: '', g: '' }])
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => { load() }, [user])
+
+  const load = async () => {
+    if (!user) { setAliments([]); setLoading(false); return }
+    setLoading(true)
+    const { data } = await supabase.from('aliments_custom').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    setAliments(data || [])
+    setLoading(false)
+  }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const setExtraField = (k, v) => setExtra(e => ({ ...e, [k]: v }))
@@ -80,9 +116,53 @@ export default function ManualPage() {
   const updatePortion = (i, k, v) => setPortions(p => p.map((x, idx) => idx === i ? { ...x, [k]: v } : x))
 
   const resetForm = () => {
-    setForm({ nom: '', marque: '', categorie: 'Personnalisé', energie_kcal: '', proteines: '', glucides: '', lipides: '', fibres: '', sel: '', sucres: '', acides_gras_satures: '' })
+    setForm(EMPTY_FORM)
     setExtra({})
     setPortions([{ label: '', g: '' }])
+    setEditingId(null)
+  }
+
+  const startNew = () => { resetForm(); setView('form') }
+
+  // Pré-remplit le formulaire (champs principaux + sections détaillées + portions)
+  // à partir d'une ligne existante de aliments_custom, pour l'édition.
+  const startEdit = (aliment) => {
+    setEditingId(aliment.id)
+    setForm({
+      nom: aliment.nom || '',
+      marque: aliment.marque || '',
+      categorie: aliment.categorie || 'Personnalisé',
+      energie_kcal: aliment.energie_kcal ?? '',
+      proteines: aliment.proteines ?? '',
+      glucides: aliment.glucides ?? '',
+      lipides: aliment.lipides ?? '',
+      fibres: aliment.fibres ?? '',
+      sel: aliment.sel ?? '',
+      sucres: aliment.sucres ?? '',
+      acides_gras_satures: aliment.acides_gras_satures ?? '',
+    })
+    const extraValues = {}
+    for (const key of ALL_NUTRIENT_KEYS) {
+      if (key === 'sucres' || key === 'acides_gras_satures' || key === 'sel') continue
+      extraValues[key] = aliment[key] != null ? String(aliment[key]) : ''
+    }
+    setExtra(extraValues)
+    setPortions(
+      Array.isArray(aliment.portions) && aliment.portions.length
+        ? aliment.portions.map(p => ({ label: p.label || '', g: p.g != null ? String(p.g) : '' }))
+        : [{ label: '', g: '' }]
+    )
+    setView('form')
+  }
+
+  const handleDelete = async (id) => {
+    const { error } = await supabase.from('aliments_custom').delete().eq('id', id).eq('user_id', user.id)
+    if (!error) {
+      setAliments(a => a.filter(x => x.id !== id))
+      toast('Supprimé')
+    } else {
+      toast('Erreur lors de la suppression')
+    }
   }
 
   const save = async () => {
@@ -92,15 +172,15 @@ export default function ManualPage() {
     const cleanPortions = portions.filter(p => p.label && p.g).map(p => ({ label: p.label, g: parseFloat(p.g) }))
 
     // Tous les nutriments détaillés (sections repliables) sont parsés génériquement
-    // à partir de la liste partagée ALL_NUTRIENT_KEYS — sucres/AG saturés totaux sont
-    // déjà dans `form` (champs principaux), ALL_NUTRIENT_KEYS les ignore donc ici si présents dans `extra`.
+    // à partir de la liste partagée ALL_NUTRIENT_KEYS — sucres/AG saturés totaux/sel sont
+    // déjà dans `form` (champs principaux), on les ignore donc ici s'ils sont dans `extra`.
     const extraValues = {}
     for (const key of ALL_NUTRIENT_KEYS) {
-      if (key === 'sucres' || key === 'acides_gras_satures' || key === 'sel') continue // déjà dans form
+      if (key === 'sucres' || key === 'acides_gras_satures' || key === 'sel') continue
       extraValues[key] = extra[key] ? parseFloat(extra[key]) : null
     }
 
-    const { error } = await supabase.from('aliments_custom').insert([{
+    const payload = {
       nom: form.nom.trim(),
       marque: form.marque.trim() || null,
       categorie: form.categorie || 'Personnalisé',
@@ -114,21 +194,67 @@ export default function ManualPage() {
       acides_gras_satures: parseFloat(form.acides_gras_satures) || 0,
       ...extraValues,
       portions: cleanPortions,
-      user_id: user.id,
-    }])
+    }
+
+    const { error } = editingId
+      ? await supabase.from('aliments_custom').update(payload).eq('id', editingId).eq('user_id', user.id)
+      : await supabase.from('aliments_custom').insert([{ ...payload, user_id: user.id }])
+
     setSaving(false)
     if (!error) {
-      toast('✓ Aliment sauvegardé !')
+      toast(editingId ? '✓ Aliment modifié !' : '✓ Aliment sauvegardé !')
       resetForm()
+      setView('list')
+      load()
     } else {
       toast('Erreur lors de la sauvegarde')
     }
   }
 
+  if (view === 'list') {
+    return (
+      <div className="page-content">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 20 }}>Mes aliments</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aliments personnalisés, absents de Ciqual</div>
+          </div>
+          <button
+            onClick={startNew}
+            style={{ background: 'var(--green)', color: 'white', borderRadius: 10, padding: '9px 14px', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            <Plus size={16} /> Nouveau
+          </button>
+        </div>
+
+        {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+
+        {!loading && aliments.length === 0 && (
+          <div className="empty">
+            <Apple size={40} />
+            <div style={{ marginTop: 8, fontWeight: 600 }}>Aucun aliment personnalisé</div>
+            <div style={{ marginTop: 4 }}>Ajoute un aliment qui n'existe pas dans Ciqual</div>
+          </div>
+        )}
+
+        {aliments.map(a => (
+          <FoodCard key={a.id} aliment={a} onEdit={startEdit} onDelete={handleDelete} />
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="page-content">
-      <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 4 }}>Aliment personnalisé</div>
-      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>Ajoute un aliment qui n'existe pas dans Ciqual</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <button className="btn-icon" onClick={() => { resetForm(); setView('list') }} style={{ marginLeft: -8 }}>
+          <ChevronLeft size={20} color="var(--text-muted)" />
+        </button>
+        <div style={{ fontWeight: 700, fontSize: 20 }}>{editingId ? "Modifier l'aliment" : 'Nouvel aliment'}</div>
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, marginLeft: 36 }}>
+        {editingId ? 'Mets à jour les valeurs nutritionnelles' : "Ajoute un aliment qui n'existe pas dans Ciqual"}
+      </div>
 
       <div className="card" style={{ padding: '16px', marginBottom: 12 }}>
         <div className="section-title">Informations</div>
@@ -192,7 +318,7 @@ export default function ManualPage() {
       </div>
 
       <button className="btn-primary" onClick={save} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>
-        {saving ? 'Sauvegarde...' : '💾 Sauvegarder l\'aliment'}
+        {saving ? 'Sauvegarde...' : editingId ? '💾 Enregistrer les modifications' : "💾 Sauvegarder l'aliment"}
       </button>
       <div style={{ fontSize: 12, color: 'var(--text-hint)', textAlign: 'center', marginTop: 10 }}>
         L'aliment sera disponible dans la recherche

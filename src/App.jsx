@@ -12,7 +12,7 @@ import ProfilePage from './pages/ProfilePage'
 const TABS = [
   { id: 'today',   label: "Aujourd'hui", icon: HomeIcon },
   { id: 'meals',   label: 'Repas types', icon: UtensilsIcon },
-  { id: 'manual',  label: 'Manuel',      icon: PencilIcon },
+  { id: 'manual',  label: 'Mes aliments', icon: PencilIcon },
   { id: 'history', label: 'Historique',  icon: ChartIcon },
   { id: 'settings',label: 'Objectifs',   icon: SettingsIcon },
   { id: 'profile', label: 'Profil',      icon: ProfileIcon },
