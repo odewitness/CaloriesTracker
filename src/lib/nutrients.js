@@ -119,3 +119,77 @@ export const ALL_NUTRIENT_KEYS = Array.from(new Set([
   ...MINERAL_FIELDS.map(f => f.key),
   ...DETAIL_ONLY_FIELDS.map(f => f.key),
 ]))
+
+// ── Répartition des objectifs par repas ──────────────────────────────────────
+// Utilisé par : TodayPage.jsx (affichage compact par MealSection) et
+// ProfilePage.jsx (édition des objectifs par repas).
+//
+// Bases utilisées :
+// - Calories : réparties selon des repères usuels en nutrition (proches des
+//   habitudes françaises type PNNS/ANSES) à défaut de norme physiologique
+//   stricte imposant une répartition précise entre repas.
+// - Protéines : réparties à parts EGALES entre les 3 repas principaux plutôt
+//   qu'au prorata des calories. La recherche sur la synthèse protéique
+//   musculaire (Mamerow et al. 2014, "Dietary Protein Distribution Positively
+//   Influences 24-h Muscle Protein Synthesis" ; Moore et al. 2012) montre
+//   qu'un apport protéique réparti régulièrement sur la journée (~0.3-0.4
+//   g/kg/repas) stimule davantage la synthèse protéique sur 24h qu'une
+//   répartition inégale, même à apport total identique.
+// - Glucides/lipides : pas de consensus scientifique imposant une répartition
+//   précise par repas → réparti simplement au prorata de la part calorique
+//   de chaque repas.
+//
+// Toute valeur peut être surchargée manuellement par l'utilisateur via
+// settings.meal_overrides = { [nomDuRepas]: { kcal?, prot?, gluc?, lip? } }.
+// Une valeur absente (null/undefined) dans l'override retombe sur le calcul auto.
+
+export const MEALS_ORDER = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
+
+export const MEAL_KCAL_SHARE = {
+  'Petit-déjeuner': 0.25,
+  'Déjeuner':       0.35,
+  'Dîner':          0.30,
+  'Collation':      0.10,
+}
+
+// Part résiduelle des protéines allouée à la collation ; le reste est
+// réparti à parts strictement égales entre les 3 repas principaux.
+const COLLATION_PROT_SHARE = 0.10
+const MAIN_MEALS = MEALS_ORDER.filter(m => m !== 'Collation')
+
+export function computeMealTargets(settings) {
+  const overrides = settings?.meal_overrides || {}
+  const kcalGoal = settings?.goal_kcal || 0
+  const protGoal = settings?.goal_proteines || 0
+  const glucGoal = settings?.goal_glucides || 0
+  const lipGoal  = settings?.goal_lipides || 0
+
+  const protMainEach  = (protGoal * (1 - COLLATION_PROT_SHARE)) / MAIN_MEALS.length
+  const protCollation = protGoal * COLLATION_PROT_SHARE
+
+  const targets = {}
+  for (const meal of MEALS_ORDER) {
+    const share = MEAL_KCAL_SHARE[meal]
+    const auto = {
+      kcal: kcalGoal * share,
+      prot: meal === 'Collation' ? protCollation : protMainEach,
+      gluc: glucGoal * share,
+      lip:  lipGoal * share,
+    }
+    const o = overrides[meal] || {}
+    const isAuto = {
+      kcal: o.kcal == null,
+      prot: o.prot == null,
+      gluc: o.gluc == null,
+      lip:  o.lip == null,
+    }
+    targets[meal] = {
+      kcal: Math.round(isAuto.kcal ? auto.kcal : o.kcal),
+      prot: Math.round(isAuto.prot ? auto.prot : o.prot),
+      gluc: Math.round(isAuto.gluc ? auto.gluc : o.gluc),
+      lip:  Math.round(isAuto.lip  ? auto.lip  : o.lip),
+      isAuto,
+    }
+  }
+  return targets
+}

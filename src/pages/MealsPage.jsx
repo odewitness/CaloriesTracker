@@ -3,11 +3,9 @@ import { Plus, Trash2, ChevronRight, Check, X, Pencil, UtensilsCrossed } from 'l
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { ALL_NUTRIENT_KEYS, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import AddFoodModal from '../components/AddFoodModal'
 import { useBackButton } from '../hooks/useBackButton'
-
-const MEALS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 
 function RepasCard({ repas, onDelete, onEdit, onAddToJournal }) {
   const [open, setOpen] = useState(false)

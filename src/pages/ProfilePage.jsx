@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf } from 'lucide-react'
+import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw } from 'lucide-react'
+import { computeMealTargets, MEALS_ORDER } from '../lib/nutrients'
+
+const MEAL_ICONS = { 'Petit-déjeuner': Coffee, 'Déjeuner': Sun, 'Dîner': Moon, 'Collation': Cookie }
 
 const PRESETS = [
   { label: 'Perte de poids (femme)', kcal: 1400, prot: 100, gluc: 130, lip: 50, fib: 30 },
@@ -39,6 +42,49 @@ function GoalField({ icon, label, value, unit, color, onChange }) {
           style={{ width: 72, textAlign: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 6px', fontSize: 15, fontWeight: 700, fontFamily: 'var(--font)', color, background: 'var(--gray-bg)', outline: 'none' }}
         />
         <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 24 }}>{unit}</span>
+      </div>
+    </div>
+  )
+}
+
+function MealTargetCard({ meal, target, onChange, onReset }) {
+  const Icon = MEAL_ICONS[meal]
+  const hasOverride = !target.isAuto.kcal || !target.isAuto.prot || !target.isAuto.gluc || !target.isAuto.lip
+
+  const field = (key, label, color) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <input
+        type="number"
+        value={target[key]}
+        onChange={e => onChange(key, e.target.value)}
+        style={{
+          width: 56, textAlign: 'center', border: `1px solid ${target.isAuto[key] ? 'var(--border)' : color}`,
+          borderRadius: 6, padding: '6px 4px', fontSize: 13, fontWeight: 700, color,
+          background: target.isAuto[key] ? 'var(--gray-bg)' : 'var(--white)', fontFamily: 'var(--font)', outline: 'none',
+        }}
+      />
+      <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>{label}</span>
+    </div>
+  )
+
+  return (
+    <div className="card" style={{ padding: '12px 14px', marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          {Icon && <Icon size={15} color="var(--green)" />}
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{meal}</div>
+        </div>
+        {hasOverride && (
+          <button onClick={onReset} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-hint)', fontFamily: 'var(--font)' }}>
+            <RotateCcw size={12} /> Auto
+          </button>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between' }}>
+        {field('kcal', 'kcal', 'var(--text)')}
+        {field('prot', 'Prot.', 'var(--green)')}
+        {field('gluc', 'Gluc.', 'var(--amber)')}
+        {field('lip',  'Lip.',  'var(--coral)')}
       </div>
     </div>
   )
@@ -100,6 +146,35 @@ export default function ProfilePage() {
 
   const applyPreset = (p) => {
     setGoals(g => ({ ...g, goal_kcal: p.kcal, goal_proteines: p.prot, goal_glucides: p.gluc, goal_lipides: p.lip, goal_fibres: p.fib }))
+    setGoalsDirty(true)
+  }
+
+  // ── Répartition par repas (auto basé sur la science, surchargeable) ────
+  const mealTargets = useMemo(() => computeMealTargets(goals), [goals])
+
+  const setMealOverride = (meal, key, rawValue) => {
+    setGoals(g => {
+      const overrides = { ...(g.meal_overrides || {}) }
+      const mealOv = { ...(overrides[meal] || {}) }
+      if (rawValue === '') {
+        delete mealOv[key]
+      } else {
+        const num = parseFloat(rawValue)
+        if (!isNaN(num)) mealOv[key] = num
+      }
+      if (Object.keys(mealOv).length === 0) delete overrides[meal]
+      else overrides[meal] = mealOv
+      return { ...g, meal_overrides: overrides }
+    })
+    setGoalsDirty(true)
+  }
+
+  const resetMealOverrides = (meal) => {
+    setGoals(g => {
+      const overrides = { ...(g.meal_overrides || {}) }
+      delete overrides[meal]
+      return { ...g, meal_overrides: overrides }
+    })
     setGoalsDirty(true)
   }
 
@@ -171,6 +246,28 @@ export default function ProfilePage() {
 
       {goalsDirty && (
         <button className="btn-primary" onClick={saveGoals} style={{ marginBottom: 20 }}>💾 Sauvegarder les objectifs</button>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <Target size={16} color="var(--green)" />
+        <div className="section-title" style={{ marginBottom: 0 }}>Répartition par repas</div>
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 10 }}>
+        Calculée automatiquement à partir de tes objectifs ci-dessus (calories réparties selon les repères nutritionnels usuels, protéines réparties à parts égales entre les 3 repas principaux pour mieux soutenir la synthèse musculaire). Modifie une valeur pour la fixer manuellement, ou appuie sur « Auto » pour revenir au calcul automatique.
+      </div>
+
+      {MEALS_ORDER.map(meal => (
+        <MealTargetCard
+          key={meal}
+          meal={meal}
+          target={mealTargets[meal]}
+          onChange={(key, val) => setMealOverride(meal, key, val)}
+          onReset={() => resetMealOverrides(meal)}
+        />
+      ))}
+
+      {goalsDirty && (
+        <button className="btn-primary" onClick={saveGoals} style={{ marginTop: 4, marginBottom: 20 }}>💾 Sauvegarder les objectifs</button>
       )}
 
       <button

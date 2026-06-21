@@ -10,9 +10,7 @@ import FoodDetailModal from '../components/FoodDetailModal'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useToast } from '../lib/toast'
-import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
-
-const MEALS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
+import { ALL_NUTRIENT_KEYS, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
 
 function fmt(date) {
   return date.toISOString().slice(0, 10)
@@ -80,6 +78,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
     return t
   }, [entries])
 
+  const mealTargets = useMemo(() => computeMealTargets(settings), [settings])
+
   const handleAdd = async (entry) => {
     const { error } = await addEntry(entry)
     if (!error) toast('✓ Ajouté !')
@@ -112,6 +112,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
               key={m}
               name={m}
               entries={entries.filter(e => e.meal === m)}
+              target={mealTargets[m]}
               onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd })}
               onDelete={handleDelete}
               onUpdate={handleUpdate}
