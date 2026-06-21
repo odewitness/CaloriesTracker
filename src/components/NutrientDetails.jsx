@@ -60,9 +60,6 @@ export default function NutrientDetails({ totals, hasEntries }) {
             ? <NutrientList fields={SUGAR_FIELDS} totals={totals} hasEntries={hasEntries} />
             : <NutrientList fields={FAT_FIELDS} totals={totals} hasEntries={hasEntries} />}
 
-          <div style={{ fontSize: 10, color: 'var(--text-hint)', marginTop: 10 }}>
-            Pas de valeur de référence officielle pour ces nutriments pris individuellement — affichage informatif uniquement.
-          </div>
         </div>
       )}
     </div>

@@ -136,10 +136,6 @@ export default function VitaminPanel({ totals, hasEntries }) {
               <span style={{ color: 'var(--amber)', fontWeight: 600 }}>orange</span> = à surveiller &nbsp;·&nbsp;
               <span style={{ color: 'var(--coral)', fontWeight: 600 }}>rouge</span> = trop bas ou trop haut
             </span>
-            <span style={{ fontSize: 10, color: 'var(--text-hint)', width: '100%' }}>
-              Sel et Sodium fonctionnent à l'inverse des autres : vert = en dessous de l'objectif (c'est ce qu'on veut), rouge = au-dessus.
-              Valeurs de référence indicatives, population adulte générale — non personnalisées.
-            </span>
           </div>
         </div>
       )}
