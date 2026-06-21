@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { SUGAR_FIELDS, FAT_FIELDS } from '../lib/nutrients'
+import { SUGAR_FIELDS, FAT_FIELDS, SUCRES_ANSES_REF } from '../lib/nutrients'
 
 function fmtVal(val, unit) {
   if (val == null) return '—'
@@ -19,6 +19,34 @@ function NutrientList({ fields, totals, hasEntries }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function SucresAnsesGauge({ totals, hasEntries }) {
+  const sucresTotal = totals.sucres ?? 0
+  const lactose = totals.lactose ?? 0
+  const galactose = totals.galactose ?? 0
+  const pertinent = Math.max(0, sucresTotal - lactose - galactose)
+  const pct = Math.round((pertinent / SUCRES_ANSES_REF) * 100)
+  const barPct = hasEntries ? Math.min(100, pct) : 0
+  const excess = hasEntries && pertinent >= SUCRES_ANSES_REF
+  const color = excess ? 'var(--coral)' : pct >= 80 ? 'var(--amber)' : '#1D9E75'
+
+  return (
+    <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--gray-bg)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Sucres (recommandation Anses)</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: hasEntries ? color : 'var(--text-hint)' }}>
+          {hasEntries ? `${excess ? '⚠︎ ' : ''}${pertinent.toFixed(1)} / ${SUCRES_ANSES_REF} g` : 'N/D'}
+        </span>
+      </div>
+      <div style={{ position: 'relative', height: 6, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ width: `${barPct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width .4s' }} />
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-hint)', marginTop: 4 }}>
+        Sucres totaux hors lactose et galactose · max recommandé 100 g/j
+      </div>
     </div>
   )
 }
@@ -57,7 +85,12 @@ export default function NutrientDetails({ totals, hasEntries }) {
           </div>
 
           {tab === 'sucres'
-            ? <NutrientList fields={SUGAR_FIELDS} totals={totals} hasEntries={hasEntries} />
+            ? (
+              <>
+                <SucresAnsesGauge totals={totals} hasEntries={hasEntries} />
+                <NutrientList fields={SUGAR_FIELDS} totals={totals} hasEntries={hasEntries} />
+              </>
+            )
             : <NutrientList fields={FAT_FIELDS} totals={totals} hasEntries={hasEntries} />}
 
         </div>

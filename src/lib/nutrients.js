@@ -89,6 +89,12 @@ export const DETAIL_ONLY_FIELDS = [
   { key: 'acide_folique',        label: 'Acide folique (enrichi)', unit: 'µg' },
 ]
 
+// Recommandation Anses : ne pas dépasser 100 g/j de sucres totaux chez l'adulte,
+// hors lactose et galactose (sucres naturels du lait, non concernés par la limite).
+// On calcule donc le total "pertinent" = sucres totaux − lactose − galactose.
+// cf. rapport Anses « Actualisation des repères du PNNS : recommandations d'apport de sucres » (2016)
+export const SUCRES_ANSES_REF = 100 // g/j
+
 // "Acides gras saturés" garde son nom historique (acides_gras_satures) pour ne pas
 // casser les données déjà en base — on l'ajoute manuellement à la liste plutôt que
 // dans FAT_FIELDS pour ne pas dupliquer le libellé "Saturés" géré ailleurs.
