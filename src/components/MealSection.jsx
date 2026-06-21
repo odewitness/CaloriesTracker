@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react'
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { useBackButton } from '../hooks/useBackButton'
 
 function EditRow({ entry, onSave, onCancel }) {
+  useBackButton(onCancel)
   const [qty, setQty] = useState(String(entry.qty_g))
   const [kcal, setKcal] = useState(entry.energie_kcal)
   const [prot, setProt] = useState(entry.proteines)
