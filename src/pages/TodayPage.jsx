@@ -141,6 +141,8 @@ export default function TodayPage() {
   const settled = useRef(false)
   const SWIPE_THRESHOLD = 0.15  // 15% de la largeur écran
 
+  const wrapperRef = useRef(null)
+
   const onTouchStart = useCallback((e) => {
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
@@ -148,6 +150,8 @@ export default function TodayPage() {
     setDragPx(0)
   }, [])
 
+  // onTouchMove doit être non-passif pour pouvoir appeler preventDefault()
+  // → on l'attache manuellement via useEffect
   const onTouchMove = useCallback((e) => {
     if (touchStartX.current === null) return
     const dx = e.touches[0].clientX - touchStartX.current
@@ -156,9 +160,17 @@ export default function TodayPage() {
       if (Math.abs(dy) > Math.abs(dx)) return   // geste vertical → scroll normal
       isHorizontal.current = true
     }
-    e.preventDefault()
+    e.preventDefault()   // bloque le scroll seulement si horizontal confirmé
     setDragPx(dx)
   }, [])
+
+  // Attache touchmove avec { passive: false } pour que preventDefault() fonctionne
+  React.useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onTouchMove)
+  }, [onTouchMove])
 
   const commitNav = useCallback((dir) => {
     // dir = -1 (suivant) ou +1 (précédent)
@@ -219,9 +231,9 @@ export default function TodayPage() {
     <>
       {/* Conteneur masquant les slots latéraux */}
       <div
+        ref={wrapperRef}
         style={{ overflow: 'hidden', position: 'relative' }}
         onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
         {/* Slider 3 slots */}
