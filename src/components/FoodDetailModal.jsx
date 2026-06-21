@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { useBackButton } from '../hooks/useBackButton'
 
 function MacroGrid({ live }) {
   const items = [
@@ -25,6 +26,7 @@ function MacroGrid({ live }) {
 }
 
 export default function FoodDetailModal({ entry, onUpdate, onClose }) {
+  useBackButton(onClose)
   const [qty, setQty] = useState(String(entry.qty_g))
   const [saving, setSaving] = useState(false)
 

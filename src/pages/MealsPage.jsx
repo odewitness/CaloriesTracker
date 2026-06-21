@@ -5,6 +5,7 @@ import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import AddFoodModal from '../components/AddFoodModal'
+import { useBackButton } from '../hooks/useBackButton'
 
 const MEALS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 
@@ -60,6 +61,7 @@ function RepasCard({ repas, onDelete, onEdit, onAddToJournal }) {
 }
 
 function EditRepasModal({ repas, onSave, onClose }) {
+  useBackButton(onClose)
   const toast = useToast()
   const [nom, setNom] = useState(repas?.nom || '')
   const [desc, setDesc] = useState(repas?.description || '')
@@ -182,6 +184,26 @@ function EditRepasModal({ repas, onSave, onClose }) {
   )
 }
 
+function AddToJournalSheet({ repas, journalMeal, onMealChange, onConfirm, onClose }) {
+  useBackButton(onClose)
+  return (
+    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-sheet">
+        <div className="modal-handle" />
+        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Ajouter au journal</h2>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+          Quel repas pour « {repas.nom} » ?
+        </div>
+        <select className="input" value={journalMeal} onChange={e => onMealChange(e.target.value)} style={{ marginBottom: 16 }}>
+          {MEALS.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <button className="btn-primary" onClick={onConfirm}>Ajouter</button>
+        <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={onClose}>Annuler</button>
+      </div>
+    </div>
+  )
+}
+
 export default function MealsPage() {
   const toast = useToast()
   const { user } = useAuth()
@@ -276,20 +298,13 @@ export default function MealsPage() {
       )}
 
       {addToJournalTarget && (
-        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setAddToJournalTarget(null)}>
-          <div className="modal-sheet">
-            <div className="modal-handle" />
-            <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Ajouter au journal</h2>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-              Quel repas pour « {addToJournalTarget.nom} » ?
-            </div>
-            <select className="input" value={journalMeal} onChange={e => setJournalMeal(e.target.value)} style={{ marginBottom: 16 }}>
-              {MEALS.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <button className="btn-primary" onClick={confirmAddToJournal}>Ajouter</button>
-            <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={() => setAddToJournalTarget(null)}>Annuler</button>
-          </div>
-        </div>
+        <AddToJournalSheet
+          repas={addToJournalTarget}
+          journalMeal={journalMeal}
+          onMealChange={setJournalMeal}
+          onConfirm={confirmAddToJournal}
+          onClose={() => setAddToJournalTarget(null)}
+        />
       )}
     </>
   )

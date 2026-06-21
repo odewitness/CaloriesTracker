@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ToastProvider } from './lib/toast'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import AuthPage from './pages/AuthPage'
@@ -65,6 +65,23 @@ function ProfileIcon({ active }) {
 
 function AppShell() {
   const [tab, setTab] = useState('today')
+
+  // Retour Android : si on n'est pas sur "today", y revenir.
+  // Si on est déjà sur "today", les modales gèrent leur propre entrée
+  // d'historique via useBackButton — on ne fait rien ici.
+  useEffect(() => {
+    if (tab === 'today') return // les modales de TodayPage prennent le relais
+
+    // Pousse une entrée pour que le retour ait quelque chose à dépiler
+    history.pushState({ tab }, '')
+
+    const handlePop = () => setTab('today')
+    window.addEventListener('popstate', handlePop)
+    return () => {
+      window.removeEventListener('popstate', handlePop)
+      if (history.state?.tab) history.back()
+    }
+  }, [tab])
 
   const pages = {
     today:    <TodayPage />,
