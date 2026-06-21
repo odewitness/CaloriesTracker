@@ -81,7 +81,19 @@ function EditRow({ entry, onSave, onCancel }) {
 
 export default function MealSection({ name, entries, onAdd, onDelete, onUpdate, onOpenDetail }) {
   const [editId, setEditId] = useState(null)
-  const [collapsed, setCollapsed] = useState(false)
+  const storageKey = `meal-collapsed:${name}`
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey)) ?? false }
+    catch { return false }
+  })
+
+  const toggleCollapsed = () => {
+    setCollapsed(c => {
+      const next = !c
+      try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
   const totalKcal = entries.reduce((s, e) => s + (e.energie_kcal || 0), 0)
 
   const handleSave = async (id, patch) => {
@@ -94,7 +106,7 @@ export default function MealSection({ name, entries, onAdd, onDelete, onUpdate, 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px' }}>
         <button
-          onClick={() => setCollapsed(c => !c)}
+          onClick={toggleCollapsed}
           style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, textAlign: 'left' }}
         >
           <ChevronDown
