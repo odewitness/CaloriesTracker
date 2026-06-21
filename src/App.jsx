@@ -66,21 +66,16 @@ function ProfileIcon({ active }) {
 function AppShell() {
   const [tab, setTab] = useState('today')
 
-  // Retour Android : si on n'est pas sur "today", y revenir.
-  // Si on est déjà sur "today", les modales gèrent leur propre entrée
-  // d'historique via useBackButton — on ne fait rien ici.
+  // Retour Android : pousse une entrée à chaque changement d'onglet,
+  // et écoute popstate pour revenir à 'today' — sans jamais appeler history.back() au cleanup.
   useEffect(() => {
-    if (tab === 'today') return // les modales de TodayPage prennent le relais
+    if (tab === 'today') return
 
-    // Pousse une entrée pour que le retour ait quelque chose à dépiler
     history.pushState({ tab }, '')
 
     const handlePop = () => setTab('today')
     window.addEventListener('popstate', handlePop)
-    return () => {
-      window.removeEventListener('popstate', handlePop)
-      if (history.state?.tab) history.back()
-    }
+    return () => window.removeEventListener('popstate', handlePop)
   }, [tab])
 
   const pages = {
@@ -93,7 +88,8 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+      {/* overflow visible ici — c'est page-content qui scroll en interne */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
         {pages[tab]}
       </div>
 

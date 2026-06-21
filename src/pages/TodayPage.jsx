@@ -232,7 +232,7 @@ export default function TodayPage() {
       {/* Conteneur masquant les slots latéraux */}
       <div
         ref={wrapperRef}
-        style={{ overflow: 'hidden', position: 'relative' }}
+        style={{ overflowX: 'hidden', position: 'relative' }}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
