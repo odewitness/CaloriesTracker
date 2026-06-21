@@ -23,6 +23,7 @@ function dateLabel(date) {
   const diff = (d - today) / 86400000
   if (diff === 0) return "Aujourd'hui"
   if (diff === -1) return 'Hier'
+  if (diff === 1) return 'Demain'
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
@@ -69,7 +70,6 @@ export default function TodayPage() {
   const navigate = (dir) => {
     const d = new Date(date)
     d.setDate(d.getDate() + dir)
-    if (d > new Date()) return
     setDate(d)
   }
 
@@ -80,10 +80,15 @@ export default function TodayPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <button className="btn-icon" onClick={() => navigate(-1)}><ChevronLeft size={20} color="var(--text-muted)" /></button>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{dateLabel(date)}</div>
+            <button
+              onClick={() => !isToday && setDate(new Date())}
+              style={{ fontWeight: 700, fontSize: 16, color: isToday ? 'var(--text)' : 'var(--green)' }}
+            >
+              {dateLabel(date)}{!isToday && ' ↩'}
+            </button>
             <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>{date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
           </div>
-          <button className="btn-icon" onClick={() => navigate(1)} style={{ opacity: isToday ? 0.3 : 1 }} disabled={isToday}>
+          <button className="btn-icon" onClick={() => navigate(1)}>
             <ChevronRight size={20} color="var(--text-muted)" />
           </button>
         </div>

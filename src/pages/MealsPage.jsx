@@ -39,7 +39,7 @@ function RepasCard({ repas, onDelete, onEdit, onAddToJournal }) {
           {items.map((item, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: '0.5px solid var(--border)', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.food_name}</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{item.food_name}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.qty_g}g</div>
               </div>
               <span style={{ fontSize: 13, fontWeight: 700 }}>{Math.round(item.energie_kcal || 0)} kcal</span>
@@ -158,7 +158,7 @@ function EditRepasModal({ repas, onSave, onClose }) {
           {items.map((item, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border)', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.food_name}</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{item.food_name}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{Math.round(item.energie_kcal || 0)} kcal</div>
               </div>
               <input

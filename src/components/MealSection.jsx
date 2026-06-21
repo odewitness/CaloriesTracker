@@ -111,7 +111,7 @@ export default function MealSection({ name, entries, onAdd, onDelete, onUpdate }
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.food_name}</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{entry.food_name}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                   {entry.qty_g}g &nbsp;·&nbsp;
                   <span className="c-prot">P {Math.round(entry.proteines || 0)}g</span>&nbsp;
