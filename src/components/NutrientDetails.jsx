@@ -23,7 +23,10 @@ function NutrientList({ fields, totals, hasEntries }) {
   )
 }
 
-function SucresAnsesGauge({ totals, hasEntries }) {
+// Exported: reused as-is by HistoryPage.jsx so the period dashboard shows the
+// exact same Anses gauge as TodayPage, just fed with period-averaged totals
+// instead of today's totals.
+export function SucresAnsesGauge({ totals, hasEntries }) {
   const sucresTotal = totals.sucres ?? 0
   const lactose = totals.lactose ?? 0
   const galactose = totals.galactose ?? 0
@@ -68,7 +71,7 @@ function GaugeBar({ barPct, color, bandMarkers }) {
 // Lipides totaux : l'Anses recommande une zone cible de 35-40% de l'apport
 // énergétique (AE) du jour, pas un simple plafond — en dessous = sous-couverture
 // des besoins, au-dessus = excès. On affiche donc une bande cible plutôt qu'un seuil.
-function LipidesTotauxGauge({ totals, hasEntries }) {
+export function LipidesTotauxGauge({ totals, hasEntries }) {
   const hasKcal = hasEntries && totals.kcal > 0
   const aePct = hasKcal ? (totals.lip * KCAL_PER_G_LIPIDES / totals.kcal) * 100 : 0
   const { min, max } = LIPIDES_AE_TARGET
@@ -97,7 +100,7 @@ function LipidesTotauxGauge({ totals, hasEntries }) {
 }
 
 // AG saturés totaux : seuil maximal (≤12% AE), pas une zone cible.
-function AGSGauge({ totals, hasEntries }) {
+export function AGSGauge({ totals, hasEntries }) {
   const hasKcal = hasEntries && totals.kcal > 0
   const ags = totals.acides_gras_satures ?? 0
   const aePct = hasKcal ? (ags * KCAL_PER_G_LIPIDES / totals.kcal) * 100 : 0
