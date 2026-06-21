@@ -4,7 +4,6 @@ import { useAuth } from '../lib/AuthContext'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 
 const DAYS_BACK = 3   // aujourd'hui + 2 jours précédents
-const MAX_ITEMS = 10
 
 function fmtDate(d) { return d.toISOString().slice(0, 10) }
 
@@ -52,7 +51,6 @@ export function useRecentFoods() {
       .eq('user_id', user.id)
       .gte('date', fmtDate(cutoff))
       .order('created_at', { ascending: false })
-      .limit(100)
 
     // Déduplication par identité d'aliment, on garde l'occurrence la plus récente.
     const seen = new Set()
@@ -62,7 +60,6 @@ export function useRecentFoods() {
       if (seen.has(key)) continue
       seen.add(key)
       unique.push(entryToFood(entry))
-      if (unique.length >= MAX_ITEMS) break
     }
     setRecents(unique)
     setLoading(false)
