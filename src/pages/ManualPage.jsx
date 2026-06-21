@@ -217,7 +217,7 @@ export default function ManualPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 20 }}>Mes aliments</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aliments personnalisés, absents de Ciqual</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aliments personnalisés</div>
           </div>
           <button
             onClick={startNew}
