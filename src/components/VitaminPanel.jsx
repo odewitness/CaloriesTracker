@@ -2,7 +2,16 @@ import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { VITAMIN_FIELDS, MINERAL_FIELDS } from '../lib/nutrients'
 
-function getStatus(val, ref, lss) {
+// Pour les nutriments normaux (RNP = besoin minimum) : plus on s'approche de
+// la ref, mieux c'est. Pour les nutriments "limite" (v.limite = true, ex. Sel,
+// Sodium) c'est l'inverse : ref = objectif max à ne pas dépasser, donc rester
+// en dessous = bien (vert), dépasser = pas bien (ambre/rouge).
+function getStatus(val, ref, lss, limite) {
+  if (limite) {
+    if (lss !== null && val >= lss) return 'excess'
+    if (val >= ref) return 'mid'
+    return 'ok'
+  }
   if (lss !== null && val >= lss) return 'excess'
   if (val >= ref)                  return 'ok'
   if (val >= ref * 0.5)            return 'mid'
@@ -18,10 +27,7 @@ const STATUS_COLOR = {
 
 function NutrientRow({ v, totals, hasEntries }) {
   const val = totals[v.key] ?? 0
-
-  // N/D uniquement si aucune entrée dans le journal du jour —
-  // une valeur à 0 sur un aliment loggé est une vraie donnée (aliment non source de ce nutriment)
-  const hasData = hasEntries
+  const hasData = hasEntries // N/D uniquement si aucune entrée loggée — 0 sur un aliment loggé est une vraie donnée
 
   const pct = Math.round((val / v.ref) * 100)
   const barPct = Math.min(100, pct)
@@ -30,11 +36,13 @@ function NutrientRow({ v, totals, hasEntries }) {
     ? Math.min(100, (v.lss / v.ref) * 100)
     : null
 
-  const status = hasData ? getStatus(val, v.ref, v.lss) : 'low'
+  const status = hasData ? getStatus(val, v.ref, v.lss, v.limite) : 'low'
   const badgeColor = STATUS_COLOR[status]
 
+  const refLabel = v.limite ? 'Objectif max' : 'RNP'
+  const lssLabel = v.limite ? 'Seuil' : 'LSS'
   const tooltip = hasData
-    ? `${val.toFixed(val < 1 ? 3 : 1)} ${v.unit} / RNP ${v.ref} ${v.unit}${v.lss ? ` / LSS ${v.lss} ${v.unit}` : ''}`
+    ? `${val.toFixed(val < 1 ? 3 : 1)} ${v.unit} / ${refLabel} ${v.ref} ${v.unit}${v.lss ? ` / ${lssLabel} ${v.lss} ${v.unit}` : ''}`
     : 'Données non disponibles'
 
   return (
@@ -83,6 +91,7 @@ function NutrientRow({ v, totals, hasEntries }) {
 
 export default function VitaminPanel({ totals, hasEntries }) {
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState('vitamines') // vitamines | mineraux
 
   return (
     <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
@@ -96,24 +105,40 @@ export default function VitaminPanel({ totals, hasEntries }) {
 
       {open && (
         <div style={{ padding: '0 16px 14px' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Vitamines</div>
-          {VITAMIN_FIELDS.map(v => <NutrientRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} />)}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <button
+              onClick={() => setTab('vitamines')}
+              className="chip"
+              style={{ background: tab === 'vitamines' ? 'var(--green)' : 'var(--green-light)', color: tab === 'vitamines' ? 'white' : 'var(--green-dark)' }}
+            >
+              Vitamines
+            </button>
+            <button
+              onClick={() => setTab('mineraux')}
+              className="chip"
+              style={{ background: tab === 'mineraux' ? 'var(--green)' : 'var(--green-light)', color: tab === 'mineraux' ? 'white' : 'var(--green-dark)' }}
+            >
+              Minéraux
+            </button>
+          </div>
 
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '6px 0 8px' }}>Minéraux</div>
-          {MINERAL_FIELDS.map(v => <NutrientRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} />)}
+          {(tab === 'vitamines' ? VITAMIN_FIELDS : MINERAL_FIELDS).map(v => (
+            <NutrientRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} />
+          ))}
 
           <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{ width: 2, height: 10, background: 'var(--coral)', borderRadius: 1, opacity: 0.55 }} />
-              <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>LSS</span>
+              <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>LSS / Seuil</span>
             </div>
             <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>
-              <span style={{ color: '#1D9E75', fontWeight: 600 }}>vert</span> ≥ RNP &nbsp;·&nbsp;
-              <span style={{ color: 'var(--amber)', fontWeight: 600 }}>orange</span> 50–99 % &nbsp;·&nbsp;
-              <span style={{ color: 'var(--coral)', fontWeight: 600 }}>rouge</span> &lt; 50 % ou ≥ LSS
+              <span style={{ color: '#1D9E75', fontWeight: 600 }}>vert</span> = bien &nbsp;·&nbsp;
+              <span style={{ color: 'var(--amber)', fontWeight: 600 }}>orange</span> = à surveiller &nbsp;·&nbsp;
+              <span style={{ color: 'var(--coral)', fontWeight: 600 }}>rouge</span> = trop bas ou trop haut
             </span>
             <span style={{ fontSize: 10, color: 'var(--text-hint)', width: '100%' }}>
-              Valeurs de référence (RNP/LSS) indicatives, population adulte générale — non personnalisées.
+              Sel et Sodium fonctionnent à l'inverse des autres : vert = en dessous de l'objectif (c'est ce qu'on veut), rouge = au-dessus.
+              Valeurs de référence indicatives, population adulte générale — non personnalisées.
             </span>
           </div>
         </div>
