@@ -68,6 +68,9 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState(null)
   const [qty, setQty] = useState("100")
+  const [subtractMode, setSubtractMode] = useState(false)
+  const [grossWeight, setGrossWeight] = useState("")
+  const [wasteWeight, setWasteWeight] = useState("")
   const meal = initialMeal || 'Déjeuner' // fixé par le "+" sur lequel on a cliqué
   const [barcode, setBarcode] = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
@@ -207,6 +210,9 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     setSelected(food)
     const defaultPortion = food.portions?.[0]?.g || 100
     setQty(String(defaultPortion))
+    setSubtractMode(false)
+    setGrossWeight("")
+    setWasteWeight("")
     setStep('configure')
   }
 
@@ -401,17 +407,113 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
               </div>
             )}
 
-            {/* Qty input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <input
-                className="input-sm"
-                type="text"
-                inputMode="decimal"
-                value={qty}
-                onChange={e => setQty(e.target.value)}
-              />
-              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
-            </div>
+            {/* Toggle mode soustraction */}
+            <button
+              onClick={() => {
+                const next = !subtractMode
+                setSubtractMode(next)
+                if (!next) { setGrossWeight(""); setWasteWeight("") }
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                marginBottom: 14, padding: '9px 12px',
+                background: subtractMode ? 'var(--amber-light)' : 'var(--gray-bg)',
+                border: `1px solid ${subtractMode ? 'var(--amber)' : 'var(--border)'}`,
+                borderRadius: 'var(--radius-sm)', width: '100%',
+                color: subtractMode ? 'var(--amber)' : 'var(--text-muted)',
+                fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)',
+                transition: 'all .15s',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>⚖️</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>
+                {subtractMode ? 'Mode soustraction actif' : 'Peser avec soustraction'}
+              </span>
+              <span style={{
+                width: 32, height: 18, borderRadius: 9, flexShrink: 0,
+                background: subtractMode ? 'var(--amber)' : 'var(--border-md)',
+                position: 'relative', transition: 'background .15s',
+              }}>
+                <span style={{
+                  position: 'absolute', top: 2, left: subtractMode ? 16 : 2,
+                  width: 14, height: 14, borderRadius: '50%', background: 'white',
+                  transition: 'left .15s',
+                }} />
+              </span>
+            </button>
+
+            {subtractMode ? (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Poids brut (avec os / peau)</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input
+                        className="input-sm" type="text" inputMode="decimal" placeholder="—"
+                        value={grossWeight}
+                        onChange={e => {
+                          const g = e.target.value; setGrossWeight(g)
+                          const net = (parseFloat(g) || 0) - (parseFloat(wasteWeight) || 0)
+                          if (net > 0) setQty(String(net))
+                        }}
+                        style={{ width: 72 }}
+                      />
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 20, color: 'var(--text-hint)', paddingBottom: 6, flexShrink: 0 }}>−</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Déchet (os, peau…)</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input
+                        className="input-sm" type="text" inputMode="decimal" placeholder="—"
+                        value={wasteWeight}
+                        onChange={e => {
+                          const w = e.target.value; setWasteWeight(w)
+                          const net = (parseFloat(grossWeight) || 0) - (parseFloat(w) || 0)
+                          if (net > 0) setQty(String(net))
+                        }}
+                        style={{ width: 72 }}
+                      />
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0, paddingBottom: 6, fontSize: 20, color: 'var(--text-hint)' }}>=</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Net consommé</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{
+                        width: 72, textAlign: 'center', padding: '8px 4px',
+                        background: 'var(--amber-light)', borderRadius: 'var(--radius-xs)',
+                        fontSize: 15, fontWeight: 700, color: 'var(--amber)',
+                        border: '1px solid var(--amber)',
+                      }}>
+                        {(() => { const net = (parseFloat(grossWeight) || 0) - (parseFloat(wasteWeight) || 0); return net > 0 ? Math.round(net) : '—' })()}
+                      </div>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
+                    </div>
+                  </div>
+                </div>
+                {!grossWeight && (
+                  <div style={{ fontSize: 12, color: 'var(--text-hint)', fontStyle: 'italic' }}>Pèse d'abord l'aliment entier, puis reviens peser le déchet.</div>
+                )}
+                {grossWeight && !wasteWeight && (
+                  <div style={{ fontSize: 12, color: 'var(--amber)', fontStyle: 'italic' }}>✓ Poids brut noté. Va peser le déchet, puis reviens ici.</div>
+                )}
+              </div>
+            ) : (
+              /* Mode normal */
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <input
+                  className="input-sm"
+                  type="text"
+                  inputMode="decimal"
+                  value={qty}
+                  onChange={e => setQty(e.target.value)}
+                />
+                <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
+              </div>
+            )}
 
             {/* Macro preview */}
             <MacroPreview food={selected} qty={qty} />
@@ -421,7 +523,20 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
               Ajout à : <strong style={{ color: 'var(--text)' }}>{meal}</strong>
             </div>
 
-            <button className="btn-primary" onClick={confirm}>Ajouter au journal</button>
+            <button
+              className="btn-primary"
+              onClick={confirm}
+              disabled={subtractMode && (
+                !grossWeight || !wasteWeight ||
+                (parseFloat(grossWeight) || 0) - (parseFloat(wasteWeight) || 0) <= 0
+              )}
+              style={{
+                opacity: subtractMode && (
+                  !grossWeight || !wasteWeight ||
+                  (parseFloat(grossWeight) || 0) - (parseFloat(wasteWeight) || 0) <= 0
+                ) ? 0.45 : 1
+              }}
+            >Ajouter au journal</button>
             <button className="btn-ghost" style={{ width: '100%', marginTop: 8, textAlign: 'center' }} onClick={onClose}>Annuler</button>
           </>
         )}
