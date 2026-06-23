@@ -175,8 +175,8 @@ export default function ProfilePage() {
   const [goalsDirty, setGoalsDirty] = useState(false)
 
   useEffect(() => {
-    if (settings && !goals) setGoals({ ...settings })
-  }, [settings])
+    if (!settingsLoading && settings && !goals) setGoals({ ...settings })
+    }, [settings, settingsLoading])
 
   const setGoal = (k, v) => { setGoals(g => ({ ...g, [k]: v })); setGoalsDirty(true) }
 
