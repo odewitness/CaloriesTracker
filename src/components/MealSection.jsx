@@ -11,14 +11,8 @@ function EditRow({ entry, onSave, onCancel }) {
   const [gluc, setGluc] = useState(entry.glucides)
   const [lip, setLip]   = useState(entry.lipides)
 
-  // Les ~55 autres nutriments (sucres détaillés, acides gras, vitamines, minéraux...)
-  // ne sont pas affichés ici pour ne pas surcharger cette mini-UI d'édition rapide,
-  // mais on les garde synchronisés au prorata du grammage pour ne pas les figer/perdre
-  // quand on ajuste juste la quantité.
   const extraRef = useRef({})
 
-  // Quand le grammage change, on recalcule kcal/macros au prorata
-  // à partir des valeurs d'origine de l'entrée (entry.qty_g -> entry.energie_kcal etc.)
   const handleQtyChange = (val) => {
     setQty(val)
     const newQty = parseFloat(val)
@@ -28,7 +22,6 @@ function EditRow({ entry, onSave, onCancel }) {
     setProt(parseFloat((entry.proteines * f).toFixed(2)))
     setGluc(parseFloat((entry.glucides * f).toFixed(2)))
     setLip(parseFloat((entry.lipides * f).toFixed(2)))
-
     const next = {}
     for (const key of ALL_NUTRIENT_KEYS) {
       const raw = entry[key]
@@ -80,6 +73,7 @@ function EditRow({ entry, onSave, onCancel }) {
 }
 
 export default function MealSection({ name, entries, target, onAdd, onDelete, onUpdate, onOpenDetail }) {
+  const enabled = target?.enabled !== false
   const [editId, setEditId] = useState(null)
   const storageKey = `meal-collapsed:${name}`
   const [collapsed, setCollapsed] = useState(() => {
@@ -94,6 +88,7 @@ export default function MealSection({ name, entries, target, onAdd, onDelete, on
       return next
     })
   }
+
   const totalKcal = entries.reduce((s, e) => s + (e.energie_kcal || 0), 0)
   const totalProt = entries.reduce((s, e) => s + (e.proteines || 0), 0)
   const totalGluc = entries.reduce((s, e) => s + (e.glucides || 0), 0)
@@ -104,6 +99,29 @@ export default function MealSection({ name, entries, target, onAdd, onDelete, on
     setEditId(null)
   }
 
+  // ── Repas désactivé : carte compacte grisée ───────────────────────────
+  if (!enabled) {
+    return (
+      <div className="card" style={{ marginBottom: 10, overflow: 'hidden', opacity: 0.45 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-muted)' }}>{name}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 1 }}>
+              Désactivé · {entries.length > 0 ? `${Math.round(totalKcal)} kcal enregistrées` : 'Aucun aliment'}
+            </div>
+          </div>
+          <button
+            onClick={() => onAdd(name)}
+            style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--gray-bg)', color: 'var(--text-hint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Repas actif ───────────────────────────────────────────────────────
   return (
     <div className="card" style={{ marginBottom: 10, overflow: 'hidden' }}>
       {/* Header */}

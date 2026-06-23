@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 
-const DEFAULTS = { goal_kcal: 1800, goal_proteines: 100, goal_glucides: 180, goal_lipides: 60, goal_fibres: 30, meal_overrides: {} }
+import { MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
+
+const DEFAULTS = {
+  goal_kcal: 1800, goal_proteines: 100, goal_glucides: 180, goal_lipides: 60, goal_fibres: 30,
+  meal_overrides: {},
+  meal_enabled: { ...MEAL_ENABLED_DEFAULTS },
+}
 
 export function useSettings() {
   const { user } = useAuth()
@@ -14,15 +20,14 @@ export function useSettings() {
     setLoading(true)
     const { data } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle()
     if (data) {
-      setSettings({ ...DEFAULTS, ...data, meal_overrides: data.meal_overrides || {} })
+      setSettings({ ...DEFAULTS, ...data, meal_overrides: data.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(data.meal_enabled || {}) } })
     } else {
-      // Pas encore de ligne settings pour cet utilisateur — on en crée une avec les valeurs par défaut.
       const { data: created } = await supabase
         .from('settings')
         .insert([{ ...DEFAULTS, user_id: user.id }])
         .select()
         .single()
-      setSettings({ ...DEFAULTS, ...(created || {}), meal_overrides: created?.meal_overrides || {} })
+      setSettings({ ...DEFAULTS, ...(created || {}), meal_overrides: created?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(created?.meal_enabled || {}) } })
     }
     setLoading(false)
   }, [user])

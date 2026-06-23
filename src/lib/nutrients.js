@@ -145,6 +145,9 @@ export const ALL_NUTRIENT_KEYS = Array.from(new Set([
 
 export const MEALS_ORDER = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 
+// Part calorique de base de chaque repas (repères PNNS/ANSES).
+// Sert de poids RELATIF pour redistribuer le budget restant entre les repas
+// actifs non verrouillés — ce n'est donc pas un % fixe mais un ratio de priorité.
 export const MEAL_KCAL_SHARE = {
   'Petit-déjeuner': 0.25,
   'Déjeuner':       0.35,
@@ -152,43 +155,121 @@ export const MEAL_KCAL_SHARE = {
   'Collation':      0.10,
 }
 
-// Part résiduelle des protéines allouée à la collation ; le reste est
-// réparti à parts strictement égales entre les 3 repas principaux.
+// Defaults utilisés quand le champ meal_enabled est absent de settings.
+export const MEAL_ENABLED_DEFAULTS = {
+  'Petit-déjeuner': true,
+  'Déjeuner':       true,
+  'Dîner':          true,
+  'Collation':      true,
+}
+
+// Part "collation" sur les protéines quand la collation est active.
 const COLLATION_PROT_SHARE = 0.10
-const MAIN_MEALS = MEALS_ORDER.filter(m => m !== 'Collation')
+
+// ── computeMealTargets ────────────────────────────────────────────────────────
+// Logique de redistribution :
+//
+// CALORIES
+//   1. On part du budget total (goal_kcal).
+//   2. On soustrait les repas actifs avec une kcal verrouillée manuellement.
+//   3. Le budget restant est distribué entre les repas actifs en mode "auto",
+//      au prorata de leurs poids de base (MEAL_KCAL_SHARE) normalisés.
+//   → Désactiver un repas libère son budget vers les repas auto actifs.
+//   → Fixer manuellement la kcal d'un repas fixe sa valeur et les autres auto
+//     s'ajustent pour consommer exactement le budget restant.
+//
+// PROTÉINES
+//   Réparties à parts égales entre les repas principaux actifs (science : cf.
+//   Mamerow et al. 2014). La collation (si active) reçoit sa part fixe
+//   (10% du total) ; le reste va à parts égales sur les repas principaux actifs.
+//   Chaque valeur peut être verrouillée individuellement.
+//
+// GLUCIDES / LIPIDES
+//   Distribués au prorata de la part calorique effective de chaque repas
+//   (=kcal du repas / total kcal actif), sauf surcharge manuelle.
 
 export function computeMealTargets(settings) {
-  const overrides = settings?.meal_overrides || {}
-  const kcalGoal = settings?.goal_kcal || 0
+  const overrides  = settings?.meal_overrides || {}
+  const enabledMap = { ...MEAL_ENABLED_DEFAULTS, ...(settings?.meal_enabled || {}) }
+
+  const kcalGoal = settings?.goal_kcal    || 0
   const protGoal = settings?.goal_proteines || 0
-  const glucGoal = settings?.goal_glucides || 0
-  const lipGoal  = settings?.goal_lipides || 0
+  const glucGoal = settings?.goal_glucides  || 0
+  const lipGoal  = settings?.goal_lipides   || 0
 
-  const protMainEach  = (protGoal * (1 - COLLATION_PROT_SHARE)) / MAIN_MEALS.length
-  const protCollation = protGoal * COLLATION_PROT_SHARE
+  const activeMeals = MEALS_ORDER.filter(m => enabledMap[m])
 
+  // ── 1. Calories ──────────────────────────────────────────────────────────
+  const kcalLocked    = activeMeals.filter(m => overrides[m]?.kcal != null)
+  const kcalAuto      = activeMeals.filter(m => overrides[m]?.kcal == null)
+  const fixedKcalSum  = kcalLocked.reduce((s, m) => s + overrides[m].kcal, 0)
+  const remainingKcal = Math.max(0, kcalGoal - fixedKcalSum)
+  const autoWeightSum = kcalAuto.reduce((s, m) => s + MEAL_KCAL_SHARE[m], 0)
+
+  const mealKcal = {}
+  for (const meal of MEALS_ORDER) {
+    if (!enabledMap[meal]) { mealKcal[meal] = 0; continue }
+    if (overrides[meal]?.kcal != null) {
+      mealKcal[meal] = overrides[meal].kcal
+    } else {
+      const w = autoWeightSum > 0 ? MEAL_KCAL_SHARE[meal] / autoWeightSum : 0
+      mealKcal[meal] = remainingKcal * w
+    }
+  }
+
+  // ── 2. Protéines ─────────────────────────────────────────────────────────
+  const collationActive      = enabledMap['Collation']
+  const collationProtBudget  = collationActive ? protGoal * COLLATION_PROT_SHARE : 0
+  const mainMealsActive      = activeMeals.filter(m => m !== 'Collation')
+  const mainProtBudget       = protGoal - collationProtBudget
+
+  // Parmi les repas principaux actifs : part égale, sauf ceux verrouillés
+  const protLockedMain  = mainMealsActive.filter(m => overrides[m]?.prot != null)
+  const protAutoMain    = mainMealsActive.filter(m => overrides[m]?.prot == null)
+  const fixedMainProt   = protLockedMain.reduce((s, m) => s + overrides[m].prot, 0)
+  const remainingMainProt = Math.max(0, mainProtBudget - fixedMainProt)
+  const protPerAutoMain = protAutoMain.length > 0 ? remainingMainProt / protAutoMain.length : 0
+
+  // Collation protéines
+  const collationProtFinal = collationActive
+    ? (overrides['Collation']?.prot ?? collationProtBudget)
+    : 0
+
+  // ── 3. Glucides & Lipides (prorata kcal) ────────────────────────────────
+  const totalActiveKcal = activeMeals.reduce((s, m) => s + mealKcal[m], 0) || 1
+
+  // ── Assemblage ───────────────────────────────────────────────────────────
   const targets = {}
   for (const meal of MEALS_ORDER) {
-    const share = MEAL_KCAL_SHARE[meal]
-    const auto = {
-      kcal: kcalGoal * share,
-      prot: meal === 'Collation' ? protCollation : protMainEach,
-      gluc: glucGoal * share,
-      lip:  lipGoal * share,
+    if (!enabledMap[meal]) {
+      targets[meal] = { kcal: 0, prot: 0, gluc: 0, lip: 0, enabled: false,
+        isAuto: { kcal: true, prot: true, gluc: true, lip: true } }
+      continue
     }
-    const o = overrides[meal] || {}
-    const isAuto = {
-      kcal: o.kcal == null,
-      prot: o.prot == null,
-      gluc: o.gluc == null,
-      lip:  o.lip == null,
-    }
+
+    const ov       = overrides[meal] || {}
+    const kcalVal  = mealKcal[meal]
+    const kcalRatio = kcalVal / totalActiveKcal
+
+    let prot
+    if (meal === 'Collation') prot = collationProtFinal
+    else prot = ov.prot != null ? ov.prot : protPerAutoMain
+
+    const gluc = ov.gluc != null ? ov.gluc : glucGoal * kcalRatio
+    const lip  = ov.lip  != null ? ov.lip  : lipGoal  * kcalRatio
+
     targets[meal] = {
-      kcal: Math.round(isAuto.kcal ? auto.kcal : o.kcal),
-      prot: Math.round(isAuto.prot ? auto.prot : o.prot),
-      gluc: Math.round(isAuto.gluc ? auto.gluc : o.gluc),
-      lip:  Math.round(isAuto.lip  ? auto.lip  : o.lip),
-      isAuto,
+      kcal: Math.round(kcalVal),
+      prot: Math.round(prot),
+      gluc: Math.round(gluc),
+      lip:  Math.round(lip),
+      enabled: true,
+      isAuto: {
+        kcal: ov.kcal == null,
+        prot: ov.prot == null,
+        gluc: ov.gluc == null,
+        lip:  ov.lip  == null,
+      },
     }
   }
   return targets

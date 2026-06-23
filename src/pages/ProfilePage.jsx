@@ -4,7 +4,7 @@ import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw } from 'lucide-react'
-import { computeMealTargets, MEALS_ORDER } from '../lib/nutrients'
+import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
 
 const MEAL_ICONS = { 'Petit-déjeuner': Coffee, 'Déjeuner': Sun, 'Dîner': Moon, 'Collation': Cookie }
 
@@ -47,20 +47,28 @@ function GoalField({ icon, label, value, unit, color, onChange }) {
   )
 }
 
-function MealTargetCard({ meal, target, onChange, onReset }) {
+function MealTargetCard({ meal, target, allTargets, goalKcal, onChange, onReset, onToggleEnabled }) {
   const Icon = MEAL_ICONS[meal]
-  const hasOverride = !target.isAuto.kcal || !target.isAuto.prot || !target.isAuto.gluc || !target.isAuto.lip
+  const hasOverride = target.enabled && (!target.isAuto.kcal || !target.isAuto.prot || !target.isAuto.gluc || !target.isAuto.lip)
+
+  // Total des kcal attribuées = somme de tous les repas actifs
+  const totalAllocated = Object.values(allTargets).reduce((s, t) => s + (t.enabled ? t.kcal : 0), 0)
+  const kcalRemaining = goalKcal - totalAllocated
 
   const field = (key, label, color) => (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
       <input
         type="number"
         value={target[key]}
+        disabled={!target.enabled}
         onChange={e => onChange(key, e.target.value)}
         style={{
-          width: 56, textAlign: 'center', border: `1px solid ${target.isAuto[key] ? 'var(--border)' : color}`,
-          borderRadius: 6, padding: '6px 4px', fontSize: 13, fontWeight: 700, color,
-          background: target.isAuto[key] ? 'var(--gray-bg)' : 'var(--white)', fontFamily: 'var(--font)', outline: 'none',
+          width: 56, textAlign: 'center',
+          border: `1.5px solid ${!target.enabled ? 'var(--border)' : target.isAuto[key] ? 'var(--border)' : color}`,
+          borderRadius: 6, padding: '6px 4px', fontSize: 13, fontWeight: 700,
+          color: !target.enabled ? 'var(--text-hint)' : color,
+          background: !target.enabled ? 'var(--gray-bg)' : target.isAuto[key] ? 'var(--gray-bg)' : 'var(--white)',
+          fontFamily: 'var(--font)', outline: 'none', opacity: target.enabled ? 1 : 0.5,
         }}
       />
       <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>{label}</span>
@@ -68,24 +76,58 @@ function MealTargetCard({ meal, target, onChange, onReset }) {
   )
 
   return (
-    <div className="card" style={{ padding: '12px 14px', marginBottom: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
+    <div className="card" style={{ padding: '12px 14px', marginBottom: 8, opacity: target.enabled ? 1 : 0.6, transition: 'opacity .2s' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: target.enabled ? 9 : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          {Icon && <Icon size={15} color="var(--green)" />}
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{meal}</div>
+          {Icon && <Icon size={15} color={target.enabled ? 'var(--green)' : 'var(--text-hint)'} />}
+          <div style={{ fontWeight: 700, fontSize: 13, color: target.enabled ? 'var(--text)' : 'var(--text-hint)' }}>{meal}</div>
+          {!target.enabled && (
+            <span style={{ fontSize: 10, color: 'var(--text-hint)', background: 'var(--gray-bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px' }}>désactivé</span>
+          )}
         </div>
-        {hasOverride && (
-          <button onClick={onReset} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-hint)', fontFamily: 'var(--font)' }}>
-            <RotateCcw size={12} /> Auto
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {hasOverride && target.enabled && (
+            <button onClick={onReset} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-hint)', fontFamily: 'var(--font)' }}>
+              <RotateCcw size={11} /> Auto
+            </button>
+          )}
+          {/* Toggle actif/inactif */}
+          <button
+            onClick={onToggleEnabled}
+            style={{
+              width: 36, height: 20, borderRadius: 10, position: 'relative', flexShrink: 0,
+              background: target.enabled ? 'var(--green)' : 'var(--border-md)',
+              transition: 'background .2s',
+            }}
+          >
+            <div style={{
+              position: 'absolute', top: 2, left: target.enabled ? 18 : 2,
+              width: 16, height: 16, borderRadius: '50%', background: 'white',
+              transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+            }} />
           </button>
-        )}
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between' }}>
-        {field('kcal', 'kcal', 'var(--text)')}
-        {field('prot', 'Prot.', 'var(--green)')}
-        {field('gluc', 'Gluc.', 'var(--amber)')}
-        {field('lip',  'Lip.',  'var(--coral)')}
-      </div>
+
+      {target.enabled && (
+        <>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between' }}>
+            {field('kcal', 'kcal', 'var(--text)')}
+            {field('prot', 'Prot.', 'var(--green)')}
+            {field('gluc', 'Gluc.', 'var(--amber)')}
+            {field('lip',  'Lip.',  'var(--coral)')}
+          </div>
+          {!target.isAuto.kcal && (
+            <div style={{ marginTop: 7, fontSize: 11, color: Math.abs(kcalRemaining) < 2 ? 'var(--green)' : kcalRemaining < 0 ? 'var(--coral)' : 'var(--amber)' }}>
+              {Math.abs(kcalRemaining) < 2
+                ? '✓ Budget calorique équilibré'
+                : kcalRemaining < 0
+                  ? `⚠ ${Math.abs(Math.round(kcalRemaining))} kcal en trop au total`
+                  : `${Math.round(kcalRemaining)} kcal non attribuées (réparties automatiquement)`}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -178,6 +220,18 @@ export default function ProfilePage() {
     setGoalsDirty(true)
   }
 
+  const toggleMealEnabled = (meal) => {
+    setGoals(g => {
+      const enabled = { ...MEAL_ENABLED_DEFAULTS, ...(g.meal_enabled || {}) }
+      enabled[meal] = !enabled[meal]
+      // Quand on désactive, on purge les surcharges pour rendre le budget aux repas auto actifs
+      const overrides = { ...(g.meal_overrides || {}) }
+      if (!enabled[meal]) delete overrides[meal]
+      return { ...g, meal_enabled: enabled, meal_overrides: overrides }
+    })
+    setGoalsDirty(true)
+  }
+
   const handleSignOut = async () => {
     await signOut()
   }
@@ -261,8 +315,11 @@ export default function ProfilePage() {
           key={meal}
           meal={meal}
           target={mealTargets[meal]}
+          allTargets={mealTargets}
+          goalKcal={goals.goal_kcal}
           onChange={(key, val) => setMealOverride(meal, key, val)}
           onReset={() => resetMealOverrides(meal)}
+          onToggleEnabled={() => toggleMealEnabled(meal)}
         />
       ))}
 
