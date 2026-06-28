@@ -15,22 +15,8 @@ import { ALL_NUTRIENT_KEYS, computeMealTargets, MEALS_ORDER as MEALS } from '../
 const SUPPLEMENT_MEAL = 'Compléments'
 
 // ── Section compléments alimentaires ──────────────────────────────────────
-function SupplementSection({ date, onOpenModal }) {
-  const toast = useToast()
-  const { entries, addEntry, deleteEntry } = useJournal(date)
-  const supplements = entries.filter(e => e.meal === SUPPLEMENT_MEAL)
+function SupplementSection({ supplements, onOpenModal, onAdd, onDelete }) {
   const [collapsed, setCollapsed] = useState(false)
-
-  const handleAdd = async (entry) => {
-    const { error } = await addEntry(entry)
-    if (!error) toast('✓ Ajouté !')
-    else toast("Erreur lors de l'ajout")
-  }
-
-  const handleDelete = async (id) => {
-    await deleteEntry(id)
-    toast('Supprimé')
-  }
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -62,7 +48,7 @@ function SupplementSection({ date, onOpenModal }) {
         </button>
 
         <button
-          onClick={() => onOpenModal({ meal: SUPPLEMENT_MEAL, addEntry: handleAdd })}
+          onClick={() => onOpenModal({ meal: SUPPLEMENT_MEAL, addEntry: onAdd })}
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
             background: 'var(--purple-light, #ede9fe)',
@@ -108,7 +94,7 @@ function SupplementSection({ date, onOpenModal }) {
                   </div>
                 </div>
                 <button
-                  onClick={() => handleDelete(s.id)}
+                  onClick={() => onDelete(s.id)}
                   className="btn-icon"
                   style={{ color: 'var(--text-hint)', flexShrink: 0 }}
                   aria-label="Supprimer"
@@ -125,7 +111,10 @@ function SupplementSection({ date, onOpenModal }) {
 }
 
 function fmt(date) {
-  return date.toISOString().slice(0, 10)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function dateOffset(base, days) {
@@ -232,7 +221,12 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
               />
             ))}
         </div>
-        <SupplementSection date={fmt(date)} onOpenModal={onOpenModal} />
+        <SupplementSection
+          supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
+          onOpenModal={onOpenModal}
+          onAdd={handleAdd}
+          onDelete={handleDelete}
+        />
       </>
     </div>
   )
