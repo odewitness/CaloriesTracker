@@ -76,6 +76,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const [barcode, setBarcode] = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -100,11 +101,75 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
 //
 // APRÈS : coller ce bloc à la place
 
+  const mapOFFProduct = (p) => {
+    const n = p.nutriments || {}
+    return {
+      alim_nom: p.product_name || p.product_name_fr || 'Produit inconnu',
+      categorie: p.categories?.split(',')[0]?.trim() || 'Open Food Facts',
+      energie_kcal: Math.round(n['energy-kcal_100g'] || (n['energy_100g'] || 0) / 4.184),
+      proteines: parseFloat((n['proteins_100g'] || 0).toFixed(1)),
+      glucides: parseFloat((n['carbohydrates_100g'] || 0).toFixed(1)),
+      lipides: parseFloat((n['fat_100g'] || 0).toFixed(1)),
+      fibres: parseFloat((n['fiber_100g'] || 0).toFixed(1)),
+      vit_c: parseFloat(((n['vitamin-c_100g'] || 0) * 1000).toFixed(2)),
+      vit_d: parseFloat(((n['vitamin-d_100g'] || 0) * 1000000).toFixed(2)),
+      calcium: parseFloat(((n['calcium_100g'] || 0) * 1000).toFixed(1)),
+      fer: parseFloat(((n['iron_100g'] || 0) * 1000).toFixed(2)),
+      sucres: parseFloat((n['sugars_100g'] || 0).toFixed(1)),
+      acides_gras_satures: parseFloat((n['saturated-fat_100g'] || 0).toFixed(2)),
+      ag_monoinsatures: parseFloat((n['monounsaturated-fat_100g'] || 0).toFixed(2)),
+      ag_polyinsatures: parseFloat((n['polyunsaturated-fat_100g'] || 0).toFixed(2)),
+      cholesterol: parseFloat(((n['cholesterol_100g'] || 0) * 1000).toFixed(1)),
+      sel: parseFloat((n['salt_100g'] || 0).toFixed(2)),
+      magnesium: parseFloat(((n['magnesium_100g'] || 0) * 1000).toFixed(1)),
+      potassium: parseFloat(((n['potassium_100g'] || 0) * 1000).toFixed(1)),
+      zinc: parseFloat(((n['zinc_100g'] || 0) * 1000).toFixed(2)),
+      sodium: parseFloat(((n['sodium_100g'] || 0) * 1000).toFixed(1)),
+      cuivre: parseFloat(((n['copper_100g'] || 0) * 1000).toFixed(2)),
+      iode: parseFloat(((n['iodine_100g'] || 0) * 1000000).toFixed(1)),
+      manganese: parseFloat(((n['manganese_100g'] || 0) * 1000).toFixed(2)),
+      phosphore: parseFloat(((n['phosphorus_100g'] || 0) * 1000).toFixed(1)),
+      selenium: parseFloat(((n['selenium_100g'] || 0) * 1000000).toFixed(1)),
+      vit_b1: parseFloat(((n['vitamin-b1_100g'] || 0) * 1000).toFixed(3)),
+      vit_b2: parseFloat(((n['vitamin-b2_100g'] || 0) * 1000).toFixed(3)),
+      vit_b3: parseFloat(((n['vitamin-pp_100g'] || 0) * 1000).toFixed(2)),
+      vit_b5: parseFloat(((n['pantothenic-acid_100g'] || 0) * 1000).toFixed(2)),
+      vit_b6: parseFloat(((n['vitamin-b6_100g'] || 0) * 1000).toFixed(3)),
+      vit_b12: parseFloat(((n['vitamin-b12_100g'] || 0) * 1000000).toFixed(3)),
+      vit_a: parseFloat(((n['vitamin-a_100g'] || 0) * 1000000).toFixed(2)),
+      vit_e: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
+      vit_e_totale: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
+      vit_k1: parseFloat(((n['vitamin-k_100g'] || 0) * 1000000).toFixed(2)),
+      folates: parseFloat(((n['folates_100g'] || 0) * 1000000).toFixed(1)),
+      portions: p.serving_size ? [{ label: 'Portion recommandée', g: parseFloat(p.serving_size) || 100 }] : [],
+      _source: 'off',
+    }
+  }
+
   const doSearch = useCallback(async (q) => {
     if (!q || q.length < 2) { setResults([]); return }
     setSearching(true)
 
-    // 1. Ciqual + aliments custom (comportement existant)
+    if (searchSource === 'off') {
+      // Recherche Open Food Facts
+      try {
+        const res = await fetch(
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=product_name,product_name_fr,categories,nutriments,serving_size`
+        )
+        const data = await res.json()
+        const products = (data.products || [])
+          .filter(p => p.product_name || p.product_name_fr)
+          .map(mapOFFProduct)
+        setResults(products)
+      } catch {
+        toast('Erreur réseau Open Food Facts')
+        setResults([])
+      }
+      setSearching(false)
+      return
+    }
+
+    // Ciqual + aliments custom (comportement existant)
     const { data, error } = await supabase.rpc('search_ciqual', { query: q, lim: 25 })
     if (error) console.error('search_ciqual error:', error)
 
@@ -121,7 +186,6 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       _source: 'custom',
     }))
 
-    // 2. Recettes de l'utilisateur — NOUVEAU
     const { data: recettes } = await supabase
       .from('recettes')
       .select('*')
@@ -129,11 +193,10 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       .ilike('nom', `%${q}%`)
       .limit(5)
     const recettesMapped = (recettes || []).map(r => ({
-      // Champs attendus par FoodRow et confirm()
       id:           r.id,
       alim_nom:     r.nom,
       categorie:    `Recette · ${r.portions || 1} portion${r.portions > 1 ? 's' : ''}`,
-      energie_kcal: r.energie_kcal,   // déjà en /100g dans la table
+      energie_kcal: r.energie_kcal,
       proteines:    r.proteines,
       glucides:     r.glucides,
       lipides:      r.lipides,
@@ -141,7 +204,6 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       sel:          r.sel,
       sucres:       r.sucres,
       acides_gras_satures: r.acides_gras_satures,
-      // Portions suggérées : si poids connu, proposer une portion
       portions: r.poids_cuit_g || r.poids_cru_g
         ? [{
             label: `1 portion (${Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1))} g)`,
@@ -154,7 +216,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     const ciqualResults = data || []
     setResults([...ciqualResults, ...customMapped, ...recettesMapped])
     setSearching(false)
-  }, [user])
+  }, [user, searchSource])
 
 
 // ─── Dans FoodRow, ajouter le badge recette après les badges custom/off ──────
@@ -176,6 +238,12 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     timerRef.current = setTimeout(() => doSearch(v), 250)
   }
 
+  // Effacer les résultats et relancer la recherche quand on change de source
+  useEffect(() => {
+    setResults([])
+    if (query.length >= 2) doSearch(query)
+  }, [searchSource])
+
   // Entrée = lance la recherche immédiatement et ferme le clavier
   const handleSearchKeyDown = (e) => {
     if (e.key !== 'Enter') return
@@ -193,53 +261,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
       const data = await res.json()
       if (data.status === 1 && data.product) {
-        const p = data.product
-        const n = p.nutriments || {}
-        const food = {
-          alim_nom: p.product_name || 'Produit inconnu',
-          categorie: p.categories?.split(',')[0]?.trim() || 'Open Food Facts',
-          energie_kcal: Math.round(n['energy-kcal_100g'] || (n['energy_100g'] || 0) / 4.184),
-          proteines: parseFloat((n['proteins_100g'] || 0).toFixed(1)),
-          glucides: parseFloat((n['carbohydrates_100g'] || 0).toFixed(1)),
-          lipides: parseFloat((n['fat_100g'] || 0).toFixed(1)),
-          fibres: parseFloat((n['fiber_100g'] || 0).toFixed(1)),
-          vit_c: parseFloat(((n['vitamin-c_100g'] || 0) * 1000).toFixed(2)),
-          vit_d: parseFloat(((n['vitamin-d_100g'] || 0) * 1000000).toFixed(2)),
-          calcium: parseFloat(((n['calcium_100g'] || 0) * 1000).toFixed(1)),
-          fer: parseFloat(((n['iron_100g'] || 0) * 1000).toFixed(2)),
-          // Sucres : OFF ne donne que le total — pas de détail fructose/glucose/etc.
-          sucres: parseFloat((n['sugars_100g'] || 0).toFixed(1)),
-          // Acides gras : OFF donne saturés + parfois mono/poly-insaturés + cholestérol,
-          // jamais le détail par longueur de chaîne (oméga-3/6 etc. restent à 0 via OFF).
-          acides_gras_satures: parseFloat((n['saturated-fat_100g'] || 0).toFixed(2)),
-          ag_monoinsatures: parseFloat((n['monounsaturated-fat_100g'] || 0).toFixed(2)),
-          ag_polyinsatures: parseFloat((n['polyunsaturated-fat_100g'] || 0).toFixed(2)),
-          cholesterol: parseFloat(((n['cholesterol_100g'] || 0) * 1000).toFixed(1)),
-          sel: parseFloat((n['salt_100g'] || 0).toFixed(2)),
-          magnesium: parseFloat(((n['magnesium_100g'] || 0) * 1000).toFixed(1)),
-          potassium: parseFloat(((n['potassium_100g'] || 0) * 1000).toFixed(1)),
-          zinc: parseFloat(((n['zinc_100g'] || 0) * 1000).toFixed(2)),
-          sodium: parseFloat(((n['sodium_100g'] || 0) * 1000).toFixed(1)),
-          cuivre: parseFloat(((n['copper_100g'] || 0) * 1000).toFixed(2)),
-          iode: parseFloat(((n['iodine_100g'] || 0) * 1000000).toFixed(1)),
-          manganese: parseFloat(((n['manganese_100g'] || 0) * 1000).toFixed(2)),
-          phosphore: parseFloat(((n['phosphorus_100g'] || 0) * 1000).toFixed(1)),
-          selenium: parseFloat(((n['selenium_100g'] || 0) * 1000000).toFixed(1)),
-          vit_b1: parseFloat(((n['vitamin-b1_100g'] || 0) * 1000).toFixed(3)),
-          vit_b2: parseFloat(((n['vitamin-b2_100g'] || 0) * 1000).toFixed(3)),
-          vit_b3: parseFloat(((n['vitamin-pp_100g'] || 0) * 1000).toFixed(2)),
-          vit_b5: parseFloat(((n['pantothenic-acid_100g'] || 0) * 1000).toFixed(2)),
-          vit_b6: parseFloat(((n['vitamin-b6_100g'] || 0) * 1000).toFixed(3)),
-          vit_b12: parseFloat(((n['vitamin-b12_100g'] || 0) * 1000000).toFixed(3)),
-          vit_a: parseFloat(((n['vitamin-a_100g'] || 0) * 1000000).toFixed(2)),
-          vit_e: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
-          vit_e_totale: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
-          vit_k1: parseFloat(((n['vitamin-k_100g'] || 0) * 1000000).toFixed(2)),
-          folates: parseFloat(((n['folates_100g'] || 0) * 1000000).toFixed(1)),
-          portions: p.serving_size ? [{ label: 'Portion recommandée', g: parseFloat(p.serving_size) || 100 }] : [],
-          _source: 'off'
-        }
-        selectFood(food)
+        selectFood(mapOFFProduct(data.product))
       } else {
         toast('Produit non trouvé dans Open Food Facts')
       }
@@ -327,13 +349,59 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                 ref={searchRef}
                 className="input"
                 style={{ paddingLeft: 36 }}
-                placeholder="Poulet, riz, pomme..."
+                placeholder={searchSource === 'off' ? 'Nutella, Activia, Président...' : 'Poulet, riz, pomme...'}
                 value={query}
                 onChange={e => handleQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 enterKeyHint="search"
                 inputMode="search"
               />
+            </div>
+
+            {/* Source toggle */}
+            <div style={{
+              display: 'flex',
+              background: 'var(--gray-bg)',
+              borderRadius: 'var(--radius-sm)',
+              padding: 3,
+              marginBottom: 10,
+              flexShrink: 0,
+              gap: 3,
+            }}>
+              {[
+                { id: 'ciqual', label: '🥦 Ciqual', sublabel: 'Base ANSES' },
+                { id: 'off',    label: '🌍 Open Food Facts', sublabel: 'Produits emballés' },
+              ].map(src => {
+                const active = searchSource === src.id
+                return (
+                  <button
+                    key={src.id}
+                    onClick={() => setSearchSource(src.id)}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 1,
+                      padding: '7px 6px',
+                      borderRadius: 7,
+                      background: active
+                        ? (src.id === 'off' ? 'var(--blue)' : 'var(--green)')
+                        : 'transparent',
+                      color: active ? 'white' : 'var(--text-muted)',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      fontFamily: 'var(--font)',
+                      transition: 'all .15s',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{src.label}</span>
+                    <span style={{ fontSize: 9, fontWeight: 500, opacity: active ? 0.85 : 0.6 }}>{src.sublabel}</span>
+                  </button>
+                )
+              })}
             </div>
 
             {/* Barcode row */}
@@ -377,7 +445,11 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
               {searching && <div className="loader"><div className="spinner" /> Recherche...</div>}
 
               {!searching && query.length >= 2 && results.length === 0 && (
-                <div className="empty">Aucun résultat pour « {query} »</div>
+                <div className="empty">
+                  {searchSource === 'off'
+                    ? `Aucun résultat dans Open Food Facts pour « ${query} »`
+                    : `Aucun résultat pour « ${query} »`}
+                </div>
               )}
 
               {!searching && query.length >= 2 && results.map((food, i) => (
@@ -392,7 +464,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
 
               {!searching && query.length < 2 && (
                 <>
-                  {favoris.length > 0 && (
+                  {searchSource === 'ciqual' && favoris.length > 0 && (
                     <>
                       <div className="section-title" style={{ marginTop: 4 }}>★ Favoris</div>
                       {favoris.map(f => (
@@ -407,7 +479,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                     </>
                   )}
 
-                  {recentsFiltered.length > 0 && (
+                  {searchSource === 'ciqual' && recentsFiltered.length > 0 && (
                     <>
                       <div className="section-title" style={{ marginTop: favoris.length > 0 ? 16 : 4 }}>Récents (3 derniers jours)</div>
                       {recentsFiltered.map((food, i) => (
@@ -422,8 +494,12 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                     </>
                   )}
 
-                  {favoris.length === 0 && recentsFiltered.length === 0 && (
-                    <div className="empty">Tape au moins 2 caractères</div>
+                  {(searchSource === 'off' || (favoris.length === 0 && recentsFiltered.length === 0)) && (
+                    <div className="empty">
+                      {searchSource === 'off'
+                        ? 'Tape le nom d\'un produit emballé (marque, référence…)'
+                        : 'Tape au moins 2 caractères'}
+                    </div>
                   )}
                 </>
               )}
