@@ -3,26 +3,19 @@ import { useEffect, useRef } from 'react'
 /**
  * Intercepts the Android/browser back button while a modal is open.
  *
- * How it works:
- *  - On mount, pushes a dummy history entry so the back button has somewhere
- *    to "go back to" without leaving the app.
- *  - On popstate (back button pressed), calls onBack() instead of navigating.
- *  - On unmount via UI (close/edit/delete buttons), silently neutralises the
- *    dummy entry with replaceState so no popstate fires and AppShell never
- *    sees a navigation event.
- *
- * Usage: call inside any modal component.
- *   useBackButton(onClose)
+ * Strategy:
+ *  - On mount: push a dummy entry { modal: true } so back has somewhere to go.
+ *  - On popstate: mark that back-button was used, then call onBack().
+ *  - On unmount via UI (✕, edit, delete…): the dummy entry is already gone if
+ *    back was pressed, or is left as a harmless orphan if not — either way we
+ *    never call history.back() / history.go() here, so no spurious popstate
+ *    fires and AppShell never navigates away.
  */
 export function useBackButton(onBack) {
-  // True when the modal was dismissed by the hardware/browser back button.
-  // False when dismissed programmatically (close button, edit, delete…).
   const closedByBackButton = useRef(false)
 
   useEffect(() => {
     closedByBackButton.current = false
-
-    // Push a dummy state so the back button has an entry to pop.
     history.pushState({ modal: true }, '')
 
     const handlePop = () => {
@@ -34,13 +27,13 @@ export function useBackButton(onBack) {
 
     return () => {
       window.removeEventListener('popstate', handlePop)
-
-      if (!closedByBackButton.current && history.state?.modal) {
-        // The modal was closed by its own UI (not the back button).
-        // Silently overwrite the dummy history entry in-place so the stack
-        // stays clean without dispatching a popstate event.
-        // This prevents AppShell's popstate listener from routing to 'today'.
-        history.replaceState(null, '')
+      // If the modal was closed by its own UI (not the back button), the dummy
+      // entry is still on the stack. We neutralise it with replaceState so it
+      // no longer carries { modal:true }, without firing any popstate event.
+      // We do NOT call history.back() / go() — that would fire popstate and
+      // trigger AppShell's listener, sending the user back to 'today'.
+      if (!closedByBackButton.current) {
+        history.replaceState({ modal: false }, '')
       }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
