@@ -165,6 +165,9 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
   const { entries, loading, addEntry, deleteEntry, updateEntry } = useJournal(fmt(date))
   const { settings } = useSettings()
 
+  console.log('meal_enabled:', settings?.meal_enabled)
+console.log('Compléments enabled:', settings?.meal_enabled?.['Compléments'])
+
   const totals = useMemo(() => {
     const t = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 }
     for (const key of ALL_NUTRIENT_KEYS) t[key] = 0
