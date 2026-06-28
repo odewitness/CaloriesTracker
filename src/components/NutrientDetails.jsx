@@ -135,7 +135,7 @@ export default function NutrientDetails({ totals, hasEntries }) {
         onClick={() => setOpen(o => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}
       >
-        <span style={{ fontWeight: 600, fontSize: 14 }}>Détail sucres & acides gras</span>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>Détail sucres & acides gras 2</span>
         <ChevronDown size={18} color="var(--text-muted)" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
       </button>
 
