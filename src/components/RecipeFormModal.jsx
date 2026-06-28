@@ -276,6 +276,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [showSearch,  setShowSearch]  = useState(false)
   const [saving,      setSaving]      = useState(false)
   const [openWeighing, setOpenWeighing] = useState(false)
+  const weighingRef = useRef(null)
 
   // Poids brut cru = somme des qty_g de tous les ingrédients (calculé auto)
   const poidsCruG = ingredients.reduce((s, i) => s + (parseFloat(i.qty_g) || 0), 0)
@@ -390,9 +391,15 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
 
         {/* ── Section pesée ── */}
         {ingredients.length > 0 && (
-          <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
+          <div ref={weighingRef} className="card" style={{ marginBottom: 12 }}>
             <button
-              onClick={() => setOpenWeighing(o => !o)}
+              onClick={() => {
+                setOpenWeighing(o => {
+                  const next = !o
+                  if (next) setTimeout(() => weighingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
+                  return next
+                })
+              }}
               style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
