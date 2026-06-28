@@ -49,6 +49,7 @@ function FoodRow({ food, isFav, onSelect, onToggleFav }) {
           {food.categorie}
           {food._source === 'custom' && <span style={{ marginLeft: 6, background: 'var(--purple-light)', color: 'var(--purple)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Perso</span>}
           {food._source === 'off' && <span style={{ marginLeft: 6, background: 'var(--blue-light)', color: 'var(--blue)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>OFF</span>}
+          {food._source === 'recette' && <span style={{ marginLeft: 6, background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Mes recettes</span>}
         </div>
       </div>
       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-dark)', flexShrink: 0 }}>{food.energie_kcal} kcal/100g</span>
@@ -92,82 +93,40 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     return () => clearTimeout(t)
   }, [step])
 
-// ─── Remplacer la fonction doSearch dans AddFoodModal.jsx ───────────────────
-//
-// AVANT (ligne ~95) :
-//   const doSearch = useCallback(async (q) => { ... }, [user])
-//
-// APRÈS : coller ce bloc à la place
-
   const doSearch = useCallback(async (q) => {
     if (!q || q.length < 2) { setResults([]); return }
     setSearching(true)
-
-    // 1. Ciqual + aliments custom (comportement existant)
     const { data, error } = await supabase.rpc('search_ciqual', { query: q, lim: 25 })
     if (error) console.error('search_ciqual error:', error)
-
-    const { data: custom } = await supabase
-      .from('aliments_custom')
-      .select('*')
-      .eq('user_id', user.id)
-      .ilike('nom', `%${q}%`)
-      .limit(5)
-    const customMapped = (custom || []).map(c => ({
-      ...c,
-      alim_nom: c.nom,
-      categorie: c.categorie || 'Personnalisé',
-      _source: 'custom',
-    }))
-
-    // 2. Recettes de l'utilisateur — NOUVEAU
-    const { data: recettes } = await supabase
-      .from('recettes')
-      .select('*')
-      .eq('user_id', user.id)
-      .ilike('nom', `%${q}%`)
-      .limit(5)
-    const recettesMapped = (recettes || []).map(r => ({
-      // Champs attendus par FoodRow et confirm()
-      id:           r.id,
-      alim_nom:     r.nom,
-      categorie:    `Recette · ${r.portions || 1} portion${r.portions > 1 ? 's' : ''}`,
-      energie_kcal: r.energie_kcal,   // déjà en /100g dans la table
-      proteines:    r.proteines,
-      glucides:     r.glucides,
-      lipides:      r.lipides,
-      fibres:       r.fibres,
-      sel:          r.sel,
-      sucres:       r.sucres,
-      acides_gras_satures: r.acides_gras_satures,
-      // Portions suggérées : si poids connu, proposer une portion
-      portions: r.poids_cuit_g || r.poids_cru_g
-        ? [{
-            label: `1 portion (${Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1))} g)`,
-            g: Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1)),
-          }]
-        : [],
-      _source: 'recette',
-    }))
-
-    const ciqualResults = data || []
-    setResults([...ciqualResults, ...customMapped, ...recettesMapped])
+    if (!data || data.length === 0) {
+      // fallback : aliments custom scopés à l'utilisateur
+      const { data: custom } = await supabase
+        .from('aliments_custom')
+        .select('*')
+        .eq('user_id', user.id)
+        .ilike('nom', `%${q}%`)
+        .limit(10)
+      setResults((custom || []).map(c => ({
+        ...c, alim_nom: c.nom, categorie: c.categorie || 'Personnalisé',
+        energie_kcal: c.energie_kcal, proteines: c.proteines, glucides: c.glucides,
+        lipides: c.lipides, fibres: c.fibres, portions: c.portions,
+        _source: 'custom'
+      })))
+    } else {
+      // merge avec custom scopés à l'utilisateur
+      const { data: custom } = await supabase
+        .from('aliments_custom')
+        .select('*')
+        .eq('user_id', user.id)
+        .ilike('nom', `%${q}%`)
+        .limit(5)
+      const customMapped = (custom || []).map(c => ({
+        ...c, alim_nom: c.nom, categorie: c.categorie || 'Personnalisé', _source: 'custom'
+      }))
+      setResults([...data, ...customMapped])
+    }
     setSearching(false)
   }, [user])
-
-
-// ─── Dans FoodRow, ajouter le badge recette après les badges custom/off ──────
-//
-// AVANT :
-//   {food._source === 'off' && <span ...>OFF</span>}
-//
-// APRÈS : ajouter cette ligne juste en dessous
-//
-//   {food._source === 'recette' && (
-//     <span style={{ marginLeft: 6, background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>
-//       Recette
-//     </span>
-//   )}
 
   const handleQuery = (v) => {
     setQuery(v)
