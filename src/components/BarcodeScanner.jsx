@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { X, CameraOff } from 'lucide-react'
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/browser'
-import { DecodeHintType, BarcodeFormat } from '@zxing/library'
+import { BrowserMultiFormatReader } from '@zxing/browser'
+import { DecodeHintType, BarcodeFormat, NotFoundException } from '@zxing/library'
 
 export default function BarcodeScanner({ onDetected, onClose }) {
   const videoRef = useRef(null)
