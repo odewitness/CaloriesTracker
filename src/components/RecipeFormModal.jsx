@@ -271,6 +271,8 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [nom,      setNom]      = useState(recette?.nom      || '')
   const [portions, setPortions] = useState(String(recette?.portions || 1))
   const [poidsCuitG, setPoidsCuitG] = useState(recette?.poids_cuit_g ? String(recette.poids_cuit_g) : '')
+  const [tare,       setTare]       = useState('')
+  const [totalBrut,  setTotalBrut]  = useState('')
 
   const [ingredients, setIngredients] = useState(initIngredients)
   const [showSearch,  setShowSearch]  = useState(false)
@@ -281,13 +283,21 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   // Poids brut cru = somme des qty_g de tous les ingrédients (calculé auto)
   const poidsCruG = ingredients.reduce((s, i) => s + (parseFloat(i.qty_g) || 0), 0)
 
+  // Méthode tare : poids cuit net = total brut − tare
+  const poidsCuitFromTare = parseFloat(tare) > 0 && parseFloat(totalBrut) > 0
+    ? Math.max(0, parseFloat(totalBrut) - parseFloat(tare))
+    : 0
+
+  // Poids cuit effectif : méthode tare en priorité, sinon saisie directe
+  const poidsCuitNet = poidsCuitFromTare > 0 ? poidsCuitFromTare : (parseFloat(poidsCuitG) || 0)
+
   // Totaux nutritionnels bruts (pour le plat entier)
   const totaux = sumIngredients(ingredients)
 
   // Référence de poids pour le calcul /100g :
   // si le poids cuit est renseigné → on l'utilise (méthode scientifique)
   // sinon → on utilise le poids cru
-  const poidsRef = parseFloat(poidsCuitG) > 0 ? parseFloat(poidsCuitG) : poidsCruG
+  const poidsRef = poidsCuitNet > 0 ? poidsCuitNet : poidsCruG
   const per100   = poidsRef > 0 ? calcPer100g(totaux, poidsRef) : null
 
   // ── Ajouter un ingrédient ─────────────────────────────────────────────────
@@ -309,7 +319,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
       nom,
       portions:        parseInt(portions, 10) || 1,
       poidsCruG,
-      poidsCuitG:      parseFloat(poidsCuitG) || null,
+      poidsCuitG:      poidsCuitNet > 0 ? poidsCuitNet : null,
       poidsReferenceG: poidsRef,
       ingredients,
     })
@@ -412,7 +422,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
             {openWeighing && (
               <div style={{ padding: '0 16px 16px' }}>
                 {/* Poids cru calculé */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, padding: '10px 12px', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)' }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Poids cru total</div>
                     <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2 }}>Somme de tous les ingrédients</div>
@@ -420,18 +430,71 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
                   <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--green)' }}>{Math.round(poidsCruG)} g</span>
                 </div>
 
-                {/* Poids cuit saisi */}
+                {/* ── Méthode tare (recommandée) ── */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-hint)', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>
+                  ⚖️ Méthode recommandée — avec tare
+                </div>
+
+                {/* ① Tare */}
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-                    Poids du plat <strong>après cuisson</strong> (optionnel mais recommandé)
+                    ① Poids du récipient <strong>vide</strong> (tare)
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <input
-                      className="input-sm"
-                      type="text" inputMode="decimal"
+                      className="input-sm" type="text" inputMode="decimal"
+                      placeholder="—" value={tare} onChange={e => setTare(e.target.value)}
+                      style={{ width: 90 }}
+                    />
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
+                  </div>
+                </div>
+
+                {/* ② Poids total brut */}
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    ② Poids total après cuisson <strong>(récipient + nourriture)</strong>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      className="input-sm" type="text" inputMode="decimal"
+                      placeholder="—" value={totalBrut} onChange={e => setTotalBrut(e.target.value)}
+                      style={{ width: 90 }}
+                    />
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
+                  </div>
+                </div>
+
+                {/* Résultat tare */}
+                {poidsCuitFromTare > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--green-light)', borderRadius: 8, marginBottom: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green-dark)' }}>✓ Poids cuit net</div>
+                      <div style={{ fontSize: 11, color: 'var(--green-dark)', marginTop: 2 }}>{totalBrut} − {tare} g</div>
+                    </div>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{Math.round(poidsCuitFromTare)} g</span>
+                  </div>
+                )}
+
+                {/* Séparateur */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 12px' }}>
+                  <div style={{ flex: 1, height: '0.5px', background: 'var(--border)' }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>ou saisie directe</span>
+                  <div style={{ flex: 1, height: '0.5px', background: 'var(--border)' }} />
+                </div>
+
+                {/* Poids cuit direct (désactivé si méthode tare active) */}
+                <div style={{ marginBottom: 10, opacity: poidsCuitFromTare > 0 ? 0.45 : 1 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    Poids cuit net {poidsCuitFromTare > 0 ? <span style={{ color: 'var(--text-hint)' }}>(remplacé par la méthode tare)</span> : <strong>direct</strong>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      className="input-sm" type="text" inputMode="decimal"
                       placeholder="—"
-                      value={poidsCuitG}
-                      onChange={e => setPoidsCuitG(e.target.value)}
+                      value={poidsCuitFromTare > 0 ? Math.round(poidsCuitFromTare) : poidsCuitG}
+                      onChange={poidsCuitFromTare > 0 ? undefined : e => setPoidsCuitG(e.target.value)}
+                      readOnly={poidsCuitFromTare > 0}
                       style={{ width: 90 }}
                     />
                     <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
@@ -439,17 +502,15 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
                 </div>
 
                 {/* Explication méthode */}
-                <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.5, background: 'var(--blue-light)', borderRadius: 8, padding: '8px 10px' }}>
-                  💡 <strong>Méthode scientifique :</strong> les kcal totales sont calculées sur les ingrédients crus,
-                  puis ramenées à 100 g sur la base du poids <em>cuit</em>. Si tu ne pèses pas le plat cuit,
-                  les kcal/100 g seront calculées sur le poids cru (moins précis pour les recettes qui cuisent longtemps).
+                <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.5, background: 'var(--blue-light)', borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
+                  💡 <strong>Méthode :</strong> pèse le récipient vide (tare), cuisine, puis pèse le tout. La différence = poids cuit net. Les kcal totales restent calculées sur les ingrédients crus.
                 </div>
 
                 {/* Référence utilisée */}
                 {poidsRef > 0 && (
                   <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>
                     Référence utilisée : <strong style={{ color: 'var(--text)' }}>{Math.round(poidsRef)} g</strong>
-                    {parseFloat(poidsCuitG) > 0 ? ' (poids cuit ✓)' : ' (poids cru — renseigne le poids cuit pour plus de précision)'}
+                    {poidsCuitNet > 0 ? ' (poids cuit ✓)' : ' (poids cru — renseigne le poids cuit pour plus de précision)'}
                   </div>
                 )}
               </div>
@@ -460,7 +521,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
         {/* ── Récap nutritionnel /100g ── */}
         {per100 && (
           <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-            <div className="section-title">Valeurs pour 100 g de plat {parseFloat(poidsCuitG) > 0 ? 'cuit' : 'cru'}</div>
+            <div className="section-title">Valeurs pour 100 g de plat {poidsCuitNet > 0 ? 'cuit' : 'cru'}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 10 }}>
               {[
                 { label: 'kcal',   val: Math.round(per100.energie_kcal || 0), color: 'var(--text)'  },

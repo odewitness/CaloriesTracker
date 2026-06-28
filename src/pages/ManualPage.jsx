@@ -156,7 +156,7 @@ function RecipeDetailWrapper({ recette, onEdit, onDelete, onClose }) {
       <div className="page-modal-header">
         <div style={{ width: 32 }} />
         <h2>{recette.nom}</h2>
-        <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
+        <button className="btn-icon" onClick={() => window.history.back()}><X size={20} color="var(--text-muted)" /></button>
       </div>
       <div className="loader"><div className="spinner" /> Chargement...</div>
     </div>
@@ -174,7 +174,7 @@ function RecipeEditWrapper({ recette, onSaved, onClose }) {
       <div className="page-modal-header">
         <div style={{ width: 32 }} />
         <h2>Chargement...</h2>
-        <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
+        <button className="btn-icon" onClick={() => window.history.back()}><X size={20} color="var(--text-muted)" /></button>
       </div>
       <div className="loader"><div className="spinner" /> Chargement...</div>
     </div>

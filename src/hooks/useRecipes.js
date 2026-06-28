@@ -166,7 +166,11 @@ export async function saveRecette({ userId, recetteId, nom, portions, poidsRefer
   await supabase.from('recette_ingredients').delete().eq('recette_id', id).eq('user_id', userId)
 
   if (ingredients.length > 0) {
-    const rows = ingredients.map(ing => ({ ...ing, recette_id: id, user_id: userId }))
+    // Supprime les champs côté client (_tmpId, id existant, etc.) avant l'insert
+    const rows = ingredients.map(({
+      _tmpId, id: _ingId, recette_id: _rid, user_id: _uid, created_at,
+      ...ingData
+    }) => ({ ...ingData, recette_id: id, user_id: userId }))
     const { error } = await supabase.from('recette_ingredients').insert(rows)
     if (error) return { error }
   }
