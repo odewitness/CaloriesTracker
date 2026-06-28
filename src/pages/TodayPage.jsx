@@ -199,7 +199,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
   }
 
   return (
-    <div className="page-content" style={{ width: '33.333%', flexShrink: 0, boxSizing: 'border-box' }}>
+    <div style={{ width: '33.333%', flexShrink: 0, boxSizing: 'border-box', padding: '16px 16px 90px' }}>
       <DateHeader date={date} onNavigate={onNavigate} />
       <>
         <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
