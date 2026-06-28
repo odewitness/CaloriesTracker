@@ -199,7 +199,15 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
   }
 
   return (
-    <div style={{ width: '33.333%', flexShrink: 0, boxSizing: 'border-box', padding: '16px 16px 90px' }}>
+    <div style={{
+  width: '33.333%',
+  flexShrink: 0,
+  boxSizing: 'border-box',
+  padding: '16px 16px 90px',
+  height: '100%',                       // ← chaque slot = hauteur du viewport
+  overflowY: 'auto',                    // ← scroll indépendant par slot
+  WebkitOverflowScrolling: 'touch',     // ← momentum scroll iOS
+}}>
       <DateHeader date={date} onNavigate={onNavigate} />
       <>
         <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
@@ -340,7 +348,7 @@ export default function TodayPage() {
       {/* Conteneur masquant les slots latéraux */}
       <div
         ref={wrapperRef}
-        style={{ overflowX: 'hidden', position: 'relative' }}
+        style={{ overflowX: 'hidden', position: 'relative', height: '100%' }}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -349,6 +357,7 @@ export default function TodayPage() {
           style={{
             display: 'flex',
             width: '300%',
+            height: '100%',  
             transform: `translateX(${sliderTranslate}%)`,
             transition: animating ? 'transform .28s cubic-bezier(.25,.46,.45,.94)' : 'none',
             willChange: 'transform',
