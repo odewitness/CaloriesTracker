@@ -232,14 +232,14 @@ console.log('Compléments enabled:', settings?.meal_enabled?.['Compléments'])
               />
             ))}
         </div>
-        {settings.meal_enabled?.['Compléments'] !== false && (
-          <SupplementSection
-            supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
-            onOpenModal={onOpenModal}
-            onAdd={handleAdd}
-            onDelete={handleDelete}
-          />
-        )}
+{true && (
+  <SupplementSection
+    supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
+    onOpenModal={onOpenModal}
+    onAdd={handleAdd}
+    onDelete={handleDelete}
+  />
+)}
       </>
     </div>
   )
