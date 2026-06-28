@@ -152,24 +152,16 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
 
     if (searchSource === 'off') {
       try {
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 8000)
         const res = await fetch(
-          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_fr,categories,nutriments,serving_size`,
-          {
-            signal: controller.signal,
-            headers: { 'User-Agent': 'NutriApp/1.0 (contact@nutriapp.fr)' },
-          }
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=product_name,product_name_fr,categories,nutriments,serving_size`
         )
-        clearTimeout(timeout)
         const data = await res.json()
         const products = (data.products || [])
           .filter(p => p.product_name || p.product_name_fr)
           .map(mapOFFProduct)
         setResults(products)
-      } catch (err) {
-        if (err.name === 'AbortError') toast('Open Food Facts trop lent, réessaie')
-        else toast('Erreur réseau Open Food Facts')
+      } catch {
+        toast('Erreur réseau Open Food Facts')
         setResults([])
       }
       setSearching(false)
