@@ -271,7 +271,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [nom,      setNom]      = useState(recette?.nom      || '')
   const [portions, setPortions] = useState(String(recette?.portions || 1))
   const [poidsCuitG, setPoidsCuitG] = useState(recette?.poids_cuit_g ? String(recette.poids_cuit_g) : '')
-  const [tare,       setTare]       = useState('')
+  const [tare,       setTare]       = useState(recette?.tare_g ? String(recette.tare_g) : '')
   const [totalBrut,  setTotalBrut]  = useState('')
 
   const [ingredients, setIngredients] = useState(initIngredients)
@@ -320,6 +320,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
       portions:        parseInt(portions, 10) || 1,
       poidsCruG,
       poidsCuitG:      poidsCuitNet > 0 ? poidsCuitNet : null,
+      tareG:           parseFloat(tare) > 0 ? parseFloat(tare) : null,
       poidsReferenceG: poidsRef,
       ingredients,
     })
@@ -448,6 +449,11 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
                     />
                     <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
                   </div>
+                  {parseFloat(tare) > 0 && !totalBrut && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: 'var(--amber)', background: 'var(--amber-light, #fff8e1)', borderRadius: 6, padding: '5px 8px' }}>
+                      ⏳ Tare sauvegardée — renseigne le poids total ② après cuisson pour finaliser.
+                    </div>
+                  )}
                 </div>
 
                 {/* ② Poids total brut */}
