@@ -1,125 +1,75 @@
 import React, { useEffect, useRef, useState } from 'react'
-import Quagga from '@ericblade/quagga2'
 import { X, CameraOff } from 'lucide-react'
-
-// Validates EAN-13 / EAN-8 / UPC-A check digit to reject misreads
-function isValidChecksum(code) {
-  if (!/^\d+$/.test(code)) return false
-  const digits = code.split('').map(Number)
-  const checkDigit = digits.pop()
-  // EAN-13 / EAN-8 / UPC-A all use the same weighted mod-10 algorithm,
-  // alternating weights 3/1 from the rightmost digit before the check digit.
-  let sum = 0
-  for (let i = 0; i < digits.length; i++) {
-    const weight = (digits.length - i) % 2 === 0 ? 1 : 3
-    sum += digits[i] * weight
-  }
-  const expected = (10 - (sum % 10)) % 10
-  return expected === checkDigit
-}
-
-// Le checksum (voir isValidChecksum) filtre déjà la grande majorité des
-// mauvais scans, mais pas tous : un code mal lu a statistiquement ~1
-// chance sur 10 de retomber quand même sur un checksum valide. Avec
-// REQUIRED_MATCHES = 1, ce genre de faux positif est accepté instantanément
-// et donne l'impression que le scanner "invente" un produit au hasard.
-// 2 lectures identiques d'affilée (quelques dizaines de ms à 30fps) reste
-// quasi instantané comme Yazio, tout en rendant un faux positif
-// quasiment impossible (il faudrait lire deux fois EXACTEMENT le même
-// mauvais code à la suite).
-const REQUIRED_MATCHES = 2
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/browser'
+import { DecodeHintType, BarcodeFormat } from '@zxing/library'
 
 export default function BarcodeScanner({ onDetected, onClose }) {
   const videoRef = useRef(null)
+  const readerRef = useRef(null)
+  const detectedRef = useRef(false)
   const [error, setError] = useState(null)
   const [ready, setReady] = useState(false)
-  const detectedRef = useRef(false)
-  const candidatesRef = useRef({}) // code -> consecutive count
-  const lastCodeRef = useRef(null)
 
   useEffect(() => {
     detectedRef.current = false
-    candidatesRef.current = {}
-    lastCodeRef.current = null
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError("Ton navigateur ne supporte pas l'accès à la caméra.")
-      return
-    }
+    const hints = new Map()
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+    ])
+    hints.set(DecodeHintType.TRY_HARDER, true)
 
-    Quagga.init(
-      {
-        inputStream: {
-          type: 'LiveStream',
-          target: videoRef.current,
-          constraints: {
-            facingMode: 'environment',
-            width: { min: 480, ideal: 720, max: 1280 },
-            height: { min: 480, ideal: 720, max: 1280 },
-            advanced: [{ focusMode: 'continuous' }, { zoom: 1 }],
-          },
-        },
-        locator: { patchSize: 'large', halfSample: true },
-        numOfWorkers: navigator.hardwareConcurrency || 2,
-        frequency: 30,
-        decoder: {
-          readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader'],
-          multiple: false,
-        },
-        locate: true,
-      },
-      (err) => {
-        if (err) {
-          console.error('Quagga init error:', err)
-          if (err.name === 'NotAllowedError' || /Permission/i.test(err.message || '')) {
-            setError("Accès à la caméra refusé. Autorise la caméra dans les paramètres de ton navigateur.")
-          } else if (err.name === 'NotFoundError') {
-            setError('Aucune caméra trouvée sur cet appareil.')
-          } else {
-            setError("Impossible d'ouvrir la caméra. Essaie de saisir le code-barres manuellement.")
+    const reader = new BrowserMultiFormatReader(hints)
+    readerRef.current = reader
+
+    const startScanner = async () => {
+      try {
+        // Préférer la caméra arrière
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices()
+        const backCamera = devices.find(d =>
+          /back|rear|environment/i.test(d.label)
+        ) || devices[devices.length - 1]
+
+        const deviceId = backCamera?.deviceId
+
+        await reader.decodeFromVideoDevice(
+          deviceId,
+          videoRef.current,
+          (result, err) => {
+            if (detectedRef.current) return
+            if (result) {
+              detectedRef.current = true
+              if (navigator.vibrate) navigator.vibrate(60)
+              onDetected(result.getText())
+              return
+            }
+            if (err && !(err instanceof NotFoundException)) {
+              console.warn('ZXing decode error:', err)
+            }
           }
-          return
-        }
-        Quagga.start()
+        )
         setReady(true)
-      }
-    )
-
-    const handleDetected = (result) => {
-      if (detectedRef.current) return
-      const code = result?.codeResult?.code
-      if (!code) return
-
-      // Reject codes that fail the standard checksum — these are misreads
-      if (!isValidChecksum(code)) {
-        candidatesRef.current = {}
-        lastCodeRef.current = null
-        return
-      }
-
-      // Require the same valid code to be read several times in a row
-      if (code === lastCodeRef.current) {
-        candidatesRef.current[code] = (candidatesRef.current[code] || 1) + 1
-      } else {
-        candidatesRef.current = { [code]: 1 }
-        lastCodeRef.current = code
-      }
-
-      if (candidatesRef.current[code] >= REQUIRED_MATCHES) {
-        detectedRef.current = true
-        if (navigator.vibrate) navigator.vibrate(60)
-        onDetected(code)
+      } catch (err) {
+        console.error('ZXing init error:', err)
+        if (err.name === 'NotAllowedError' || /permission/i.test(err.message || '')) {
+          setError("Accès à la caméra refusé. Autorise la caméra dans les paramètres de ton navigateur.")
+        } else if (err.name === 'NotFoundError') {
+          setError('Aucune caméra trouvée sur cet appareil.')
+        } else {
+          setError("Impossible d'ouvrir la caméra. Essaie de saisir le code-barres manuellement.")
+        }
       }
     }
 
-    Quagga.onDetected(handleDetected)
+    startScanner()
 
     return () => {
-      Quagga.offDetected(handleDetected)
-      try { Quagga.stop() } catch (e) {}
+      try { readerRef.current?.reset() } catch (e) {}
     }
   }, [onDetected])
-
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000', zIndex: 300, display: 'flex', flexDirection: 'column' }}>
@@ -131,7 +81,13 @@ export default function BarcodeScanner({ onDetected, onClose }) {
       </div>
 
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <div ref={videoRef} style={{ width: '100%', height: '100%' }} />
+        <video
+          ref={videoRef}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          autoPlay
+          muted
+          playsInline
+        />
 
         {!error && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
