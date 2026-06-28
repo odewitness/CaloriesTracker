@@ -151,17 +151,19 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     setSearching(true)
 
     if (searchSource === 'off') {
-      // Recherche Open Food Facts via le moteur rapide (Meilisearch)
       try {
         const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 5000)
+        const timeout = setTimeout(() => controller.abort(), 8000)
         const res = await fetch(
-          `https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=25&fields=product_name,product_name_fr,categories,nutriments,serving_size`,
-          { signal: controller.signal }
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_fr,categories,nutriments,serving_size`,
+          {
+            signal: controller.signal,
+            headers: { 'User-Agent': 'NutriApp/1.0 (contact@nutriapp.fr)' },
+          }
         )
         clearTimeout(timeout)
         const data = await res.json()
-        const products = (data.hits || [])
+        const products = (data.products || [])
           .filter(p => p.product_name || p.product_name_fr)
           .map(mapOFFProduct)
         setResults(products)
