@@ -3,7 +3,7 @@ import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw } from 'lucide-react'
+import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill } from 'lucide-react'
 import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
 
 const MEAL_ICONS = { 'Petit-déjeuner': Coffee, 'Déjeuner': Sun, 'Dîner': Moon, 'Collation': Cookie }
@@ -322,6 +322,36 @@ export default function ProfilePage() {
           onToggleEnabled={() => toggleMealEnabled(meal)}
         />
       ))}
+
+      {/* Toggle Compléments alimentaires — pas un repas, pas de calcul kcal/macros */}
+      <div className="card" style={{ padding: '12px 14px', marginBottom: 8, opacity: goals.meal_enabled?.['Compléments'] !== false ? 1 : 0.6, transition: 'opacity .2s' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Pill size={15} color={goals.meal_enabled?.['Compléments'] !== false ? 'var(--purple, #8b5cf6)' : 'var(--text-hint)'} />
+            <div style={{ fontWeight: 700, fontSize: 13, color: goals.meal_enabled?.['Compléments'] !== false ? 'var(--text)' : 'var(--text-hint)' }}>
+              Compléments
+            </div>
+            {goals.meal_enabled?.['Compléments'] === false && (
+              <span style={{ fontSize: 10, color: 'var(--text-hint)', background: 'var(--gray-bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px' }}>désactivé</span>
+            )}
+          </div>
+          <button
+            onClick={() => toggleMealEnabled('Compléments')}
+            style={{
+              width: 36, height: 20, borderRadius: 10, position: 'relative', flexShrink: 0,
+              background: goals.meal_enabled?.['Compléments'] !== false ? 'var(--green)' : 'var(--border-md)',
+              transition: 'background .2s',
+            }}
+          >
+            <div style={{
+              position: 'absolute', top: 2,
+              left: goals.meal_enabled?.['Compléments'] !== false ? 18 : 2,
+              width: 16, height: 16, borderRadius: '50%', background: 'white',
+              transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+            }} />
+          </button>
+        </div>
+      </div>
 
       {goalsDirty && (
         <button className="btn-primary" onClick={saveGoals} style={{ marginTop: 4, marginBottom: 20 }}>💾 Sauvegarder les objectifs</button>

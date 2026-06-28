@@ -161,6 +161,7 @@ export const MEAL_ENABLED_DEFAULTS = {
   'Déjeuner':       true,
   'Dîner':          true,
   'Collation':      true,
+  'Compléments':    true,   // section compléments alimentaires (pas un repas, pas de calcul kcal/macros)
 }
 
 // Part "collation" sur les protéines quand la collation est active.

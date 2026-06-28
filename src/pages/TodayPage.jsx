@@ -229,12 +229,14 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
               />
             ))}
         </div>
-        <SupplementSection
-          supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
-          onOpenModal={onOpenModal}
-          onAdd={handleAdd}
-          onDelete={handleDelete}
-        />
+        {settings.meal_enabled?.['Compléments'] !== false && (
+          <SupplementSection
+            supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
+            onOpenModal={onOpenModal}
+            onAdd={handleAdd}
+            onDelete={handleDelete}
+          />
+        )}
       </>
     </div>
   )
