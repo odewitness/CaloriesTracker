@@ -192,25 +192,18 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       .ilike('nom', `%${q}%`)
       .limit(5)
     const recettesMapped = (recettes || []).map(r => ({
-      id:           r.id,
-      alim_nom:     r.nom,
-      categorie:    `Recette · ${r.portions || 1} portion${r.portions > 1 ? 's' : ''}`,
-      energie_kcal: r.energie_kcal,
-      proteines:    r.proteines,
-      glucides:     r.glucides,
-      lipides:      r.lipides,
-      fibres:       r.fibres,
-      sel:          r.sel,
-      sucres:       r.sucres,
-      acides_gras_satures: r.acides_gras_satures,
-      portions: r.poids_cuit_g || r.poids_cru_g
-        ? [{
-            label: `1 portion (${Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1))} g)`,
-            g: Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1)),
-          }]
-        : [],
-      _source: 'recette',
-    }))
+  ...r,                          // ← spread complet pour capturer tous les nutriments
+  id:        r.id,
+  alim_nom:  r.nom,
+  categorie: `Recette · ${r.portions || 1} portion${r.portions > 1 ? 's' : ''}`,
+  portions: r.poids_cuit_g || r.poids_cru_g
+    ? [{
+        label: `1 portion (${Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1))} g)`,
+        g: Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1)),
+      }]
+    : [],
+  _source: 'recette',
+}))
 
     const ciqualResults = data || []
     setResults([...ciqualResults, ...customMapped, ...recettesMapped])
