@@ -126,7 +126,7 @@ export function AGSGauge({ totals, hasEntries }) {
 }
 
 export default function NutrientDetails({ totals, hasEntries }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [tab, setTab] = useState('sucres') // sucres | gras
 
   return (
