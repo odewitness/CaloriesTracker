@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { X, Pencil, Trash2 } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
+import FoodDetailModal from './FoodDetailModal'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
 import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
 
@@ -29,16 +31,69 @@ function MacroGrid({ totals }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CustomPortionCard — calcule les valeurs nutritionnelles pour un grammage
+// choisi librement par l'utilisateur (ni 100g, ni le plat entier).
+// Basé sur les valeurs /100g de la recette.
+// ─────────────────────────────────────────────────────────────────────────────
+function CustomPortionCard({ per100, defaultQty }) {
+  const [qty, setQty] = useState(String(defaultQty || 100))
+
+  const totals = useMemo(() => {
+    const q = parseFloat(qty)
+    if (!per100 || !q || q <= 0) return null
+    const factor = q / 100
+    const t = {}
+    t.energie_kcal = per100.energie_kcal * factor
+    t.proteines    = per100.proteines    * factor
+    t.glucides     = per100.glucides     * factor
+    t.lipides      = per100.lipides      * factor
+    t.fibres       = per100.fibres       * factor
+    for (const key of ALL_NUTRIENT_KEYS) {
+      t[key] = per100[key] != null ? per100[key] * factor : null
+    }
+    return t
+  }, [per100, qty])
+
+  if (!per100) return null
+
+  return (
+    <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+      <div className="section-title">Portion personnalisée</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <input
+          className="input-sm"
+          type="text"
+          inputMode="decimal"
+          value={qty}
+          onChange={e => setQty(e.target.value)}
+          style={{ width: 90 }}
+        />
+        <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
+      </div>
+      {totals ? (
+        <MacroGrid totals={totals} />
+      ) : (
+        <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Indique un grammage valide.</div>
+      )}
+    </div>
+  )
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RecipeDetailModal
 // Props :
-//   recette      — objet recette (ligne Supabase)
-//   ingredients  — tableau des ingrédients (lignes recette_ingredients)
-//   onEdit()     — ouvre RecipeFormModal en mode édition
-//   onDelete()   — supprime la recette
-//   onClose()    — ferme la modal
+//   recette            — objet recette (ligne Supabase)
+//   ingredients        — tableau des ingrédients (lignes recette_ingredients)
+//   onEdit()           — ouvre RecipeFormModal en mode édition
+//   onDelete()         — supprime la recette
+//   onClose()          — ferme la modal
+//   onUpdateIngredient(id, patch) — optionnel, persiste l'ajustement du
+//                                   grammage d'un ingrédient (cf. useRecetteDetail)
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailModal({ recette, ingredients, onEdit, onDelete, onClose }) {
+export default function RecipeDetailModal({ recette, ingredients, onEdit, onDelete, onClose, onUpdateIngredient }) {
   useBackButton(onClose)
+  const [selectedIngredient, setSelectedIngredient] = useState(null)
 
   // Totaux bruts (plat entier)
   const totaux = useMemo(() => sumIngredients(ingredients), [ingredients])
@@ -114,10 +169,18 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
           <MacroGrid totals={totaux} />
         </div>
 
+        {/* ── Portion personnalisée ── */}
+        <CustomPortionCard per100={per100} defaultQty={grammesParPortion || 100} />
+
         {/* ── Liste ingrédients ── */}
         <div className="section-title" style={{ marginTop: 4 }}>Ingrédients ({ingredients.length})</div>
         {ingredients.map((ing, idx) => (
-          <div key={ing.id || idx} className="card" style={{ marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            key={ing.id || idx}
+            onClick={() => setSelectedIngredient(ing)}
+            className="card"
+            style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}
+          >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ing.food_name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
@@ -128,7 +191,7 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
               </div>
             </div>
             <span style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{Math.round(ing.energie_kcal || 0)} kcal</span>
-          </div>
+          </button>
         ))}
 
         {/* ── Vitamines / minéraux / sucres / gras (basés sur /100g) ── */}
@@ -141,6 +204,20 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
           </>
         )}
       </div>
+
+      {/* ── Détail d'un ingrédient (mêmes macros + vitamines/minéraux que sur
+           la page d'accueil) — réutilise FoodDetailModal tel quel. ── */}
+      {selectedIngredient && (
+        <FoodDetailModal
+          key={selectedIngredient.id}
+          entry={{ ...selectedIngredient, meal: recette.nom }}
+          onUpdate={async (id, patch) => {
+            if (!onUpdateIngredient) return { error: null }
+            return onUpdateIngredient(id, patch)
+          }}
+          onClose={() => setSelectedIngredient(null)}
+        />
+      )}
     </div>
   )
 }

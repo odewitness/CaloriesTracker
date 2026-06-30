@@ -62,7 +62,22 @@ export function useRecetteDetail(recetteId) {
 
   useEffect(() => { load() }, [load])
 
-  return { recette, ingredients, loading, refetch: load, setRecette, setIngredients }
+  // ── Met à jour un seul ingrédient (ex: ajustement du grammage depuis le
+  // détail de l'ingrédient, comme FoodDetailModal le fait pour le journal) ──
+  const updateIngredient = async (ingredientId, patch) => {
+    if (!user) return { error: 'Non connecté' }
+    const { data, error } = await supabase
+      .from('recette_ingredients')
+      .update(patch)
+      .eq('id', ingredientId)
+      .eq('user_id', user.id)
+      .select()
+      .single()
+    if (!error && data) setIngredients(ing => ing.map(i => i.id === ingredientId ? data : i))
+    return { data, error }
+  }
+
+  return { recette, ingredients, loading, refetch: load, setRecette, setIngredients, updateIngredient }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

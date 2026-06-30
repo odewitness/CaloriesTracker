@@ -222,7 +222,7 @@ function NewMenu({ onNewAliment, onNewRecette, onClose }) {
 // Wrapper pour charger ingrédients + afficher RecipeDetailModal
 // ─────────────────────────────────────────────────────────────────────────────
 function RecipeDetailWrapper({ recette, onEdit, onDelete, onClose }) {
-  const { ingredients, loading } = useRecetteDetail(recette.id)
+  const { ingredients, loading, updateIngredient } = useRecetteDetail(recette.id)
   if (loading) return (
     <div className="page-modal">
       <div className="page-modal-header">
@@ -233,7 +233,7 @@ function RecipeDetailWrapper({ recette, onEdit, onDelete, onClose }) {
       <div className="loader"><div className="spinner" /> Chargement...</div>
     </div>
   )
-  return <RecipeDetailModal recette={recette} ingredients={ingredients} onEdit={onEdit} onDelete={onDelete} onClose={onClose} />
+  return <RecipeDetailModal recette={recette} ingredients={ingredients} onEdit={onEdit} onDelete={onDelete} onClose={onClose} onUpdateIngredient={updateIngredient} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
