@@ -46,7 +46,7 @@ function FoodRow({ food, isFav, onSelect, onToggleFav }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>{food.alim_nom}</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-          {food.categorie}
+          {food._source === 'off' ? (food.marque || food.categorie) : food.categorie}
           {food._source === 'custom' && <span style={{ marginLeft: 6, background: 'var(--purple-light)', color: 'var(--purple)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Perso</span>}
           {food._source === 'off' && <span style={{ marginLeft: 6, background: 'var(--blue-light)', color: 'var(--blue)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>OFF</span>}
           {food._source === 'recette' && <span style={{ marginLeft: 6, background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Mes recettes</span>}
@@ -106,6 +106,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     return {
       alim_nom: p.product_name || p.product_name_fr || 'Produit inconnu',
       categorie: p.categories?.split(',')[0]?.trim() || 'Open Food Facts',
+      marque: p.brands?.split(',')[0]?.trim() || '',
       energie_kcal: Math.round(n['energy-kcal_100g'] || (n['energy_100g'] || 0) / 4.184),
       proteines: parseFloat((n['proteins_100g'] || 0).toFixed(1)),
       glucides: parseFloat((n['carbohydrates_100g'] || 0).toFixed(1)),
@@ -153,7 +154,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
     if (searchSource === 'off') {
       try {
         const res = await fetch(
-          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=product_name,product_name_fr,categories,nutriments,serving_size`
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=product_name,product_name_fr,categories,brands,nutriments,serving_size`
         )
         const data = await res.json()
         const products = (data.products || [])
