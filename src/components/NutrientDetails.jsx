@@ -132,7 +132,7 @@ export function AGSGauge({ totals, hasEntries }) {
   )
 }
 
-export default function NutrientDetails({ totals, hasEntries, defaultOpen = false, entries }) {
+export default function NutrientDetails({ totals, hasEntries, defaultOpen = false, entries, onUpdate }) {
   const [open, setOpen] = useState(defaultOpen)
   const [tab, setTab] = useState('sucres') // sucres | gras
   const [selectedField, setSelectedField] = useState(null)
@@ -188,6 +188,7 @@ export default function NutrientDetails({ totals, hasEntries, defaultOpen = fals
         <NutrientBreakdownModal
           field={selectedField}
           entries={entries}
+          onUpdate={onUpdate}
           onClose={() => setSelectedField(null)}
         />
       )}

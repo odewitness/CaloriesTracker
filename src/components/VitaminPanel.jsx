@@ -96,7 +96,7 @@ function NutrientRow({ v, totals, hasEntries, onClick }) {
   )
 }
 
-export default function VitaminPanel({ totals, hasEntries, defaultOpen = false, entries }) {
+export default function VitaminPanel({ totals, hasEntries, defaultOpen = false, entries, onUpdate }) {
   const [open, setOpen] = useState(defaultOpen)
   const [tab, setTab] = useState('vitamines') // vitamines | mineraux
   const [selectedField, setSelectedField] = useState(null)
@@ -163,6 +163,7 @@ export default function VitaminPanel({ totals, hasEntries, defaultOpen = false, 
         <NutrientBreakdownModal
           field={selectedField}
           entries={entries}
+          onUpdate={onUpdate}
           onClose={() => setSelectedField(null)}
         />
       )}

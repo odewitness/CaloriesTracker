@@ -215,8 +215,8 @@ console.log('Compléments enabled:', settings?.meal_enabled?.['Compléments'])
       <>
         <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
         <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
-        <VitaminPanel totals={totals} hasEntries={entries.length > 0} entries={entries} />
-        <NutrientDetails totals={totals} hasEntries={entries.length > 0} entries={entries} />
+        <VitaminPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
+        <NutrientDetails totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
         <div style={{ marginTop: 16 }}>
           <div className="section-title">Repas du jour</div>
           {MEALS.map(m => (

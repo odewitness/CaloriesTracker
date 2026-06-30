@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { X } from 'lucide-react'
+import { X, ChevronLeft } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
@@ -25,10 +25,14 @@ function MacroGrid({ live }) {
   )
 }
 
-export default function FoodDetailModal({ entry, onUpdate, onClose }) {
-  useBackButton(onClose)
+export default function FoodDetailModal({ entry, onUpdate, onClose, onBack }) {
+  // Si on vient d'un drill-down (ex: liste des aliments riches en tel nutriment),
+  // le bouton matériel "retour" doit remonter d'un niveau (onBack) plutôt que
+  // fermer toute la pile de modaux (onClose).
+  useBackButton(onBack || onClose)
   const [qty, setQty] = useState(String(entry.qty_g))
   const [saving, setSaving] = useState(false)
+  const canEdit = typeof onUpdate === 'function'
 
   const f = useMemo(() => {
     const newQty = parseFloat(qty)
@@ -75,13 +79,19 @@ export default function FoodDetailModal({ entry, onUpdate, onClose }) {
     }
     const { error } = await onUpdate(entry.id, patch)
     setSaving(false)
-    if (!error) onClose()
+    if (!error) (onBack || onClose)()
   }
 
   return (
     <div className="page-modal">
       <div className="page-modal-header">
-        <div style={{ width: 32, flexShrink: 0 }} />
+        {onBack ? (
+          <button className="btn-icon" onClick={onBack} aria-label="Retour">
+            <ChevronLeft size={20} color="var(--text-muted)" />
+          </button>
+        ) : (
+          <div style={{ width: 32, flexShrink: 0 }} />
+        )}
         <h2 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.food_name}</h2>
         <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
       </div>
@@ -105,7 +115,7 @@ export default function FoodDetailModal({ entry, onUpdate, onClose }) {
 
           <MacroGrid live={live} />
 
-          {dirty && (
+          {dirty && canEdit && (
             <button className="btn-primary" onClick={save} disabled={saving} style={{ marginBottom: 16, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Sauvegarde...' : '💾 Enregistrer le grammage'}
             </button>

@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { X, ChevronRight } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
+import FoodDetailModal from './FoodDetailModal'
 
 function fmtVal(val, unit) {
   if (val == null) return '—'
@@ -17,13 +18,17 @@ function fmtVal(val, unit) {
 //   entries — tableau d'aliments du jour (journal), valeurs déjà au prorata
 //             du grammage consommé (pas du /100g)
 //   onClose()
+//   onUpdate(id, patch) — optionnel, transmis depuis TodayPage. Permet
+//             d'éditer le grammage depuis la fiche aliment ouverte en
+//             drill-down ; si absent, la fiche s'ouvre en lecture seule.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function NutrientBreakdownModal({ field, entries, onClose }) {
+export default function NutrientBreakdownModal({ field, entries, onClose, onUpdate }) {
   useBackButton(onClose)
+  const [selectedEntry, setSelectedEntry] = useState(null)
 
   const rows = useMemo(() => {
     return (entries || [])
-      .map(e => ({ name: e.food_name, qty: e.qty_g, val: e[field.key] }))
+      .map(e => ({ entry: e, val: e[field.key] }))
       .filter(r => r.val != null && r.val > 0)
       .sort((a, b) => b.val - a.val)
   }, [entries, field])
@@ -46,12 +51,22 @@ export default function NutrientBreakdownModal({ field, entries, onClose }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {rows.map((r, i) => (
-              <div key={i} className="card" style={{ padding: '12px 14px' }}>
+              <button
+                key={i}
+                className="card"
+                onClick={() => setSelectedEntry(r.entry)}
+                style={{ padding: '12px 14px', width: '100%', textAlign: 'left', display: 'block' }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
-                    {r.name}{r.qty ? <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>{` · ${r.qty}g`}</span> : null}
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.entry.food_name}{r.entry.qty_g ? <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>{` · ${r.entry.qty_g}g`}</span> : null}
+                    </span>
                   </span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>{fmtVal(r.val, field.unit)}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(r.val, field.unit)}</span>
+                    <ChevronRight size={15} color="var(--text-hint)" />
+                  </span>
                 </div>
                 <div style={{ height: 6, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
                   <div style={{
@@ -61,11 +76,21 @@ export default function NutrientBreakdownModal({ field, entries, onClose }) {
                     borderRadius: 3,
                   }} />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </div>
+
+      {selectedEntry && (
+        <FoodDetailModal
+          key={selectedEntry.id}
+          entry={selectedEntry}
+          onUpdate={onUpdate}
+          onBack={() => setSelectedEntry(null)}
+          onClose={() => { setSelectedEntry(null); onClose() }}
+        />
+      )}
     </div>,
     document.body
   )
