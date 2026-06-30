@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { VITAMIN_FIELDS, MINERAL_FIELDS } from '../lib/nutrients'
+import NutrientBreakdownModal from './NutrientBreakdownModal'
 
 // Pour les nutriments normaux (RNP = besoin minimum) : plus on s'approche de
 // la ref, mieux c'est. Pour les nutriments "limite" (v.limite = true, ex. Sel,
@@ -25,7 +26,7 @@ const STATUS_COLOR = {
   low:    'var(--coral)',
 }
 
-function NutrientRow({ v, totals, hasEntries }) {
+function NutrientRow({ v, totals, hasEntries, onClick }) {
   const val = totals[v.key] ?? 0
   const hasData = hasEntries // N/D uniquement si aucune entrée loggée — 0 sur un aliment loggé est une vraie donnée
 
@@ -45,8 +46,14 @@ function NutrientRow({ v, totals, hasEntries }) {
     ? `${val.toFixed(val < 1 ? 3 : 1)} ${v.unit} / ${refLabel} ${v.ref} ${v.unit}${v.lss ? ` / ${lssLabel} ${v.lss} ${v.unit}` : ''}`
     : 'Données non disponibles'
 
+  const Wrapper = onClick ? 'button' : 'div'
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }} title={tooltip}>
+    <Wrapper
+      onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, width: '100%', textAlign: 'left', cursor: onClick ? 'pointer' : 'default' }}
+      title={tooltip}
+    >
       <span style={{ fontSize: 12, color: 'var(--text)', width: 90, flexShrink: 0 }}>{v.label}</span>
 
       <div style={{ flex: 1, position: 'relative', height: 6 }}>
@@ -85,13 +92,19 @@ function NutrientRow({ v, totals, hasEntries }) {
       }}>
         {hasData ? `${status === 'excess' ? '⚠︎ ' : ''}${pct}%` : 'N/D'}
       </span>
-    </div>
+    </Wrapper>
   )
 }
 
-export default function VitaminPanel({ totals, hasEntries, defaultOpen = false }) {
+export default function VitaminPanel({ totals, hasEntries, defaultOpen = false, entries }) {
   const [open, setOpen] = useState(defaultOpen)
   const [tab, setTab] = useState('vitamines') // vitamines | mineraux
+  const [selectedField, setSelectedField] = useState(null)
+
+  // La liste détaillée par aliment n'a de sens que si on dispose des entrées
+  // individuelles (ex: page d'accueil) — pas dans les contextes où VitaminPanel
+  // affiche déjà un seul aliment (FoodDetailModal) ou un /100g de recette.
+  const canBreakdown = entries && entries.length > 0
 
   return (
     <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
@@ -123,7 +136,13 @@ export default function VitaminPanel({ totals, hasEntries, defaultOpen = false }
           </div>
 
           {(tab === 'vitamines' ? VITAMIN_FIELDS : MINERAL_FIELDS).map(v => (
-            <NutrientRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} />
+            <NutrientRow
+              key={v.key}
+              v={v}
+              totals={totals}
+              hasEntries={hasEntries}
+              onClick={canBreakdown ? () => setSelectedField(v) : undefined}
+            />
           ))}
 
           <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
@@ -138,6 +157,14 @@ export default function VitaminPanel({ totals, hasEntries, defaultOpen = false }
             </span>
           </div>
         </div>
+      )}
+
+      {selectedField && (
+        <NutrientBreakdownModal
+          field={selectedField}
+          entries={entries}
+          onClose={() => setSelectedField(null)}
+        />
       )}
     </div>
   )

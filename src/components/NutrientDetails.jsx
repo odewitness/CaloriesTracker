@@ -1,22 +1,29 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { SUGAR_FIELDS, FAT_FIELDS, SUCRES_ANSES_REF, KCAL_PER_G_LIPIDES, LIPIDES_AE_TARGET, AGS_AE_MAX } from '../lib/nutrients'
+import NutrientBreakdownModal from './NutrientBreakdownModal'
 
 function fmtVal(val, unit) {
   if (val == null) return '—'
   return `${val < 1 && val > 0 ? val.toFixed(2) : Math.round(val * 10) / 10} ${unit}`
 }
 
-function NutrientList({ fields, totals, hasEntries }) {
+function NutrientList({ fields, totals, hasEntries, entries, onSelectField }) {
+  const canBreakdown = entries && entries.length > 0
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
       {fields.map(f => {
         const val = hasEntries ? (totals[f.key] ?? 0) : null
+        const Wrapper = canBreakdown ? 'button' : 'div'
         return (
-          <div key={f.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+          <Wrapper
+            key={f.key}
+            onClick={canBreakdown ? () => onSelectField(f) : undefined}
+            style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, width: '100%', textAlign: 'left', cursor: canBreakdown ? 'pointer' : 'default' }}
+          >
             <span style={{ color: 'var(--text)' }}>{f.label}</span>
             <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{hasEntries ? fmtVal(val, f.unit) : 'N/D'}</span>
-          </div>
+          </Wrapper>
         )
       })}
     </div>
@@ -125,9 +132,10 @@ export function AGSGauge({ totals, hasEntries }) {
   )
 }
 
-export default function NutrientDetails({ totals, hasEntries, defaultOpen = false }) {
+export default function NutrientDetails({ totals, hasEntries, defaultOpen = false, entries }) {
   const [open, setOpen] = useState(defaultOpen)
   const [tab, setTab] = useState('sucres') // sucres | gras
+  const [selectedField, setSelectedField] = useState(null)
 
   return (
     <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
@@ -162,18 +170,26 @@ export default function NutrientDetails({ totals, hasEntries, defaultOpen = fals
             ? (
               <>
                 <SucresAnsesGauge totals={totals} hasEntries={hasEntries} />
-                <NutrientList fields={SUGAR_FIELDS} totals={totals} hasEntries={hasEntries} />
+                <NutrientList fields={SUGAR_FIELDS} totals={totals} hasEntries={hasEntries} entries={entries} onSelectField={setSelectedField} />
               </>
             )
             : (
               <>
                 <LipidesTotauxGauge totals={totals} hasEntries={hasEntries} />
                 <AGSGauge totals={totals} hasEntries={hasEntries} />
-                <NutrientList fields={FAT_FIELDS} totals={totals} hasEntries={hasEntries} />
+                <NutrientList fields={FAT_FIELDS} totals={totals} hasEntries={hasEntries} entries={entries} onSelectField={setSelectedField} />
               </>
             )}
 
         </div>
+      )}
+
+      {selectedField && (
+        <NutrientBreakdownModal
+          field={selectedField}
+          entries={entries}
+          onClose={() => setSelectedField(null)}
+        />
       )}
     </div>
   )
