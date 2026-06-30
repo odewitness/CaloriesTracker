@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 
@@ -29,7 +30,7 @@ export default function NutrientBreakdownModal({ field, entries, onClose }) {
 
   const maxVal = rows.length > 0 ? rows[0].val : 0
 
-  return (
+  return createPortal(
     <div className="page-modal">
       <div className="page-modal-header">
         <div style={{ width: 32, flexShrink: 0 }} />
@@ -65,6 +66,7 @@ export default function NutrientBreakdownModal({ field, entries, onClose }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
