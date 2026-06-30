@@ -89,8 +89,8 @@ function NutrientRow({ v, totals, hasEntries }) {
   )
 }
 
-export default function VitaminPanel({ totals, hasEntries }) {
-  const [open, setOpen] = useState(true)
+export default function VitaminPanel({ totals, hasEntries, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
   const [tab, setTab] = useState('vitamines') // vitamines | mineraux
 
   return (

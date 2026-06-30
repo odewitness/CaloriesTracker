@@ -111,8 +111,8 @@ export default function FoodDetailModal({ entry, onUpdate, onClose }) {
             </button>
           )}
 
-          <VitaminPanel totals={live} hasEntries={true} />
-          <NutrientDetails totals={live} hasEntries={true} />
+          <VitaminPanel totals={live} hasEntries={true} defaultOpen={true} />
+          <NutrientDetails totals={live} hasEntries={true} defaultOpen={true} />
         </div>
       </div>
     </div>
