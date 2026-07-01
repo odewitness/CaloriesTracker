@@ -199,6 +199,7 @@ console.log('Compléments enabled:', settings?.meal_enabled?.['Compléments'])
     const { error } = await updateEntry(id, patch)
     if (!error) toast('✓ Modifié !')
     else toast('Erreur')
+    return { error }
   }
 
   return (
