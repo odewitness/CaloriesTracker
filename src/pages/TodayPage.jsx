@@ -228,7 +228,7 @@ console.log('Compléments enabled:', settings?.meal_enabled?.['Compléments'])
               onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd })}
               onDelete={handleDelete}
               onUpdate={handleUpdate}
-                onOpenDetail={onOpenDetail}
+                onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
               />
             ))}
         </div>
@@ -384,9 +384,9 @@ export default function TodayPage() {
 
       {detailEntry && (
         <FoodDetailModal
-          key={detailEntry.id}
-          entry={detailEntry}
-          onUpdate={async (id, patch) => {}}
+          key={detailEntry.entry.id}
+          entry={detailEntry.entry}
+          onUpdate={detailEntry.onUpdate}
           onClose={() => setDetailEntry(null)}
         />
       )}
