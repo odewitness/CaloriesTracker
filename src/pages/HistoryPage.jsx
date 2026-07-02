@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
-import { TrendingDown, Flame, Target, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { TrendingDown, Flame, Target, ChevronLeft, ChevronRight } from 'lucide-react'
 import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
-import NutrientGauges from '../components/NutrientGauges'
-import { SucresAnsesGauge, LipidesTotauxGauge, AGSGauge } from '../components/NutrientDetails'
-import { VITAMIN_FIELDS, MINERAL_FIELDS } from '../lib/nutrients'
+import VitaminPanel from '../components/VitaminPanel'
+import NutrientDetails from '../components/NutrientDetails'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 
 const TABS = [
   { key: 'jour', label: 'Jour' },
@@ -132,60 +132,6 @@ function MonthCard({ monthLabel, avgKcal, daysLogged, goalKcal }) {
   )
 }
 
-// Carte dépliable "Sucres / Gras / Vitamines / Minéraux" — réutilise les jauges
-// déjà construites pour TodayPage (NutrientDetails) et la nouvelle jauge générique
-// vitamines/minéraux, nourries avec les totaux moyens de la période sélectionnée.
-function NutrientCollapsible({ avg, hasEntries }) {
-  const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState('sucres')
-
-  const tabs = [
-    { key: 'sucres', label: 'Sucres' },
-    { key: 'gras', label: 'Gras' },
-    { key: 'vitamines', label: 'Vitamines' },
-    { key: 'mineraux', label: 'Minéraux' },
-  ]
-
-  return (
-    <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}
-      >
-        <span style={{ fontWeight: 600, fontSize: 14 }}>Sucres, gras, vitamines & minéraux</span>
-        <ChevronDown size={18} color="var(--text-muted)" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-      </button>
-
-      {open && (
-        <div style={{ padding: '0 16px 14px' }}>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-            {tabs.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className="chip"
-                style={{ background: tab === t.key ? 'var(--green)' : 'var(--green-light)', color: tab === t.key ? 'white' : 'var(--green-dark)' }}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {tab === 'sucres' && <SucresAnsesGauge totals={avg} hasEntries={hasEntries} />}
-          {tab === 'gras' && (
-            <>
-              <LipidesTotauxGauge totals={avg} hasEntries={hasEntries} />
-              <AGSGauge totals={avg} hasEntries={hasEntries} />
-            </>
-          )}
-          {tab === 'vitamines' && <NutrientGauges fields={VITAMIN_FIELDS} totals={avg} hasEntries={hasEntries} />}
-          {tab === 'mineraux' && <NutrientGauges fields={MINERAL_FIELDS} totals={avg} hasEntries={hasEntries} />}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function HistoryPage() {
   const { settings } = useSettings()
   const { user } = useAuth()
@@ -218,6 +164,22 @@ export default function HistoryPage() {
     load()
     return () => { cancelled = true }
   }, [user, bounds.start, bounds.end])
+
+  // Édition d'une entrée depuis la fiche aliment ouverte en drill-down (clic sur
+  // un nutriment → NutrientBreakdownModal → FoodDetailModal). Même logique que
+  // useJournal.updateEntry ; on ne réutilise pas le hook tel quel car HistoryPage
+  // charge des entrées sur une période arbitraire, pas sur une seule date.
+  const handleUpdate = async (id, patch) => {
+    const { data, error } = await supabase
+      .from('journal')
+      .update(patch)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single()
+    if (!error && data) setEntries(es => es.map(x => x.id === id ? data : x))
+    return { error }
+  }
 
   // Série en cours : indépendante de la période affichée, toujours calculée
   // depuis aujourd'hui en remontant (comme avant).
@@ -263,34 +225,26 @@ export default function HistoryPage() {
   // Moyenne / jour sur la période, calculée sur les jours réellement loggés
   // (pas sur le nombre de jours calendaires) pour ne pas fausser la comparaison
   // aux repères Anses si la semaine/le mois n'est pas terminé(e) ou partiellement loggé(e).
-const avg = useMemo(() => {
-  const sum = (key) => entries.reduce((s, e) => s + (Number(e[key]) || 0), 0)
-  const n = daysWithData || 1
-  const obj = {
-    kcal: sum('energie_kcal') / n,
-    prot: sum('proteines') / n,
-    gluc: sum('glucides') / n,
-    lip: sum('lipides') / n,
-    fib: sum('fibres') / n,
-    sucres: sum('sucres') / n,
-    lactose: sum('lactose') / n,
-    galactose: sum('galactose') / n,
-    acides_gras_satures: sum('acides_gras_satures') / n,
-  }
-  // sumKeys : additionne les colonnes équivalentes/dédoublées (ex: folates +
-  // folates_intrinseques, vit_e_totale + vit_e) — même logique que VitaminPanel,
-  // appliquée ici au niveau de l'agrégation pour que ça marche quel que soit
-  // le composant d'affichage utilisé en aval.
-  for (const f of VITAMIN_FIELDS) {
-    const keys = f.sumKeys || [f.key]
-    obj[f.key] = keys.reduce((s, k) => s + sum(k), 0) / n
-  }
-  for (const f of MINERAL_FIELDS) {
-    const keys = f.sumKeys || [f.key]
-    obj[f.key] = keys.reduce((s, k) => s + sum(k), 0) / n
-  }
-  return obj
-}, [entries, daysWithData])
+  // Même construction que le `totals` de TodayPage : une somme brute par clé,
+  // sans pré-fusionner les colonnes dédoublées (vit_e_totale/vit_e,
+  // folates/folates_intrinseques...). Cette fusion (sumKeys) est laissée aux
+  // composants d'affichage (VitaminPanel, NutrientDetails) qui la font déjà —
+  // une seule source de vérité pour cette logique, au lieu de la dupliquer ici.
+  const avg = useMemo(() => {
+    const n = daysWithData || 1
+    const obj = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 }
+    for (const key of ALL_NUTRIENT_KEYS) obj[key] = 0
+    for (const e of entries) {
+      obj.kcal += e.energie_kcal || 0
+      obj.prot += e.proteines || 0
+      obj.gluc += e.glucides || 0
+      obj.lip  += e.lipides || 0
+      obj.fib  += e.fibres || 0
+      for (const key of ALL_NUTRIENT_KEYS) obj[key] += e[key] || 0
+    }
+    for (const key in obj) obj[key] /= n
+    return obj
+  }, [entries, daysWithData])
 
   const daysObjectif = dateKeys.filter(d => days[d].reduce((s, e) => s + (e.energie_kcal || 0), 0) <= settings.goal_kcal).length
 
@@ -406,7 +360,23 @@ const avg = useMemo(() => {
 
           <CalorieRing consumed={avg.kcal} goal={settings.goal_kcal} />
           <MacroBar prot={avg.prot} gluc={avg.gluc} lip={avg.lip} fib={avg.fib} goals={settings} />
-          <NutrientCollapsible avg={avg} hasEntries={hasEntries} />
+          {/* Le détail par aliment (clic sur un nutriment) n'a de sens que sur
+              l'onglet Jour : sur Semaine/Mois/Année, `avg` est une moyenne/jour,
+              pas la somme d'un lot d'entrées identifiable. On ne passe donc
+              `entries` que dans ce cas — VitaminPanel/NutrientDetails désactivent
+              déjà le clic tout seuls si `entries` est vide/absent. */}
+          <VitaminPanel
+            totals={avg}
+            hasEntries={hasEntries}
+            entries={tab === 'jour' ? (days[anchor] || []) : undefined}
+            onUpdate={handleUpdate}
+          />
+          <NutrientDetails
+            totals={avg}
+            hasEntries={hasEntries}
+            entries={tab === 'jour' ? (days[anchor] || []) : undefined}
+            onUpdate={handleUpdate}
+          />
 
           {/* Détail */}
           <div style={{ fontWeight: 700, fontSize: 15, margin: '20px 0 10px' }}>
