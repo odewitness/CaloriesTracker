@@ -26,12 +26,13 @@ export default function NutrientBreakdownModal({ field, entries, onClose, onUpda
   useBackButton(onClose)
   const [selectedEntry, setSelectedEntry] = useState(null)
 
-  const rows = useMemo(() => {
-    return (entries || [])
-      .map(e => ({ entry: e, val: e[field.key] }))
-      .filter(r => r.val != null && r.val > 0)
-      .sort((a, b) => b.val - a.val)
-  }, [entries, field])
+const rows = useMemo(() => {
+  const keys = field.sumKeys || [field.key]
+  return (entries || [])
+    .map(e => ({ entry: e, val: keys.reduce((s, k) => s + (e[k] ?? 0), 0) }))
+    .filter(r => r.val > 0)
+    .sort((a, b) => b.val - a.val)
+}, [entries, field])
 
   const maxVal = rows.length > 0 ? rows[0].val : 0
 

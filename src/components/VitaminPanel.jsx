@@ -1,17 +1,7 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS } from '../lib/nutrients'
+import { VITAMIN_FIELDS, MINERAL_FIELDS } from '../lib/nutrients'
 import NutrientBreakdownModal from './NutrientBreakdownModal'
-import { NutrientList } from './NutrientDetails'
-
-// Sous-ensemble de DETAIL_ONLY_FIELDS concernant spécifiquement les folates :
-// la clé "folates" (VITAMIN_FIELDS) est le total, mais pour les aliments CIQUAL
-// on dispose aussi de la répartition intrinsèque (naturelle) / acide folique
-// (enrichissement), utile car l'acide folique de synthèse a une biodisponibilité
-// différente (équivalents folates alimentaires ANSES).
-const FOLATES_DETAIL_FIELDS = DETAIL_ONLY_FIELDS.filter(
-  f => f.key === 'folates_intrinseques' || f.key === 'acide_folique'
-)
 
 // Pour les nutriments normaux (RNP = besoin minimum) : plus on s'approche de
 // la ref, mieux c'est. Pour les nutriments "limite" (v.limite = true, ex. Sel,
@@ -37,7 +27,7 @@ const STATUS_COLOR = {
 }
 
 function NutrientRow({ v, totals, hasEntries, onClick }) {
-  const val = totals[v.key] ?? 0
+  const val = (v.sumKeys || [v.key]).reduce((s, k) => s + (totals[k] ?? 0), 0)
   const hasData = hasEntries // N/D uniquement si aucune entrée loggée — 0 sur un aliment loggé est une vraie donnée
 
   const pct = Math.round((val / v.ref) * 100)
@@ -154,21 +144,6 @@ export default function VitaminPanel({ totals, hasEntries, defaultOpen = false, 
               onClick={canBreakdown ? () => setSelectedField(v) : undefined}
             />
           ))}
-
-          {tab === 'vitamines' && (
-            <div style={{ marginTop: 6, marginBottom: 4, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-hint)', marginBottom: 6 }}>
-                Détail Folates (B9) — intrinsèque / enrichi
-              </div>
-              <NutrientList
-                fields={FOLATES_DETAIL_FIELDS}
-                totals={totals}
-                hasEntries={hasEntries}
-                entries={entries}
-                onSelectField={setSelectedField}
-              />
-            </div>
-          )}
 
           <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

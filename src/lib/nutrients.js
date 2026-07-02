@@ -53,7 +53,7 @@ export const VITAMIN_FIELDS = [
   { key: 'vit_b3', label: 'Vitamine B3',         ref: 14,   lss: 900,  unit: 'mg', color: 'var(--coral)'  },
   { key: 'vit_b5', label: 'Vitamine B5',         ref: 5,    lss: null, unit: 'mg', color: 'var(--green)'  },
   { key: 'vit_b6', label: 'Vitamine B6',         ref: 1.7,  lss: 25,   unit: 'mg', color: 'var(--blue)'   },
-  { key: 'folates',label: 'Folates (B9)',        ref: 330,  lss: 1000, unit: 'µg', color: 'var(--purple)' },
+  { key: 'folates', sumKeys: ['folates', 'folates_intrinseques'], label: 'Folates (B9)', ref: 330, lss: 1000, unit: 'µg', color: 'var(--purple)' },
   { key: 'vit_b12',label: 'Vitamine B12',        ref: 4,    lss: null, unit: 'µg', color: 'var(--purple)' },
   { key: 'vit_a',  label: 'Vitamine A',          ref: 650,  lss: 3000, unit: 'µg', color: 'var(--coral)'  },
 ]
