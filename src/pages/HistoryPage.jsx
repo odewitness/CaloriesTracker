@@ -263,24 +263,34 @@ export default function HistoryPage() {
   // Moyenne / jour sur la période, calculée sur les jours réellement loggés
   // (pas sur le nombre de jours calendaires) pour ne pas fausser la comparaison
   // aux repères Anses si la semaine/le mois n'est pas terminé(e) ou partiellement loggé(e).
-  const avg = useMemo(() => {
-    const sum = (key) => entries.reduce((s, e) => s + (Number(e[key]) || 0), 0)
-    const n = daysWithData || 1
-    const obj = {
-      kcal: sum('energie_kcal') / n,
-      prot: sum('proteines') / n,
-      gluc: sum('glucides') / n,
-      lip: sum('lipides') / n,
-      fib: sum('fibres') / n,
-      sucres: sum('sucres') / n,
-      lactose: sum('lactose') / n,
-      galactose: sum('galactose') / n,
-      acides_gras_satures: sum('acides_gras_satures') / n,
-    }
-    for (const f of VITAMIN_FIELDS) obj[f.key] = sum(f.key) / n
-    for (const f of MINERAL_FIELDS) obj[f.key] = sum(f.key) / n
-    return obj
-  }, [entries, daysWithData])
+const avg = useMemo(() => {
+  const sum = (key) => entries.reduce((s, e) => s + (Number(e[key]) || 0), 0)
+  const n = daysWithData || 1
+  const obj = {
+    kcal: sum('energie_kcal') / n,
+    prot: sum('proteines') / n,
+    gluc: sum('glucides') / n,
+    lip: sum('lipides') / n,
+    fib: sum('fibres') / n,
+    sucres: sum('sucres') / n,
+    lactose: sum('lactose') / n,
+    galactose: sum('galactose') / n,
+    acides_gras_satures: sum('acides_gras_satures') / n,
+  }
+  // sumKeys : additionne les colonnes équivalentes/dédoublées (ex: folates +
+  // folates_intrinseques, vit_e_totale + vit_e) — même logique que VitaminPanel,
+  // appliquée ici au niveau de l'agrégation pour que ça marche quel que soit
+  // le composant d'affichage utilisé en aval.
+  for (const f of VITAMIN_FIELDS) {
+    const keys = f.sumKeys || [f.key]
+    obj[f.key] = keys.reduce((s, k) => s + sum(k), 0) / n
+  }
+  for (const f of MINERAL_FIELDS) {
+    const keys = f.sumKeys || [f.key]
+    obj[f.key] = keys.reduce((s, k) => s + sum(k), 0) / n
+  }
+  return obj
+}, [entries, daysWithData])
 
   const daysObjectif = dateKeys.filter(d => days[d].reduce((s, e) => s + (e.energie_kcal || 0), 0) <= settings.goal_kcal).length
 
