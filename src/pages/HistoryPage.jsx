@@ -360,21 +360,19 @@ export default function HistoryPage() {
 
           <CalorieRing consumed={avg.kcal} goal={settings.goal_kcal} />
           <MacroBar prot={avg.prot} gluc={avg.gluc} lip={avg.lip} fib={avg.fib} goals={settings} />
-          {/* Le détail par aliment (clic sur un nutriment) n'a de sens que sur
-              l'onglet Jour : sur Semaine/Mois/Année, `avg` est une moyenne/jour,
-              pas la somme d'un lot d'entrées identifiable. On ne passe donc
-              `entries` que dans ce cas — VitaminPanel/NutrientDetails désactivent
-              déjà le clic tout seuls si `entries` est vide/absent. */}
+          {/* Clic sur un nutriment → liste des aliments qui y contribuent sur
+              la période affichée, triés du plus au moins riche (même modal
+              que sur TodayPage : NutrientBreakdownModal trie déjà tout seul). */}
           <VitaminPanel
             totals={avg}
             hasEntries={hasEntries}
-            entries={tab === 'jour' ? (days[anchor] || []) : undefined}
+            entries={entries}
             onUpdate={handleUpdate}
           />
           <NutrientDetails
             totals={avg}
             hasEntries={hasEntries}
-            entries={tab === 'jour' ? (days[anchor] || []) : undefined}
+            entries={entries}
             onUpdate={handleUpdate}
           />
 

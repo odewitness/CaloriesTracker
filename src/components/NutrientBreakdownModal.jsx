@@ -47,7 +47,7 @@ const rows = useMemo(() => {
       <div className="page-modal-body">
         {rows.length === 0 ? (
           <div className="empty">
-            Aucun aliment renseigné aujourd'hui ne contient de {field.label.toLowerCase()}.
+            Aucun aliment renseigné ne contient de {field.label.toLowerCase()} sur cette période.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
