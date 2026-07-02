@@ -26,12 +26,29 @@ export default function NutrientBreakdownModal({ field, entries, onClose, onUpda
   useBackButton(onClose)
   const [selectedEntry, setSelectedEntry] = useState(null)
 
+// Regroupe les entrées par nom d'aliment et somme leur contribution — un
+// aliment loggé plusieurs fois (même jour ou jours différents sur une période
+// Semaine/Mois/Année) apparaît en une seule ligne avec le total, plutôt qu'en
+// autant de lignes que d'occurrences.
+// Le clic → édition individuelle (FoodDetailModal) ne reste possible que si
+// le groupe ne contient qu'UNE occurrence : au-delà, il n'y a plus une entrée
+// précise à éditer, donc la ligne devient non cliquable (affichage seul).
 const rows = useMemo(() => {
   const keys = field.sumKeys || [field.key]
-  return (entries || [])
-    .map(e => ({ entry: e, val: keys.reduce((s, k) => s + (e[k] ?? 0), 0) }))
-    .filter(r => r.val > 0)
-    .sort((a, b) => b.val - a.val)
+  const byFood = new Map()
+  for (const e of (entries || [])) {
+    const val = keys.reduce((s, k) => s + (e[k] ?? 0), 0)
+    if (val <= 0) continue
+    const group = byFood.get(e.food_name)
+    if (group) {
+      group.val += val
+      group.count += 1
+      group.entries.push(e)
+    } else {
+      byFood.set(e.food_name, { food_name: e.food_name, val, count: 1, entries: [e] })
+    }
+  }
+  return Array.from(byFood.values()).sort((a, b) => b.val - a.val)
 }, [entries, field])
 
   const maxVal = rows.length > 0 ? rows[0].val : 0
@@ -51,34 +68,43 @@ const rows = useMemo(() => {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {rows.map((r, i) => (
-              <button
-                key={i}
-                className="card"
-                onClick={() => setSelectedEntry(r.entry)}
-                style={{ padding: '12px 14px', width: '100%', textAlign: 'left', display: 'block' }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0 }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.entry.food_name}{r.entry.qty_g ? <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>{` · ${r.entry.qty_g}g`}</span> : null}
+            {rows.map((r, i) => {
+              const single = r.count === 1
+              const Wrapper = single ? 'button' : 'div'
+              return (
+                <Wrapper
+                  key={i}
+                  className="card"
+                  onClick={single ? () => setSelectedEntry(r.entries[0]) : undefined}
+                  style={{ padding: '12px 14px', width: '100%', textAlign: 'left', display: 'block', cursor: single ? 'pointer' : 'default' }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.food_name}
+                        {single && r.entries[0].qty_g
+                          ? <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>{` · ${r.entries[0].qty_g}g`}</span>
+                          : !single
+                            ? <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>{` · ×${r.count}`}</span>
+                            : null}
+                      </span>
                     </span>
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(r.val, field.unit)}</span>
-                    <ChevronRight size={15} color="var(--text-hint)" />
-                  </span>
-                </div>
-                <div style={{ height: 6, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{
-                    width: `${maxVal > 0 ? (r.val / maxVal) * 100 : 0}%`,
-                    height: '100%',
-                    background: field.color || 'var(--green)',
-                    borderRadius: 3,
-                  }} />
-                </div>
-              </button>
-            ))}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(r.val, field.unit)}</span>
+                      {single && <ChevronRight size={15} color="var(--text-hint)" />}
+                    </span>
+                  </div>
+                  <div style={{ height: 6, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${maxVal > 0 ? (r.val / maxVal) * 100 : 0}%`,
+                      height: '100%',
+                      background: field.color || 'var(--green)',
+                      borderRadius: 3,
+                    }} />
+                  </div>
+                </Wrapper>
+              )
+            })}
           </div>
         )}
       </div>
