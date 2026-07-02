@@ -8,7 +8,9 @@ function fmtVal(val, unit) {
   return `${val < 1 && val > 0 ? val.toFixed(2) : Math.round(val * 10) / 10} ${unit}`
 }
 
-function NutrientList({ fields, totals, hasEntries, entries, onSelectField }) {
+// Exported: réutilisé par VitaminPanel.jsx pour le détail intrinsèque/enrichi
+// des folates (mêmes interactions clic → NutrientBreakdownModal que Sucres/Gras).
+export function NutrientList({ fields, totals, hasEntries, entries, onSelectField }) {
   const canBreakdown = entries && entries.length > 0
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
