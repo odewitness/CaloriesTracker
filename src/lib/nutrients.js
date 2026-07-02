@@ -46,7 +46,7 @@ export const FAT_FIELDS = [
 export const VITAMIN_FIELDS = [
   { key: 'vit_c',  label: 'Vitamine C',          ref: 110,  lss: 1000, unit: 'mg', color: 'var(--green)'  },
   { key: 'vit_d',  label: 'Vitamine D',          ref: 15,   lss: 100,  unit: 'µg', color: 'var(--amber)'  },
-  { key: 'vit_e_totale', label: 'Vitamine E',    ref: 13,   lss: 300,  unit: 'mg', color: 'var(--blue)'   },
+  { key: 'vit_e_totale', sumKeys: ['vit_e_totale', 'vit_e'], label: 'Vitamine E', ref: 13, lss: 300, unit: 'mg', color: 'var(--blue)' },
   { key: 'vit_k1', label: 'Vitamine K',          ref: 79,   lss: null, unit: 'µg', color: 'var(--purple)' },
   { key: 'vit_b1', label: 'Vitamine B1',         ref: 1.3,  lss: null, unit: 'mg', color: 'var(--coral)'  },
   { key: 'vit_b2', label: 'Vitamine B2',         ref: 1.6,  lss: null, unit: 'mg', color: 'var(--amber)'  },
@@ -82,6 +82,7 @@ export const MINERAL_FIELDS = [
 export const DETAIL_ONLY_FIELDS = [
   { key: 'retinol',              label: 'Rétinol',                 unit: 'µg' },
   { key: 'beta_carotene',        label: 'Bêta-carotène',           unit: 'µg' },
+  { key: 'vit_e',                label: 'Vitamine E (brute)',      unit: 'mg' },
   { key: 'vit_d2',               label: 'Vitamine D2',             unit: 'µg' },
   { key: 'vit_d3',               label: 'Vitamine D3',             unit: 'µg' },
   { key: 'vit_k2',               label: 'Vitamine K2',             unit: 'µg' },

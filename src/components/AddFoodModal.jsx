@@ -138,7 +138,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       vit_b6: parseFloat(((n['vitamin-b6_100g'] || 0) * 1000).toFixed(3)),
       vit_b12: parseFloat(((n['vitamin-b12_100g'] || 0) * 1000000).toFixed(3)),
       vit_a: parseFloat(((n['vitamin-a_100g'] || 0) * 1000000).toFixed(2)),
-      vit_e: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
+      //vit_e: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
       vit_e_totale: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
       vit_k1: parseFloat(((n['vitamin-k_100g'] || 0) * 1000000).toFixed(2)),
       folates: parseFloat(((n['folates_100g'] || 0) * 1000000).toFixed(1)),
