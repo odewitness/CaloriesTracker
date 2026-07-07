@@ -77,6 +77,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
+  const [favorisCollapsed, setFavorisCollapsed] = useState(false)
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -459,8 +460,16 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                 <>
                   {searchSource === 'ciqual' && favoris.length > 0 && (
                     <>
-                      <div className="section-title" style={{ marginTop: 4 }}>★ Favoris</div>
-                      {favoris.map(f => (
+                      <button
+                        onClick={() => setFavorisCollapsed(c => !c)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, marginTop: 4, cursor: 'pointer' }}
+                      >
+                        <span className="section-title" style={{ margin: 0 }}>★ Favoris</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
+                          {favorisCollapsed ? '▸' : '▾'}
+                        </span>
+                      </button>
+                      {!favorisCollapsed && favoris.map(f => (
                         <FoodRow
                           key={f.id}
                           food={f.food_data}

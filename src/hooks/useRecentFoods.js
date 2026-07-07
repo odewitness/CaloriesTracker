@@ -51,6 +51,7 @@ export function useRecentFoods() {
       .eq('user_id', user.id)
       .gte('date', fmtDate(cutoff))
       .order('created_at', { ascending: false })
+      .limit(100)   // garde-fou perf : au-delà, la dédup/mapping n'apporte plus rien d'utile
 
     // Déduplication par identité d'aliment, on garde l'occurrence la plus récente.
     const seen = new Set()
