@@ -3,10 +3,6 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 
-const DAYS_BACK = 3   // aujourd'hui + 2 jours précédents
-
-function fmtDate(d) { return d.toISOString().slice(0, 10) }
-
 // Le journal stocke des valeurs déjà mises à l'échelle de qty_g (pas des
 // valeurs /100g) — on doit donc "dé-proportionner" pour reconstruire un objet
 // "food" réutilisable par AddFoodModal, dans le même format que les résultats
@@ -42,16 +38,15 @@ export function useRecentFoods() {
   const load = useCallback(async () => {
     if (!user?.id) { setRecents([]); setLoading(false); return }
     setLoading(true)
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - (DAYS_BACK - 1))
 
+    // Plus de filtre par date : on prend simplement les 100 dernières entrées
+    // du journal, tous jours confondus, puis on déduplique par aliment.
     const { data } = await supabase
       .from('journal')
       .select('*')
       .eq('user_id', user.id)
-      .gte('date', fmtDate(cutoff))
       .order('created_at', { ascending: false })
-      .limit(100)   // garde-fou perf : au-delà, la dédup/mapping n'apporte plus rien d'utile
+      .limit(100)
 
     // Déduplication par identité d'aliment, on garde l'occurrence la plus récente.
     const seen = new Set()

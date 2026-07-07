@@ -81,8 +81,19 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
-  const favKeys = new Set(favoris.map(f => `${f.food_source}:${f.food_ref_id ?? f.food_name}`))
-  const recentsFiltered = recents.filter(r => !favKeys.has(foodIdentity(r).key))
+  // Un aliment favori reste affiché dans les récents (l'utilisateur veut voir
+  // les deux). Quand un récent correspond à un favori, on fusionne les portions
+  // recommandées du favori (stockées dans food_data) avec la "Dernière quantité"
+  // venant du journal, sans que l'une efface l'autre.
+  const favoriByKey = new Map(favoris.map(f => [`${f.food_source}:${f.food_ref_id ?? f.food_name}`, f]))
+  const recentsMerged = recents.map(r => {
+    const fav = favoriByKey.get(foodIdentity(r).key)
+    if (!fav) return r
+    const recommandees = (fav.food_data.portions || []).filter(
+      p => !r.portions.some(rp => rp.g === p.g)
+    )
+    return { ...r, portions: [...recommandees, ...r.portions] }
+  })
 
   // Pas d'autofocus à l'ouverture — évite l'ouverture automatique du clavier sur mobile.
   // Le focus est déclenché uniquement quand l'utilisateur revient à l'étape search
@@ -481,14 +492,14 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                     </>
                   )}
 
-                  {searchSource === 'ciqual' && recentsFiltered.length > 0 && (
+                  {searchSource === 'ciqual' && recentsMerged.length > 0 && (
                     <>
-                      <div className="section-title" style={{ marginTop: favoris.length > 0 ? 16 : 4 }}>Récents (3 derniers jours)</div>
-                      {recentsFiltered.map((food, i) => (
+                      <div className="section-title" style={{ marginTop: favoris.length > 0 ? 16 : 4 }}>Récents (100 dernières entrées)</div>
+                      {recentsMerged.map((food, i) => (
                         <FoodRow
                           key={i}
                           food={food}
-                          isFav={false}
+                          isFav={isFavorite(food)}
                           onSelect={selectFood}
                           onToggleFav={toggleFavorite}
                         />
@@ -496,7 +507,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
                     </>
                   )}
 
-                  {(searchSource === 'off' || (favoris.length === 0 && recentsFiltered.length === 0)) && (
+                  {(searchSource === 'off' || (favoris.length === 0 && recentsMerged.length === 0)) && (
                     <div className="empty">
                       {searchSource === 'off'
                         ? 'Tape le nom d\'un produit emballé (marque, référence…)'
