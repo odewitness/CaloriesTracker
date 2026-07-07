@@ -384,6 +384,7 @@ function AddToJournalSheet({ repas, journalDate, onDateChange, journalMeal, onMe
   useBackButton(onClose)
   const todayStr = new Date().toISOString().slice(0, 10)
   const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -410,15 +411,21 @@ function AddToJournalSheet({ repas, journalDate, onDateChange, journalMeal, onMe
           >
             Aujourd'hui
           </button>
-          <input
-            type="date"
-            className="input"
-            value={journalDate}
-            max={todayStr}
-            onChange={e => onDateChange(e.target.value)}
-            style={{ flex: 1 }}
-          />
+          <button
+            onClick={() => onDateChange(tomorrowStr)}
+            className="chip"
+            style={journalDate === tomorrowStr ? { background: 'var(--green)', color: 'white' } : undefined}
+          >
+            Demain
+          </button>
         </div>
+        <input
+          type="date"
+          className="input"
+          value={journalDate}
+          onChange={e => onDateChange(e.target.value)}
+          style={{ marginBottom: 16 }}
+        />
 
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Repas</div>
         <select className="input" value={journalMeal} onChange={e => onMealChange(e.target.value)} style={{ marginBottom: 16 }}>
