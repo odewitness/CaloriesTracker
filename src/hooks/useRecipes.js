@@ -154,9 +154,12 @@ export async function saveRecette({ userId, recetteId, nom, portions, poidsRefer
     sucres:               per100?.sucres               ?? null,
     acides_gras_satures:  per100?.acides_gras_satures  ?? null,
   }
-  for (const key of ALL_NUTRIENT_KEYS) {
-    payload[key] = per100?.[key] ?? null
-  }
+  // Note : on n'écrit PAS les clés détaillées de ALL_NUTRIENT_KEYS (vitamines,
+  // minéraux, sucres/AG détaillés) sur la table `recettes` — elle n'a pas ces
+  // colonnes en base (contrairement à `aliments_custom` et
+  // `recette_ingredients`), et elles ne sont de toute façon jamais relues :
+  // RecipeDetailModal recalcule systématiquement per100 à la volée à partir
+  // des ingrédients (calcPer100g(sumIngredients(ingredients), poidsRef)).
 
   let id = recetteId
   if (recetteId) {
