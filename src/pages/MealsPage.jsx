@@ -50,7 +50,7 @@ function RepasCard({ repas, onDelete, onEdit, onAddToJournal }) {
               onClick={() => onAddToJournal(repas)}
               style={{ width: '100%', background: 'var(--green)', color: 'white', borderRadius: 9, padding: '11px', fontSize: 14, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
             >
-              <Check size={15} /> Ajouter au journal d'aujourd'hui
+              <Check size={15} /> Ajouter au journal
             </button>
           </div>
         </div>
@@ -380,19 +380,51 @@ function EditRepasPage({ repas, onSave, onClose }) {
   )
 }
 
-function AddToJournalSheet({ repas, journalMeal, onMealChange, onConfirm, onClose }) {
+function AddToJournalSheet({ repas, journalDate, onDateChange, journalMeal, onMealChange, onConfirm, onClose }) {
   useBackButton(onClose)
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet">
         <div className="modal-handle" />
         <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Ajouter au journal</h2>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-          Quel repas pour « {repas.nom} » ?
+          Pour quel jour et quel repas « {repas.nom} » ?
         </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Jour</div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          <button
+            onClick={() => onDateChange(yesterdayStr)}
+            className="chip"
+            style={journalDate === yesterdayStr ? { background: 'var(--green)', color: 'white' } : undefined}
+          >
+            Hier
+          </button>
+          <button
+            onClick={() => onDateChange(todayStr)}
+            className="chip"
+            style={journalDate === todayStr ? { background: 'var(--green)', color: 'white' } : undefined}
+          >
+            Aujourd'hui
+          </button>
+          <input
+            type="date"
+            className="input"
+            value={journalDate}
+            max={todayStr}
+            onChange={e => onDateChange(e.target.value)}
+            style={{ flex: 1 }}
+          />
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Repas</div>
         <select className="input" value={journalMeal} onChange={e => onMealChange(e.target.value)} style={{ marginBottom: 16 }}>
           {MEALS.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
+
         <button className="btn-primary" onClick={onConfirm}>Ajouter</button>
         <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={onClose}>Annuler</button>
       </div>
@@ -407,6 +439,7 @@ export default function MealsPage() {
   const [loading, setLoading] = useState(true)
   const [editTarget, setEditTarget] = useState(null) // null = closed, {} = new, repas = edit
   const [addToJournalTarget, setAddToJournalTarget] = useState(null)
+  const [journalDate, setJournalDate] = useState(new Date().toISOString().slice(0, 10))
   const [journalMeal, setJournalMeal] = useState('Déjeuner')
 
   useEffect(() => { load() }, [user])
@@ -439,13 +472,13 @@ export default function MealsPage() {
   }
 
   const handleAddToJournal = async (repas) => {
+    setJournalDate(new Date().toISOString().slice(0, 10))
     setAddToJournalTarget(repas)
   }
 
   const confirmAddToJournal = async () => {
     if (!addToJournalTarget) return
-    const today = new Date().toISOString().slice(0, 10)
-    const rows = addToJournalTarget.items.map(item => ({ ...item, date: today, meal: journalMeal, user_id: user.id }))
+    const rows = addToJournalTarget.items.map(item => ({ ...item, date: journalDate, meal: journalMeal, user_id: user.id }))
     const { error } = await supabase.from('journal').insert(rows)
     if (!error) toast(`✓ ${addToJournalTarget.nom} ajouté au journal !`)
     else toast('Erreur')
@@ -496,6 +529,8 @@ export default function MealsPage() {
       {addToJournalTarget && (
         <AddToJournalSheet
           repas={addToJournalTarget}
+          journalDate={journalDate}
+          onDateChange={setJournalDate}
           journalMeal={journalMeal}
           onMealChange={setJournalMeal}
           onConfirm={confirmAddToJournal}
