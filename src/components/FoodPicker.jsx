@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Search, ScanLine, Camera, ArrowLeft, Star } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
@@ -75,6 +75,37 @@ function FoodRow({ food, isFav, onSelect, onToggleFav }) {
   )
 }
 
+const FAV_SORTS = [
+  { id: 'recent', label: 'Récents' },
+  { id: 'alpha',  label: 'A→Z' },
+  { id: 'most',   label: 'Top' },
+]
+
+function FavSortToggle({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+      {FAV_SORTS.map(s => {
+        const active = value === s.id
+        return (
+          <button
+            key={s.id}
+            onClick={() => onChange(s.id)}
+            style={{
+              fontSize: 11, fontWeight: 700, fontFamily: 'var(--font)',
+              padding: '3px 9px', borderRadius: 20, border: 'none',
+              background: active ? 'var(--green)' : 'var(--gray-bg)',
+              color: active ? 'white' : 'var(--text-muted)',
+              transition: 'all .15s',
+            }}
+          >
+            {s.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function FoodPicker({
   title = 'Ajouter un aliment',
   confirmLabel = 'Ajouter',
@@ -102,6 +133,7 @@ export default function FoodPicker({
   const [scannerOpen, setScannerOpen] = useState(false)
   const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
   const [favorisCollapsed, setFavorisCollapsed] = useState(false)
+  const [favSort, setFavSort] = useState('recent') // 'recent' | 'alpha' | 'most'
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -110,6 +142,21 @@ export default function FoodPicker({
   // recommandées du favori (stockées dans food_data) avec la "Dernière quantité"
   // venant du journal, sans que l'une efface l'autre.
   const favoriByKey = new Map(favoris.map(f => [`${f.food_source}:${f.food_ref_id ?? f.food_name}`, f]))
+
+  // "Récents" = dernière utilisation réelle (last_used_at, alimenté par
+  // bumpFavoriUsage à chaque ajout au journal) ; un favori jamais utilisé
+  // retombe sur sa date d'ajout aux favoris (created_at).
+  const sortedFavoris = useMemo(() => {
+    const arr = [...favoris]
+    if (favSort === 'alpha') {
+      arr.sort((a, b) => (a.food_name || '').localeCompare(b.food_name || '', 'fr'))
+    } else if (favSort === 'most') {
+      arr.sort((a, b) => (b.use_count || 0) - (a.use_count || 0))
+    } else {
+      arr.sort((a, b) => new Date(b.last_used_at || b.created_at) - new Date(a.last_used_at || a.created_at))
+    }
+    return arr
+  }, [favoris, favSort])
   const recentsMerged = recents.map(r => {
     const fav = favoriByKey.get(foodIdentity(r).key)
     if (!fav) return r
@@ -455,16 +502,21 @@ export default function FoodPicker({
                 <>
                   {searchSource === 'ciqual' && favoris.length > 0 && (
                     <>
-                      <button
-                        onClick={() => setFavorisCollapsed(c => !c)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, marginTop: 4, cursor: 'pointer' }}
-                      >
-                        <span className="section-title" style={{ margin: 0 }}>★ Favoris</span>
-                        <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
-                          {favorisCollapsed ? '▸' : '▾'}
-                        </span>
-                      </button>
-                      {!favorisCollapsed && favoris.map(f => (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 8 }}>
+                        <button
+                          onClick={() => setFavorisCollapsed(c => !c)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                        >
+                          <span className="section-title" style={{ margin: 0 }}>★ Favoris</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
+                            {favorisCollapsed ? '▸' : '▾'}
+                          </span>
+                        </button>
+                        {!favorisCollapsed && favoris.length > 1 && (
+                          <FavSortToggle value={favSort} onChange={setFavSort} />
+                        )}
+                      </div>
+                      {!favorisCollapsed && sortedFavoris.map(f => (
                         <FoodRow
                           key={f.id}
                           food={f.food_data}

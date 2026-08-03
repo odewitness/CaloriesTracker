@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
+import { bumpFavoriUsage } from './useFavoris'
 
 export function useJournal(date) {
   const { user } = useAuth()
@@ -29,7 +30,11 @@ export function useJournal(date) {
       .insert([{ ...entry, date, user_id: user.id }])
       .select()
       .single()
-    if (!error && data) setEntries(e => [...e, data])
+    if (!error && data) {
+      setEntries(e => [...e, data])
+      // Non bloquant : ne doit jamais retarder ni faire échouer l'ajout au journal.
+      bumpFavoriUsage(user.id, data)
+    }
     return { data, error }
   }
 

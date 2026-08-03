@@ -13,6 +13,39 @@ export function foodIdentity(food) {
   return { source, refId, name, key: `${source}:${refId ?? name}` }
 }
 
+// ── bumpFavoriUsage ───────────────────────────────────────────────────────
+// Appelée par useJournal.addEntry après chaque ajout au journal. Si l'aliment
+// ajouté correspond à un favori existant, incrémente son compteur d'usage et
+// note la date — sert au tri "Plus utilisés" / "Récents" dans FoodPicker.
+// Ne fait rien si l'aliment n'est pas (ou plus) favori. Volontairement non
+// bloquante côté appelant : un échec ici ne doit jamais faire échouer l'ajout
+// au journal lui-même.
+export async function bumpFavoriUsage(userId, food) {
+  if (!userId) return
+  try {
+    const { source, refId, name } = foodIdentity(food)
+    let query = supabase
+      .from('favoris')
+      .select('id, use_count')
+      .eq('user_id', userId)
+      .eq('food_source', source)
+    query = refId != null
+      ? query.eq('food_ref_id', String(refId))
+      : query.is('food_ref_id', null).eq('food_name', name)
+
+    const { data } = await query.limit(1)
+    const row = data?.[0]
+    if (!row) return // pas un favori — rien à faire
+
+    await supabase
+      .from('favoris')
+      .update({ use_count: (row.use_count || 0) + 1, last_used_at: new Date().toISOString() })
+      .eq('id', row.id)
+  } catch (e) {
+    console.error('bumpFavoriUsage error:', e)
+  }
+}
+
 export function useFavoris() {
   const { user } = useAuth()
   const [favoris, setFavoris] = useState([])
