@@ -1,259 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Search, ScanLine, Camera, ArrowLeft, Trash2, ChevronDown, Scale } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import React, { useState, useRef } from 'react'
+import { ArrowLeft, ChevronDown, Scale } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
-import BarcodeScanner from './BarcodeScanner'
-import { useBackButton } from '../hooks/useBackButton'
 import { saveRecette, sumIngredients, calcPer100g } from '../hooks/useRecipes'
+import { useBackButton } from '../hooks/useBackButton'
+import FoodPicker from './FoodPicker'
+import EditableFoodRow from './EditableFoodRow'
+import { scaleFood } from '../lib/nutrients'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sous-composant : prévisualisation macros d'un ingrédient
-// ─────────────────────────────────────────────────────────────────────────────
-function MacroPreview({ food, qty }) {
-  const f = (parseFloat(qty) || 0) / 100
-  const items = [
-    { label: 'kcal', val: Math.round((food.energie_kcal || 0) * f),               color: 'var(--text)' },
-    { label: 'Prot', val: `${((food.proteines || 0) * f).toFixed(1)}g`,           color: 'var(--green)' },
-    { label: 'Gluc', val: `${((food.glucides  || 0) * f).toFixed(1)}g`,           color: 'var(--amber)' },
-    { label: 'Lip',  val: `${((food.lipides   || 0) * f).toFixed(1)}g`,           color: 'var(--coral)' },
-  ]
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 14 }}>
-      {items.map(({ label, val, color }) => (
-        <div key={label} style={{ background: 'var(--gray-bg)', borderRadius: 8, padding: '7px 4px', textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color }}>{val}</div>
-          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>{label}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sous-composant : ligne d'un résultat de recherche
-// ─────────────────────────────────────────────────────────────────────────────
-function FoodRow({ food, onSelect }) {
-  return (
-    <div
-      onClick={() => onSelect(food)}
-      style={{ display: 'flex', alignItems: 'center', padding: '10px 4px', borderBottom: '0.5px solid var(--border)', cursor: 'pointer', gap: 8 }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>{food.alim_nom}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-          {food.categorie}
-          {food._source === 'custom' && <span style={{ marginLeft: 6, background: 'var(--purple-light)', color: 'var(--purple)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Perso</span>}
-          {food._source === 'off'    && <span style={{ marginLeft: 6, background: 'var(--blue-light)',   color: 'var(--blue)',   borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>OFF</span>}
-        </div>
-      </div>
-      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-dark)', flexShrink: 0 }}>{food.energie_kcal} kcal/100g</span>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sous-composant : panneau de recherche d'un ingrédient
-// ─────────────────────────────────────────────────────────────────────────────
-function IngredientSearch({ user, onSelect, onClose }) {
-  const toast = useToast()
-  const [query,          setQuery]          = useState('')
-  const [results,        setResults]        = useState([])
-  const [searching,      setSearching]      = useState(false)
-  const [selectedFood,   setSelectedFood]   = useState(null)
-  const [qty,            setQty]            = useState('100')
-  const [barcode,        setBarcode]        = useState('')
-  const [barcodeLoading, setBarcodeLoading] = useState(false)
-  const [scannerOpen,    setScannerOpen]    = useState(false)
-  const timerRef = useRef(null)
-
-  const doSearch = useCallback(async (q) => {
-    if (!q || q.length < 2) { setResults([]); return }
-    setSearching(true)
-    const { data, error } = await supabase.rpc('search_ciqual', { query: q, lim: 25 })
-    if (error) console.error('search_ciqual error:', error)
-    if (!data || data.length === 0) {
-      const { data: custom } = await supabase.from('aliments_custom').select('*').eq('user_id', user.id).ilike('nom', `%${q}%`).limit(10)
-      setResults((custom || []).map(c => ({ ...c, alim_nom: c.nom, categorie: c.categorie || 'Personnalisé', _source: 'custom' })))
-    } else {
-      const { data: custom } = await supabase.from('aliments_custom').select('*').eq('user_id', user.id).ilike('nom', `%${q}%`).limit(5)
-      const customMapped = (custom || []).map(c => ({ ...c, alim_nom: c.nom, categorie: c.categorie || 'Personnalisé', _source: 'custom' }))
-      setResults([...data, ...customMapped])
-    }
-    setSearching(false)
-  }, [user])
-
-  const handleQuery = (v) => {
-    setQuery(v)
-    clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => doSearch(v), 250)
-  }
-
-  const fetchBarcode = async (codeOverride) => {
-    const code = (codeOverride ?? barcode).trim()
-    if (!code) return
-    setBarcodeLoading(true)
-    try {
-      const res  = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
-      const data = await res.json()
-      if (data.status === 1 && data.product) {
-        const p = data.product
-        const n = p.nutriments || {}
-        const food = {
-          alim_nom:    p.product_name || 'Produit inconnu',
-          categorie:   p.categories?.split(',')[0]?.trim() || 'Open Food Facts',
-          energie_kcal: Math.round(n['energy-kcal_100g'] || (n['energy_100g'] || 0) / 4.184),
-          proteines:   parseFloat((n['proteins_100g']       || 0).toFixed(1)),
-          glucides:    parseFloat((n['carbohydrates_100g']  || 0).toFixed(1)),
-          lipides:     parseFloat((n['fat_100g']            || 0).toFixed(1)),
-          fibres:      parseFloat((n['fiber_100g']          || 0).toFixed(1)),
-          sucres:      parseFloat((n['sugars_100g']         || 0).toFixed(1)),
-          acides_gras_satures: parseFloat((n['saturated-fat_100g'] || 0).toFixed(2)),
-          ag_monoinsatures:    parseFloat((n['monounsaturated-fat_100g'] || 0).toFixed(2)),
-          ag_polyinsatures:    parseFloat((n['polyunsaturated-fat_100g'] || 0).toFixed(2)),
-          cholesterol: parseFloat(((n['cholesterol_100g']   || 0) * 1000).toFixed(1)),
-          sel:         parseFloat((n['salt_100g']           || 0).toFixed(2)),
-          vit_c:       parseFloat(((n['vitamin-c_100g']     || 0) * 1000).toFixed(2)),
-          vit_d:       parseFloat(((n['vitamin-d_100g']     || 0) * 1000000).toFixed(2)),
-          calcium:     parseFloat(((n['calcium_100g']       || 0) * 1000).toFixed(1)),
-          fer:         parseFloat(((n['iron_100g']          || 0) * 1000).toFixed(2)),
-          magnesium:   parseFloat(((n['magnesium_100g']     || 0) * 1000).toFixed(1)),
-          potassium:   parseFloat(((n['potassium_100g']     || 0) * 1000).toFixed(1)),
-          zinc:        parseFloat(((n['zinc_100g']          || 0) * 1000).toFixed(2)),
-          sodium:      parseFloat(((n['sodium_100g']        || 0) * 1000).toFixed(1)),
-          portions: p.serving_size ? [{ label: 'Portion recommandée', g: parseFloat(p.serving_size) || 100 }] : [],
-          _source: 'off',
-        }
-        setSelectedFood(food)
-        setQty(String(food.portions?.[0]?.g || 100))
-      } else {
-        toast('Produit non trouvé dans Open Food Facts')
-      }
-    } catch { toast('Erreur réseau') }
-    setBarcodeLoading(false)
-  }
-
-  const handleScanDetected = (code) => {
-    setScannerOpen(false)
-    setBarcode(code)
-    fetchBarcode(code)
-  }
-
-  // ── Confirme l'ajout de l'ingrédient ──────────────────────────────────────
-  const confirm = () => {
-    if (!selectedFood) return
-    const f = (parseFloat(qty) || 0) / 100
-    const ing = {
-      food_name:   selectedFood.alim_nom,
-      food_source: selectedFood._source || 'ciqual',
-      food_ref_id: selectedFood.alim_code || selectedFood.id || null,
-      qty_g:       parseFloat(qty) || 0,
-      energie_kcal: parseFloat(((selectedFood.energie_kcal || 0) * f).toFixed(1)),
-      proteines:    parseFloat(((selectedFood.proteines    || 0) * f).toFixed(2)),
-      glucides:     parseFloat(((selectedFood.glucides     || 0) * f).toFixed(2)),
-      lipides:      parseFloat(((selectedFood.lipides      || 0) * f).toFixed(2)),
-      fibres:       parseFloat(((selectedFood.fibres       || 0) * f).toFixed(2)),
-      sel:          parseFloat(((selectedFood.sel          || 0) * f).toFixed(2)),
-      sucres:       parseFloat(((selectedFood.sucres       || 0) * f).toFixed(2)),
-      acides_gras_satures: parseFloat(((selectedFood.acides_gras_satures || 0) * f).toFixed(2)),
-    }
-    for (const key of ALL_NUTRIENT_KEYS) {
-      const raw = selectedFood[key]
-      ing[key] = raw != null ? parseFloat((raw * f).toFixed(4)) : null
-    }
-    onSelect(ing)
-  }
-
-  // ── Vue configure : portions + grammage ──────────────────────────────────
-  if (selectedFood) {
-    return (
-      <>
-        <div className="page-modal-header">
-          <button className="btn-icon" onClick={() => setSelectedFood(null)}><ArrowLeft size={20} color="var(--text-muted)" /></button>
-          <h2 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedFood.alim_nom}</h2>
-          <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
-        </div>
-        <div className="page-modal-body">
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{selectedFood.categorie}</div>
-
-          {selectedFood.portions?.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 6 }}>Portions courantes</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {selectedFood.portions.map((p, i) => (
-                  <button key={i} className="chip" onClick={() => setQty(String(p.g))}>{p.label} · {p.g}g</button>
-                ))}
-                <button className="chip" onClick={() => setQty('100')}>100g</button>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <input className="input-sm" type="text" inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} />
-            <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
-          </div>
-
-          <MacroPreview food={selectedFood} qty={qty} />
-
-          <button className="btn-primary" onClick={confirm}>Ajouter à la recette</button>
-          <button className="btn-ghost" style={{ width: '100%', marginTop: 8, textAlign: 'center' }} onClick={onClose}>Annuler</button>
-        </div>
-      </>
-    )
-  }
-
-  // ── Vue recherche ──────────────────────────────────────────────────────────
-  return (
-    <>
-      <div className="page-modal-header">
-        <div style={{ width: 32, flexShrink: 0 }} />
-        <h2>Ajouter un ingrédient</h2>
-        <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
-      </div>
-      <div className="page-modal-body">
-        <div style={{ position: 'relative', marginBottom: 10, flexShrink: 0 }}>
-          <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-          <input
-            className="input" style={{ paddingLeft: 36 }} placeholder="Poulet, riz, huile d'olive..."
-            value={query} onChange={e => handleQuery(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(query); e.currentTarget.blur() } }}
-            enterKeyHint="search" inputMode="search"
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexShrink: 0 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <ScanLine size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              className="input" style={{ paddingLeft: 36 }} placeholder="Code-barres..." type="number"
-              value={barcode} onChange={e => setBarcode(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); fetchBarcode(); e.currentTarget.blur() } }}
-              enterKeyHint="go"
-            />
-          </div>
-          <button onClick={() => setScannerOpen(true)} style={{ background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 9, padding: '0 12px', display: 'flex', alignItems: 'center' }} aria-label="Scanner">
-            <Camera size={18} />
-          </button>
-          <button onClick={() => fetchBarcode()} disabled={barcodeLoading} style={{ background: 'var(--green)', color: 'white', borderRadius: 9, padding: '0 14px', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', opacity: barcodeLoading ? 0.6 : 1 }}>
-            {barcodeLoading ? '...' : 'OK'}
-          </button>
-        </div>
-
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          {searching && <div className="loader"><div className="spinner" /> Recherche...</div>}
-          {!searching && query.length >= 2 && results.length === 0 && <div className="empty">Aucun résultat pour « {query} »</div>}
-          {!searching && query.length >= 2 && results.map((food, i) => (
-            <FoodRow key={food.id || food.alim_code || i} food={food} onSelect={f => { setSelectedFood(f); setQty(String(f.portions?.[0]?.g || 100)) }} />
-          ))}
-          {!searching && query.length < 2 && <div className="empty">Tape au moins 2 caractères pour chercher</div>}
-        </div>
-      </div>
-
-      {scannerOpen && <BarcodeScanner onDetected={handleScanDetected} onClose={() => setScannerOpen(false)} />}
-    </>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Composant principal : RecipeFormModal
@@ -308,6 +62,12 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
 
   const removeIngredient = (idx) => setIngredients(prev => prev.filter((_, i) => i !== idx))
 
+  // Édition inline du grammage d'un ingrédient déjà dans la liste (avant
+  // sauvegarde) — même patch que celui produit par EditableFoodRow pour les
+  // entrées du journal : qty_g + tous les nutriments reproportionnés.
+  const updateIngredient = (idx, patch) =>
+    setIngredients(prev => prev.map((ing, i) => i === idx ? { ...ing, ...patch } : ing))
+
   // ── Sauvegarde ────────────────────────────────────────────────────────────
   const save = async () => {
     if (!nom.trim())        { toast('⚠ Donne un nom à ta recette') ; return }
@@ -335,11 +95,17 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   }
 
   // ── Rendu : vue "recherche d'ingrédient" ──────────────────────────────────
+  // includeRecipes=false : on évite qu'une recette puisse s'imbriquer dans une
+  // autre recette (même limite que l'ancien IngredientSearch dédié).
   if (showSearch) {
     return (
-      <div className="page-modal">
-        <IngredientSearch user={user} onSelect={handleIngredientSelected} onClose={() => setShowSearch(false)} />
-      </div>
+      <FoodPicker
+        title="Ajouter un ingrédient"
+        confirmLabel="Ajouter à la recette"
+        includeRecipes={false}
+        onConfirm={(food, qty) => handleIngredientSelected(scaleFood(food, qty))}
+        onClose={() => setShowSearch(false)}
+      />
     )
   }
 
@@ -385,19 +151,12 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
         )}
 
         {ingredients.map((ing, idx) => (
-          <div key={ing.id || ing._tmpId || idx} className="card" style={{ marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ing.food_name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                {ing.qty_g}g&nbsp;·&nbsp;
-                <span className="c-prot">P {(ing.proteines || 0).toFixed(1)}g</span>&nbsp;
-                <span className="c-gluc">G {(ing.glucides  || 0).toFixed(1)}g</span>&nbsp;
-                <span className="c-lip">L {(ing.lipides   || 0).toFixed(1)}g</span>
-              </div>
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{Math.round(ing.energie_kcal || 0)} kcal</span>
-            <button className="btn-icon" onClick={() => removeIngredient(idx)} style={{ color: 'var(--text-hint)' }}><Trash2 size={15} /></button>
-          </div>
+          <EditableFoodRow
+            key={ing.id || ing._tmpId || idx}
+            entry={ing}
+            onSave={patch => updateIngredient(idx, patch)}
+            onDelete={() => removeIngredient(idx)}
+          />
         ))}
 
         {/* ── Section pesée ── */}

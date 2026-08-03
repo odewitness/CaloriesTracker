@@ -121,6 +121,36 @@ export const ALL_NUTRIENT_KEYS = Array.from(new Set([
   ...DETAIL_ONLY_FIELDS.map(f => f.key),
 ]))
 
+// ── scaleFood ────────────────────────────────────────────────────────────────
+// Recalcule un aliment (valeurs pour 100 g — recherche Ciqual/OFF/custom/recette)
+// à un grammage donné, et renvoie un objet directement persistable tel quel en
+// entrée de journal (+ `meal`) ou en ligne d'ingrédient de recette.
+//
+// Source unique pour ce calcul, qui était dupliqué à l'identique dans
+// AddFoodModal.confirm() et RecipeFormModal.IngredientSearch.confirm().
+//
+// `food` = objet tel que manipulé par FoodPicker (alim_nom, _source, alim_code/id,
+// valeurs /100g, ALL_NUTRIENT_KEYS...).
+export function scaleFood(food, qty_g) {
+  const f = (parseFloat(qty_g) || 0) / 100
+  const scaled = {
+    food_name:   food.alim_nom || food.food_name,
+    food_source: food._source || food.food_source || 'ciqual',
+    food_ref_id: food.alim_code || food.id || food.food_ref_id || null,
+    qty_g:        parseFloat(qty_g) || 0,
+    energie_kcal: parseFloat(((food.energie_kcal || 0) * f).toFixed(1)),
+    proteines:    parseFloat(((food.proteines    || 0) * f).toFixed(2)),
+    glucides:     parseFloat(((food.glucides     || 0) * f).toFixed(2)),
+    lipides:      parseFloat(((food.lipides      || 0) * f).toFixed(2)),
+    fibres:       parseFloat(((food.fibres       || 0) * f).toFixed(2)),
+  }
+  for (const key of ALL_NUTRIENT_KEYS) {
+    const raw = food[key]
+    scaled[key] = raw != null ? parseFloat((raw * f).toFixed(4)) : null
+  }
+  return scaled
+}
+
 // ── Répartition des objectifs par repas ──────────────────────────────────────
 // Utilisé par : TodayPage.jsx (affichage compact par MealSection) et
 // ProfilePage.jsx (édition des objectifs par repas).
