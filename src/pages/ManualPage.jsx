@@ -183,6 +183,7 @@ function RecipeCard({ recette, onOpen, onDelete }) {
 
         {recette.energie_kcal != null && factor != null && (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            {Math.round(recette.energie_kcal * factor)} kcal&nbsp;·&nbsp;
             <span className="c-prot">P {Math.round((recette.proteines || 0) * factor)}g</span>&nbsp;
             <span className="c-gluc">G {Math.round((recette.glucides  || 0) * factor)}g</span>&nbsp;
             <span className="c-lip">L {Math.round((recette.lipides   || 0) * factor)}g</span>
