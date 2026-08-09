@@ -192,6 +192,24 @@ export function useShoppingListItems(listeId) {
     return addItems(toAdd)
   }
 
+  // ── Ajoute une sélection d'aliments provenant d'un repas type
+  // (repas_types), en résolvant leur catégorie au préalable — même logique
+  // que pour les ingrédients de recette. mealItems: items du repas type
+  // (déjà filtrés/mis à l'échelle si besoin), au format { food_name, qty_g,
+  // food_source?, food_ref_id?, ... }. ───────────────────────────────────
+  const addRepasItems = async (repas, mealItems) => {
+    const withCategories = await resolveCategories(mealItems)
+    const toAdd = withCategories.map(i => ({
+      nom: i.food_name,
+      categorie: i.categorie,
+      qty_g: i.qty_g,
+      food_source: i.food_source,
+      food_ref_id: i.food_ref_id,
+      recetteNom: repas.nom,
+    }))
+    return addItems(toAdd)
+  }
+
   const toggleChecked = async (id, checked) => {
     setItems(it => it.map(x => x.id === id ? { ...x, checked } : x)) // optimiste
     const { error } = await supabase
@@ -225,5 +243,5 @@ export function useShoppingListItems(listeId) {
     return { error }
   }
 
-  return { items, loading, addItems, addRecetteIngredients, toggleChecked, deleteItem, clearChecked, refetch: load }
+  return { items, loading, addItems, addRecetteIngredients, addRepasItems, toggleChecked, deleteItem, clearChecked, refetch: load }
 }

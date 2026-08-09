@@ -3,6 +3,7 @@ import { Plus, ChevronLeft, Trash2, X, Check, ShoppingCart, Pencil } from 'lucid
 import { useToast } from '../lib/toast'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
 import AddFromRecipeModal from '../components/AddFromRecipeModal'
+import AddFromMealModal from '../components/AddFromMealModal'
 import FoodPicker from '../components/FoodPicker'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,7 +95,7 @@ function QuickAddForm({ onAdd, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // AddMenu — feuille du bas : 3 façons d'ajouter
 // ─────────────────────────────────────────────────────────────────────────────
-function AddMenu({ onClose, onQuickAdd, onFromFood, onFromRecipe }) {
+function AddMenu({ onClose, onQuickAdd, onFromFood, onFromRecipe, onFromMeal }) {
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-end' }}
@@ -107,6 +108,7 @@ function AddMenu({ onClose, onQuickAdd, onFromFood, onFromRecipe }) {
         {[
           { label: 'Chercher un aliment', action: onFromFood },
           { label: 'Depuis une recette', action: onFromRecipe },
+          { label: 'Depuis un repas type', action: onFromMeal },
           { label: 'Article libre (non alimentaire...)', action: onQuickAdd },
         ].map(opt => (
           <button
@@ -174,11 +176,12 @@ function ItemRow({ item, onToggle, onDelete }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function ListeDetail({ liste, onBack }) {
   const toast = useToast()
-  const { items, loading, addItems, addRecetteIngredients, toggleChecked, deleteItem, clearChecked } = useShoppingListItems(liste.id)
+  const { items, loading, addItems, addRecetteIngredients, addRepasItems, toggleChecked, deleteItem, clearChecked } = useShoppingListItems(liste.id)
   const [menuOpen, setMenuOpen] = useState(false)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [foodPickerOpen, setFoodPickerOpen] = useState(false)
   const [recipeModalOpen, setRecipeModalOpen] = useState(false)
+  const [mealModalOpen, setMealModalOpen] = useState(false)
 
   const grouped = useMemo(() => {
     const map = new Map()
@@ -273,6 +276,7 @@ function ListeDetail({ liste, onBack }) {
           onQuickAdd={() => setQuickAddOpen(true)}
           onFromFood={() => setFoodPickerOpen(true)}
           onFromRecipe={() => setRecipeModalOpen(true)}
+          onFromMeal={() => setMealModalOpen(true)}
         />
       )}
 
@@ -303,6 +307,16 @@ function ListeDetail({ liste, onBack }) {
             toast('✓ Ingrédients ajoutés')
           }}
           onClose={() => setRecipeModalOpen(false)}
+        />
+      )}
+
+      {mealModalOpen && (
+        <AddFromMealModal
+          onAdd={async (repas, items) => {
+            await addRepasItems(repas, items)
+            toast('✓ Aliments ajoutés')
+          }}
+          onClose={() => setMealModalOpen(false)}
         />
       )}
     </div>
