@@ -55,26 +55,25 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 .page-content {
   height: 100%;
   overflow-y: auto;
-  padding: calc(56px + env(safe-area-inset-top)) 16px 90px;
+  padding: 16px 16px 90px;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Top bar (bouton profil) — position: absolute plutôt que fixed, ancré sur
-   #root (qui ne scrolle jamais, lui). Certains WebViews mobiles (iOS/
-   Capacitor) font "dériver" un position:fixed pendant le scroll à inertie
-   d'un conteneur scrollable ailleurs sur la page, même sans lien de
-   parenté ; absolute sur un ancêtre non-scrollable est immunisé contre ça.
-   #root étant déjà centré (max-width 430px), plus besoin du bricolage
-   left:50%/transform : right:0 suffit. */
+/* Top bar (bouton profil) — barre normale dans le flux (comme bottom-nav
+   pour la partie basse), PAS en position fixed/absolute. Certains WebViews
+   mobiles (Capacitor/Android) cassent le positionnement fixed/absolute
+   pendant le scroll à inertie d'un enfant ailleurs sur la page : un élément
+   qui prend sa vraie place dans le flux ne peut, par construction, jamais
+   chevaucher ni suivre une zone qui scroll.
+   → la zone scrollable (.page-content) est un frère plus bas dans le flex,
+   donc ce bandeau reste immobile quoi qu'il arrive. */
 .top-bar {
-  position: absolute;
-  top: 0;
-  right: 0;
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
-  padding: calc(10px + env(safe-area-inset-top)) 14px 0;
-  pointer-events: none;
-  z-index: 100;
+  align-items: center;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 8px;
+  background: var(--gray-bg);
 }
 
 .profile-avatar-btn {
