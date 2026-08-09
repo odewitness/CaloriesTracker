@@ -150,50 +150,89 @@ function FoodCard({ aliment, onEdit, onDelete }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // RecipeCard — carte d'une recette dans la liste
 // ─────────────────────────────────────────────────────────────────────────────
-function RecipeCard({ recette, onOpen, onDelete }) {
-  const portions       = recette.portions || 1
-  const poidsRef        = recette.poids_cuit_g || recette.poids_cru_g || null
-  const poidsParPortion = poidsRef ? poidsRef / portions : null
-  const factor          = poidsParPortion ? poidsParPortion / 100 : null
+function RecipeCard({ recette, ingredients, onOpen, onDelete }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasIngredients = ingredients && ingredients.length > 0
 
   return (
-    <div
-      className="card"
-      style={{ marginBottom: 10, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-      onClick={() => onOpen(recette)}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {recette.nom}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-          {recette.energie_kcal != null ? `${Math.round(recette.energie_kcal)} kcal/100g` : 'Aucun ingrédient'}
-          {recette.portions > 1 && <span style={{ marginLeft: 6, color: 'var(--text-hint)' }}>· {recette.portions} portions</span>}
-          {recette.poids_cuit_g && <span style={{ marginLeft: 6, color: 'var(--blue)', fontSize: 11 }}>⚖️ pesé</span>}
+    <div className="card" style={{ marginBottom: 10, padding: '13px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div
+          style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+          onClick={() => onOpen(recette)}
+        >
+          <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {recette.nom}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            {recette.energie_kcal != null ? `${Math.round(recette.energie_kcal)} kcal/100g` : 'Aucun ingrédient'}
+            {recette.portions > 1 && <span style={{ marginLeft: 6, color: 'var(--text-hint)' }}>· {recette.portions} portions</span>}
+            {recette.poids_cuit_g && <span style={{ marginLeft: 6, color: 'var(--blue)', fontSize: 11 }}>⚖️ pesé</span>}
+          </div>
+
+          {recette.energie_kcal != null && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              <span className="c-prot">P {Math.round(recette.proteines || 0)}g</span>&nbsp;
+              <span className="c-gluc">G {Math.round(recette.glucides  || 0)}g</span>&nbsp;
+              <span className="c-lip">L {Math.round(recette.lipides   || 0)}g</span>
+              <span style={{ color: 'var(--text-hint)' }}> /100g</span>
+            </div>
+          )}
+
+          {(() => {
+            const portions       = recette.portions || 1
+            const poidsRef        = recette.poids_cuit_g || recette.poids_cru_g || null
+            const poidsParPortion = poidsRef ? poidsRef / portions : null
+            const factor          = poidsParPortion ? poidsParPortion / 100 : null
+            if (recette.energie_kcal == null || factor == null) return null
+            return (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                {Math.round(recette.energie_kcal * factor)} kcal&nbsp;·&nbsp;
+                <span className="c-prot">P {Math.round((recette.proteines || 0) * factor)}g</span>&nbsp;
+                <span className="c-gluc">G {Math.round((recette.glucides  || 0) * factor)}g</span>&nbsp;
+                <span className="c-lip">L {Math.round((recette.lipides   || 0) * factor)}g</span>
+                <span style={{ color: 'var(--text-hint)' }}> /portion ({Math.round(poidsParPortion)}g)</span>
+              </div>
+            )
+          })()}
         </div>
 
-        {recette.energie_kcal != null && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            <span className="c-prot">P {Math.round(recette.proteines || 0)}g</span>&nbsp;
-            <span className="c-gluc">G {Math.round(recette.glucides  || 0)}g</span>&nbsp;
-            <span className="c-lip">L {Math.round(recette.lipides   || 0)}g</span>
-            <span style={{ color: 'var(--text-hint)' }}> /100g</span>
-          </div>
+        {/* ── Toggle ingrédients ── */}
+        {hasIngredients && (
+          <button
+            onClick={e => { e.stopPropagation(); setExpanded(x => !x) }}
+            className="btn-icon"
+            style={{ color: 'var(--text-hint)', flexShrink: 0 }}
+          >
+            <ChevronDown size={18} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+          </button>
         )}
-
-        {recette.energie_kcal != null && factor != null && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {Math.round(recette.energie_kcal * factor)} kcal&nbsp;·&nbsp;
-            <span className="c-prot">P {Math.round((recette.proteines || 0) * factor)}g</span>&nbsp;
-            <span className="c-gluc">G {Math.round((recette.glucides  || 0) * factor)}g</span>&nbsp;
-            <span className="c-lip">L {Math.round((recette.lipides   || 0) * factor)}g</span>
-            <span style={{ color: 'var(--text-hint)' }}> /portion ({Math.round(poidsParPortion)}g)</span>
-          </div>
-        )}
+        <button
+          className="btn-icon"
+          onClick={e => { e.stopPropagation(); onDelete(recette.id) }}
+          style={{ color: 'var(--text-hint)', flexShrink: 0 }}
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
-      <button className="btn-icon" onClick={e => { e.stopPropagation(); onDelete(recette.id) }} style={{ color: 'var(--text-hint)' }}>
-        <Trash2 size={16} />
-      </button>
+
+      {/* ── Liste ingrédients + grammage (dépliable) ── */}
+      {expanded && hasIngredients && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
+          {ingredients.map((ing, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex', justifyContent: 'space-between', gap: 8,
+                fontSize: 12, color: 'var(--text-muted)', padding: '3px 0',
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ing.food_name}</span>
+              <span style={{ flexShrink: 0, fontWeight: 600, color: 'var(--text)' }}>{ing.qty_g} g</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -303,8 +342,8 @@ const filteredRecettes = useMemo(() => {
   if (!q) return recettes
   return recettes.filter(r => {
     if (normalize(r.nom).includes(q)) return true
-    const ingredientNames = ingredientsByRecette[r.id] || []
-    return ingredientNames.some(name => normalize(name).includes(q))
+    const ings = ingredientsByRecette[r.id] || []
+    return ings.some(ing => normalize(ing.food_name).includes(q))
   })
 }, [recettes, ingredientsByRecette, recipeSearch])
   const [recipeModal, setRecipeModal] = useState(null) // null | { type: 'new' | 'edit' | 'detail', recette? }
@@ -659,13 +698,14 @@ const filteredRecettes = useMemo(() => {
           )}
 
     {filteredRecettes.map(r => (
-      <RecipeCard
-        key={r.id}
-        recette={r}
-        onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
-        onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
-      />
-    ))}
+  <RecipeCard
+    key={r.id}
+    recette={r}
+    ingredients={ingredientsByRecette[r.id]}
+    onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+    onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+  />
+))}
   </>
 )}
       </div>

@@ -23,10 +23,10 @@ export function useRecipes() {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
-      // Léger : uniquement recette_id + food_name, utile pour la recherche
+      // food_name + qty_g : utile pour la recherche ET pour l'affichage inline
       supabase
         .from('recette_ingredients')
-        .select('recette_id, food_name')
+        .select('recette_id, food_name, qty_g')
         .eq('user_id', user.id),
     ])
     setRecettes(recettesData || [])
@@ -34,11 +34,13 @@ export function useRecipes() {
     const grouped = {}
     for (const ing of ingredientsData || []) {
       if (!grouped[ing.recette_id]) grouped[ing.recette_id] = []
-      grouped[ing.recette_id].push(ing.food_name)
+      grouped[ing.recette_id].push({ food_name: ing.food_name, qty_g: ing.qty_g })
     }
     setIngredientsByRecette(grouped)
     setLoading(false)
   }, [user])
+
+  // ... reste inchangé (useEffect, deleteRecette, return)
 
   useEffect(() => { load() }, [load])
 
