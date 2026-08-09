@@ -129,11 +129,11 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div className="page-stack">
-        <div className="page-scroll">
-          {pages[tab]}
-        </div>
-        <ProfileButton onClick={() => setProfileOpen(true)} />
+      <ProfileButton onClick={() => setProfileOpen(true)} />
+
+      {/* overflow visible ici — c'est page-content qui scroll en interne */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+        {pages[tab]}
       </div>
 
       <nav className="bottom-nav">
