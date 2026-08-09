@@ -1,31 +1,37 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
-import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// useRecipes — charge la liste des recettes de l'utilisateur
-// ─────────────────────────────────────────────────────────────────────────────
 export function useRecipes() {
   const { user } = useAuth()
-  const [recettes, setRecettes] = useState([])
-  const [loading, setLoading]   = useState(true)
+  const [recettes, setRecettes]                     = useState([])
+  const [ingredientsByRecette, setIngredientsByRecette] = useState({})
+  const [loading, setLoading]                       = useState(true)
 
   const load = useCallback(async () => {
-    if (!user) { setRecettes([]); setLoading(false); return }
+    if (!user) { setRecettes([]); setIngredientsByRecette({}); setLoading(false); return }
     setLoading(true)
-    const { data } = await supabase
-      .from('recettes')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    setRecettes(data || [])
+    const [{ data: recettesData }, { data: ingredientsData }] = await Promise.all([
+      supabase
+        .from('recettes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
+      // Léger : uniquement recette_id + food_name, utile pour la recherche
+      supabase
+        .from('recette_ingredients')
+        .select('recette_id, food_name')
+        .eq('user_id', user.id),
+    ])
+    setRecettes(recettesData || [])
+
+    const grouped = {}
+    for (const ing of ingredientsData || []) {
+      if (!grouped[ing.recette_id]) grouped[ing.recette_id] = []
+      grouped[ing.recette_id].push(ing.food_name)
+    }
+    setIngredientsByRecette(grouped)
     setLoading(false)
   }, [user])
 
   useEffect(() => { load() }, [load])
 
-  // ── Supprimer une recette (cascade sur les ingrédients via FK) ────────────
   const deleteRecette = async (id) => {
     const { error } = await supabase
       .from('recettes')
@@ -36,7 +42,7 @@ export function useRecipes() {
     return { error }
   }
 
-  return { recettes, loading, deleteRecette, refetch: load }
+  return { recettes, ingredientsByRecette, loading, deleteRecette, refetch: load }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

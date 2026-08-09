@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo  } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple, UtensilsCrossed, X } from 'lucide-react'
+import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple, UtensilsCrossed, X, Search } from 'lucide-react'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import RecipeFormModal from '../components/RecipeFormModal'
@@ -292,7 +292,21 @@ export default function ManualPage() {
   const [saving,    setSaving]    = useState(false)
 
   // ── Recettes ──────────────────────────────────────────────────────────────
-  const { recettes, loading: loadingRecettes, deleteRecette, refetch: refetchRecettes } = useRecipes()
+  const { recettes, ingredientsByRecette, loading: loadingRecettes, deleteRecette, refetch: refetchRecettes } = useRecipes()
+const [recipeSearch, setRecipeSearch] = useState('')
+
+// Normalise pour une recherche insensible à la casse et aux accents
+const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+const filteredRecettes = useMemo(() => {
+  const q = normalize(recipeSearch.trim())
+  if (!q) return recettes
+  return recettes.filter(r => {
+    if (normalize(r.nom).includes(q)) return true
+    const ingredientNames = ingredientsByRecette[r.id] || []
+    return ingredientNames.some(name => normalize(name).includes(q))
+  })
+}, [recettes, ingredientsByRecette, recipeSearch])
   const [recipeModal, setRecipeModal] = useState(null) // null | { type: 'new' | 'edit' | 'detail', recette? }
 
   // ── Sous-menu "Nouveau" ───────────────────────────────────────────────────
@@ -606,26 +620,54 @@ export default function ManualPage() {
         )}
 
         {/* ── Onglet Recettes ── */}
-        {tab === 'recettes' && (
-          <>
-            {loadingRecettes && <div className="loader"><div className="spinner" /> Chargement...</div>}
-            {!loadingRecettes && recettes.length === 0 && (
-              <div className="empty">
-                <UtensilsCrossed size={40} />
-                <div style={{ marginTop: 8, fontWeight: 600 }}>Aucune recette</div>
-                <div style={{ marginTop: 4 }}>Crée ta première recette pour calculer les calories de tes plats maison</div>
-              </div>
+              {tab === 'recettes' && (
+        <>
+          {/* ── Barre de recherche ── */}
+          <div style={{ position: 'relative', marginBottom: 14 }}>
+            <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              className="input"
+              placeholder="Rechercher une recette ou un ingrédient..."
+              value={recipeSearch}
+              onChange={e => setRecipeSearch(e.target.value)}
+              style={{ paddingLeft: 36, paddingRight: recipeSearch ? 36 : 12 }}
+            />
+            {recipeSearch && (
+              <button
+                onClick={() => setRecipeSearch('')}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }}
+              >
+                <X size={16} />
+              </button>
             )}
-            {recettes.map(r => (
-              <RecipeCard
-                key={r.id}
-                recette={r}
-                onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
-                onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
-              />
-            ))}
-          </>
-        )}
+          </div>
+
+          {loadingRecettes && <div className="loader"><div className="spinner" /> Chargement...</div>}
+
+          {!loadingRecettes && filteredRecettes.length === 0 && (
+            <div className="empty">
+              <UtensilsCrossed size={40} />
+              <div style={{ marginTop: 8, fontWeight: 600 }}>
+                {recipeSearch ? 'Aucun résultat' : 'Aucune recette'}
+              </div>
+              <div style={{ marginTop: 4 }}>
+                {recipeSearch
+                  ? `Aucune recette ni ingrédient ne correspond à "${recipeSearch}"`
+                  : "Crée ta première recette pour calculer les calories de tes plats maison"}
+              </div>
+            </div>
+          )}
+
+    {filteredRecettes.map(r => (
+      <RecipeCard
+        key={r.id}
+        recette={r}
+        onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+        onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+      />
+    ))}
+  </>
+)}
       </div>
 
       {/* ── Modals recettes ── */}
