@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { ToastProvider } from './lib/toast'
 import { AuthProvider, useAuth } from './lib/AuthContext'
+import { useProfile } from './hooks/useProfile'
 import AuthPage from './pages/AuthPage'
 import TodayPage from './pages/TodayPage'
 import ManualPage from './pages/ManualPage'
@@ -53,10 +54,9 @@ function ChartIcon({ active }) {
   )
 }
 
-// NOTE PROVISOIRE : ProfileIcon + rendu de ProfilePage restent sur l'onglet
-// "profile" en attendant ProfilePage.jsx + index.css pour le relocaliser
-// proprement en haut à droite (cf. message).
-function ProfileIcon({ active }) {
+// Icône de secours pour le bouton profil (utilisée quand on n'a pas encore
+// de prénom/nom pour afficher des initiales).
+function ProfileIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -64,10 +64,36 @@ function ProfileIcon({ active }) {
     </svg>
   )
 }
-TABS.push({ id: 'profile', label: 'Profil', icon: ProfileIcon })
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/>
+      <line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  )
+}
+
+// Bouton rond en haut à droite : ouvre ProfilePage en plein écran par-dessus
+// l'app, sans occuper d'onglet dans la bottom nav.
+function ProfileButton({ onClick }) {
+  const { user } = useAuth()
+  const { profile } = useProfile()
+  const initials = ((profile?.prenom?.[0] || '') + (profile?.nom?.[0] || '')).toUpperCase()
+    || (user?.email?.[0] || '').toUpperCase()
+
+  return (
+    <div className="top-bar">
+      <button className="profile-avatar-btn" onClick={onClick} aria-label="Profil">
+        {initials ? initials : <ProfileIcon />}
+      </button>
+    </div>
+  )
+}
 
 function AppShell() {
   const [tab, setTab] = useState('today')
+  const [profileOpen, setProfileOpen] = useState(false)
 
   // Retour Android : pousse une entrée à chaque changement d'onglet,
   // et écoute popstate pour revenir à 'today' — sans jamais appeler history.back() au cleanup.
@@ -81,16 +107,30 @@ function AppShell() {
     return () => window.removeEventListener('popstate', handlePop)
   }, [tab])
 
+  // Le profil suit la même logique de retour Android : une ouverture pousse
+  // une entrée d'historique, et "précédent" referme la modale plutôt que
+  // de quitter l'app.
+  useEffect(() => {
+    if (!profileOpen) return
+
+    history.pushState({ profile: true }, '')
+
+    const handlePop = () => setProfileOpen(false)
+    window.addEventListener('popstate', handlePop)
+    return () => window.removeEventListener('popstate', handlePop)
+  }, [profileOpen])
+
   const pages = {
     today:    <TodayPage />,
     manual:   <ManualPage />,
     courses:  <ShoppingListPage />,
     history:  <HistoryPage />,
-    profile:  <ProfilePage />,
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <ProfileButton onClick={() => setProfileOpen(true)} />
+
       {/* overflow visible ici — c'est page-content qui scroll en interne */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
         {pages[tab]}
@@ -108,6 +148,20 @@ function AppShell() {
           )
         })}
       </nav>
+
+      {profileOpen && (
+        <div className="page-modal">
+          <div className="page-modal-header">
+            <h2>Profil</h2>
+            <button className="btn-icon" onClick={() => history.back()} aria-label="Fermer">
+              <CloseIcon />
+            </button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+            <ProfilePage />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
