@@ -1,8 +1,18 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/AuthContext'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useRecipes — charge la liste des recettes de l'utilisateur, ainsi que les
+// noms d'ingrédients de chaque recette (pour permettre la recherche par
+// ingrédient dans ManualPage sans recharger le détail de chaque recette).
+// ─────────────────────────────────────────────────────────────────────────────
 export function useRecipes() {
   const { user } = useAuth()
-  const [recettes, setRecettes]                     = useState([])
-  const [ingredientsByRecette, setIngredientsByRecette] = useState({})
-  const [loading, setLoading]                       = useState(true)
+  const [recettes, setRecettes]                         = useState([])
+  const [ingredientsByRecette, setIngredientsByRecette]  = useState({})
+  const [loading, setLoading]                            = useState(true)
 
   const load = useCallback(async () => {
     if (!user) { setRecettes([]); setIngredientsByRecette({}); setLoading(false); return }
@@ -32,6 +42,7 @@ export function useRecipes() {
 
   useEffect(() => { load() }, [load])
 
+  // ── Supprimer une recette (cascade sur les ingrédients via FK) ────────────
   const deleteRecette = async (id) => {
     const { error } = await supabase
       .from('recettes')
