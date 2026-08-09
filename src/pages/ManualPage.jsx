@@ -151,6 +151,11 @@ function FoodCard({ aliment, onEdit, onDelete }) {
 // RecipeCard — carte d'une recette dans la liste
 // ─────────────────────────────────────────────────────────────────────────────
 function RecipeCard({ recette, onOpen, onDelete }) {
+  const portions       = recette.portions || 1
+  const poidsRef        = recette.poids_cuit_g || recette.poids_cru_g || null
+  const poidsParPortion = poidsRef ? poidsRef / portions : null
+  const factor          = poidsParPortion ? poidsParPortion / 100 : null
+
   return (
     <div
       className="card"
@@ -166,11 +171,22 @@ function RecipeCard({ recette, onOpen, onDelete }) {
           {recette.portions > 1 && <span style={{ marginLeft: 6, color: 'var(--text-hint)' }}>· {recette.portions} portions</span>}
           {recette.poids_cuit_g && <span style={{ marginLeft: 6, color: 'var(--blue)', fontSize: 11 }}>⚖️ pesé</span>}
         </div>
+
         {recette.energie_kcal != null && (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
             <span className="c-prot">P {Math.round(recette.proteines || 0)}g</span>&nbsp;
             <span className="c-gluc">G {Math.round(recette.glucides  || 0)}g</span>&nbsp;
             <span className="c-lip">L {Math.round(recette.lipides   || 0)}g</span>
+            <span style={{ color: 'var(--text-hint)' }}> /100g</span>
+          </div>
+        )}
+
+        {recette.energie_kcal != null && factor != null && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            <span className="c-prot">P {Math.round((recette.proteines || 0) * factor)}g</span>&nbsp;
+            <span className="c-gluc">G {Math.round((recette.glucides  || 0) * factor)}g</span>&nbsp;
+            <span className="c-lip">L {Math.round((recette.lipides   || 0) * factor)}g</span>
+            <span style={{ color: 'var(--text-hint)' }}> /portion ({Math.round(poidsParPortion)}g)</span>
           </div>
         )}
       </div>
