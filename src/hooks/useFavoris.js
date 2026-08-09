@@ -20,10 +20,22 @@ export function foodIdentity(food) {
 // Ne fait rien si l'aliment n'est pas (ou plus) favori. Volontairement non
 // bloquante côté appelant : un échec ici ne doit jamais faire échouer l'ajout
 // au journal lui-même.
-export async function bumpFavoriUsage(userId, food) {
+//
+// IMPORTANT : `entry` est ici la LIGNE DU JOURNAL telle que retournée par
+// Supabase après insertion — elle a donc son propre `id` (clé primaire de la
+// ligne `journal`), distinct de l'identifiant de l'aliment. On lit donc
+// directement food_source/food_ref_id/food_name (déjà corrects, posés par
+// scaleFood() au moment de l'ajout) plutôt que de repasser par foodIdentity(),
+// qui est conçue pour des objets "aliment brut" de recherche où `food.id` sert
+// de repli pour les aliments personnalisés — un repli qui, ici, capterait à
+// tort l'id de la ligne journal.
+export async function bumpFavoriUsage(userId, entry) {
   if (!userId) return
   try {
-    const { source, refId, name } = foodIdentity(food)
+    const source = entry.food_source || 'ciqual'
+    const refId  = entry.food_ref_id ?? null
+    const name   = entry.food_name
+
     let query = supabase
       .from('favoris')
       .select('id, use_count')
