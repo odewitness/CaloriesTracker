@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react'
-import { X, Pencil, Trash2 } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { X, Pencil, Trash2, Minus, Plus } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import FoodDetailModal from './FoodDetailModal'
@@ -31,12 +31,50 @@ function MacroGrid({ totals }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PortionsStepper — augmente/diminue le nombre de portions souhaité.
+// N'affecte pas la recette en base : c'est juste un multiplicateur d'affichage
+// qui recalcule en temps réel le grammage de chaque ingrédient et les totaux
+// du plat entier (les valeurs /100g et /portion restent, elles, inchangées).
+// ─────────────────────────────────────────────────────────────────────────────
+function PortionsStepper({ value, onChange, min = 1 }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--gray-bg)', borderRadius: 20, padding: 3 }}>
+      <button
+        onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min}
+        style={{
+          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--white)', color: value <= min ? 'var(--text-hint)' : 'var(--text)',
+          border: 'none', opacity: value <= min ? 0.5 : 1,
+        }}
+      >
+        <Minus size={13} />
+      </button>
+      <span style={{ fontSize: 14, fontWeight: 700, minWidth: 22, textAlign: 'center' }}>{value}</span>
+      <button
+        onClick={() => onChange(value + 1)}
+        style={{
+          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--white)', color: 'var(--text)', border: 'none',
+        }}
+      >
+        <Plus size={13} />
+      </button>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CustomPortionCard — calcule les valeurs nutritionnelles pour un grammage
 // choisi librement par l'utilisateur (ni 100g, ni le plat entier).
-// Basé sur les valeurs /100g de la recette.
+// Basé sur les valeurs /100g de la recette (indépendant du nb de portions).
 // ─────────────────────────────────────────────────────────────────────────────
 function CustomPortionCard({ per100, defaultQty }) {
   const [qty, setQty] = useState(String(defaultQty || 100))
+
+  useEffect(() => { setQty(String(defaultQty || 100)) }, [defaultQty])
 
   const totals = useMemo(() => {
     const q = parseFloat(qty)
@@ -95,24 +133,47 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
   useBackButton(onClose)
   const [selectedIngredient, setSelectedIngredient] = useState(null)
 
-  // Totaux bruts (plat entier)
+  // Totaux bruts (plat entier, à l'échelle de base de la recette)
   const totaux = useMemo(() => sumIngredients(ingredients), [ingredients])
 
-  // Référence de poids (cuit si renseigné, sinon cru)
+  // Référence de poids (cuit si renseigné, sinon cru) — à l'échelle de base
   const poidsCruG  = ingredients.reduce((s, i) => s + (parseFloat(i.qty_g) || 0), 0)
   const poidsCuitG = parseFloat(recette.poids_cuit_g) || 0
   const poidsRef   = poidsCuitG > 0 ? poidsCuitG : poidsCruG
   const estCuit    = poidsCuitG > 0
 
-  // Valeurs /100g
+  // Valeurs /100g — indépendantes du nombre de portions
   const per100 = useMemo(() => calcPer100g(totaux, poidsRef), [totaux, poidsRef])
 
-  // Valeurs par portion
-  const nbPortions       = parseInt(recette.portions, 10) || 1
-  const grammesParPortion = poidsRef > 0 ? Math.round(poidsRef / nbPortions) : null
-  const kcalParPortion   = per100 && grammesParPortion ? Math.round(per100.energie_kcal * grammesParPortion / 100) : null
+  // Nombre de portions de base (celui enregistré sur la recette)
+  const nbPortionsBase = parseInt(recette.portions, 10) || 1
+
+  // Nombre de portions SOUHAITÉ — modifiable via le stepper, réinitialisé
+  // à la valeur de base à chaque fois qu'on ouvre une recette différente.
+  const [portionsSouhaitees, setPortionsSouhaitees] = useState(nbPortionsBase)
+  useEffect(() => { setPortionsSouhaitees(nbPortionsBase) }, [recette.id, nbPortionsBase])
+
+  // Facteur d'échelle appliqué au plat entier et à la liste d'ingrédients.
+  // La taille d'UNE portion (grammesParPortion, kcalParPortion) ne change
+  // pas : seul le nombre de portions — donc la quantité totale — varie.
+  const factor = nbPortionsBase > 0 ? portionsSouhaitees / nbPortionsBase : 1
+  const scaled = factor !== 1
+
+  const grammesParPortion = poidsRef > 0 ? Math.round(poidsRef / nbPortionsBase) : null
+  const kcalParPortion    = per100 && grammesParPortion ? Math.round(per100.energie_kcal * grammesParPortion / 100) : null
+
+  // Totaux mis à l'échelle pour le nombre de portions souhaité
+  const totauxScaled = useMemo(() => {
+    const t = {}
+    for (const key of Object.keys(totaux)) {
+      t[key] = totaux[key] != null ? totaux[key] * factor : totaux[key]
+    }
+    return t
+  }, [totaux, factor])
+  const poidsRefScaled = poidsRef * factor
 
   // Totaux /100g sous forme "totals" pour VitaminPanel et NutrientDetails
+  // (toujours à l'échelle 100g, jamais mis à l'échelle des portions)
   const totals100 = per100 || {}
 
   return (
@@ -129,11 +190,17 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
       </div>
 
       <div className="page-modal-body">
-        {/* Meta recette */}
+        {/* Meta recette + sélecteur de portions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Portions :</span>
+          <PortionsStepper value={portionsSouhaitees} onChange={setPortionsSouhaitees} />
+        </div>
+        {scaled && (
+          <div style={{ fontSize: 12, color: 'var(--green-dark)', marginBottom: 10 }}>
+            × {factor.toFixed(2).replace(/\.?0+$/, '')} par rapport à la recette de base ({nbPortionsBase} portion{nbPortionsBase > 1 ? 's' : ''})
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          <span style={{ background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
-            {nbPortions} portion{nbPortions > 1 ? 's' : ''}
-          </span>
           {grammesParPortion && (
             <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
               ~{grammesParPortion} g / portion
@@ -163,36 +230,47 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
           </div>
         )}
 
-        {/* ── Valeurs plat entier ── */}
+        {/* ── Valeurs plat entier (mises à l'échelle du nb de portions choisi) ── */}
         <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div className="section-title">Plat entier ({Math.round(poidsRef)} g)</div>
-          <MacroGrid totals={totaux} />
+          <div className="section-title">
+            Plat entier ({Math.round(poidsRefScaled)} g) {scaled && <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>· pour {portionsSouhaitees} portions</span>}
+          </div>
+          <MacroGrid totals={totauxScaled} />
         </div>
 
         {/* ── Portion personnalisée ── */}
         <CustomPortionCard per100={per100} defaultQty={grammesParPortion || 100} />
 
-        {/* ── Liste ingrédients ── */}
-        <div className="section-title" style={{ marginTop: 4 }}>Ingrédients ({ingredients.length})</div>
-        {ingredients.map((ing, idx) => (
-          <button
-            key={ing.id || idx}
-            onClick={() => setSelectedIngredient(ing)}
-            className="card"
-            style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ing.food_name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                {ing.qty_g}g&nbsp;·&nbsp;
-                <span className="c-prot">P {(ing.proteines || 0).toFixed(1)}g</span>&nbsp;
-                <span className="c-gluc">G {(ing.glucides  || 0).toFixed(1)}g</span>&nbsp;
-                <span className="c-lip">L {(ing.lipides   || 0).toFixed(1)}g</span>
+        {/* ── Liste ingrédients (grammages mis à l'échelle pour affichage) ── */}
+        <div className="section-title" style={{ marginTop: 4 }}>
+          Ingrédients ({ingredients.length}) {scaled && <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>· pour {portionsSouhaitees} portions</span>}
+        </div>
+        {ingredients.map((ing, idx) => {
+          const qtyScaled  = (ing.qty_g || 0) * factor
+          const kcalScaled = (ing.energie_kcal || 0) * factor
+          const protScaled = (ing.proteines || 0) * factor
+          const glucScaled = (ing.glucides || 0) * factor
+          const lipScaled  = (ing.lipides || 0) * factor
+          return (
+            <button
+              key={ing.id || idx}
+              onClick={() => setSelectedIngredient(ing)}
+              className="card"
+              style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ing.food_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {Math.round(qtyScaled)}g&nbsp;·&nbsp;
+                  <span className="c-prot">P {protScaled.toFixed(1)}g</span>&nbsp;
+                  <span className="c-gluc">G {glucScaled.toFixed(1)}g</span>&nbsp;
+                  <span className="c-lip">L {lipScaled.toFixed(1)}g</span>
+                </div>
               </div>
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{Math.round(ing.energie_kcal || 0)} kcal</span>
-          </button>
-        ))}
+              <span style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{Math.round(kcalScaled)} kcal</span>
+            </button>
+          )
+        })}
 
         {/* ── Vitamines / minéraux / sucres / gras (basés sur /100g) ── */}
         {per100 && (
@@ -205,8 +283,8 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
         )}
       </div>
 
-      {/* ── Détail d'un ingrédient (mêmes macros + vitamines/minéraux que sur
-           la page d'accueil) — réutilise FoodDetailModal tel quel. ── */}
+      {/* ── Détail d'un ingrédient — affiche et permet de modifier le
+           grammage DE BASE (non mis à l'échelle), comme avant. ── */}
       {selectedIngredient && (
         <FoodDetailModal
           key={selectedIngredient.id}

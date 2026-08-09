@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from 'react'
-import { X, Search, Check, ArrowLeft } from 'lucide-react'
+import { X, Search, Check, ArrowLeft, Minus, Plus } from 'lucide-react'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import { useBackButton } from '../hooks/useBackButton'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AddFromRecipeModal
 // Étape 1 : choisir une recette (recherche par nom)
-// Étape 2 : cocher/décocher ses ingrédients (tous cochés par défaut), valider
+// Étape 2 : choisir le nombre de portions souhaité (met à l'échelle les
+//           grammages), puis cocher/décocher les ingrédients à ajouter
 //
 // Props :
-//   onAdd(recette, ingredientsSelectionnes) — appelé à la validation
+//   onAdd(recette, ingredientsSelectionnesEtMisÀLÉchelle) — appelé à la validation
 //   onClose()
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AddFromRecipeModal({ onAdd, onClose }) {
@@ -86,13 +87,58 @@ export default function AddFromRecipeModal({ onAdd, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PortionsStepper
+// ─────────────────────────────────────────────────────────────────────────────
+function PortionsStepper({ value, onChange, min = 1 }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--gray-bg)', borderRadius: 20, padding: 3 }}>
+      <button
+        onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min}
+        style={{
+          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--white)', color: value <= min ? 'var(--text-hint)' : 'var(--text)',
+          border: 'none', opacity: value <= min ? 0.5 : 1,
+        }}
+      >
+        <Minus size={13} />
+      </button>
+      <span style={{ fontSize: 14, fontWeight: 700, minWidth: 22, textAlign: 'center' }}>{value}</span>
+      <button
+        onClick={() => onChange(value + 1)}
+        style={{
+          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--white)', color: 'var(--text)', border: 'none',
+        }}
+      >
+        <Plus size={13} />
+      </button>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // IngredientPicker — étape 2
 // ─────────────────────────────────────────────────────────────────────────────
 function IngredientPicker({ recette, onBack, onAdd, onClose }) {
   const { ingredients, loading } = useRecetteDetail(recette.id)
+  const nbPortionsBase = parseInt(recette.portions, 10) || 1
+  const [portionsSouhaitees, setPortionsSouhaitees] = useState(nbPortionsBase)
   // null = "tous sélectionnés" (état par défaut avant toute interaction)
   const [selectedIds, setSelectedIds] = useState(null)
   const [adding, setAdding] = useState(false)
+
+  const factor = nbPortionsBase > 0 ? portionsSouhaitees / nbPortionsBase : 1
+  const scaled = factor !== 1
+
+  // Ingrédients avec grammage mis à l'échelle du nb de portions souhaité —
+  // c'est ce tableau qui sert à la fois à l'affichage et à l'ajout.
+  const scaledIngredients = useMemo(
+    () => ingredients.map(i => ({ ...i, qty_g: i.qty_g != null ? Math.round(i.qty_g * factor * 10) / 10 : i.qty_g })),
+    [ingredients, factor]
+  )
 
   const isSelected = (id) => selectedIds === null || selectedIds.includes(id)
 
@@ -103,12 +149,12 @@ function IngredientPicker({ recette, onBack, onAdd, onClose }) {
     })
   }
 
-  const selectedCount = selectedIds === null ? ingredients.length : selectedIds.length
+  const selectedCount = selectedIds === null ? scaledIngredients.length : selectedIds.length
 
   const confirm = async () => {
     if (selectedCount === 0) return
     setAdding(true)
-    const toAdd = selectedIds === null ? ingredients : ingredients.filter(i => selectedIds.includes(i.id))
+    const toAdd = selectedIds === null ? scaledIngredients : scaledIngredients.filter(i => selectedIds.includes(i.id))
     await onAdd(recette, toAdd)
     setAdding(false)
     onClose()
@@ -126,11 +172,22 @@ function IngredientPicker({ recette, onBack, onAdd, onClose }) {
 
         {!loading && (
           <>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+            {/* Sélecteur de portions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Portions :</span>
+              <PortionsStepper value={portionsSouhaitees} onChange={setPortionsSouhaitees} />
+            </div>
+            {scaled && (
+              <div style={{ fontSize: 12, color: 'var(--green-dark)', marginBottom: 10 }}>
+                × {factor.toFixed(2).replace(/\.?0+$/, '')} — recette de base pour {nbPortionsBase} portion{nbPortionsBase > 1 ? 's' : ''}
+              </div>
+            )}
+
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, marginTop: scaled ? 0 : 6 }}>
               Décoche les ingrédients que tu as déjà, ou que tu ne veux pas acheter.
             </div>
 
-            {ingredients.map(ing => {
+            {scaledIngredients.map(ing => {
               const sel = isSelected(ing.id)
               return (
                 <button
