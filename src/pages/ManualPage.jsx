@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef, useMemo  } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple, UtensilsCrossed, X, Search } from 'lucide-react'
+import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple, UtensilsCrossed, X, Search, CalendarDays  } from 'lucide-react'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import RecipeFormModal from '../components/RecipeFormModal'
 import RecipeDetailModal from '../components/RecipeDetailModal'
+import MealsSection from '../components/MealsSection'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -623,8 +624,9 @@ const filteredRecettes = useMemo(() => {
         {/* ── Switch tabs ── */}
         <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, marginBottom: 16 }}>
           {[
-            { key: 'aliments', label: 'Mes aliments', icon: <Apple size={14} /> },
-            { key: 'recettes', label: 'Mes recettes', icon: <UtensilsCrossed size={14} /> },
+            { key: 'aliments', label: 'Aliments', icon: <Apple size={14} /> },
+            { key: 'recettes', label: 'Recettes', icon: <UtensilsCrossed size={14} /> },
+            { key: 'repas',    label: 'Repas types', icon: <CalendarDays size={14} /> },
           ].map(t => (
             <button
               key={t.key}
@@ -708,6 +710,9 @@ const filteredRecettes = useMemo(() => {
 ))}
   </>
 )}
+      {/* ── Onglet Repas types ── */}
+              {tab === 'repas' && <MealsSection />}
+      
       </div>
 
       {/* ── Modals recettes ── */}

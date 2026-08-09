@@ -3,7 +3,6 @@ import { ToastProvider } from './lib/toast'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import AuthPage from './pages/AuthPage'
 import TodayPage from './pages/TodayPage'
-import MealsPage from './pages/MealsPage'
 import ManualPage from './pages/ManualPage'
 import ShoppingListPage from './pages/ShoppingListPage'
 import HistoryPage from './pages/HistoryPage'
@@ -11,11 +10,9 @@ import ProfilePage from './pages/ProfilePage'
 
 const TABS = [
   { id: 'today',    label: "Aujourd'hui", icon: HomeIcon },
-  { id: 'meals',    label: 'Repas types', icon: UtensilsIcon },
   { id: 'manual',   label: 'Mes aliments', icon: PencilIcon },
   { id: 'courses',  label: 'Courses',     icon: CartIcon },
   { id: 'history',  label: 'Historique',  icon: ChartIcon },
-  { id: 'profile',  label: 'Profil',      icon: ProfileIcon },
 ]
 
 function HomeIcon({ active }) {
@@ -23,16 +20,6 @@ function HomeIcon({ active }) {
     <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
       <polyline points="9 22 9 12 15 12 15 22"/>
-    </svg>
-  )
-}
-
-function UtensilsIcon({ active }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/>
-      <path d="M7 2v20"/>
-      <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>
     </svg>
   )
 }
@@ -66,6 +53,9 @@ function ChartIcon({ active }) {
   )
 }
 
+// NOTE PROVISOIRE : ProfileIcon + rendu de ProfilePage restent sur l'onglet
+// "profile" en attendant ProfilePage.jsx + index.css pour le relocaliser
+// proprement en haut à droite (cf. message).
 function ProfileIcon({ active }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -74,6 +64,7 @@ function ProfileIcon({ active }) {
     </svg>
   )
 }
+TABS.push({ id: 'profile', label: 'Profil', icon: ProfileIcon })
 
 function AppShell() {
   const [tab, setTab] = useState('today')
@@ -92,7 +83,6 @@ function AppShell() {
 
   const pages = {
     today:    <TodayPage />,
-    meals:    <MealsPage />,
     manual:   <ManualPage />,
     courses:  <ShoppingListPage />,
     history:  <HistoryPage />,
