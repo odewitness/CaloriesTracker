@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ToastProvider } from './lib/toast'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { useProfile } from './hooks/useProfile'
@@ -76,14 +76,15 @@ function CloseIcon() {
 
 // Bouton rond en haut à droite : ouvre ProfilePage en plein écran par-dessus
 // l'app, sans occuper d'onglet dans la bottom nav.
-function ProfileButton({ onClick }) {
+// hidden=true → le bandeau se rétracte (scroll vers le bas), voir handleScroll.
+function ProfileButton({ onClick, hidden }) {
   const { user } = useAuth()
   const { profile } = useProfile()
   const initials = ((profile?.prenom?.[0] || '') + (profile?.nom?.[0] || '')).toUpperCase()
     || (user?.email?.[0] || '').toUpperCase()
 
   return (
-    <div className="top-bar">
+    <div className={`top-bar${hidden ? ' top-bar-hidden' : ''}`}>
       <button className="profile-avatar-btn" onClick={onClick} aria-label="Profil">
         {initials ? initials : <ProfileIcon />}
       </button>
@@ -94,6 +95,31 @@ function ProfileButton({ onClick }) {
 function AppShell() {
   const [tab, setTab] = useState('today')
   const [profileOpen, setProfileOpen] = useState(false)
+
+  // Header qui se cache au scroll vers le bas, réapparaît vers le haut (ou
+  // en haut de page). onScrollCapture sur le conteneur des pages permet de
+  // détecter le scroll même si c'est le .page-content d'une page enfant qui
+  // scrolle réellement (le scroll ne "bubble" pas nativement en DOM, mais
+  // React capture les events des descendants avec onScrollCapture).
+  const [headerHidden, setHeaderHidden] = useState(false)
+  const lastScrollTop = useRef(0)
+
+  // On repart d'un header visible et d'un scroll à 0 à chaque changement
+  // d'onglet, pour éviter un état incohérent avec la position de scroll
+  // de la nouvelle page.
+  useEffect(() => {
+    setHeaderHidden(false)
+    lastScrollTop.current = 0
+  }, [tab])
+
+  const handleScroll = (e) => {
+    const top = e.target.scrollTop
+    const delta = top - lastScrollTop.current
+    if (top <= 4) setHeaderHidden(false)        // tout en haut → toujours visible
+    else if (delta > 6) setHeaderHidden(true)    // scroll vers le bas → se cache
+    else if (delta < -6) setHeaderHidden(false)  // scroll vers le haut → réapparaît
+    lastScrollTop.current = top
+  }
 
   // Retour Android : pousse une entrée à chaque changement d'onglet,
   // et écoute popstate pour revenir à 'today' — sans jamais appeler history.back() au cleanup.
@@ -129,10 +155,10 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <ProfileButton onClick={() => setProfileOpen(true)} />
+      <ProfileButton onClick={() => setProfileOpen(true)} hidden={headerHidden} />
 
       {/* overflow visible ici — c'est page-content qui scroll en interne */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }} onScrollCapture={handleScroll}>
         {pages[tab]}
       </div>
 

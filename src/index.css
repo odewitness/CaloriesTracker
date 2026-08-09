@@ -62,18 +62,30 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 /* Top bar (header du haut) — bandeau normal dans le flux, comme la
    bottom-nav pour le bas. Il vit physiquement EN DEHORS de la zone qui
    scroll (.page-content, plus bas dans le flex) : il ne peut donc, par
-   construction, jamais bouger ni disparaître au scroll, quel que soit le
-   navigateur/WebView. C'est ici qu'ajouter d'autres éléments plus tard
-   (recherche, notifications, etc.) — ils resteront fixes de la même façon. */
+   construction, jamais bouger ni disparaître au scroll de façon
+   involontaire, quel que soit le navigateur/WebView.
+   → il se rétracte volontairement (max-height/padding → 0) quand
+   AppShell détecte un scroll vers le bas (classe .top-bar-hidden), et
+   réapparaît au scroll vers le haut ou en haut de page. */
 .top-bar {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+  max-height: 100px;
   padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
   background: var(--white);
   border-bottom: 0.5px solid var(--border);
+  overflow: hidden;
+  transition: max-height .22s ease, padding-top .22s ease, padding-bottom .22s ease, border-color .22s ease;
+}
+
+.top-bar-hidden {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
 }
 
 .profile-avatar-btn {
