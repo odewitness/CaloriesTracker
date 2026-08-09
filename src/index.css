@@ -55,47 +55,25 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 .page-content {
   height: 100%;
   overflow-y: auto;
-  padding: calc(56px + env(safe-area-inset-top)) 16px 90px;
+  padding: 16px 16px 90px;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Empilement page / bouton profil flottant — CSS Grid plutôt que
-   position:fixed/absolute. Les deux enfants (.page-scroll et .top-bar)
-   occupent la MÊME cellule de grille (grid-area: 1 / 1), donc ils se
-   superposent visuellement — exactement l'effet "flotte par-dessus le
-   contenu" recherché — sans jamais utiliser position:fixed ni absolute.
-   C'est un simple empilement du flux normal, immunisé contre le bug de
-   certains WebViews mobiles (Capacitor/Android) qui font dériver un
-   élément fixed/absolute pendant le scroll à inertie d'un frère. */
-.page-stack {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-}
-
-.page-stack > * {
-  grid-area: 1 / 1;
-}
-
-.page-scroll {
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Bouton profil flottant — occupe toute la cellule (comme son frère
-   .page-scroll) mais reste transparent : lui seul intercepte les clics
-   (pointer-events: none sur le conteneur, auto sur le bouton), le reste
-   des clics traverse jusqu'au contenu en dessous. */
+/* Top bar (header du haut) — bandeau normal dans le flux, comme la
+   bottom-nav pour le bas. Il vit physiquement EN DEHORS de la zone qui
+   scroll (.page-content, plus bas dans le flex) : il ne peut donc, par
+   construction, jamais bouger ni disparaître au scroll, quel que soit le
+   navigateur/WebView. C'est ici qu'ajouter d'autres éléments plus tard
+   (recherche, notifications, etc.) — ils resteront fixes de la même façon. */
 .top-bar {
+  flex-shrink: 0;
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  align-items: flex-start;
-  padding: calc(10px + env(safe-area-inset-top)) 14px 0;
-  pointer-events: none;
-  z-index: 10;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background: var(--white);
+  border-bottom: 0.5px solid var(--border);
 }
 
 .profile-avatar-btn {
