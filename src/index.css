@@ -59,14 +59,17 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   -webkit-overflow-scrolling: touch;
 }
 
-/* Top bar (bouton profil) */
+/* Top bar (bouton profil) — position: absolute plutôt que fixed, ancré sur
+   #root (qui ne scrolle jamais, lui). Certains WebViews mobiles (iOS/
+   Capacitor) font "dériver" un position:fixed pendant le scroll à inertie
+   d'un conteneur scrollable ailleurs sur la page, même sans lien de
+   parenté ; absolute sur un ancêtre non-scrollable est immunisé contre ça.
+   #root étant déjà centré (max-width 430px), plus besoin du bricolage
+   left:50%/transform : right:0 suffit. */
 .top-bar {
-  position: fixed;
+  position: absolute;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 430px;
+  right: 0;
   display: flex;
   justify-content: flex-end;
   padding: calc(10px + env(safe-area-inset-top)) 14px 0;
