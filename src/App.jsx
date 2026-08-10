@@ -173,11 +173,21 @@ function AppShell() {
     return () => window.removeEventListener('popstate', handlePop)
   }, [calendarOpen])
 
+  // Le calendrier s'ouvre en page-modal PAR-DESSUS l'onglet actif sans le
+  // démonter (contrairement à un changement d'onglet) — donc TodayPage garde
+  // son ancien useJournal en mémoire même après un ajout/suppression/
+  // "marquer mangé" fait depuis le calendrier. On force un remontage propre
+  // (nouvelles données) à la fermeture, via un compteur utilisé comme key.
+  const [journalVersion, setJournalVersion] = useState(0)
+  useEffect(() => {
+    if (!calendarOpen) setJournalVersion(v => v + 1)
+  }, [calendarOpen])
+
   const pages = {
-    today:    <TodayPage />,
+    today:    <TodayPage key={journalVersion} />,
     manual:   <ManualPage />,
     courses:  <ShoppingListPage />,
-    history:  <HistoryPage />,
+    history:  <HistoryPage key={journalVersion} />,
   }
 
   return (

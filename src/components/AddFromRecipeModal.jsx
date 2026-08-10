@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { X, Search, Check, ArrowLeft, Minus, Plus } from 'lucide-react'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import { useBackButton } from '../hooks/useBackButton'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AddFromRecipeModal
@@ -133,10 +134,27 @@ function IngredientPicker({ recette, onBack, onAdd, onClose }) {
   const factor = nbPortionsBase > 0 ? portionsSouhaitees / nbPortionsBase : 1
   const scaled = factor !== 1
 
-  // Ingrédients avec grammage mis à l'échelle du nb de portions souhaité —
-  // c'est ce tableau qui sert à la fois à l'affichage et à l'ajout.
+  // Ingrédients avec TOUTES leurs valeurs (grammage ET nutriments) mises à
+  // l'échelle du nb de portions souhaité — c'est ce tableau qui sert à la
+  // fois à l'affichage et à l'ajout/planification. Avant, seul qty_g était
+  // recalculé : sélectionner 1 portion sur 4 affichait le bon grammage mais
+  // gardait les kcal/macros du plat entier.
   const scaledIngredients = useMemo(
-    () => ingredients.map(i => ({ ...i, qty_g: i.qty_g != null ? Math.round(i.qty_g * factor * 10) / 10 : i.qty_g })),
+    () => ingredients.map(i => {
+      const scaled = {
+        ...i,
+        qty_g:        i.qty_g        != null ? Math.round(i.qty_g * factor * 10) / 10 : i.qty_g,
+        energie_kcal: i.energie_kcal != null ? parseFloat((i.energie_kcal * factor).toFixed(1)) : i.energie_kcal,
+        proteines:    i.proteines    != null ? parseFloat((i.proteines    * factor).toFixed(2)) : i.proteines,
+        glucides:     i.glucides     != null ? parseFloat((i.glucides     * factor).toFixed(2)) : i.glucides,
+        lipides:      i.lipides      != null ? parseFloat((i.lipides      * factor).toFixed(2)) : i.lipides,
+        fibres:       i.fibres       != null ? parseFloat((i.fibres       * factor).toFixed(2)) : i.fibres,
+      }
+      for (const key of ALL_NUTRIENT_KEYS) {
+        scaled[key] = i[key] != null ? parseFloat((i[key] * factor).toFixed(4)) : i[key]
+      }
+      return scaled
+    }),
     [ingredients, factor]
   )
 
