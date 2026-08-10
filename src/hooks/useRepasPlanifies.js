@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
+import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 
 function fmt(date) {
   if (typeof date === 'string') return date
@@ -110,9 +111,15 @@ export async function deleteRepasPlanifie(id, userId) {
 // ce jour-là (utile pour le point violet "planifié" une fois passé à vert).
 // ─────────────────────────────────────────────────────────────────────────────
 export async function markAsMange(repas, userId) {
+  // `items` peut contenir des champs superflus selon leur origine (ex:
+  // recette_id, id, created_at pour un item copié depuis recette_ingredients
+  // via AddFromRecipeModal) — on ne garde QUE les colonnes valides sur
+  // `journal`, dans la forme exacte produite par scaleFood().
+  const JOURNAL_FIELDS = ['food_name', 'food_source', 'food_ref_id', 'qty_g', 'energie_kcal', 'proteines', 'glucides', 'lipides', 'fibres', ...ALL_NUTRIENT_KEYS]
   const rows = (repas.items || []).map(item => {
-    const { id: _id, user_id: _uid, created_at: _ca, date: _d, meal: _m, ...rest } = item
-    return { ...rest, date: repas.date, meal: repas.meal, user_id: userId }
+    const row = { date: repas.date, meal: repas.meal, user_id: userId }
+    for (const key of JOURNAL_FIELDS) row[key] = item[key] ?? null
+    return row
   })
   if (rows.length > 0) {
     const { error: insertError } = await supabase.from('journal').insert(rows)
