@@ -309,6 +309,7 @@ export default function PlanMealModal({ presetSource, defaultDate, onClose, onPl
   if (step === 'recette') {
     return (
       <AddFromRecipeModal
+        defaultPortions={1}
         onAdd={async (recette, ingredients) => {
           setSource({ nom: recette.nom, items: ingredients, sourceType: 'recette', sourceId: recette.id })
           goToStep('schedule')

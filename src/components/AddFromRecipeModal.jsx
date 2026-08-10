@@ -13,8 +13,12 @@ import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 // Props :
 //   onAdd(recette, ingredientsSelectionnesEtMisÀLÉchelle) — appelé à la validation
 //   onClose()
+//   defaultPortions — optionnel, portions initiales du stepper. Par défaut
+//                      (non fourni) : nb de portions de la recette de base,
+//                      comme avant. PlanMealModal passe 1 pour que planifier
+//                      une recette parte toujours d'1 portion.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function AddFromRecipeModal({ onAdd, onClose }) {
+export default function AddFromRecipeModal({ onAdd, onClose, defaultPortions }) {
   useBackButton(onClose)
   const { recettes, loading } = useRecipes()
   const [query, setQuery] = useState('')
@@ -33,6 +37,7 @@ export default function AddFromRecipeModal({ onAdd, onClose }) {
         onBack={() => setSelectedRecette(null)}
         onAdd={onAdd}
         onClose={onClose}
+        defaultPortions={defaultPortions}
       />
     )
   }
@@ -123,10 +128,10 @@ function PortionsStepper({ value, onChange, min = 1 }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // IngredientPicker — étape 2
 // ─────────────────────────────────────────────────────────────────────────────
-function IngredientPicker({ recette, onBack, onAdd, onClose }) {
+function IngredientPicker({ recette, onBack, onAdd, onClose, defaultPortions }) {
   const { ingredients, loading } = useRecetteDetail(recette.id)
   const nbPortionsBase = parseInt(recette.portions, 10) || 1
-  const [portionsSouhaitees, setPortionsSouhaitees] = useState(nbPortionsBase)
+  const [portionsSouhaitees, setPortionsSouhaitees] = useState(defaultPortions ?? nbPortionsBase)
   // null = "tous sélectionnés" (état par défaut avant toute interaction)
   const [selectedIds, setSelectedIds] = useState(null)
   const [adding, setAdding] = useState(false)

@@ -148,10 +148,13 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
   // Nombre de portions de base (celui enregistré sur la recette)
   const nbPortionsBase = parseInt(recette.portions, 10) || 1
 
-  // Nombre de portions SOUHAITÉ — modifiable via le stepper, réinitialisé
-  // à la valeur de base à chaque fois qu'on ouvre une recette différente.
-  const [portionsSouhaitees, setPortionsSouhaitees] = useState(nbPortionsBase)
-  useEffect(() => { setPortionsSouhaitees(nbPortionsBase) }, [recette.id, nbPortionsBase])
+  // Nombre de portions SOUHAITÉ — modifiable via le stepper. Par défaut 1
+  // portion (pas le nb de portions de la recette de base) : c'est la valeur
+  // la plus utile aussi bien pour consulter "ce que je mange vraiment" que
+  // pour planifier — réinitialisé à 1 à chaque fois qu'on ouvre une recette
+  // différente.
+  const [portionsSouhaitees, setPortionsSouhaitees] = useState(1)
+  useEffect(() => { setPortionsSouhaitees(1) }, [recette.id])
 
   // Facteur d'échelle appliqué au plat entier et à la liste d'ingrédients.
   // La taille d'UNE portion (grammesParPortion, kcalParPortion) ne change
