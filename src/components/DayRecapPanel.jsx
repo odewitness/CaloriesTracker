@@ -4,15 +4,18 @@ import CalorieRing from './CalorieRing'
 import MacroBar from './MacroBar'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
+import MealSection from './MealSection'
+import AddFoodModal from './AddFoodModal'
+import FoodDetailModal from './FoodDetailModal'
+import SupplementSection, { SUPPLEMENT_MEAL } from './SupplementSection'
 import PlannedMealCard from './PlannedMealCard'
 import PlanMealModal from './PlanMealModal'
-import FoodDetailModal from './FoodDetailModal'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { useRepasPlanifiesForDate, deleteRepasPlanifie, markAsMange } from '../hooks/useRepasPlanifies'
-import { computeTotals } from '../lib/nutrients'
+import { computeTotals, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
 
 function fmt(date) {
   const y = date.getFullYear()
@@ -33,9 +36,12 @@ function dateLabel(date) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DayRecapPanel — récap complet d'UNE date choisie dans le calendrier.
-// Réutilise TEL QUEL CalorieRing / MacroBar / VitaminPanel / NutrientDetails
-// (déjà génériques via totals/hasEntries/entries — aucune modif nécessaire) +
-// useJournal(date) (déjà générique) + la liste des repas planifiés du jour.
+// Réutilise EXACTEMENT la même mise en page que TodayPage : CalorieRing,
+// MacroBar, VitaminPanel, NutrientDetails, puis "Repas du jour" avec un
+// MealSection par repas (toggle, ajout, suppression) + SupplementSection —
+// donc les repas réellement mangés ce jour-là (planifiés ou non) s'affichent
+// tous. Les repas encore planifiés mais pas mangés restent visibles à part,
+// juste au-dessus, avec l'action "Marquer mangé".
 // Props :
 //   date        — Date sélectionnée
 //   onPlannedChange() — notifie le parent (calendrier) qu'un repas planifié a
@@ -45,15 +51,29 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
   const dateStr = fmt(date)
   const { user } = useAuth()
   const toast = useToast()
-  const { entries, loading, updateEntry } = useJournal(dateStr)
+  const { entries, loading, addEntry, deleteEntry, updateEntry } = useJournal(dateStr)
   const { settings } = useSettings()
   const { repas: repasPlanifies, loading: loadingPlanifies, refetch: refetchPlanifies } = useRepasPlanifiesForDate(dateStr)
 
   const [planModalOpen, setPlanModalOpen] = useState(false)
+  const [modal, setModal] = useState(null) // { meal, addEntry } — AddFoodModal, même pattern que TodayPage
   const [detailEntry, setDetailEntry] = useState(null)
 
   const totals = useMemo(() => computeTotals(entries), [entries])
   const hasEntries = entries.length > 0
+  const mealTargets = useMemo(() => computeMealTargets(settings), [settings])
+  const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
+
+  const handleAdd = async (entry) => {
+    const { error } = await addEntry(entry)
+    if (!error) toast('✓ Ajouté !')
+    else toast("Erreur lors de l'ajout")
+  }
+
+  const handleDelete = async (id) => {
+    await deleteEntry(id)
+    toast('Supprimé')
+  }
 
   const handleUpdate = async (id, patch) => {
     const { error } = await updateEntry(id, patch)
@@ -91,7 +111,7 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
 
       <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div className="section-title" style={{ marginBottom: 0 }}>Repas planifiés</div>
+          <div className="section-title" style={{ marginBottom: 0 }}>Repas</div>
           <button
             onClick={() => setPlanModalOpen(true)}
             style={{
@@ -105,23 +125,49 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
           </button>
         </div>
 
-        {loadingPlanifies && <div className="loader" style={{ padding: 16 }}><div className="spinner" /></div>}
-
-        {!loadingPlanifies && repasPlanifies.length === 0 && (
-          <div style={{ fontSize: 13, color: 'var(--text-hint)', textAlign: 'center', padding: '14px 0' }}>
-            Aucun repas planifié pour ce jour
+        {/* Repas encore planifiés, pas encore mangés — au-dessus, distincts */}
+        {!loadingPlanifies && nonMangesPlanifies.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            {nonMangesPlanifies.map(r => (
+              <PlannedMealCard
+                key={r.id}
+                repas={r}
+                onMarkEaten={handleMarkEaten}
+                onDelete={handleDeletePlanifie}
+              />
+            ))}
           </div>
         )}
 
-        {repasPlanifies.map(r => (
-          <PlannedMealCard
-            key={r.id}
-            repas={r}
-            onMarkEaten={handleMarkEaten}
-            onDelete={handleDeletePlanifie}
+        {/* Repas réellement mangés — même component/mise en page que TodayPage */}
+        {MEALS.map(m => (
+          <MealSection
+            key={m}
+            name={m}
+            entries={entries.filter(e => e.meal === m)}
+            target={mealTargets[m]}
+            onAdd={(meal) => setModal({ meal, addEntry: handleAdd })}
+            onDelete={handleDelete}
+            onUpdate={handleUpdate}
+            onOpenDetail={(entry) => setDetailEntry(entry)}
           />
         ))}
       </div>
+
+      <SupplementSection
+        supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
+        onOpenModal={setModal}
+        onAdd={handleAdd}
+        onDelete={handleDelete}
+      />
+
+      {modal && (
+        <AddFoodModal
+          initialMeal={modal.meal}
+          onAdd={modal.addEntry}
+          onClose={() => setModal(null)}
+        />
+      )}
 
       {planModalOpen && (
         <PlanMealModal
