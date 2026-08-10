@@ -334,7 +334,7 @@ export function computeTotals(entries) {
 //   'off'  — au moins une des 4 valeurs sort de cette bande → rouge
 // Tolérance volontairement stricte (±5%) : la couleur reflète un vrai
 // suivi précis, pas une simple présence de données.
-export const DAY_STATUS_TOLERANCE = 0.05
+export const DAY_STATUS_TOLERANCE = 0.15
 
 export function getDayStatus(totals, settings, hasEntries) {
   if (!hasEntries) return 'none'
