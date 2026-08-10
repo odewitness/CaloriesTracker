@@ -306,3 +306,44 @@ export function computeMealTargets(settings) {
   }
   return targets
 }
+
+// ── computeTotals ────────────────────────────────────────────────────────
+// Somme les entrées `journal` (ou tout tableau d'objets shape scaleFood())
+// en un objet de totaux { kcal, prot, gluc, lip, fib, ...ALL_NUTRIENT_KEYS }.
+// Extrait de TodayPage.jsx (DaySlot) pour être réutilisé tel quel par le
+// calendrier nutritionnel (DayRecapPanel) — une seule source de vérité pour
+// ne jamais avoir deux totaux qui divergent entre pages.
+export function computeTotals(entries) {
+  const t = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 }
+  for (const key of ALL_NUTRIENT_KEYS) t[key] = 0
+  for (const e of entries || []) {
+    t.kcal += e.energie_kcal || 0
+    t.prot += e.proteines || 0
+    t.gluc += e.glucides || 0
+    t.lip  += e.lipides || 0
+    t.fib  += e.fibres || 0
+    for (const key of ALL_NUTRIENT_KEYS) t[key] += e[key] || 0
+  }
+  return t
+}
+
+// ── getDayStatus ─────────────────────────────────────────────────────────
+// Statut couleur d'un jour pour le calendrier nutritionnel :
+//   'none' — aucune entrée journal ce jour-là → gris
+//   'ok'   — kcal ET protéines ET glucides ET lipides tous à ±5% de l'objectif → vert
+//   'off'  — au moins une des 4 valeurs sort de cette bande → rouge
+// Tolérance volontairement stricte (±5%) : la couleur reflète un vrai
+// suivi précis, pas une simple présence de données.
+export const DAY_STATUS_TOLERANCE = 0.05
+
+export function getDayStatus(totals, settings, hasEntries) {
+  if (!hasEntries) return 'none'
+  const checks = [
+    [totals.kcal, settings?.goal_kcal],
+    [totals.prot, settings?.goal_proteines],
+    [totals.gluc, settings?.goal_glucides],
+    [totals.lip,  settings?.goal_lipides],
+  ]
+  const ok = checks.every(([val, goal]) => goal > 0 && Math.abs(val - goal) / goal <= DAY_STATUS_TOLERANCE)
+  return ok ? 'ok' : 'off'
+}

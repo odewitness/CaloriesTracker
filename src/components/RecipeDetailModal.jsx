@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { X, Pencil, Trash2, Minus, Plus } from 'lucide-react'
+import { X, Pencil, Trash2, Minus, Plus, CalendarPlus } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import FoodDetailModal from './FoodDetailModal'
@@ -129,7 +129,7 @@ function CustomPortionCard({ per100, defaultQty }) {
 //   onUpdateIngredient(id, patch) — optionnel, persiste l'ajustement du
 //                                   grammage d'un ingrédient (cf. useRecetteDetail)
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailModal({ recette, ingredients, onEdit, onDelete, onClose, onUpdateIngredient }) {
+export default function RecipeDetailModal({ recette, ingredients, onEdit, onDelete, onClose, onUpdateIngredient, onPlan }) {
   useBackButton(onClose)
   const [selectedIngredient, setSelectedIngredient] = useState(null)
 
@@ -176,6 +176,28 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
   // (toujours à l'échelle 100g, jamais mis à l'échelle des portions)
   const totals100 = per100 || {}
 
+  // Ingrédients mis à l'échelle du nb de portions souhaité, TOUS champs
+  // nutritionnels compris (pas seulement qty_g) — utilisé pour "Planifier",
+  // qui a besoin d'items nutritionnellement corrects, pas juste d'un
+  // grammage réaffiché.
+  const scaledIngredientsForPlan = useMemo(() => ingredients.map(ing => {
+    const scaled = {
+      food_name:    ing.food_name,
+      food_source:  ing.food_source,
+      food_ref_id:  ing.food_ref_id,
+      qty_g:        (ing.qty_g || 0) * factor,
+      energie_kcal: (ing.energie_kcal || 0) * factor,
+      proteines:    (ing.proteines || 0) * factor,
+      glucides:     (ing.glucides || 0) * factor,
+      lipides:      (ing.lipides || 0) * factor,
+      fibres:       (ing.fibres || 0) * factor,
+    }
+    for (const key of ALL_NUTRIENT_KEYS) {
+      scaled[key] = ing[key] != null ? ing[key] * factor : null
+    }
+    return scaled
+  }), [ingredients, factor])
+
   return (
     <div className="page-modal">
       {/* Header */}
@@ -183,6 +205,17 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
         <div style={{ width: 32, flexShrink: 0 }} />
         <h2 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{recette.nom}</h2>
         <div style={{ display: 'flex', gap: 2 }}>
+          {onPlan && (
+            <button
+              className="btn-icon"
+              onClick={() => onPlan({ nom: recette.nom, items: scaledIngredientsForPlan, sourceType: 'recette', sourceId: recette.id })}
+              style={{ color: 'var(--purple, #8b5cf6)' }}
+              aria-label="Planifier"
+              title="Planifier"
+            >
+              <CalendarPlus size={18} />
+            </button>
+          )}
           <button className="btn-icon" onClick={onEdit}  style={{ color: 'var(--text-hint)' }}><Pencil  size={18} /></button>
           <button className="btn-icon" onClick={onDelete} style={{ color: 'var(--text-hint)' }}><Trash2  size={18} /></button>
           <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>

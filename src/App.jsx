@@ -8,6 +8,7 @@ import ManualPage from './pages/ManualPage'
 import ShoppingListPage from './pages/ShoppingListPage'
 import HistoryPage from './pages/HistoryPage'
 import ProfilePage from './pages/ProfilePage'
+import CalendarPage from './pages/CalendarPage'
 
 const TABS = [
   { id: 'today',    label: "Aujourd'hui", icon: HomeIcon },
@@ -74,10 +75,21 @@ function CloseIcon() {
   )
 }
 
+function CalendarButtonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  )
+}
+
 // Bouton rond en haut à droite : ouvre ProfilePage en plein écran par-dessus
 // l'app, sans occuper d'onglet dans la bottom nav.
 // hidden=true → le bandeau se rétracte (scroll vers le bas), voir handleScroll.
-function ProfileButton({ onClick, hidden }) {
+function ProfileButton({ onClick, onCalendarClick, hidden }) {
   const { user } = useAuth()
   const { profile } = useProfile()
   const initials = ((profile?.prenom?.[0] || '') + (profile?.nom?.[0] || '')).toUpperCase()
@@ -85,6 +97,9 @@ function ProfileButton({ onClick, hidden }) {
 
   return (
     <div className={`top-bar${hidden ? ' top-bar-hidden' : ''}`}>
+      <button className="profile-avatar-btn" onClick={onCalendarClick} aria-label="Calendrier">
+        <CalendarButtonIcon />
+      </button>
       <button className="profile-avatar-btn" onClick={onClick} aria-label="Profil">
         {initials ? initials : <ProfileIcon />}
       </button>
@@ -95,6 +110,7 @@ function ProfileButton({ onClick, hidden }) {
 function AppShell() {
   const [tab, setTab] = useState('today')
   const [profileOpen, setProfileOpen] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
 
   // Header qui se cache au scroll vers le bas, réapparaît vers le haut (ou
   // en haut de page). onScrollCapture sur le conteneur des pages permet de
@@ -146,6 +162,17 @@ function AppShell() {
     return () => window.removeEventListener('popstate', handlePop)
   }, [profileOpen])
 
+  // Même logique de retour Android pour le calendrier.
+  useEffect(() => {
+    if (!calendarOpen) return
+
+    history.pushState({ calendar: true }, '')
+
+    const handlePop = () => setCalendarOpen(false)
+    window.addEventListener('popstate', handlePop)
+    return () => window.removeEventListener('popstate', handlePop)
+  }, [calendarOpen])
+
   const pages = {
     today:    <TodayPage />,
     manual:   <ManualPage />,
@@ -155,7 +182,7 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <ProfileButton onClick={() => setProfileOpen(true)} hidden={headerHidden} />
+      <ProfileButton onClick={() => setProfileOpen(true)} onCalendarClick={() => setCalendarOpen(true)} hidden={headerHidden} />
 
       {/* overflow visible ici — c'est page-content qui scroll en interne */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }} onScrollCapture={handleScroll}>
@@ -185,6 +212,20 @@ function AppShell() {
           </div>
           <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
             <ProfilePage />
+          </div>
+        </div>
+      )}
+
+      {calendarOpen && (
+        <div className="page-modal">
+          <div className="page-modal-header">
+            <h2>Calendrier</h2>
+            <button className="btn-icon" onClick={() => history.back()} aria-label="Fermer">
+              <CloseIcon />
+            </button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+            <CalendarPage />
           </div>
         </div>
       )}

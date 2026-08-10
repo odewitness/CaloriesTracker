@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronRight, Check, X, Pencil, UtensilsCrossed, CalendarDays, ArrowLeft } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, Check, X, Pencil, UtensilsCrossed, CalendarDays, ArrowLeft, CalendarPlus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { ALL_NUTRIENT_KEYS, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import AddFoodModal from './AddFoodModal'
+import PlanMealModal from './PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
 import { useBackButton } from '../hooks/useBackButton'
 
@@ -17,7 +18,7 @@ import { useBackButton } from '../hooks/useBackButton'
 // double (ManualPage fournit déjà son propre header + le switch d'onglets).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RepasCard({ repas, onDelete, onEdit, onAddToJournal }) {
+function RepasCard({ repas, onDelete, onEdit, onAddToJournal, onPlan }) {
   const [open, setOpen] = useState(false)
   const items = repas.items || []
   const totalKcal = items.reduce((s, i) => s + (i.energie_kcal || 0), 0)
@@ -38,6 +39,7 @@ function RepasCard({ repas, onDelete, onEdit, onAddToJournal }) {
           </div>
           {repas.description && <div style={{ fontSize: 12, color: 'var(--text-hint)', marginTop: 2 }}>{repas.description}</div>}
         </button>
+        <button className="btn-icon" onClick={() => onPlan(repas)} style={{ color: 'var(--purple, #8b5cf6)' }} aria-label="Planifier" title="Planifier"><CalendarPlus size={16} /></button>
         <button className="btn-icon" onClick={() => onEdit(repas)} style={{ color: 'var(--text-hint)' }}><Pencil size={16} /></button>
         <button className="btn-icon" onClick={() => onDelete(repas.id)} style={{ color: 'var(--text-hint)' }}><Trash2 size={16} /></button>
         <ChevronRight size={16} color="var(--text-hint)" style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
@@ -451,6 +453,7 @@ export default function MealsSection() {
   const [loading, setLoading] = useState(true)
   const [editTarget, setEditTarget] = useState(null) // null = fermé, {} = nouveau, repas = édition
   const [addToJournalTarget, setAddToJournalTarget] = useState(null)
+  const [planTarget, setPlanTarget] = useState(null) // repas type en cours de planification
   const [journalDate, setJournalDate] = useState(new Date().toISOString().slice(0, 10))
   const [journalMeal, setJournalMeal] = useState('Déjeuner')
 
@@ -526,6 +529,7 @@ export default function MealsSection() {
           onDelete={handleDelete}
           onEdit={setEditTarget}
           onAddToJournal={handleAddToJournal}
+          onPlan={setPlanTarget}
         />
       ))}
 
@@ -542,6 +546,14 @@ export default function MealsSection() {
           onMealChange={setJournalMeal}
           onConfirm={confirmAddToJournal}
           onClose={() => setAddToJournalTarget(null)}
+        />
+      )}
+
+      {planTarget && (
+        <PlanMealModal
+          presetSource={{ nom: planTarget.nom, items: planTarget.items || [], sourceType: 'repas_type', sourceId: planTarget.id }}
+          onClose={() => setPlanTarget(null)}
+          onPlanned={() => setPlanTarget(null)}
         />
       )}
     </>

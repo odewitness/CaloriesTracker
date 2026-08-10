@@ -8,6 +8,7 @@ import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import RecipeFormModal from '../components/RecipeFormModal'
 import RecipeDetailModal from '../components/RecipeDetailModal'
 import MealsSection from '../components/MealsSection'
+import PlanMealModal from '../components/PlanMealModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -278,7 +279,7 @@ function NewMenu({ onNewAliment, onNewRecette, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Wrapper pour charger ingrédients + afficher RecipeDetailModal
 // ─────────────────────────────────────────────────────────────────────────────
-function RecipeDetailWrapper({ recette, onEdit, onDelete, onClose }) {
+function RecipeDetailWrapper({ recette, onEdit, onDelete, onClose, onPlan }) {
   const { ingredients, loading, updateIngredient } = useRecetteDetail(recette.id)
   if (loading) return (
     <div className="page-modal">
@@ -290,7 +291,7 @@ function RecipeDetailWrapper({ recette, onEdit, onDelete, onClose }) {
       <div className="loader"><div className="spinner" /> Chargement...</div>
     </div>
   )
-  return <RecipeDetailModal recette={recette} ingredients={ingredients} onEdit={onEdit} onDelete={onDelete} onClose={onClose} onUpdateIngredient={updateIngredient} />
+  return <RecipeDetailModal recette={recette} ingredients={ingredients} onEdit={onEdit} onDelete={onDelete} onClose={onClose} onUpdateIngredient={updateIngredient} onPlan={onPlan} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -348,6 +349,7 @@ const filteredRecettes = useMemo(() => {
   })
 }, [recettes, ingredientsByRecette, recipeSearch])
   const [recipeModal, setRecipeModal] = useState(null) // null | { type: 'new' | 'edit' | 'detail', recette? }
+  const [planTarget, setPlanTarget] = useState(null) // preset source { nom, items, sourceType, sourceId } en cours de planification
 
   // ── Sous-menu "Nouveau" ───────────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false)
@@ -738,6 +740,16 @@ const filteredRecettes = useMemo(() => {
             setRecipeModal(null)
           }}
           onClose={() => setRecipeModal(null)}
+          onPlan={setPlanTarget}
+        />
+      )}
+
+      {/* ── Planifier (recette ou repas type) ── */}
+      {planTarget && (
+        <PlanMealModal
+          presetSource={planTarget}
+          onClose={() => setPlanTarget(null)}
+          onPlanned={() => setPlanTarget(null)}
         />
       )}
 
