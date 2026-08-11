@@ -10,6 +10,8 @@ import FoodDetailModal from './FoodDetailModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from './SupplementSection'
 import PlannedMealCard from './PlannedMealCard'
 import PlanMealModal from './PlanMealModal'
+import RecipeDetailWrapper from './RecipeDetailWrapper'
+import RepasTypeDetailWrapper from './RepasTypeDetailWrapper'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
@@ -58,6 +60,7 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
   const [planModalOpen, setPlanModalOpen] = useState(false)
   const [modal, setModal] = useState(null) // { meal, addEntry } — AddFoodModal, même pattern que TodayPage
   const [detailEntry, setDetailEntry] = useState(null)
+  const [sourceDetail, setSourceDetail] = useState(null) // repas_planifies en cours de "voir sa page dédiée"
 
   const totals = useMemo(() => computeTotals(entries), [entries])
   const hasEntries = entries.length > 0
@@ -93,7 +96,6 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
     if (!error) { toast('Supprimé'); refetchPlanifies(); onPlannedChange?.() }
     else toast('Erreur')
   }
-
   if (loading) {
     return <div className="loader"><div className="spinner" /> Chargement...</div>
   }
@@ -134,6 +136,7 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
                 repas={r}
                 onMarkEaten={handleMarkEaten}
                 onDelete={handleDeletePlanifie}
+                onOpenSource={r.source_type ? (repas) => setSourceDetail(repas) : undefined}
               />
             ))}
           </div>
@@ -183,6 +186,27 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
           entry={detailEntry}
           onUpdate={handleUpdate}
           onClose={() => setDetailEntry(null)}
+        />
+      )}
+
+      {/* "Page dédiée" d'un repas planifié : recette / repas type / aliment */}
+      {sourceDetail?.source_type === 'recette' && (
+        <RecipeDetailWrapper
+          recetteId={sourceDetail.source_id}
+          onClose={() => setSourceDetail(null)}
+        />
+      )}
+      {sourceDetail?.source_type === 'repas_type' && (
+        <RepasTypeDetailWrapper
+          repasTypeId={sourceDetail.source_id}
+          onClose={() => setSourceDetail(null)}
+        />
+      )}
+      {sourceDetail?.source_type === 'libre' && (
+        <FoodDetailModal
+          key={sourceDetail.id}
+          entry={sourceDetail.items?.[0]}
+          onClose={() => setSourceDetail(null)}
         />
       )}
     </div>

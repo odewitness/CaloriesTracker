@@ -219,8 +219,12 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
               <CalendarPlus size={18} />
             </button>
           )}
-          <button className="btn-icon" onClick={onEdit}  style={{ color: 'var(--text-hint)' }}><Pencil  size={18} /></button>
-          <button className="btn-icon" onClick={onDelete} style={{ color: 'var(--text-hint)' }}><Trash2  size={18} /></button>
+          {onEdit && (
+            <button className="btn-icon" onClick={onEdit} style={{ color: 'var(--text-hint)' }}><Pencil size={18} /></button>
+          )}
+          {onDelete && (
+            <button className="btn-icon" onClick={onDelete} style={{ color: 'var(--text-hint)' }}><Trash2 size={18} /></button>
+          )}
           <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
         </div>
       </div>

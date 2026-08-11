@@ -2,12 +2,11 @@ import React, { useState, useEffect, useRef, useMemo  } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple, UtensilsCrossed, X, Search, CalendarDays, ArrowUpDown, Check  } from 'lucide-react'
+import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple, UtensilsCrossed, X, Search, CalendarDays  } from 'lucide-react'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
-import { useBackButton } from '../hooks/useBackButton'
 import RecipeFormModal from '../components/RecipeFormModal'
-import RecipeDetailModal from '../components/RecipeDetailModal'
+import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealsSection from '../components/MealsSection'
 import PlanMealModal from '../components/PlanMealModal'
 
@@ -278,186 +277,6 @@ function NewMenu({ onNewAliment, onNewRecette, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tri des recettes — critère principal + critère secondaire optionnel
-// (ex: "moins caloriques, puis plus de protéines")
-// ─────────────────────────────────────────────────────────────────────────────
-const SORT_FIELDS = [
-  { key: 'nom',       label: 'Nom',       ascLabel: 'A → Z',         descLabel: 'Z → A' },
-  { key: 'kcal',      label: 'Calories',  ascLabel: 'Les - élevées', descLabel: 'Les + élevées' },
-  { key: 'proteines', label: 'Protéines', ascLabel: 'Les - élevées', descLabel: 'Les + élevées' },
-  { key: 'glucides',  label: 'Glucides',  ascLabel: 'Les - élevés',  descLabel: 'Les + élevés' },
-  { key: 'lipides',   label: 'Lipides',   ascLabel: 'Les - élevés',  descLabel: 'Les + élevés' },
-]
-
-const DEFAULT_SORT = { primary: { field: 'nom', dir: 'asc' }, secondary: null }
-
-function compareByField(a, b, field, dir) {
-  if (field === 'nom') {
-    const cmp = (a.nom || '').localeCompare(b.nom || '', 'fr')
-    return dir === 'desc' ? -cmp : cmp
-  }
-  const key = field === 'kcal' ? 'energie_kcal' : field
-  const av = a[key], bv = b[key]
-  // Les recettes sans valeur (pas d'ingrédient) sont toujours reléguées en
-  // fin de liste, quel que soit le sens choisi.
-  if (av == null && bv == null) return 0
-  if (av == null) return 1
-  if (bv == null) return -1
-  const cmp = av - bv
-  return dir === 'desc' ? -cmp : cmp
-}
-
-function sortRecettes(list, { primary, secondary }) {
-  return [...list].sort((a, b) => {
-    const c1 = compareByField(a, b, primary.field, primary.dir)
-    if (c1 !== 0) return c1
-    if (secondary) {
-      const c2 = compareByField(a, b, secondary.field, secondary.dir)
-      if (c2 !== 0) return c2
-    }
-    return (a.nom || '').localeCompare(b.nom || '', 'fr') // tie-break stable
-  })
-}
-
-function describeSortField({ field, dir }) {
-  const f = SORT_FIELDS.find(x => x.key === field)
-  if (!f) return ''
-  return `${f.label.toLowerCase()} (${(dir === 'asc' ? f.ascLabel : f.descLabel).toLowerCase()})`
-}
-
-// ─── Sélecteur de champ + sens, réutilisé pour le critère principal et secondaire ───
-function FieldPicker({ fields, selected, dir, onSelectField, onToggleDir, allowNone }) {
-  const activeField = SORT_FIELDS.find(f => f.key === selected)
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: selected ? 10 : 0 }}>
-        {allowNone && (
-          <button
-            onClick={() => onSelectField(null)}
-            className="chip"
-            style={selected === null ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-          >
-            Aucun
-          </button>
-        )}
-        {fields.map(f => (
-          <button
-            key={f.key}
-            onClick={() => onSelectField(f.key)}
-            className="chip"
-            style={selected === f.key ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {selected && activeField && (
-        <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
-          {['asc', 'desc'].map(d => (
-            <button
-              key={d}
-              onClick={() => { if (dir !== d) onToggleDir() }}
-              style={{
-                flex: 1, padding: '8px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
-                background: dir === d ? 'var(--white)' : 'transparent',
-                color: dir === d ? 'var(--text)' : 'var(--text-muted)',
-                boxShadow: dir === d ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all .15s',
-              }}
-            >
-              {d === 'asc' ? activeField.ascLabel : activeField.descLabel}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Modal de tri ────────────────────────────────────────────────────────────
-function SortModal({ value, onChange, onClose }) {
-  useBackButton(onClose)
-  const [primaryField, setPrimaryField]     = useState(value.primary.field)
-  const [primaryDir, setPrimaryDir]         = useState(value.primary.dir)
-  const [secondaryField, setSecondaryField] = useState(value.secondary?.field || null)
-  const [secondaryDir, setSecondaryDir]     = useState(value.secondary?.dir || 'desc')
-
-  // Si le critère secondaire devient identique au principal, on l'efface
-  useEffect(() => { if (secondaryField === primaryField) setSecondaryField(null) }, [primaryField]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const apply = () => {
-    onChange({
-      primary: { field: primaryField, dir: primaryDir },
-      secondary: secondaryField ? { field: secondaryField, dir: secondaryDir } : null,
-    })
-    onClose()
-  }
-
-  const reset = () => {
-    setPrimaryField('nom'); setPrimaryDir('asc')
-    setSecondaryField(null); setSecondaryDir('desc')
-  }
-
-  return (
-    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-sheet">
-        <div className="modal-handle" />
-        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Trier les recettes</h2>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 18 }}>
-          Choisis un critère principal, et éventuellement un second pour départager les égalités.
-        </div>
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-          Trier par
-        </div>
-        <FieldPicker
-          fields={SORT_FIELDS}
-          selected={primaryField}
-          dir={primaryDir}
-          onSelectField={setPrimaryField}
-          onToggleDir={() => setPrimaryDir(d => d === 'asc' ? 'desc' : 'asc')}
-        />
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '18px 0 8px' }}>
-          Puis par <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
-        </div>
-        <FieldPicker
-          fields={SORT_FIELDS.filter(f => f.key !== primaryField)}
-          selected={secondaryField}
-          dir={secondaryDir}
-          onSelectField={setSecondaryField}
-          onToggleDir={() => setSecondaryDir(d => d === 'asc' ? 'desc' : 'asc')}
-          allowNone
-        />
-
-        <button className="btn-primary" onClick={apply} style={{ marginTop: 20 }}>Appliquer</button>
-        <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={reset}>Réinitialiser</button>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Wrapper pour charger ingrédients + afficher RecipeDetailModal
-// ─────────────────────────────────────────────────────────────────────────────
-function RecipeDetailWrapper({ recette, onEdit, onDelete, onClose, onPlan }) {
-  const { ingredients, loading, updateIngredient } = useRecetteDetail(recette.id)
-  if (loading) return (
-    <div className="page-modal">
-      <div className="page-modal-header">
-        <div style={{ width: 32 }} />
-        <h2>{recette.nom}</h2>
-        <button className="btn-icon" onClick={() => window.history.back()}><X size={20} color="var(--text-muted)" /></button>
-      </div>
-      <div className="loader"><div className="spinner" /> Chargement...</div>
-    </div>
-  )
-  return <RecipeDetailModal recette={recette} ingredients={ingredients} onEdit={onEdit} onDelete={onDelete} onClose={onClose} onUpdateIngredient={updateIngredient} onPlan={onPlan} />
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Wrapper pour charger ingrédients + afficher RecipeFormModal en édition
 // ─────────────────────────────────────────────────────────────────────────────
 function RecipeEditWrapper({ recette, onSaved, onClose }) {
@@ -482,7 +301,7 @@ export default function ManualPage() {
   const toast    = useToast()
   const { user } = useAuth()
 
-  // ── Onglet actif : 'aliments' | 'recettes' | 'repas' ────────────────────
+  // ── Onglet actif : 'aliments' | 'recettes' ──────────────────────────────
   const [tab, setTab] = useState('aliments')
 
   // ── Aliments ─────────────────────────────────────────────────────────────
@@ -497,32 +316,20 @@ export default function ManualPage() {
 
   // ── Recettes ──────────────────────────────────────────────────────────────
   const { recettes, ingredientsByRecette, loading: loadingRecettes, deleteRecette, refetch: refetchRecettes } = useRecipes()
-  const [recipeSearch, setRecipeSearch] = useState('')
+const [recipeSearch, setRecipeSearch] = useState('')
 
-  // Normalise pour une recherche insensible à la casse et aux accents
-  const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+// Normalise pour une recherche insensible à la casse et aux accents
+const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
-  const filteredRecettes = useMemo(() => {
-    const q = normalize(recipeSearch.trim())
-    if (!q) return recettes
-    return recettes.filter(r => {
-      if (normalize(r.nom).includes(q)) return true
-      const ings = ingredientsByRecette[r.id] || []
-      return ings.some(ing => normalize(ing.food_name).includes(q))
-    })
-  }, [recettes, ingredientsByRecette, recipeSearch])
-
-  // ── Tri ─────────────────────────────────────────────────────────────────
-  const [recipeSort, setRecipeSort] = useState(DEFAULT_SORT)
-  const [sortModalOpen, setSortModalOpen] = useState(false)
-
-  const sortedFilteredRecettes = useMemo(
-    () => sortRecettes(filteredRecettes, recipeSort),
-    [filteredRecettes, recipeSort]
-  )
-
-  const isCustomSort = recipeSort.primary.field !== 'nom' || recipeSort.primary.dir !== 'asc' || !!recipeSort.secondary
-
+const filteredRecettes = useMemo(() => {
+  const q = normalize(recipeSearch.trim())
+  if (!q) return recettes
+  return recettes.filter(r => {
+    if (normalize(r.nom).includes(q)) return true
+    const ings = ingredientsByRecette[r.id] || []
+    return ings.some(ing => normalize(ing.food_name).includes(q))
+  })
+}, [recettes, ingredientsByRecette, recipeSearch])
   const [recipeModal, setRecipeModal] = useState(null) // null | { type: 'new' | 'edit' | 'detail', recette? }
   const [planTarget, setPlanTarget] = useState(null) // preset source { nom, items, sourceType, sourceId } en cours de planification
 
@@ -838,81 +645,58 @@ export default function ManualPage() {
         )}
 
         {/* ── Onglet Recettes ── */}
-        {tab === 'recettes' && (
-          <>
-            {/* ── Barre de recherche + tri ── */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-                <input
-                  className="input"
-                  placeholder="Rechercher une recette ou un ingrédient..."
-                  value={recipeSearch}
-                  onChange={e => setRecipeSearch(e.target.value)}
-                  style={{ paddingLeft: 36, paddingRight: recipeSearch ? 36 : 12 }}
-                />
-                {recipeSearch && (
-                  <button
-                    onClick={() => setRecipeSearch('')}
-                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }}
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-
+              {tab === 'recettes' && (
+        <>
+          {/* ── Barre de recherche ── */}
+          <div style={{ position: 'relative', marginBottom: 14 }}>
+            <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              className="input"
+              placeholder="Rechercher une recette ou un ingrédient..."
+              value={recipeSearch}
+              onChange={e => setRecipeSearch(e.target.value)}
+              style={{ paddingLeft: 36, paddingRight: recipeSearch ? 36 : 12 }}
+            />
+            {recipeSearch && (
               <button
-                onClick={() => setSortModalOpen(true)}
-                style={{
-                  width: 44, height: 44, borderRadius: 'var(--radius-sm)', flexShrink: 0,
-                  background: isCustomSort ? 'var(--green-light)' : 'var(--gray-bg)',
-                  color: isCustomSort ? 'var(--green-dark)' : 'var(--text-muted)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid var(--border)',
-                }}
+                onClick={() => setRecipeSearch('')}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }}
               >
-                <ArrowUpDown size={17} />
+                <X size={16} />
               </button>
+            )}
+          </div>
+
+          {loadingRecettes && <div className="loader"><div className="spinner" /> Chargement...</div>}
+
+          {!loadingRecettes && filteredRecettes.length === 0 && (
+            <div className="empty">
+              <UtensilsCrossed size={40} />
+              <div style={{ marginTop: 8, fontWeight: 600 }}>
+                {recipeSearch ? 'Aucun résultat' : 'Aucune recette'}
+              </div>
+              <div style={{ marginTop: 4 }}>
+                {recipeSearch
+                  ? `Aucune recette ni ingrédient ne correspond à "${recipeSearch}"`
+                  : "Crée ta première recette pour calculer les calories de tes plats maison"}
+              </div>
             </div>
+          )}
 
-            {isCustomSort && (
-              <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 10 }}>
-                Trié par {describeSortField(recipeSort.primary)}
-                {recipeSort.secondary ? `, puis ${describeSortField(recipeSort.secondary)}` : ''}
-              </div>
-            )}
-
-            {loadingRecettes && <div className="loader"><div className="spinner" /> Chargement...</div>}
-
-            {!loadingRecettes && sortedFilteredRecettes.length === 0 && (
-              <div className="empty">
-                <UtensilsCrossed size={40} />
-                <div style={{ marginTop: 8, fontWeight: 600 }}>
-                  {recipeSearch ? 'Aucun résultat' : 'Aucune recette'}
-                </div>
-                <div style={{ marginTop: 4 }}>
-                  {recipeSearch
-                    ? `Aucune recette ni ingrédient ne correspond à "${recipeSearch}"`
-                    : "Crée ta première recette pour calculer les calories de tes plats maison"}
-                </div>
-              </div>
-            )}
-
-            {sortedFilteredRecettes.map(r => (
-              <RecipeCard
-                key={r.id}
-                recette={r}
-                ingredients={ingredientsByRecette[r.id]}
-                onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
-                onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
-              />
-            ))}
-          </>
-        )}
-
-        {/* ── Onglet Repas types ── */}
-        {tab === 'repas' && <MealsSection />}
-
+    {filteredRecettes.map(r => (
+  <RecipeCard
+    key={r.id}
+    recette={r}
+    ingredients={ingredientsByRecette[r.id]}
+    onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+    onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+  />
+))}
+  </>
+)}
+      {/* ── Onglet Repas types ── */}
+              {tab === 'repas' && <MealsSection />}
+      
       </div>
 
       {/* ── Modals recettes ── */}
@@ -930,7 +714,7 @@ export default function ManualPage() {
       {/* Détail recette */}
       {recipeModal?.type === 'detail' && recipeModal.recette && (
         <RecipeDetailWrapper
-          recette={recipeModal.recette}
+          recetteId={recipeModal.recette.id}
           onEdit={() => setRecipeModal({ type: 'edit', recette: recipeModal.recette })}
           onDelete={async () => {
             await deleteRecette(recipeModal.recette.id)
@@ -957,15 +741,6 @@ export default function ManualPage() {
           recette={recipeModal.recette}
           onSaved={() => { setRecipeModal(null); refetchRecettes() }}
           onClose={() => setRecipeModal(null)}
-        />
-      )}
-
-      {/* ── Tri des recettes ── */}
-      {sortModalOpen && (
-        <SortModal
-          value={recipeSort}
-          onChange={setRecipeSort}
-          onClose={() => setSortModalOpen(false)}
         />
       )}
     </>

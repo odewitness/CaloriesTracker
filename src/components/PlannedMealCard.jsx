@@ -1,17 +1,21 @@
 import React, { useState } from 'react'
-import { Check, Trash2, Clock } from 'lucide-react'
+import { Check, Trash2, ChevronRight } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PlannedMealCard — carte compacte pour un repas planifié (repas_planifies).
 // Props :
-//   repas         — ligne repas_planifies { nom, meal, items, mange, ... }
+//   repas         — ligne repas_planifies { nom, meal, items, mange, source_type, source_id, ... }
 //   onMarkEaten() — async, copie les items dans le journal
 //   onDelete()    — async, supprime le repas planifié
+//   onOpenSource(repas) — optionnel ; si fourni, le nom du repas devient
+//                          cliquable et ouvre sa "page dédiée" (recette /
+//                          repas type / aliment)
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PlannedMealCard({ repas, onMarkEaten, onDelete }) {
+export default function PlannedMealCard({ repas, onMarkEaten, onDelete, onOpenSource }) {
   const [busy, setBusy] = useState(false)
   const items = repas.items || []
   const totalKcal = items.reduce((s, i) => s + (i.energie_kcal || 0), 0)
+  const clickable = !!onOpenSource
 
   const handleMarkEaten = async () => {
     setBusy(true)
@@ -24,7 +28,10 @@ export default function PlannedMealCard({ repas, onMarkEaten, onDelete }) {
       marginBottom: 8, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10,
       opacity: repas.mange ? 0.6 : 1,
     }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        onClick={clickable ? () => onOpenSource(repas) : undefined}
+        style={{ flex: 1, minWidth: 0, cursor: clickable ? 'pointer' : 'default' }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{
             fontSize: 10, fontWeight: 700, color: 'var(--purple)',
@@ -36,8 +43,11 @@ export default function PlannedMealCard({ repas, onMarkEaten, onDelete }) {
             <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)' }}>✓ Mangé</span>
           )}
         </div>
-        <div style={{ fontWeight: 700, fontSize: 14, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {repas.nom}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 3 }}>
+          <span style={{ fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {repas.nom}
+          </span>
+          {clickable && <ChevronRight size={14} color="var(--text-hint)" style={{ flexShrink: 0 }} />}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
           {items.length} aliment{items.length > 1 ? 's' : ''} · {Math.round(totalKcal)} kcal
