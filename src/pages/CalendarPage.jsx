@@ -7,13 +7,7 @@ import { useJournalRange } from '../hooks/useJournalRange'
 import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useSettings } from '../hooks/useSettings'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
-
-function fmt(date) {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
+import { fmt } from '../lib/dates'
 
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
 function endOfMonth(d) { return new Date(d.getFullYear(), d.getMonth() + 1, 0) }

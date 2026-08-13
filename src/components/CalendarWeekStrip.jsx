@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { fmt } from '../lib/dates'
 
 const STATUS_COLOR = {
   ok:   'var(--green)',
@@ -13,13 +14,6 @@ const STATUS_BG = {
 }
 
 const WEEKDAY_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-
-function fmt(date) {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 // Lundi de la semaine contenant `date`
 function startOfWeek(date) {

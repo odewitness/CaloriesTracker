@@ -2,14 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
-
-function fmt(date) {
-  if (typeof date === 'string') return date
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
+import { fmt } from '../lib/dates'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // usePlannedMealsRange — charge tous les repas planifiés d'une plage de

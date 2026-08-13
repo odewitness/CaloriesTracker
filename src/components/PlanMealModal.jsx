@@ -8,13 +8,7 @@ import { MEALS_ORDER as MEALS, scaleFood } from '../lib/nutrients'
 import { createPlannedMeal } from '../hooks/usePlannedMeals'
 import FoodPicker from './FoodPicker'
 import AddFromRecipeModal from './AddFromRecipeModal'
-
-function fmt(date) {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
+import { fmt } from '../lib/dates'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RepasTypePicker — étape "choisir un repas type" (liste simple, comme
