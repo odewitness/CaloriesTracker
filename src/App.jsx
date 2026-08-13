@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { ToastProvider } from './lib/toast'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { useProfile } from './hooks/useProfile'
@@ -11,10 +12,10 @@ import ProfilePage from './pages/ProfilePage'
 import CalendarPage from './pages/CalendarPage'
 
 const TABS = [
-  { id: 'today',    label: "Aujourd'hui", icon: HomeIcon },
-  { id: 'manual',   label: 'Mes aliments', icon: PencilIcon },
-  { id: 'courses',  label: 'Courses',     icon: CartIcon },
-  { id: 'history',  label: 'Historique',  icon: ChartIcon },
+  { path: '/today',    label: "Aujourd'hui", icon: HomeIcon },
+  { path: '/manual',   label: 'Mes aliments', icon: PencilIcon },
+  { path: '/courses',  label: 'Courses',     icon: CartIcon },
+  { path: '/history',  label: 'Historique',  icon: ChartIcon },
 ]
 
 function HomeIcon({ active }) {
@@ -108,9 +109,18 @@ function ProfileButton({ onClick, onCalendarClick, hidden }) {
 }
 
 function AppShell() {
-  const [tab, setTab] = useState('today')
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [calendarOpen, setCalendarOpen] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // Le profil et le calendrier s'ouvrent comme des routes "par-dessus" la
+  // route de fond (pattern React Router du modal avec sa propre URL) : on
+  // mémorise dans le state de navigation la route affichée EN DESSOUS, pour
+  // continuer à la rendre pendant que la modale est ouverte. Si l'utilisateur
+  // arrive directement sur /profil ou /calendrier (lien, rechargement), il
+  // n'y a pas de backgroundLocation → on retombe sur l'onglet par défaut,
+  // comme au chargement initial de l'app aujourd'hui.
+  const backgroundLocation = location.state?.backgroundLocation
+  const activePath = (backgroundLocation || location).pathname
 
   // Header qui se cache au scroll vers le bas, réapparaît vers le haut (ou
   // en haut de page). onScrollCapture sur le conteneur des pages permet de
@@ -126,7 +136,7 @@ function AppShell() {
   useEffect(() => {
     setHeaderHidden(false)
     lastScrollTop.current = 0
-  }, [tab])
+  }, [activePath])
 
   const handleScroll = (e) => {
     const top = e.target.scrollTop
@@ -137,74 +147,44 @@ function AppShell() {
     lastScrollTop.current = top
   }
 
-  // Retour Android : pousse une entrée à chaque changement d'onglet,
-  // et écoute popstate pour revenir à 'today' — sans jamais appeler history.back() au cleanup.
-  useEffect(() => {
-    if (tab === 'today') return
+  const goToTab = (path) => { if (activePath !== path) navigate(path) }
+  const openOverlay = (path) => navigate(path, { state: { backgroundLocation: backgroundLocation || location } })
+  const closeOverlay = () => navigate(-1)
 
-    history.pushState({ tab }, '')
-
-    const handlePop = () => setTab('today')
-    window.addEventListener('popstate', handlePop)
-    return () => window.removeEventListener('popstate', handlePop)
-  }, [tab])
-
-  // Le profil suit la même logique de retour Android : une ouverture pousse
-  // une entrée d'historique, et "précédent" referme la modale plutôt que
-  // de quitter l'app.
-  useEffect(() => {
-    if (!profileOpen) return
-
-    history.pushState({ profile: true }, '')
-
-    const handlePop = () => setProfileOpen(false)
-    window.addEventListener('popstate', handlePop)
-    return () => window.removeEventListener('popstate', handlePop)
-  }, [profileOpen])
-
-  // Même logique de retour Android pour le calendrier.
-  useEffect(() => {
-    if (!calendarOpen) return
-
-    history.pushState({ calendar: true }, '')
-
-    const handlePop = () => setCalendarOpen(false)
-    window.addEventListener('popstate', handlePop)
-    return () => window.removeEventListener('popstate', handlePop)
-  }, [calendarOpen])
-
-  // Le calendrier s'ouvre en page-modal PAR-DESSUS l'onglet actif sans le
-  // démonter (contrairement à un changement d'onglet) — donc TodayPage garde
-  // son ancien useJournal en mémoire même après un ajout/suppression/
-  // "marquer mangé" fait depuis le calendrier. On force un remontage propre
-  // (nouvelles données) à la fermeture, via un compteur utilisé comme key.
+  // Le calendrier s'ouvre PAR-DESSUS l'onglet actif sans le démonter (sa
+  // route de fond reste rendue) — donc TodayPage garde son ancien useJournal
+  // en mémoire même après un ajout/suppression/"marquer mangé" fait depuis
+  // le calendrier. On force un remontage propre (nouvelles données) à la
+  // fermeture, via un compteur utilisé comme key.
   const [journalVersion, setJournalVersion] = useState(0)
+  const wasOnCalendar = useRef(false)
   useEffect(() => {
-    if (!calendarOpen) setJournalVersion(v => v + 1)
-  }, [calendarOpen])
-
-  const pages = {
-    today:    <TodayPage key={journalVersion} />,
-    manual:   <ManualPage />,
-    courses:  <ShoppingListPage />,
-    history:  <HistoryPage key={journalVersion} />,
-  }
+    const onCalendar = location.pathname === '/calendar'
+    if (wasOnCalendar.current && !onCalendar) setJournalVersion(v => v + 1)
+    wasOnCalendar.current = onCalendar
+  }, [location.pathname])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <ProfileButton onClick={() => setProfileOpen(true)} onCalendarClick={() => setCalendarOpen(true)} hidden={headerHidden} />
+      <ProfileButton onClick={() => openOverlay('/profile')} onCalendarClick={() => openOverlay('/calendar')} hidden={headerHidden} />
 
       {/* overflow visible ici — c'est page-content qui scroll en interne */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }} onScrollCapture={handleScroll}>
-        {pages[tab]}
+        <Routes location={backgroundLocation || location}>
+          <Route path="/today" element={<TodayPage key={journalVersion} />} />
+          <Route path="/manual" element={<ManualPage />} />
+          <Route path="/courses" element={<ShoppingListPage />} />
+          <Route path="/history" element={<HistoryPage key={journalVersion} />} />
+          <Route path="*" element={<Navigate to="/today" replace />} />
+        </Routes>
       </div>
 
       <nav className="bottom-nav">
         {TABS.map(t => {
           const Icon = t.icon
-          const active = tab === t.id
+          const active = activePath === t.path
           return (
-            <button key={t.id} className={`nav-item ${active ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            <button key={t.path} className={`nav-item ${active ? 'active' : ''}`} onClick={() => goToTab(t.path)}>
               <Icon active={active} />
               <span>{t.label}</span>
             </button>
@@ -212,32 +192,35 @@ function AppShell() {
         })}
       </nav>
 
-      {profileOpen && (
-        <div className="page-modal">
-          <div className="page-modal-header">
-            <h2>Profil</h2>
-            <button className="btn-icon" onClick={() => history.back()} aria-label="Fermer">
-              <CloseIcon />
-            </button>
-          </div>
-          <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
-            <ProfilePage />
-          </div>
-        </div>
-      )}
-
-      {calendarOpen && (
-        <div className="page-modal">
-          <div className="page-modal-header">
-            <h2>Calendrier</h2>
-            <button className="btn-icon" onClick={() => history.back()} aria-label="Fermer">
-              <CloseIcon />
-            </button>
-          </div>
-          <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
-            <CalendarPage />
-          </div>
-        </div>
+      {backgroundLocation && (
+        <Routes>
+          <Route path="/profile" element={
+            <div className="page-modal">
+              <div className="page-modal-header">
+                <h2>Profil</h2>
+                <button className="btn-icon" onClick={closeOverlay} aria-label="Fermer">
+                  <CloseIcon />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+                <ProfilePage />
+              </div>
+            </div>
+          } />
+          <Route path="/calendar" element={
+            <div className="page-modal">
+              <div className="page-modal-header">
+                <h2>Calendrier</h2>
+                <button className="btn-icon" onClick={closeOverlay} aria-label="Fermer">
+                  <CloseIcon />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+                <CalendarPage />
+              </div>
+            </div>
+          } />
+        </Routes>
       )}
     </div>
   )
