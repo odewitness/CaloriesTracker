@@ -4,6 +4,7 @@ import { ToastProvider } from './lib/toast'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { useProfile } from './hooks/useProfile'
 import AuthPage from './pages/AuthPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import TodayPage from './pages/TodayPage'
 import ManualPage from './pages/ManualPage'
 import ShoppingListPage from './pages/ShoppingListPage'
@@ -245,7 +246,10 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <Gate />
+        <Routes>
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="*" element={<Gate />} />
+        </Routes>
       </ToastProvider>
     </AuthProvider>
   )

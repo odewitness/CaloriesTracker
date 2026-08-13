@@ -3,10 +3,11 @@ import { useAuth } from '../lib/AuthContext'
 import { Mail, Lock, User, Calendar, Scale, Apple } from 'lucide-react'
 
 export default function AuthPage() {
-  const { signIn, signUp } = useAuth()
-  const [mode, setMode] = useState('signin') // signin | signup
+  const { signIn, signUp, resetPassword } = useAuth()
+  const [mode, setMode] = useState('signin') // signin | signup | forgot
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -15,7 +16,7 @@ export default function AuthPage() {
   const [age, setAge] = useState('')
   const [poids, setPoids] = useState('')
 
-  const reset = () => setError('')
+  const reset = () => { setError(''); setForgotSent(false) }
 
   const handleSignIn = async (e) => {
     e.preventDefault()
@@ -45,6 +46,17 @@ export default function AuthPage() {
     if (error) setError(traduireErreur(error.message))
   }
 
+  const handleForgot = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (!email) { setError('Renseigne ton email.'); return }
+    setLoading(true)
+    const { error } = await resetPassword(email.trim())
+    setLoading(false)
+    if (error) setError(traduireErreur(error.message))
+    else setForgotSent(true)
+  }
+
   return (
     <div className="page-content" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100%' }}>
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
@@ -53,10 +65,29 @@ export default function AuthPage() {
         </div>
         <div style={{ fontSize: 22, fontWeight: 700 }}>NutriTrack</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-          {mode === 'signin' ? 'Connecte-toi à ton compte' : 'Crée ton compte'}
+          {mode === 'signin' ? 'Connecte-toi à ton compte' : mode === 'signup' ? 'Crée ton compte' : 'Réinitialise ton mot de passe'}
         </div>
       </div>
 
+      {mode === 'forgot' ? (
+        <form onSubmit={handleForgot} className="card" style={{ padding: 18 }}>
+          {forgotSent ? (
+            <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>
+              Un email vient de t'être envoyé avec un lien pour choisir un nouveau mot de passe.
+            </div>
+          ) : (
+            <>
+              <Field icon={<Mail size={15} />} placeholder="Email" value={email} onChange={setEmail} type="email" autoComplete="email" />
+              {error && (
+                <div style={{ color: 'var(--coral)', fontSize: 12, marginTop: 10, lineHeight: 1.4 }}>{error}</div>
+              )}
+              <button className="btn-primary" type="submit" disabled={loading} style={{ marginTop: 16, opacity: loading ? 0.7 : 1 }}>
+                {loading ? '...' : 'Envoyer le lien'}
+              </button>
+            </>
+          )}
+        </form>
+      ) : (
       <form onSubmit={mode === 'signin' ? handleSignIn : handleSignUp} className="card" style={{ padding: 18 }}>
         {mode === 'signup' && (
           <>
@@ -81,7 +112,18 @@ export default function AuthPage() {
         <button className="btn-primary" type="submit" disabled={loading} style={{ marginTop: 16, opacity: loading ? 0.7 : 1 }}>
           {loading ? '...' : mode === 'signin' ? 'Se connecter' : 'Créer mon compte'}
         </button>
+
+        {mode === 'signin' && (
+          <button
+            type="button"
+            onClick={() => { setMode('forgot'); reset() }}
+            style={{ textAlign: 'center', marginTop: 14, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font)' }}
+          >
+            Mot de passe oublié ?
+          </button>
+        )}
       </form>
+      )}
 
       <button
         onClick={() => { setMode(m => m === 'signin' ? 'signup' : 'signin'); reset() }}
@@ -89,7 +131,9 @@ export default function AuthPage() {
       >
         {mode === 'signin'
           ? <>Pas encore de compte ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>S'inscrire</span></>
-          : <>Déjà un compte ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>Se connecter</span></>}
+          : mode === 'signup'
+          ? <>Déjà un compte ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>Se connecter</span></>
+          : <>Retour à la <span style={{ color: 'var(--green)', fontWeight: 600 }}>connexion</span></>}
       </button>
     </div>
   )
