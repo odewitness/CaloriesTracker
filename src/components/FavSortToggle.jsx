@@ -6,7 +6,10 @@ const FAV_SORTS = [
   { id: 'most',   label: 'Top' },
 ]
 
-export default function FavSortToggle({ value, onChange }) {
+// value/dir décrivent le tri actif ; cliquer sur le mode déjà actif doit
+// l'inverser plutôt que ne rien faire — c'est onChange (dans FoodPicker)
+// qui décide, ce composant se contente de notifier l'id cliqué.
+export default function FavSortToggle({ value, dir, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
       {FAV_SORTS.map(s => {
@@ -16,6 +19,7 @@ export default function FavSortToggle({ value, onChange }) {
             key={s.id}
             onClick={() => onChange(s.id)}
             style={{
+              display: 'flex', alignItems: 'center', gap: 3,
               fontSize: 11, fontWeight: 700, fontFamily: 'var(--font)',
               padding: '3px 9px', borderRadius: 20, border: 'none',
               background: active ? 'var(--green)' : 'var(--gray-bg)',
@@ -24,6 +28,7 @@ export default function FavSortToggle({ value, onChange }) {
             }}
           >
             {s.label}
+            {active && <span style={{ fontSize: 9 }}>{dir === 'asc' ? '▲' : '▼'}</span>}
           </button>
         )
       })}

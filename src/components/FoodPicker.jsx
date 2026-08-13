@@ -61,7 +61,8 @@ export default function FoodPicker({
   const [scannerOpen, setScannerOpen] = useState(false)
   const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false)
-  const [favSort, setFavSort] = useState('recent') // 'recent' | 'alpha' | 'most'
+  const [favSort, setFavSort] = useState('most') // 'recent' | 'alpha' | 'most'
+  const [favSortDir, setFavSortDir] = useState('desc') // 'asc' | 'desc'
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -82,18 +83,33 @@ export default function FoodPicker({
 
   // "Récents" = dernière utilisation réelle (last_used_at, alimenté par
   // bumpFavoriteUsage à chaque ajout au journal) ; un favori jamais utilisé
-  // retombe sur sa date d'ajout aux favoris (created_at).
+  // retombe sur sa date d'ajout aux favoris (created_at). Chaque mode a un
+  // sens "naturel" par défaut (recent/most = décroissant, alpha = A→Z) ;
+  // favSortDir permet de l'inverser sans changer de mode.
   const sortedFavorites = useMemo(() => {
     const arr = [...favorites]
+    const mult = favSortDir === 'asc' ? 1 : -1
     if (favSort === 'alpha') {
-      arr.sort((a, b) => (a.food_name || '').localeCompare(b.food_name || '', 'fr'))
+      arr.sort((a, b) => mult * (a.food_name || '').localeCompare(b.food_name || '', 'fr'))
     } else if (favSort === 'most') {
-      arr.sort((a, b) => (b.use_count || 0) - (a.use_count || 0))
+      arr.sort((a, b) => mult * ((a.use_count || 0) - (b.use_count || 0)))
     } else {
-      arr.sort((a, b) => new Date(b.last_used_at || b.created_at) - new Date(a.last_used_at || a.created_at))
+      arr.sort((a, b) => mult * (new Date(a.last_used_at || a.created_at) - new Date(b.last_used_at || b.created_at)))
     }
     return arr
-  }, [favorites, favSort])
+  }, [favorites, favSort, favSortDir])
+
+  // Cliquer sur le mode déjà actif inverse son sens ; changer de mode
+  // repart sur le sens naturel de ce nouveau mode.
+  const NATURAL_FAV_SORT_DIR = { recent: 'desc', alpha: 'asc', most: 'desc' }
+  const handleFavSortChange = (id) => {
+    if (id === favSort) {
+      setFavSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setFavSort(id)
+      setFavSortDir(NATURAL_FAV_SORT_DIR[id])
+    }
+  }
 
   // Un favori aussi présent dans les récents doit proposer en priorité la
   // dernière quantité réellement utilisée — sinon la ligne "★ Favoris"
@@ -432,7 +448,7 @@ const selectFood = async (food) => {
                           </span>
                         </button>
                         {!favoritesCollapsed && favorites.length > 1 && (
-                          <FavSortToggle value={favSort} onChange={setFavSort} />
+                          <FavSortToggle value={favSort} dir={favSortDir} onChange={handleFavSortChange} />
                         )}
                       </div>
                       {!favoritesCollapsed && sortedFavorites.map((f, i) => (
