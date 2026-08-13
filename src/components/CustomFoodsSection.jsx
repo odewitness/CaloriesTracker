@@ -36,6 +36,44 @@ const EXTRA_SECTIONS = [
   { title: 'Minéraux',  fields: MINERAL_FIELDS },
 ]
 
+// Grandes catégories Ciqual (regroupements officiels à effectif significatif dans
+// la table `ciqual` — les variantes de casse et catégories orphelines à effectif
+// quasi nul héritées d'anciens imports ne sont pas proposées ici, mais restent
+// affichées si un aliment existant les utilise déjà).
+const CIQUAL_CATEGORIES = [
+  'Aides culinaires et ingrédients divers',
+  'Aliments infantiles',
+  'Eaux et autres boissons',
+  'Entrées et plats composés',
+  'Fruits, légumes, légumineuses et oléagineux',
+  'Glaces et sorbets',
+  'Matières grasses',
+  'Produits céréaliers',
+  'Produits laitiers',
+  'Produits sucrés',
+  'Viandes, oeufs, poissons',
+]
+
+const CATEGORIES = ['Personnalisé', 'Compléments alimentaires', ...CIQUAL_CATEGORIES]
+
+const COMPLEMENT_CATEGORY = 'Compléments alimentaires'
+
+// Types de dose courants pour les compléments — le poids par défaut est une
+// estimation grossière, l'utilisateur peut toujours le corriger.
+const DOSE_TYPES = [
+  { key: 'gelule',         label: 'Gélule',           defaultG: 0.5 },
+  { key: 'comprime',       label: 'Comprimé',         defaultG: 1 },
+  { key: 'sachet',         label: 'Sachet',           defaultG: 5 },
+  { key: 'cuillere_cafe',  label: 'Cuillère à café',  defaultG: 5 },
+  { key: 'cuillere_soupe', label: 'Cuillère à soupe', defaultG: 15 },
+  { key: 'ml',             label: 'Ml (liquide)',     defaultG: 1 },
+  { key: 'autre',          label: 'Autre',            defaultG: null },
+]
+
+// Évite le bruit en virgule flottante (ex: 0.1 * 200 = 20.000000000000004)
+// après application du facteur de conversion dose ↔ 100g.
+const round = (n) => Math.round(n * 1e6) / 1e6
+
 const EMPTY_FORM = {
   nom: '', marque: '', categorie: 'Personnalisé',
   energie_kcal: '', proteines: '', glucides: '', lipides: '',
@@ -128,6 +166,14 @@ function ExtraSection({ title, fields, extra, setExtraField }) {
 // FoodCard — carte aliment dans la liste
 // ─────────────────────────────────────────────────────────────────────────────
 function FoodCard({ aliment, onEdit, onDelete }) {
+  // Pour un complément, les valeurs sont stockées pour 100g (comme le reste du
+  // schéma) mais l'utilisateur les pense "par dose" — on reconvertit pour
+  // l'affichage à partir de la dose (1ère portion), plutôt que d'afficher un
+  // "kcal/100g" démesuré et sans rapport avec ce qui a été saisi.
+  const dose  = aliment.categorie === COMPLEMENT_CATEGORY ? aliment.portions?.[0] : null
+  const scale = dose?.g > 0 ? dose.g / 100 : 1
+  const unit  = dose?.g > 0 ? `/${dose.label}` : '/100g'
+
   return (
     <div className="card" style={{ marginBottom: 10, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -135,10 +181,10 @@ function FoodCard({ aliment, onEdit, onDelete }) {
           {aliment.nom}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-          {aliment.marque ? `${aliment.marque} · ` : ''}{Math.round(aliment.energie_kcal || 0)} kcal/100g
-          &nbsp;·&nbsp;<span className="c-prot">P {Math.round(aliment.proteines || 0)}g</span>
-          &nbsp;<span className="c-gluc">G {Math.round(aliment.glucides || 0)}g</span>
-          &nbsp;<span className="c-lip">L {Math.round(aliment.lipides || 0)}g</span>
+          {aliment.marque ? `${aliment.marque} · ` : ''}{Math.round((aliment.energie_kcal || 0) * scale)} kcal{unit}
+          &nbsp;·&nbsp;<span className="c-prot">P {Math.round((aliment.proteines || 0) * scale)}g</span>
+          &nbsp;<span className="c-gluc">G {Math.round((aliment.glucides || 0) * scale)}g</span>
+          &nbsp;<span className="c-lip">L {Math.round((aliment.lipides || 0) * scale)}g</span>
         </div>
       </div>
       <button className="btn-icon" onClick={() => onEdit(aliment)}      style={{ color: 'var(--text-hint)' }}><Pencil size={16} /></button>
@@ -170,6 +216,25 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   const [portions,  setPortions]  = useState([{ label: '', g: '' }])
   const [saving,    setSaving]    = useState(false)
 
+  // Saisie "par dose" pour la catégorie Compléments alimentaires — voir save()
+  // et startEdit() pour la conversion vers/depuis les valeurs pour 100g stockées.
+  const [doseTypeKey, setDoseTypeKey] = useState(DOSE_TYPES[0].key)
+  const [doseLabel,   setDoseLabel]   = useState('') // libellé perso si doseTypeKey === 'autre'
+  const [doseWeight,  setDoseWeight]  = useState(String(DOSE_TYPES[0].defaultG))
+
+  const isComplement = form.categorie === COMPLEMENT_CATEGORY
+
+  const setDoseType = (key) => {
+    setDoseTypeKey(key)
+    const dt = DOSE_TYPES.find(d => d.key === key)
+    if (dt?.defaultG != null) setDoseWeight(String(dt.defaultG))
+  }
+
+  const resolveDoseLabel = () => {
+    if (doseTypeKey === 'autre') return doseLabel.trim() || 'Dose'
+    return `1 ${DOSE_TYPES.find(d => d.key === doseTypeKey).label.toLowerCase()}`
+  }
+
   useEffect(() => { load() }, [user])
 
   useEffect(() => { onFormOpenChange?.(view === 'form') }, [view])
@@ -192,27 +257,47 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   const removePortion = (i) => setPortions(p => p.filter((_, idx) => idx !== i))
   const updatePortion = (i, k, v) => setPortions(p => p.map((x, idx) => idx === i ? { ...x, [k]: v } : x))
 
-  const resetForm = () => { setForm(EMPTY_FORM); setExtra({}); setPortions([{ label: '', g: '' }]); setEditingId(null) }
+  const resetForm = () => {
+    setForm(EMPTY_FORM); setExtra({}); setPortions([{ label: '', g: '' }]); setEditingId(null)
+    setDoseType(DOSE_TYPES[0].key); setDoseLabel('')
+  }
   const startNew  = () => { resetForm(); setView('form') }
 
   useImperativeHandle(ref, () => ({ startNew }))
 
   const startEdit = (aliment) => {
     setEditingId(aliment.id)
+    const categorie = aliment.categorie || 'Personnalisé'
+    const isComp = categorie === COMPLEMENT_CATEGORY
+    const firstPortion = isComp && Array.isArray(aliment.portions) ? aliment.portions[0] : null
+    // Poids de la dose utilisé pour reconvertir les valeurs stockées (pour 100g)
+    // en valeurs "par dose" affichées dans le formulaire.
+    const doseW  = firstPortion?.g > 0 ? firstPortion.g : 1
+    const factor = isComp ? doseW / 100 : 1
+
+    if (isComp) {
+      const matched = DOSE_TYPES.find(d => d.key !== 'autre' && `1 ${d.label.toLowerCase()}` === (firstPortion?.label || '').toLowerCase())
+      if (matched) { setDoseTypeKey(matched.key) } else { setDoseTypeKey('autre'); setDoseLabel(firstPortion?.label || '') }
+      setDoseWeight(String(doseW))
+    } else {
+      setDoseType(DOSE_TYPES[0].key); setDoseLabel('')
+    }
+
+    const scale = v => v == null ? '' : String(round(v * factor))
     setForm({
-      nom: aliment.nom || '', marque: aliment.marque || '', categorie: aliment.categorie || 'Personnalisé',
-      energie_kcal: aliment.energie_kcal ?? '', proteines: aliment.proteines ?? '',
-      glucides: aliment.glucides ?? '', lipides: aliment.lipides ?? '', fibres: aliment.fibres ?? '',
-      sel: aliment.sel ?? '', sucres: aliment.sucres ?? '', acides_gras_satures: aliment.acides_gras_satures ?? '',
+      nom: aliment.nom || '', marque: aliment.marque || '', categorie,
+      energie_kcal: scale(aliment.energie_kcal), proteines: scale(aliment.proteines),
+      glucides: scale(aliment.glucides), lipides: scale(aliment.lipides), fibres: scale(aliment.fibres),
+      sel: scale(aliment.sel), sucres: scale(aliment.sucres), acides_gras_satures: scale(aliment.acides_gras_satures),
     })
     const extraValues = {}
     for (const key of ALL_NUTRIENT_KEYS) {
       if (MAIN_FORM_KEYS.has(key)) continue
-      extraValues[key] = aliment[key] != null ? String(aliment[key]) : ''
+      extraValues[key] = aliment[key] != null ? String(round(aliment[key] * factor)) : ''
     }
     setExtra(extraValues)
     setPortions(
-      Array.isArray(aliment.portions) && aliment.portions.length
+      !isComp && Array.isArray(aliment.portions) && aliment.portions.length
         ? aliment.portions.map(p => ({ label: p.label || '', g: p.g != null ? String(p.g) : '' }))
         : [{ label: '', g: '' }]
     )
@@ -228,24 +313,31 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   const save = async () => {
     if (!form.nom.trim())   { toast('⚠ Donne un nom');        return }
     if (!form.energie_kcal) { toast('⚠ Entre les calories');  return }
+    const doseW = parseFloat(doseWeight) || 0
+    if (isComplement && doseW <= 0) { toast("⚠ Indique le poids d'une dose"); return }
     setSaving(true)
-    const cleanPortions = portions.filter(p => p.label && p.g).map(p => ({ label: p.label, g: parseFloat(p.g) }))
+    // Les valeurs saisies pour un complément sont "par dose" — on les convertit
+    // vers l'équivalent pour 100g attendu par le schéma (comme ciqual/recettes).
+    const factor = isComplement ? 100 / doseW : 1
+    const cleanPortions = isComplement
+      ? [{ label: resolveDoseLabel(), g: doseW }]
+      : portions.filter(p => p.label && p.g).map(p => ({ label: p.label, g: parseFloat(p.g) }))
     const extraValues   = {}
     for (const key of ALL_NUTRIENT_KEYS) {
       // Les clés du formulaire principal sont déjà dans `form` — ne pas les écraser
       if (MAIN_FORM_KEYS.has(key)) continue
-      extraValues[key] = extra[key] ? parseFloat(extra[key]) : null
+      extraValues[key] = extra[key] ? round(parseFloat(extra[key]) * factor) : null
     }
     const payload = {
       nom: form.nom.trim(), marque: form.marque.trim() || null, categorie: form.categorie || 'Personnalisé',
-      energie_kcal:        parseFloat(form.energie_kcal)        || 0,
-      proteines:           parseFloat(form.proteines)           || 0,
-      glucides:            parseFloat(form.glucides)            || 0,
-      lipides:             parseFloat(form.lipides)             || 0,
-      fibres:              parseFloat(form.fibres)              || 0,
-      sel:                 parseFloat(form.sel)                 || 0,
-      sucres:              parseFloat(form.sucres)              || 0,
-      acides_gras_satures: parseFloat(form.acides_gras_satures) || 0,
+      energie_kcal:        round((parseFloat(form.energie_kcal)        || 0) * factor),
+      proteines:           round((parseFloat(form.proteines)           || 0) * factor),
+      glucides:            round((parseFloat(form.glucides)            || 0) * factor),
+      lipides:             round((parseFloat(form.lipides)             || 0) * factor),
+      fibres:              round((parseFloat(form.fibres)              || 0) * factor),
+      sel:                 round((parseFloat(form.sel)                 || 0) * factor),
+      sucres:              round((parseFloat(form.sucres)              || 0) * factor),
+      acides_gras_satures: round((parseFloat(form.acides_gras_satures) || 0) * factor),
       ...extraValues,
       portions: cleanPortions,
     }
@@ -296,15 +388,41 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
               </div>
               <div>
                 <FieldLabel>Catégorie</FieldLabel>
-                <input className="input" placeholder="Personnalisé" value={form.categorie} onChange={e => set('categorie', e.target.value)} />
+                <select className="input" value={form.categorie} onChange={e => set('categorie', e.target.value)}>
+                  {(CATEGORIES.includes(form.categorie) ? CATEGORIES : [form.categorie, ...CATEGORIES]).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── Valeurs pour 100g ── */}
+        {/* ── Dose (compléments uniquement) ── */}
+        {isComplement && (
+          <div className="card" style={{ padding: '16px', marginBottom: 12 }}>
+            <div className="section-title">Dose</div>
+            <div style={{ display: 'grid', gridTemplateColumns: doseTypeKey === 'autre' ? '1fr 1fr' : '1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <FieldLabel>Type de dose</FieldLabel>
+                <select className="input" value={doseTypeKey} onChange={e => setDoseType(e.target.value)}>
+                  {DOSE_TYPES.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+                </select>
+              </div>
+              {doseTypeKey === 'autre' && (
+                <div>
+                  <FieldLabel>Nom de la dose</FieldLabel>
+                  <input className="input" placeholder="Ex: 1 dosette" value={doseLabel} onChange={e => setDoseLabel(e.target.value)} />
+                </div>
+              )}
+            </div>
+            <MacroField id="doseWeight" label="Poids d'une dose" unit="g" required value={doseWeight} onChange={(_, v) => setDoseWeight(v)} placeholder="0.5" />
+          </div>
+        )}
+
+        {/* ── Valeurs pour 100g / par dose ── */}
         <div className="card" style={{ padding: '16px', marginBottom: 12 }}>
-          <div className="section-title">Valeurs pour 100g</div>
+          <div className="section-title">{isComplement ? 'Valeurs par dose' : 'Valeurs pour 100g'}</div>
 
           {/* Ligne 1 : Calories + Protéines */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
@@ -366,41 +484,44 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
           />
         ))}
 
-        {/* ── Portions courantes ── */}
-        <div className="card" style={{ padding: '16px', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div className="section-title" style={{ marginBottom: 0 }}>Portions courantes</div>
-            <button
-              onClick={addPortion}
-              style={{ color: 'var(--green)', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4 }}
-            >
-              <PlusCircle size={14} /> Ajouter
-            </button>
-          </div>
-          {portions.map((p, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-              <input
-                className="input"
-                placeholder="Ex: 1 oeuf"
-                value={p.label}
-                onChange={e => updatePortion(i, 'label', e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <input
-                className="input"
-                type="number"
-                placeholder="g"
-                value={p.g}
-                onChange={e => updatePortion(i, 'g', e.target.value)}
-                style={{ width: 70 }}
-              />
-              <span style={{ fontSize: 11, color: 'var(--text-hint)', flexShrink: 0 }}>g</span>
-              {portions.length > 1 && (
-                <button onClick={() => removePortion(i)} style={{ color: 'var(--coral)', flexShrink: 0, fontSize: 18, lineHeight: 1 }}>×</button>
-              )}
+        {/* ── Portions courantes (pas pour les compléments : la dose ci-dessus
+              sert déjà de portion unique) ── */}
+        {!isComplement && (
+          <div className="card" style={{ padding: '16px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div className="section-title" style={{ marginBottom: 0 }}>Portions courantes</div>
+              <button
+                onClick={addPortion}
+                style={{ color: 'var(--green)', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                <PlusCircle size={14} /> Ajouter
+              </button>
             </div>
-          ))}
-        </div>
+            {portions.map((p, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <input
+                  className="input"
+                  placeholder="Ex: 1 oeuf"
+                  value={p.label}
+                  onChange={e => updatePortion(i, 'label', e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="g"
+                  value={p.g}
+                  onChange={e => updatePortion(i, 'g', e.target.value)}
+                  style={{ width: 70 }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--text-hint)', flexShrink: 0 }}>g</span>
+                {portions.length > 1 && (
+                  <button onClick={() => removePortion(i)} style={{ color: 'var(--coral)', flexShrink: 0, fontSize: 18, lineHeight: 1 }}>×</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Bouton sauvegarde ── */}
         <button className="btn-primary" onClick={save} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>
