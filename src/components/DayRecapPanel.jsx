@@ -11,12 +11,12 @@ import SupplementSection, { SUPPLEMENT_MEAL } from './SupplementSection'
 import PlannedMealCard from './PlannedMealCard'
 import PlanMealModal from './PlanMealModal'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
-import RepasTypeDetailWrapper from './RepasTypeDetailWrapper'
+import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { useRepasPlanifiesForDate, deleteRepasPlanifie, markAsMange } from '../hooks/useRepasPlanifies'
+import { usePlannedMealsForDate, deletePlannedMeal, markAsEaten } from '../hooks/usePlannedMeals'
 import { computeTotals, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
 
 function fmt(date) {
@@ -55,7 +55,7 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
   const toast = useToast()
   const { entries, loading, addEntry, deleteEntry, updateEntry } = useJournal(dateStr)
   const { settings } = useSettings()
-  const { repas: repasPlanifies, loading: loadingPlanifies, refetch: refetchPlanifies } = useRepasPlanifiesForDate(dateStr)
+  const { repas: repasPlanifies, loading: loadingPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
 
   const [planModalOpen, setPlanModalOpen] = useState(false)
   const [modal, setModal] = useState(null) // { meal, addEntry } — AddFoodModal, même pattern que TodayPage
@@ -86,13 +86,13 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
   }
 
   const handleMarkEaten = async (repas) => {
-    const { error } = await markAsMange(repas, user.id)
+    const { error } = await markAsEaten(repas, user.id)
     if (!error) { toast(`✓ ${repas.nom} ajouté au journal`); refetchPlanifies(); onPlannedChange?.() }
     else toast('Erreur')
   }
 
   const handleDeletePlanifie = async (id) => {
-    const { error } = await deleteRepasPlanifie(id, user.id)
+    const { error } = await deletePlannedMeal(id, user.id)
     if (!error) { toast('Supprimé'); refetchPlanifies(); onPlannedChange?.() }
     else toast('Erreur')
   }
@@ -197,7 +197,7 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
         />
       )}
       {sourceDetail?.source_type === 'repas_type' && (
-        <RepasTypeDetailWrapper
+        <MealTemplateDetailWrapper
           repasTypeId={sourceDetail.source_id}
           onClose={() => setSourceDetail(null)}
         />

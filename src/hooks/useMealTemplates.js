@@ -3,11 +3,12 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useRepasTypeDetail — charge UN repas type par id, indépendamment de la
-// liste chargée par MealsSection. Utilisé pour naviguer vers "sa page dédiée"
-// depuis un contexte externe (ex: repas type planifié depuis le calendrier).
+// useMealTemplateDetail — charge UN repas type par id, indépendamment de la
+// liste chargée par MealTemplatesSection. Utilisé pour naviguer vers "sa page
+// dédiée" depuis un contexte externe (ex: repas type planifié depuis le
+// calendrier).
 // ─────────────────────────────────────────────────────────────────────────────
-export function useRepasTypeDetail(id) {
+export function useMealTemplateDetail(id) {
   const { user } = useAuth()
   const [repas, setRepas] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -26,11 +27,11 @@ export function useRepasTypeDetail(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// saveRepasType — crée ou met à jour un repas type. Extrait de
-// MealsSection.handleSave pour être réutilisable ailleurs (une seule source
-// de vérité pour la logique d'enregistrement).
+// saveMealTemplate — crée ou met à jour un repas type. Extrait de
+// MealTemplatesSection.handleSave pour être réutilisable ailleurs (une seule
+// source de vérité pour la logique d'enregistrement).
 // ─────────────────────────────────────────────────────────────────────────────
-export async function saveRepasType({ userId, repasTypeId, nom, description, items, nbPortions }) {
+export async function saveMealTemplate({ userId, repasTypeId, nom, description, items, nbPortions }) {
   if (repasTypeId) {
     const { data, error } = await supabase
       .from('repas_types')
@@ -49,7 +50,7 @@ export async function saveRepasType({ userId, repasTypeId, nom, description, ite
   return { data, error }
 }
 
-export async function deleteRepasType(id, userId) {
+export async function deleteMealTemplate(id, userId) {
   const { error } = await supabase.from('repas_types').delete().eq('id', id).eq('user_id', userId)
   return { error }
 }

@@ -12,11 +12,11 @@ function fmt(date) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useRepasPlanifiesRange — charge tous les repas planifiés d'une plage de
+// usePlannedMealsRange — charge tous les repas planifiés d'une plage de
 // dates en UNE requête (vue calendrier mois/semaine), regroupés par date.
 // Même logique que useJournalRange.
 // ─────────────────────────────────────────────────────────────────────────────
-export function useRepasPlanifiesRange(startDate, endDate) {
+export function usePlannedMealsRange(startDate, endDate) {
   const { user } = useAuth()
   const [byDate, setByDate] = useState({})
   const [loading, setLoading] = useState(true)
@@ -49,10 +49,10 @@ export function useRepasPlanifiesRange(startDate, endDate) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useRepasPlanifiesForDate — variante ciblée sur UNE seule date (utilisée par
+// usePlannedMealsForDate — variante ciblée sur UNE seule date (utilisée par
 // DayRecapPanel une fois un jour sélectionné dans le calendrier).
 // ─────────────────────────────────────────────────────────────────────────────
-export function useRepasPlanifiesForDate(date) {
+export function usePlannedMealsForDate(date) {
   const { user } = useAuth()
   const [repas, setRepas] = useState([])
   const [loading, setLoading] = useState(true)
@@ -78,11 +78,11 @@ export function useRepasPlanifiesForDate(date) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// createRepasPlanifie — crée UN repas planifié pour UNE date. Le caller
+// createPlannedMeal — crée UN repas planifié pour UNE date. Le caller
 // (PlanMealModal) boucle sur les dates choisies pour planifier plusieurs
 // jours d'un coup.
 // ─────────────────────────────────────────────────────────────────────────────
-export async function createRepasPlanifie({ userId, date, meal, nom, items, sourceType, sourceId }) {
+export async function createPlannedMeal({ userId, date, meal, nom, items, sourceType, sourceId }) {
   const { data, error } = await supabase
     .from('repas_planifies')
     .insert([{
@@ -99,18 +99,18 @@ export async function createRepasPlanifie({ userId, date, meal, nom, items, sour
   return { data, error }
 }
 
-export async function deleteRepasPlanifie(id, userId) {
+export async function deletePlannedMeal(id, userId) {
   const { error } = await supabase.from('repas_planifies').delete().eq('id', id).eq('user_id', userId)
   return { error }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// markAsMange — copie les items du repas planifié dans `journal` (à sa date
+// markAsEaten — copie les items du repas planifié dans `journal` (à sa date
 // et son repas), puis marque le repas planifié comme mangé. On ne supprime
 // PAS la ligne repas_planifies : elle garde la trace de ce qui était prévu
 // ce jour-là (utile pour le point violet "planifié" une fois passé à vert).
 // ─────────────────────────────────────────────────────────────────────────────
-export async function markAsMange(repas, userId) {
+export async function markAsEaten(repas, userId) {
   // `items` peut contenir des champs superflus selon leur origine (ex:
   // recette_id, id, created_at pour un item copié depuis recette_ingredients
   // via AddFromRecipeModal) — on ne garde QUE les colonnes valides sur

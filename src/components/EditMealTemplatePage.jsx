@@ -7,7 +7,7 @@ import { useJournal } from '../hooks/useJournal'
 import { useBackButton } from '../hooks/useBackButton'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Extrait de MealsSection.jsx, pour être réutilisable comme "page dédiée"
+// Extrait de MealTemplatesSection.jsx, pour être réutilisable comme "page dédiée"
 // d'un repas type depuis n'importe où dans l'app (ex: cliquer sur un repas
 // type planifié depuis le calendrier), pas seulement depuis l'onglet "repas"
 // de ManualPage.
@@ -180,7 +180,7 @@ function ImportFromDayModal({ onImport, onClose }) {
 //   repas   — repas type existant (avec .id) en édition, ou null pour un nouveau
 //   onSave({ nom, description, items, nb_portions })
 //   onClose()
-export default function EditRepasPage({ repas, onSave, onClose }) {
+export default function EditMealTemplatePage({ repas, onSave, onClose }) {
   useBackButton(onClose)
   const toast = useToast()
   const [nom, setNom] = useState(repas?.nom || '')

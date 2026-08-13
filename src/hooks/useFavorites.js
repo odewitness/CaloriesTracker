@@ -13,7 +13,7 @@ export function foodIdentity(food) {
   return { source, refId, name, key: `${source}:${refId ?? name}` }
 }
 
-// ── bumpFavoriUsage ───────────────────────────────────────────────────────
+// ── bumpFavoriteUsage ─────────────────────────────────────────────────────
 // Appelée par useJournal.addEntry après chaque ajout au journal. Si l'aliment
 // ajouté correspond à un favori existant, incrémente son compteur d'usage et
 // note la date — sert au tri "Plus utilisés" / "Récents" dans FoodPicker.
@@ -29,7 +29,7 @@ export function foodIdentity(food) {
 // qui est conçue pour des objets "aliment brut" de recherche où `food.id` sert
 // de repli pour les aliments personnalisés — un repli qui, ici, capterait à
 // tort l'id de la ligne journal.
-export async function bumpFavoriUsage(userId, entry) {
+export async function bumpFavoriteUsage(userId, entry) {
   if (!userId) return
   try {
     const source = entry.food_source || 'ciqual'
@@ -54,52 +54,52 @@ export async function bumpFavoriUsage(userId, entry) {
       .update({ use_count: (row.use_count || 0) + 1, last_used_at: new Date().toISOString() })
       .eq('id', row.id)
   } catch (e) {
-    console.error('bumpFavoriUsage error:', e)
+    console.error('bumpFavoriteUsage error:', e)
   }
 }
 
-export function useFavoris() {
+export function useFavorites() {
   const { user } = useAuth()
-  const [favoris, setFavoris] = useState([])
+  const [favorites, setFavorites] = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    if (!user?.id) { setFavoris([]); setLoading(false); return }
+    if (!user?.id) { setFavorites([]); setLoading(false); return }
     setLoading(true)
     const { data } = await supabase
       .from('favoris')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-    setFavoris(data || [])
+    setFavorites(data || [])
     setLoading(false)
   }, [user?.id])
 
   useEffect(() => { load() }, [load])
 
-  const favKeySet = new Set(favoris.map(f => `${f.food_source}:${f.food_ref_id ?? f.food_name}`))
+  const favKeySet = new Set(favorites.map(f => `${f.food_source}:${f.food_ref_id ?? f.food_name}`))
 
-  const isFavorite = useCallback((food) => favKeySet.has(foodIdentity(food).key), [favoris])
+  const isFavorite = useCallback((food) => favKeySet.has(foodIdentity(food).key), [favorites])
 
   // food = l'objet complet tel que manipulé par AddFoodModal (alim_nom, valeurs
   // pour 100g, portions, _source, alim_code/id...) — on le stocke tel quel.
   const toggleFavorite = async (food) => {
     if (!user?.id) return
     const { source, refId, name, key } = foodIdentity(food)
-    const existing = favoris.find(f => `${f.food_source}:${f.food_ref_id ?? f.food_name}` === key)
+    const existing = favorites.find(f => `${f.food_source}:${f.food_ref_id ?? f.food_name}` === key)
 
     if (existing) {
       await supabase.from('favoris').delete().eq('id', existing.id).eq('user_id', user.id)
-      setFavoris(f => f.filter(x => x.id !== existing.id))
+      setFavorites(f => f.filter(x => x.id !== existing.id))
     } else {
       const { data, error } = await supabase
         .from('favoris')
         .insert([{ user_id: user.id, food_source: source, food_ref_id: refId ? String(refId) : null, food_name: name, food_data: food }])
         .select()
         .single()
-      if (!error && data) setFavoris(f => [data, ...f])
+      if (!error && data) setFavorites(f => [data, ...f])
     }
   }
 
-  return { favoris, loading, isFavorite, toggleFavorite }
+  return { favorites, loading, isFavorite, toggleFavorite }
 }

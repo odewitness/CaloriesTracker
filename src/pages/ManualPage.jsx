@@ -7,7 +7,7 @@ import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_F
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import RecipeFormModal from '../components/RecipeFormModal'
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
-import MealsSection from '../components/MealsSection'
+import MealTemplatesSection from '../components/MealTemplatesSection'
 import PlanMealModal from '../components/PlanMealModal'
 import SortModal from '../components/SortModal'
 import { DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort } from '../lib/recipeSort'
@@ -732,7 +732,7 @@ export default function ManualPage() {
         )}
 
         {/* ── Onglet Repas types ── */}
-        {tab === 'repas' && <MealsSection />}
+        {tab === 'repas' && <MealTemplatesSection />}
 
       </div>
 

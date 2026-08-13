@@ -5,7 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { useBackButton } from '../hooks/useBackButton'
 import { MEALS_ORDER as MEALS, scaleFood } from '../lib/nutrients'
-import { createRepasPlanifie } from '../hooks/useRepasPlanifies'
+import { createPlannedMeal } from '../hooks/usePlannedMeals'
 import FoodPicker from './FoodPicker'
 import AddFromRecipeModal from './AddFromRecipeModal'
 
@@ -145,7 +145,7 @@ function ScheduleStep({ source, defaultDate, onBack, onClose, onPlanned }) {
     setSaving(true)
     let anyError = false
     for (const date of selectedDates) {
-      const { error } = await createRepasPlanifie({
+      const { error } = await createPlannedMeal({
         userId: user.id,
         date,
         meal,
@@ -262,7 +262,7 @@ function ScheduleStep({ source, defaultDate, onBack, onClose, onPlanned }) {
 // PlanMealModal — orchestrateur.
 // Props :
 //   presetSource — optionnel : { nom, items, sourceType, sourceId } déjà
-//                  connu (ouverture depuis RecipeDetailModal ou RepasCard) →
+//                  connu (ouverture depuis RecipeDetailModal ou MealTemplateCard) →
 //                  saute directement à l'étape "jour(s) + repas".
 //   onClose()
 //   onPlanned()  — appelé après une planification réussie (refresh calendrier)

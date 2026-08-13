@@ -3,7 +3,7 @@ import { X, Search, ScanLine, Camera, ArrowLeft, Star } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { useFavoris, foodIdentity } from '../hooks/useFavoris'
+import { useFavorites, foodIdentity } from '../hooks/useFavorites'
 import { useRecentFoods } from '../hooks/useRecentFoods'
 import BarcodeScanner from './BarcodeScanner'
 import { useBackButton } from '../hooks/useBackButton'
@@ -118,7 +118,7 @@ export default function FoodPicker({
   useBackButton(onClose)
   const toast = useToast()
   const { user } = useAuth()
-  const { favoris, isFavorite, toggleFavorite } = useFavoris()
+  const { favorites, isFavorite, toggleFavorite } = useFavorites()
   const { recents } = useRecentFoods()
   const [step, setStep] = useState('search') // search | configure
   const [query, setQuery] = useState('')
@@ -133,7 +133,7 @@ export default function FoodPicker({
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
-  const [favorisCollapsed, setFavorisCollapsed] = useState(false)
+  const [favoritesCollapsed, setFavoritesCollapsed] = useState(false)
   const [favSort, setFavSort] = useState('recent') // 'recent' | 'alpha' | 'most'
   const searchRef = useRef(null)
   const timerRef = useRef(null)
@@ -142,13 +142,13 @@ export default function FoodPicker({
   // les deux). Quand un récent correspond à un favori, on fusionne les portions
   // recommandées du favori (stockées dans food_data) avec la "Dernière quantité"
   // venant du journal, sans que l'une efface l'autre.
-  const favoriByKey = new Map(favoris.map(f => [`${f.food_source}:${f.food_ref_id ?? f.food_name}`, f]))
+  const favoriteByKey = new Map(favorites.map(f => [`${f.food_source}:${f.food_ref_id ?? f.food_name}`, f]))
 
   // "Récents" = dernière utilisation réelle (last_used_at, alimenté par
-  // bumpFavoriUsage à chaque ajout au journal) ; un favori jamais utilisé
+  // bumpFavoriteUsage à chaque ajout au journal) ; un favori jamais utilisé
   // retombe sur sa date d'ajout aux favoris (created_at).
-  const sortedFavoris = useMemo(() => {
-    const arr = [...favoris]
+  const sortedFavorites = useMemo(() => {
+    const arr = [...favorites]
     if (favSort === 'alpha') {
       arr.sort((a, b) => (a.food_name || '').localeCompare(b.food_name || '', 'fr'))
     } else if (favSort === 'most') {
@@ -157,9 +157,9 @@ export default function FoodPicker({
       arr.sort((a, b) => new Date(b.last_used_at || b.created_at) - new Date(a.last_used_at || a.created_at))
     }
     return arr
-  }, [favoris, favSort])
+  }, [favorites, favSort])
   const recentsMerged = recents.map(r => {
-    const fav = favoriByKey.get(foodIdentity(r).key)
+    const fav = favoriteByKey.get(foodIdentity(r).key)
     if (!fav) return r
     const recommandees = (fav.food_data.portions || []).filter(
       p => !r.portions.some(rp => rp.g === p.g)
@@ -520,23 +520,23 @@ const selectFood = async (food) => {
 
               {!searching && query.length < 2 && (
                 <>
-                  {searchSource === 'ciqual' && favoris.length > 0 && (
+                  {searchSource === 'ciqual' && favorites.length > 0 && (
                     <>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 8 }}>
                         <button
-                          onClick={() => setFavorisCollapsed(c => !c)}
+                          onClick={() => setFavoritesCollapsed(c => !c)}
                           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                         >
                           <span className="section-title" style={{ margin: 0 }}>★ Favoris</span>
                           <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
-                            {favorisCollapsed ? '▸' : '▾'}
+                            {favoritesCollapsed ? '▸' : '▾'}
                           </span>
                         </button>
-                        {!favorisCollapsed && favoris.length > 1 && (
+                        {!favoritesCollapsed && favorites.length > 1 && (
                           <FavSortToggle value={favSort} onChange={setFavSort} />
                         )}
                       </div>
-                      {!favorisCollapsed && sortedFavoris.map(f => (
+                      {!favoritesCollapsed && sortedFavorites.map(f => (
                         <FoodRow
                           key={f.id}
                           food={f.food_data}
@@ -550,7 +550,7 @@ const selectFood = async (food) => {
 
                   {searchSource === 'ciqual' && recentsMerged.length > 0 && (
                     <>
-                      <div className="section-title" style={{ marginTop: favoris.length > 0 ? 16 : 4 }}>Récents (100 dernières entrées)</div>
+                      <div className="section-title" style={{ marginTop: favorites.length > 0 ? 16 : 4 }}>Récents (100 dernières entrées)</div>
                       {recentsMerged.map((food, i) => (
                         <FoodRow
                           key={i}
@@ -563,7 +563,7 @@ const selectFood = async (food) => {
                     </>
                   )}
 
-                  {(searchSource === 'off' || (favoris.length === 0 && recentsMerged.length === 0)) && (
+                  {(searchSource === 'off' || (favorites.length === 0 && recentsMerged.length === 0)) && (
                     <div className="empty">
                       {searchSource === 'off'
                         ? 'Tape le nom d\'un produit emballé (marque, référence…)'

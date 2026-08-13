@@ -6,9 +6,9 @@ import { useAuth } from '../lib/AuthContext'
 import { MEALS_ORDER as MEALS } from '../lib/nutrients'
 import AddFoodModal from './AddFoodModal'
 import PlanMealModal from './PlanMealModal'
-import EditRepasPage from './EditRepasPage'
+import EditMealTemplatePage from './EditMealTemplatePage'
 import { useBackButton } from '../hooks/useBackButton'
-import { saveRepasType, deleteRepasType } from '../hooks/useRepasTypes'
+import { saveMealTemplate, deleteMealTemplate } from '../hooks/useMealTemplates'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ce fichier est l'ex-MealsPage.jsx, extrait pour vivre comme 3e onglet de
@@ -19,7 +19,7 @@ import { saveRepasType, deleteRepasType } from '../hooks/useRepasTypes'
 // double (ManualPage fournit déjà son propre header + le switch d'onglets).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RepasCard({ repas, onDelete, onEdit, onAddToJournal, onPlan }) {
+function MealTemplateCard({ repas, onDelete, onEdit, onAddToJournal, onPlan }) {
   const [open, setOpen] = useState(false)
   const items = repas.items || []
   const totalKcal = items.reduce((s, i) => s + (i.energie_kcal || 0), 0)
@@ -132,11 +132,11 @@ function AddToJournalSheet({ repas, journalDate, onDateChange, journalMeal, onMe
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MealsSection — contenu de l'onglet "Repas types" dans ManualPage.
+// MealTemplatesSection — contenu de l'onglet "Repas types" dans ManualPage.
 // Pas de <div className="page-content"> ni de gros titre : ManualPage
 // fournit déjà le header + le switch d'onglets au-dessus.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function MealsSection() {
+export default function MealTemplatesSection() {
   const toast = useToast()
   const { user } = useAuth()
   const [repasList, setRepasList] = useState([])
@@ -158,14 +158,14 @@ export default function MealsSection() {
   }
 
   const handleSave = async ({ nom, description, items, nb_portions }) => {
-    const { error } = await saveRepasType({ userId: user.id, repasTypeId: editTarget?.id, nom, description, items, nbPortions: nb_portions })
+    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: editTarget?.id, nom, description, items, nbPortions: nb_portions })
     if (!error) { toast(editTarget?.id ? '✓ Repas modifié !' : '✓ Repas créé !'); load() }
     else toast('Erreur')
     setEditTarget(null)
   }
 
   const handleDelete = async (id) => {
-    const { error } = await deleteRepasType(id, user.id)
+    const { error } = await deleteMealTemplate(id, user.id)
     if (!error) { setRepasList(r => r.filter(x => x.id !== id)); toast('Supprimé') }
     else toast('Erreur')
   }
@@ -209,7 +209,7 @@ export default function MealsSection() {
       )}
 
       {repasList.map(r => (
-        <RepasCard
+        <MealTemplateCard
           key={r.id}
           repas={r}
           onDelete={handleDelete}
@@ -220,7 +220,7 @@ export default function MealsSection() {
       ))}
 
       {editTarget !== null && (
-        <EditRepasPage repas={editTarget?.id ? editTarget : null} onSave={handleSave} onClose={() => setEditTarget(null)} />
+        <EditMealTemplatePage repas={editTarget?.id ? editTarget : null} onSave={handleSave} onClose={() => setEditTarget(null)} />
       )}
 
       {addToJournalTarget && (

@@ -4,7 +4,7 @@ import CalendarMonthGrid from '../components/CalendarMonthGrid'
 import CalendarWeekStrip from '../components/CalendarWeekStrip'
 import DayRecapPanel from '../components/DayRecapPanel'
 import { useJournalRange } from '../hooks/useJournalRange'
-import { useRepasPlanifiesRange } from '../hooks/useRepasPlanifies'
+import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useSettings } from '../hooks/useSettings'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
 
@@ -54,7 +54,7 @@ export default function CalendarPage() {
   }, [anchorDate, view])
 
   const { byDate: journalByDate, refetch: refetchJournal } = useJournalRange(rangeStart, rangeEnd)
-  const { byDate: planifiesByDate, refetch: refetchPlanifies } = useRepasPlanifiesRange(rangeStart, rangeEnd)
+  const { byDate: planifiesByDate, refetch: refetchPlanifies } = usePlannedMealsRange(rangeStart, rangeEnd)
 
   const dayStatusByDate = useMemo(() => {
     const result = {}
