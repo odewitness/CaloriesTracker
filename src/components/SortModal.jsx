@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { SORT_FIELDS } from '../lib/recipeSort'
+import { SORT_FIELDS, SORT_BASES } from '../lib/recipeSort'
 
 // ─── Sélecteur de champ + sens, réutilisé pour le critère principal et secondaire ───
 function FieldPicker({ fields, selected, dir, onSelectField, onToggleDir, allowNone }) {
@@ -63,6 +63,7 @@ export default function SortModal({ value, onChange, onClose }) {
   const [primaryDir, setPrimaryDir]         = useState(value.primary.dir)
   const [secondaryField, setSecondaryField] = useState(value.secondary?.field || null)
   const [secondaryDir, setSecondaryDir]     = useState(value.secondary?.dir || 'desc')
+  const [basis, setBasis]                   = useState(value.basis || 'per100g')
 
   // Si le critère secondaire devient identique au principal, on l'efface
   useEffect(() => { if (secondaryField === primaryField) setSecondaryField(null) }, [primaryField]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -71,6 +72,7 @@ export default function SortModal({ value, onChange, onClose }) {
     onChange({
       primary: { field: primaryField, dir: primaryDir },
       secondary: secondaryField ? { field: secondaryField, dir: secondaryDir } : null,
+      basis,
     })
     onClose()
   }
@@ -78,6 +80,7 @@ export default function SortModal({ value, onChange, onClose }) {
   const reset = () => {
     setPrimaryField('nom'); setPrimaryDir('asc')
     setSecondaryField(null); setSecondaryDir('desc')
+    setBasis('per100g')
   }
 
   return (
@@ -111,6 +114,27 @@ export default function SortModal({ value, onChange, onClose }) {
           onToggleDir={() => setSecondaryDir(d => d === 'asc' ? 'desc' : 'asc')}
           allowNone
         />
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '18px 0 8px' }}>
+          Base de calcul
+        </div>
+        <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
+          {SORT_BASES.map(b => (
+            <button
+              key={b.key}
+              onClick={() => setBasis(b.key)}
+              style={{
+                flex: 1, padding: '8px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+                background: basis === b.key ? 'var(--white)' : 'transparent',
+                color: basis === b.key ? 'var(--text)' : 'var(--text-muted)',
+                boxShadow: basis === b.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all .15s',
+              }}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
 
         <button className="btn-primary" onClick={apply} style={{ marginTop: 20 }}>Appliquer</button>
         <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={reset}>Réinitialiser</button>

@@ -12,17 +12,36 @@ export const SORT_FIELDS = [
   { key: 'lipides',   label: 'Lipides',   ascLabel: 'Les - élevés',  descLabel: 'Les + élevés' },
 ]
 
-export const DEFAULT_SORT = { primary: { field: 'nom', dir: 'asc' }, secondary: null }
+export const SORT_BASES = [
+  { key: 'per100g', label: 'Pour 100 g' },
+  { key: 'portion', label: 'Par portion' },
+]
 
-export function compareByField(a, b, field, dir) {
+export const DEFAULT_SORT = { primary: { field: 'nom', dir: 'asc' }, secondary: null, basis: 'per100g' }
+
+// Valeur numérique d'un champ pour une recette, selon la base choisie
+// ('per100g' = valeur brute stockée, 'portion' = ramenée au poids d'une
+// portion réelle, même calcul que l'affichage /portion de RecipeCard).
+function getFieldValue(recette, field, basis) {
+  const key = field === 'kcal' ? 'energie_kcal' : field
+  const raw = recette[key]
+  if (raw == null) return null
+  if (basis !== 'portion') return raw
+  const portions = recette.portions || 1
+  const poidsRef = recette.poids_cuit_g || recette.poids_cru_g || null
+  if (!poidsRef) return null
+  const poidsParPortion = poidsRef / portions
+  return raw * (poidsParPortion / 100)
+}
+
+export function compareByField(a, b, field, dir, basis) {
   if (field === 'nom') {
     const cmp = (a.nom || '').localeCompare(b.nom || '', 'fr')
     return dir === 'desc' ? -cmp : cmp
   }
-  const key = field === 'kcal' ? 'energie_kcal' : field
-  const av = a[key], bv = b[key]
-  // Les recettes sans valeur (pas d'ingrédient) sont toujours reléguées en
-  // fin de liste, quel que soit le sens choisi.
+  const av = getFieldValue(a, field, basis), bv = getFieldValue(b, field, basis)
+  // Les recettes sans valeur (pas d'ingrédient, ou pas de poids connu pour
+  // ramener à la portion) sont toujours reléguées en fin de liste.
   if (av == null && bv == null) return 0
   if (av == null) return 1
   if (bv == null) return -1
@@ -30,24 +49,25 @@ export function compareByField(a, b, field, dir) {
   return dir === 'desc' ? -cmp : cmp
 }
 
-export function sortRecettes(list, { primary, secondary }) {
+export function sortRecettes(list, { primary, secondary, basis }) {
   return [...list].sort((a, b) => {
-    const c1 = compareByField(a, b, primary.field, primary.dir)
+    const c1 = compareByField(a, b, primary.field, primary.dir, basis)
     if (c1 !== 0) return c1
     if (secondary) {
-      const c2 = compareByField(a, b, secondary.field, secondary.dir)
+      const c2 = compareByField(a, b, secondary.field, secondary.dir, basis)
       if (c2 !== 0) return c2
     }
     return (a.nom || '').localeCompare(b.nom || '', 'fr') // tie-break stable
   })
 }
 
-export function describeSortField({ field, dir }) {
+export function describeSortField({ field, dir }, basis) {
   const f = SORT_FIELDS.find(x => x.key === field)
   if (!f) return ''
-  return `${f.label.toLowerCase()} (${(dir === 'asc' ? f.ascLabel : f.descLabel).toLowerCase()})`
+  const base = `${f.label.toLowerCase()} (${(dir === 'asc' ? f.ascLabel : f.descLabel).toLowerCase()})`
+  return field !== 'nom' && basis === 'portion' ? `${base}, par portion` : base
 }
 
 export function isCustomSort(sort) {
-  return sort.primary.field !== 'nom' || sort.primary.dir !== 'asc' || !!sort.secondary
+  return sort.primary.field !== 'nom' || sort.primary.dir !== 'asc' || !!sort.secondary || sort.basis === 'portion'
 }

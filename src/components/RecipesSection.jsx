@@ -200,8 +200,8 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
 
           {recipeSortActive && (
             <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 10 }}>
-              Trié par {describeSortField(recipeSort.primary)}
-              {recipeSort.secondary ? `, puis ${describeSortField(recipeSort.secondary)}` : ''}
+              Trié par {describeSortField(recipeSort.primary, recipeSort.basis)}
+              {recipeSort.secondary ? `, puis ${describeSortField(recipeSort.secondary, recipeSort.basis)}` : ''}
             </div>
           )}
 
