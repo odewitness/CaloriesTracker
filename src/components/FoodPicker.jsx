@@ -7,6 +7,7 @@ import { useFavoris, foodIdentity } from '../hooks/useFavoris'
 import { useRecentFoods } from '../hooks/useRecentFoods'
 import BarcodeScanner from './BarcodeScanner'
 import { useBackButton } from '../hooks/useBackButton'
+import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FoodPicker — composant unique de recherche + configuration de grammage
@@ -327,15 +328,34 @@ export default function FoodPicker({
     setBarcodeLoading(false)
   }
 
-  const selectFood = (food) => {
-    setSelected(food)
-    const defaultPortion = food.portions?.[0]?.g || 100
-    setQty(String(defaultPortion))
-    setSubtractMode(false)
-    setGrossWeight("")
-    setWasteWeight("")
-    setStep('configure')
+  // remplace la fonction selectFood existante par celle-ci (devient async)
+const selectFood = async (food) => {
+  let enriched = food
+
+  // Une recette venant de la recherche n'a que les macros de base stockées
+  // sur `recettes` (cf. saveRecette) — on recalcule son per100g complet
+  // (vitamines/minéraux inclus) depuis ses ingrédients avant de l'utiliser,
+  // pour rester cohérent avec ce qu'affiche RecipeDetailModal.
+  if (food._source === 'recette' && food.id) {
+    const { data: ingredients } = await supabase
+      .from('recette_ingredients')
+      .select('*')
+      .eq('recette_id', food.id)
+      .eq('user_id', user.id)
+    const totaux = sumIngredients(ingredients || [])
+    const poidsRef = food.poids_cuit_g || food.poids_cru_g
+    const per100 = calcPer100g(totaux, poidsRef)
+    if (per100) enriched = { ...food, ...per100 }
   }
+
+  setSelected(enriched)
+  const defaultPortion = enriched.portions?.[0]?.g || 100
+  setQty(String(defaultPortion))
+  setSubtractMode(false)
+  setGrossWeight("")
+  setWasteWeight("")
+  setStep('configure')
+}
 
   const handleScanDetected = (code) => {
     setScannerOpen(false)
