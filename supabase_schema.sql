@@ -1,6 +1,9 @@
 -- =============================================
 -- CALORIE TRACKER - Schema Supabase
--- À coller dans : Supabase > SQL Editor > New query
+-- Reconstruit le 2026-08-13 depuis l'introspection de la vraie base
+-- (information_schema.columns + table_constraints), pas depuis un
+-- historique de migrations. Sert de référence pour Claude Code, pas
+-- de script d'installation à rejouer tel quel sur une base existante.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -32,7 +35,52 @@ create table if not exists ciqual (
   vit_a numeric,
   vit_e numeric,
   folates numeric,
-  portions jsonb default '[]'
+  portions jsonb default '[]',
+  -- Nutriments détaillés (sucres, acides gras, vitamines, minéraux) ajoutés
+  -- après la création initiale de la table, tous nullable.
+  fructose numeric,
+  galactose numeric,
+  glucose numeric,
+  lactose numeric,
+  maltose numeric,
+  saccharose numeric,
+  amidon numeric,
+  polyols numeric,
+  ag_monoinsatures numeric,
+  ag_polyinsatures numeric,
+  ag_4_0 numeric,
+  ag_6_0 numeric,
+  ag_8_0 numeric,
+  ag_10_0 numeric,
+  ag_12_0 numeric,
+  ag_14_0 numeric,
+  ag_16_0 numeric,
+  ag_18_0 numeric,
+  ag_18_1_oleique numeric,
+  ag_18_2_linoleique numeric,
+  ag_18_3_ala numeric,
+  ag_20_4_arachidonique numeric,
+  ag_20_5_epa numeric,
+  ag_22_6_dha numeric,
+  cholesterol numeric,
+  sodium numeric,
+  chlorure numeric,
+  cuivre numeric,
+  iode numeric,
+  manganese numeric,
+  phosphore numeric,
+  selenium numeric,
+  retinol numeric,
+  beta_carotene numeric,
+  vit_d2 numeric,
+  vit_d3 numeric,
+  vit_e_totale numeric,
+  vit_k1 numeric,
+  vit_k2 numeric,
+  vit_b3 numeric,
+  vit_b5 numeric,
+  folates_intrinseques numeric,
+  acide_folique numeric
 );
 
 -- Index pour la recherche rapide
@@ -62,7 +110,61 @@ create table if not exists journal (
   vit_b12 numeric,
   vit_a numeric,
   vit_e numeric,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  user_id uuid references auth.users(id),
+  -- Même jeu de nutriments détaillés que ciqual/aliments_custom/recettes,
+  -- scalés au grammage de l'entrée (voir ALL_NUTRIENT_KEYS dans src/lib/nutrients.js).
+  sucres numeric,
+  sel numeric,
+  acides_gras_satures numeric,
+  zinc numeric,
+  vit_b1 numeric,
+  vit_b2 numeric,
+  vit_b6 numeric,
+  folates numeric,
+  fructose numeric,
+  galactose numeric,
+  glucose numeric,
+  lactose numeric,
+  maltose numeric,
+  saccharose numeric,
+  amidon numeric,
+  polyols numeric,
+  ag_monoinsatures numeric,
+  ag_polyinsatures numeric,
+  ag_4_0 numeric,
+  ag_6_0 numeric,
+  ag_8_0 numeric,
+  ag_10_0 numeric,
+  ag_12_0 numeric,
+  ag_14_0 numeric,
+  ag_16_0 numeric,
+  ag_18_0 numeric,
+  ag_18_1_oleique numeric,
+  ag_18_2_linoleique numeric,
+  ag_18_3_ala numeric,
+  ag_20_4_arachidonique numeric,
+  ag_20_5_epa numeric,
+  ag_22_6_dha numeric,
+  cholesterol numeric,
+  sodium numeric,
+  chlorure numeric,
+  cuivre numeric,
+  iode numeric,
+  manganese numeric,
+  phosphore numeric,
+  selenium numeric,
+  retinol numeric,
+  beta_carotene numeric,
+  vit_d2 numeric,
+  vit_d3 numeric,
+  vit_e_totale numeric,
+  vit_k1 numeric,
+  vit_k2 numeric,
+  vit_b3 numeric,
+  vit_b5 numeric,
+  folates_intrinseques numeric,
+  acide_folique numeric
 );
 
 create index if not exists idx_journal_date on journal(date desc);
@@ -76,7 +178,8 @@ create table if not exists repas_types (
   -- items = [{ food_name, food_ref_id, food_source, qty_g, energie_kcal, proteines, glucides, lipides, ... }]
   nb_portions integer default 1,
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  user_id uuid references auth.users(id)
 );
 
 -- 4. TABLE SETTINGS
@@ -87,7 +190,10 @@ create table if not exists settings (
   goal_glucides integer default 180,
   goal_lipides integer default 60,
   goal_fibres integer default 30,
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  user_id uuid references auth.users(id),
+  meal_overrides jsonb not null default '{}',
+  meal_enabled jsonb not null default '{"Dîner": true, "Collation": true, "Déjeuner": true, "Compléments": true, "Petit-déjeuner": true}'
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
@@ -108,17 +214,303 @@ create table if not exists aliments_custom (
   calcium numeric default 0,
   fer numeric default 0,
   portions jsonb default '[]',
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  user_id uuid references auth.users(id),
+  -- Même jeu de nutriments détaillés que ciqual (voir plus haut).
+  sucres numeric,
+  sel numeric,
+  acides_gras_satures numeric,
+  zinc numeric,
+  vit_b1 numeric,
+  vit_b2 numeric,
+  vit_b6 numeric,
+  folates numeric,
+  fructose numeric,
+  galactose numeric,
+  glucose numeric,
+  lactose numeric,
+  maltose numeric,
+  saccharose numeric,
+  amidon numeric,
+  polyols numeric,
+  ag_monoinsatures numeric,
+  ag_polyinsatures numeric,
+  ag_4_0 numeric,
+  ag_6_0 numeric,
+  ag_8_0 numeric,
+  ag_10_0 numeric,
+  ag_12_0 numeric,
+  ag_14_0 numeric,
+  ag_16_0 numeric,
+  ag_18_0 numeric,
+  ag_18_1_oleique numeric,
+  ag_18_2_linoleique numeric,
+  ag_18_3_ala numeric,
+  ag_20_4_arachidonique numeric,
+  ag_20_5_epa numeric,
+  ag_22_6_dha numeric,
+  cholesterol numeric,
+  sodium numeric,
+  chlorure numeric,
+  cuivre numeric,
+  iode numeric,
+  manganese numeric,
+  phosphore numeric,
+  selenium numeric,
+  retinol numeric,
+  beta_carotene numeric,
+  vit_d2 numeric,
+  vit_d3 numeric,
+  vit_e_totale numeric,
+  vit_k1 numeric,
+  vit_k2 numeric,
+  vit_b3 numeric,
+  vit_b5 numeric,
+  folates_intrinseques numeric,
+  acide_folique numeric,
+  vit_b12 numeric,
+  vit_a numeric,
+  magnesium numeric,
+  potassium numeric,
+  vit_e numeric
+);
+
+-- 6. TABLE PROFILES (infos utilisateur, 1 ligne par compte auth)
+create table if not exists profiles (
+  id uuid primary key references auth.users(id),
+  -- Créée par un trigger sur auth.users (voir AuthContext.jsx), non
+  -- présent dans ce fichier — à récupérer séparément si besoin.
+  prenom text,
+  nom text,
+  age integer,
+  poids_kg numeric,
+  email text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- 7. TABLE RECETTES (plats maison, valeurs nutritionnelles pour 100g)
+create table if not exists recettes (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  nom text not null,
+  portions integer not null default 1,
+  poids_cru_g numeric,
+  poids_cuit_g numeric,
+  energie_kcal numeric,
+  proteines numeric,
+  glucides numeric,
+  lipides numeric,
+  fibres numeric,
+  sel numeric,
+  sucres numeric,
+  acides_gras_satures numeric,
+  fructose numeric,
+  galactose numeric,
+  glucose numeric,
+  lactose numeric,
+  maltose numeric,
+  saccharose numeric,
+  amidon numeric,
+  polyols numeric,
+  ag_monoinsatures numeric,
+  ag_polyinsatures numeric,
+  ag_4_0 numeric,
+  ag_6_0 numeric,
+  ag_8_0 numeric,
+  ag_10_0 numeric,
+  ag_12_0 numeric,
+  ag_14_0 numeric,
+  ag_16_0 numeric,
+  ag_18_0 numeric,
+  ag_18_1_oleique numeric,
+  ag_18_2_linoleique numeric,
+  ag_18_3_ala numeric,
+  ag_20_4_arachidonique numeric,
+  ag_20_5_epa numeric,
+  ag_22_6_dha numeric,
+  cholesterol numeric,
+  vit_c numeric,
+  vit_d numeric,
+  vit_e_totale numeric,
+  vit_k1 numeric,
+  vit_b1 numeric,
+  vit_b2 numeric,
+  vit_b3 numeric,
+  vit_b5 numeric,
+  vit_b6 numeric,
+  folates numeric,
+  vit_b12 numeric,
+  vit_a numeric,
+  calcium numeric,
+  fer numeric,
+  magnesium numeric,
+  potassium numeric,
+  zinc numeric,
+  sodium numeric,
+  chlorure numeric,
+  cuivre numeric,
+  iode numeric,
+  manganese numeric,
+  phosphore numeric,
+  selenium numeric,
+  retinol numeric,
+  beta_carotene numeric,
+  vit_d2 numeric,
+  vit_d3 numeric,
+  vit_k2 numeric,
+  folates_intrinseques numeric,
+  acide_folique numeric,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  tare_g numeric
+);
+
+-- 8. TABLE RECETTE_INGREDIENTS (lignes d'ingrédients d'une recette)
+create table if not exists recette_ingredients (
+  id uuid default gen_random_uuid() primary key,
+  recette_id uuid not null references recettes(id) on delete cascade,
+  user_id uuid not null references auth.users(id),
+  food_name text not null,
+  food_source text,
+  food_ref_id text,
+  qty_g numeric not null,
+  -- Même jeu de nutriments détaillés que recettes/ciqual, scalés au qty_g.
+  energie_kcal numeric,
+  proteines numeric,
+  glucides numeric,
+  lipides numeric,
+  fibres numeric,
+  sel numeric,
+  sucres numeric,
+  acides_gras_satures numeric,
+  fructose numeric,
+  galactose numeric,
+  glucose numeric,
+  lactose numeric,
+  maltose numeric,
+  saccharose numeric,
+  amidon numeric,
+  polyols numeric,
+  ag_monoinsatures numeric,
+  ag_polyinsatures numeric,
+  ag_4_0 numeric,
+  ag_6_0 numeric,
+  ag_8_0 numeric,
+  ag_10_0 numeric,
+  ag_12_0 numeric,
+  ag_14_0 numeric,
+  ag_16_0 numeric,
+  ag_18_0 numeric,
+  ag_18_1_oleique numeric,
+  ag_18_2_linoleique numeric,
+  ag_18_3_ala numeric,
+  ag_20_4_arachidonique numeric,
+  ag_20_5_epa numeric,
+  ag_22_6_dha numeric,
+  cholesterol numeric,
+  vit_c numeric,
+  vit_d numeric,
+  vit_e_totale numeric,
+  vit_k1 numeric,
+  vit_b1 numeric,
+  vit_b2 numeric,
+  vit_b3 numeric,
+  vit_b5 numeric,
+  vit_b6 numeric,
+  folates numeric,
+  vit_b12 numeric,
+  vit_a numeric,
+  calcium numeric,
+  fer numeric,
+  magnesium numeric,
+  potassium numeric,
+  zinc numeric,
+  sodium numeric,
+  chlorure numeric,
+  cuivre numeric,
+  iode numeric,
+  manganese numeric,
+  phosphore numeric,
+  selenium numeric,
+  retinol numeric,
+  beta_carotene numeric,
+  vit_d2 numeric,
+  vit_d3 numeric,
+  vit_k2 numeric,
+  folates_intrinseques numeric,
+  acide_folique numeric,
+  created_at timestamptz not null default now(),
+  vit_e numeric
+);
+
+-- 9. TABLE FAVORIS
+create table if not exists favoris (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  food_source text not null,
+  food_ref_id text,
+  food_name text not null,
+  food_data jsonb not null, -- objet complet de l'aliment/recette favori(te)
+  created_at timestamptz not null default now(),
+  use_count integer not null default 0,
+  last_used_at timestamptz
+);
+
+-- 10. TABLE LISTES_COURSES
+create table if not exists listes_courses (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  nom text not null default 'Ma liste',
+  created_at timestamptz not null default now()
+);
+
+-- 11. TABLE LISTE_COURSES_ITEMS
+create table if not exists liste_courses_items (
+  id uuid default gen_random_uuid() primary key,
+  liste_id uuid not null references listes_courses(id), -- cascade probable, non confirmé
+  user_id uuid not null references auth.users(id),
+  nom text not null,
+  categorie text default 'Autre',
+  qty_g numeric,
+  food_source text,
+  food_ref_id text,
+  recette_noms text[] not null default '{}', -- noms des recettes/repas types ayant contribué à l'article groupé
+  checked boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- 12. TABLE REPAS_PLANIFIES (calendrier de planification des repas)
+create table if not exists repas_planifies (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date date not null,
+  meal text not null,
+  nom text not null,
+  items jsonb not null default '[]', -- tableau d'aliments scalés, mêmes champs que journal
+  source_type text, -- 'libre' | 'recette' | 'repas_type'
+  source_id uuid,
+  mange boolean not null default false,
+  mange_at timestamptz,
+  created_at timestamptz not null default now()
 );
 
 -- =============================================
--- RLS : désactivé (app personnelle)
+-- RLS
 -- =============================================
+-- Désactivé sur les tables historiques mono-utilisateur (app personnelle,
+-- pas de séparation dev/prod — voir CLAUDE.md).
 alter table ciqual disable row level security;
 alter table journal disable row level security;
 alter table repas_types disable row level security;
 alter table settings disable row level security;
 alter table aliments_custom disable row level security;
+
+-- Statut RLS non vérifié pour les 7 tables ajoutées à cette reconstruction
+-- (profiles, recettes, recette_ingredients, favoris, listes_courses,
+-- liste_courses_items, repas_planifies) — toutes ont un user_id filtré
+-- côté client, mais ça ne dit rien sur RLS côté base. À vérifier avant de
+-- s'appuyer dessus pour la sécurité.
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)
