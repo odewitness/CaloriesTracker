@@ -1,12 +1,15 @@
-import React, { forwardRef, useImperativeHandle, useState, useEffect } from 'react'
-import { ChevronLeft, ChevronDown, PlusCircle, Pencil, Trash2, Apple } from 'lucide-react'
+import React, { forwardRef, useImperativeHandle, useState, useEffect, useMemo } from 'react'
+import { ChevronLeft, ChevronDown, PlusCircle, Pencil, Trash2, Apple, Search, X, ArrowUpDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { FOOD_CATEGORIES, COMPLEMENT_CATEGORY } from '../lib/foodCategories'
+import { DEFAULT_SORT, sortAliments, describeSortField, filterByCategories, isCustomSort, isCustomFilter } from '../lib/foodSort'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
 import FieldLabel from './FieldLabel'
+import FoodSortModal from './FoodSortModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -35,28 +38,6 @@ const EXTRA_SECTIONS = [
   { title: 'Vitamines', fields: VITAMIN_DETAIL_FIELDS },
   { title: 'Minéraux',  fields: MINERAL_FIELDS },
 ]
-
-// Grandes catégories Ciqual (regroupements officiels à effectif significatif dans
-// la table `ciqual` — les variantes de casse et catégories orphelines à effectif
-// quasi nul héritées d'anciens imports ne sont pas proposées ici, mais restent
-// affichées si un aliment existant les utilise déjà).
-const CIQUAL_CATEGORIES = [
-  'Aides culinaires et ingrédients divers',
-  'Aliments infantiles',
-  'Eaux et autres boissons',
-  'Entrées et plats composés',
-  'Fruits, légumes, légumineuses et oléagineux',
-  'Glaces et sorbets',
-  'Matières grasses',
-  'Produits céréaliers',
-  'Produits laitiers',
-  'Produits sucrés',
-  'Viandes, oeufs, poissons',
-]
-
-const CATEGORIES = ['Personnalisé', 'Compléments alimentaires', ...CIQUAL_CATEGORIES]
-
-const COMPLEMENT_CATEGORY = 'Compléments alimentaires'
 
 // Types de dose courants pour les compléments — le poids par défaut est une
 // estimation grossière, l'utilisateur peut toujours le corriger.
@@ -235,6 +216,56 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
     return `1 ${DOSE_TYPES.find(d => d.key === doseTypeKey).label.toLowerCase()}`
   }
 
+  // ── Recherche + tri/filtre + regroupement par catégorie (liste) ──────────
+  const [foodSearch, setFoodSearch]     = useState('')
+  const [foodSort,   setFoodSort]       = useState(DEFAULT_SORT)
+  const [sortModalOpen, setSortModalOpen] = useState(false)
+  const [collapsedCategories, setCollapsedCategories] = useState(() => new Set())
+
+  const foodSortActive   = isCustomSort(foodSort)
+  const foodFilterActive = isCustomFilter(foodSort)
+
+  // Normalise pour une recherche insensible à la casse et aux accents
+  const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+
+  const filteredAliments = useMemo(() => {
+    const q = normalize(foodSearch.trim())
+    if (!q) return aliments
+    return aliments.filter(a => normalize(a.nom).includes(q) || normalize(a.marque || '').includes(q))
+  }, [aliments, foodSearch])
+
+  // Regroupés par catégorie, dans l'ordre de FOOD_CATEGORIES, puis les
+  // catégories "historiques" hors liste (anciens aliments en texte libre,
+  // saisis avant que la catégorie devienne un menu déroulant), par ordre alpha.
+  const groupedAliments = useMemo(() => {
+    const categoryFiltered = filterByCategories(filteredAliments, foodSort.categories)
+    const sorted = sortAliments(categoryFiltered, foodSort)
+    const groups = []
+    const seen = new Set()
+    for (const cat of FOOD_CATEGORIES) {
+      seen.add(cat)
+      if (foodSort.categories.length > 0 && !foodSort.categories.includes(cat)) continue
+      const items = sorted.filter(a => (a.categorie || 'Personnalisé') === cat)
+      if (items.length > 0) groups.push({ key: cat, items })
+    }
+    const extraCats = [...new Set(sorted.map(a => a.categorie || 'Personnalisé').filter(c => !seen.has(c)))].sort((a, b) => a.localeCompare(b, 'fr'))
+    for (const cat of extraCats) {
+      if (foodSort.categories.length > 0 && !foodSort.categories.includes(cat)) continue
+      const items = sorted.filter(a => (a.categorie || 'Personnalisé') === cat)
+      if (items.length > 0) groups.push({ key: cat, items })
+    }
+    return groups
+  }, [filteredAliments, foodSort])
+
+  const totalFilteredCount = groupedAliments.reduce((s, g) => s + g.items.length, 0)
+
+  const toggleCategoryCollapsed = (key) =>
+    setCollapsedCategories(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+
   useEffect(() => { load() }, [user])
 
   useEffect(() => { onFormOpenChange?.(view === 'form') }, [view])
@@ -389,7 +420,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
               <div>
                 <FieldLabel>Catégorie</FieldLabel>
                 <select className="input" value={form.categorie} onChange={e => set('categorie', e.target.value)}>
-                  {(CATEGORIES.includes(form.categorie) ? CATEGORIES : [form.categorie, ...CATEGORIES]).map(c => (
+                  {(FOOD_CATEGORIES.includes(form.categorie) ? FOOD_CATEGORIES : [form.categorie, ...FOOD_CATEGORIES]).map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
@@ -538,11 +569,95 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
 
   return (
     <>
+      {aliments.length > 0 && (
+        <>
+          {/* ── Barre de recherche + tri ── */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                className="input"
+                placeholder="Rechercher un aliment..."
+                value={foodSearch}
+                onChange={e => setFoodSearch(e.target.value)}
+                style={{ paddingLeft: 36, paddingRight: foodSearch ? 36 : 12 }}
+              />
+              {foodSearch && (
+                <button
+                  onClick={() => setFoodSearch('')}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => setSortModalOpen(true)}
+              style={{
+                width: 44, height: 44, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                background: (foodSortActive || foodFilterActive) ? 'var(--green-light)' : 'var(--gray-bg)',
+                color: (foodSortActive || foodFilterActive) ? 'var(--green-dark)' : 'var(--text-muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <ArrowUpDown size={17} />
+            </button>
+          </div>
+
+          {(foodSortActive || foodFilterActive) && (
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 10 }}>
+              {foodFilterActive && `Filtré par ${foodSort.categories.join(', ')}`}
+              {foodFilterActive && foodSortActive && ' · '}
+              {foodSortActive && `Trié par ${describeSortField(foodSort.primary)}${foodSort.secondary ? `, puis ${describeSortField(foodSort.secondary)}` : ''}`}
+            </div>
+          )}
+        </>
+      )}
+
       {loading && <Loader />}
+
       {!loading && aliments.length === 0 && (
         <EmptyState icon={<Apple size={40} />} title="Aucun aliment personnalisé" description="Ajoute un aliment qui n'existe pas dans Ciqual" />
       )}
-      {aliments.map(a => <FoodCard key={a.id} aliment={a} onEdit={startEdit} onDelete={handleDelete} />)}
+
+      {!loading && aliments.length > 0 && totalFilteredCount === 0 && (
+        <EmptyState
+          icon={<Apple size={40} />}
+          title="Aucun résultat"
+          description="Aucun aliment ne correspond à ta recherche/filtre"
+        />
+      )}
+
+      {groupedAliments.map(({ key, items }) => {
+        const collapsed = collapsedCategories.has(key)
+        return (
+          <div key={key} style={{ marginBottom: 14 }}>
+            <button
+              onClick={() => toggleCategoryCollapsed(key)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: collapsed ? 0 : 6 }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                {key} <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>({items.length})</span>
+              </span>
+              <ChevronDown size={16} color="var(--text-hint)" style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
+            </button>
+            {!collapsed && items.map(a => (
+              <FoodCard key={a.id} aliment={a} onEdit={startEdit} onDelete={handleDelete} />
+            ))}
+          </div>
+        )
+      })}
+
+      {/* ── Tri des aliments ── */}
+      {sortModalOpen && (
+        <FoodSortModal
+          value={foodSort}
+          onChange={setFoodSort}
+          onClose={() => setSortModalOpen(false)}
+        />
+      )}
     </>
   )
 })
