@@ -70,6 +70,15 @@ export default function FoodPicker({
   // recommandées du favori (stockées dans food_data) avec la "Dernière quantité"
   // venant du journal, sans que l'une efface l'autre.
   const favoriteByKey = new Map(favorites.map(f => [`${f.food_source}:${f.food_ref_id ?? f.food_name}`, f]))
+  const recentByKey = new Map(recents.map(r => [foodIdentity(r).key, r]))
+
+  // Fusionne deux jeux de portions sans dupliquer les grammages déjà présents.
+  // Le premier jeu passé garde la priorité, donc devient la portion par
+  // défaut à l'ouverture de l'étape "configure" (cf. selectFood → portions[0]).
+  function mergePortions(priorityPortions, extraPortions) {
+    const extra = (extraPortions || []).filter(p => !priorityPortions.some(pp => pp.g === p.g))
+    return [...priorityPortions, ...extra]
+  }
 
   // "Récents" = dernière utilisation réelle (last_used_at, alimenté par
   // bumpFavoriteUsage à chaque ajout au journal) ; un favori jamais utilisé
@@ -85,13 +94,21 @@ export default function FoodPicker({
     }
     return arr
   }, [favorites, favSort])
+
+  // Un favori aussi présent dans les récents doit proposer en priorité la
+  // dernière quantité réellement utilisée — sinon la ligne "★ Favoris"
+  // rouvre toujours sur la portion "de base" enregistrée à la création du
+  // favori (food_data n'est jamais mis à jour après coup).
+  const favoritesMerged = sortedFavorites.map(f => {
+    const recent = recentByKey.get(`${f.food_source}:${f.food_ref_id ?? f.food_name}`)
+    if (!recent) return f.food_data
+    return { ...f.food_data, portions: mergePortions(recent.portions, f.food_data.portions) }
+  })
+
   const recentsMerged = recents.map(r => {
     const fav = favoriteByKey.get(foodIdentity(r).key)
     if (!fav) return r
-    const recommandees = (fav.food_data.portions || []).filter(
-      p => !r.portions.some(rp => rp.g === p.g)
-    )
-    return { ...r, portions: [...recommandees, ...r.portions] }
+    return { ...r, portions: mergePortions(r.portions, fav.food_data.portions) }
   })
 
   // Pas d'autofocus à l'ouverture — évite l'ouverture automatique du clavier sur mobile.
@@ -418,10 +435,10 @@ const selectFood = async (food) => {
                           <FavSortToggle value={favSort} onChange={setFavSort} />
                         )}
                       </div>
-                      {!favoritesCollapsed && sortedFavorites.map(f => (
+                      {!favoritesCollapsed && sortedFavorites.map((f, i) => (
                         <FoodRow
                           key={f.id}
-                          food={f.food_data}
+                          food={favoritesMerged[i]}
                           isFav={true}
                           onSelect={selectFood}
                           onToggleFav={() => toggleFavorite(f.food_data)}
