@@ -66,7 +66,9 @@ export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate
           const status = dayStatusByDate[dStr] || 'none'
           const isToday = dStr === todayStr
           const isSelected = dStr === selectedStr
-          const hasPlanned = !!hasPlannedByDate[dStr]
+          const plannedStatus = hasPlannedByDate[dStr]
+          const hasPlanned = !!plannedStatus
+          const isMissed = plannedStatus === 'missed'
 
           return (
             <button
@@ -93,7 +95,7 @@ export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate
                 <span style={{
                   position: 'absolute', top: 4, right: 4,
                   width: 5, height: 5, borderRadius: '50%',
-                  background: isSelected ? 'white' : 'var(--purple)',
+                  background: isSelected ? 'white' : (isMissed ? 'var(--coral)' : 'var(--purple)'),
                 }} />
               )}
             </button>

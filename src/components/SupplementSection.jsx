@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Plus, Trash2, Pill } from 'lucide-react'
+import { Plus, Trash2, Pill, Check } from 'lucide-react'
+import { fmt } from '../lib/dates'
 
 export const SUPPLEMENT_MEAL = 'Compléments'
 
@@ -7,8 +8,12 @@ export const SUPPLEMENT_MEAL = 'Compléments'
 // Extrait de TodayPage.jsx pour être réutilisé tel quel par DayRecapPanel
 // (calendrier) — même comportement (repli/dépli, ajout, suppression) sur
 // les deux pages, une seule source de vérité.
-export default function SupplementSection({ supplements, onOpenModal, onAdd, onDelete }) {
+// plannedSupplements — repas_planifies (meal='Compléments') non mangés,
+// affichés en lignes distinctes (bordure pointillée) au-dessus des
+// compléments déjà pris, avec une action de validation directe.
+export default function SupplementSection({ supplements, plannedSupplements = [], onOpenModal, onAdd, onDelete, onMarkPlannedEaten, onDeletePlanned }) {
   const [collapsed, setCollapsed] = useState(false)
+  const todayStr = fmt(new Date())
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -54,6 +59,55 @@ export default function SupplementSection({ supplements, onOpenModal, onAdd, onD
           Ajouter
         </button>
       </div>
+
+      {plannedSupplements.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          {plannedSupplements.map(r => {
+            const item = (r.items || [])[0]
+            const missed = !r.mange && r.date < todayStr
+            return (
+              <div
+                key={r.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 14px', marginBottom: 6,
+                  border: `1px dashed ${missed ? 'var(--coral)' : 'var(--purple)'}`,
+                  borderRadius: 'var(--radius-sm, 12px)',
+                }}
+              >
+                <Pill size={13} color={missed ? 'var(--coral)' : 'var(--purple, #8b5cf6)'} style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                    {r.nom}{missed && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--coral)', marginLeft: 6 }}>Manqué</span>}
+                  </div>
+                  {item && (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
+                      {item.qty_g} g / ml
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => onMarkPlannedEaten(r)}
+                  className="btn-icon"
+                  style={{ background: 'var(--green-light)', color: 'var(--green-dark)', flexShrink: 0 }}
+                  aria-label="Marquer pris"
+                  title="Marquer pris"
+                >
+                  <Check size={15} />
+                </button>
+                <button
+                  onClick={() => onDeletePlanned(r.id)}
+                  className="btn-icon"
+                  style={{ color: 'var(--text-hint)', flexShrink: 0 }}
+                  aria-label="Supprimer"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {!collapsed && (
         <div style={{

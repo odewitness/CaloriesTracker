@@ -8,9 +8,13 @@ import MealSection from '../components/MealSection'
 import AddFoodModal from '../components/AddFoodModal'
 import FoodDetailModal from '../components/FoodDetailModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from '../components/SupplementSection'
+import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
+import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
+import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
+import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
 import { ALL_NUTRIENT_KEYS, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { fmt } from '../lib/dates'
 
@@ -57,13 +61,15 @@ function DateHeader({ date, onNavigate }) {
 }
 
 // ── Contenu d'un slot jour ─────────────────────────────────────────────────
-function DaySlot({ date, onOpenModal, onOpenDetail, onNavigate }) {
+function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) {
   const toast = useToast()
-  const { entries, loading, addEntry, deleteEntry, updateEntry } = useJournal(fmt(date))
+  const { user } = useAuth()
+  const dateStr = fmt(date)
+  const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
+  const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings } = useSettings()
 
-  console.log('meal_enabled:', settings?.meal_enabled)
-console.log('Compléments enabled:', settings?.meal_enabled?.['Compléments'])
+  const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
 
   const totals = useMemo(() => {
     const t = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 }
@@ -99,6 +105,24 @@ console.log('Compléments enabled:', settings?.meal_enabled?.['Compléments'])
     return { error }
   }
 
+  const handleMarkPlannedEaten = async (repas) => {
+    const { error } = await markAsEaten(repas, user.id)
+    if (!error) { toast(`✓ ${repas.nom} ajouté au journal`); refetchJournal(); refetchPlanifies() }
+    else toast('Erreur')
+  }
+
+  const handleDeletePlanned = async (id) => {
+    const { error } = await deletePlannedMeal(id, user.id)
+    if (!error) { toast('Supprimé'); refetchPlanifies() }
+    else toast('Erreur')
+  }
+
+  const handleDeleteSeries = async (recurrenceGroupId) => {
+    const { error } = await deletePlannedMealSeries(recurrenceGroupId, user.id)
+    if (!error) { toast('Série supprimée'); refetchPlanifies() }
+    else toast('Erreur')
+  }
+
   return (
     <div style={{
   width: '33.333%',
@@ -123,21 +147,27 @@ console.log('Compléments enabled:', settings?.meal_enabled?.['Compléments'])
               name={m}
               entries={entries.filter(e => e.meal === m)}
               target={mealTargets[m]}
+              plannedItems={nonMangesPlanifies.filter(r => r.meal === m)}
               onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd })}
               onDelete={handleDelete}
               onUpdate={handleUpdate}
-                onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
-              />
-            ))}
+              onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
+              onMarkPlannedEaten={handleMarkPlannedEaten}
+              onDeletePlanned={handleDeletePlanned}
+              onDeleteSeries={handleDeleteSeries}
+              onOpenPlannedSource={onOpenSource}
+            />
+          ))}
         </div>
-{true && (
-  <SupplementSection
-    supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
-    onOpenModal={onOpenModal}
-    onAdd={handleAdd}
-    onDelete={handleDelete}
-  />
-)}
+        <SupplementSection
+          supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
+          plannedSupplements={nonMangesPlanifies.filter(r => r.meal === SUPPLEMENT_MEAL)}
+          onOpenModal={onOpenModal}
+          onAdd={handleAdd}
+          onDelete={handleDelete}
+          onMarkPlannedEaten={handleMarkPlannedEaten}
+          onDeletePlanned={handleDeletePlanned}
+        />
       </>
     </div>
   )
@@ -149,6 +179,7 @@ export default function TodayPage() {
   // modal = { meal, addEntry } | null
   const [modal, setModal] = useState(null)
   const [detailEntry, setDetailEntry] = useState(null)
+  const [sourceDetail, setSourceDetail] = useState(null) // repas_planifies en cours de "voir sa page dédiée"
 
   // ── Swipe ───────────────────────────────────────────────────────────────
   const touchStartX = useRef(null)
@@ -266,9 +297,9 @@ export default function TodayPage() {
             willChange: 'transform',
           }}
         >
-          <DaySlot date={datePrev} onOpenModal={setModal} onOpenDetail={setDetailEntry} onNavigate={navigate} />
-          <DaySlot date={date}     onOpenModal={setModal} onOpenDetail={setDetailEntry} onNavigate={navigate} />
-          <DaySlot date={dateNext} onOpenModal={setModal} onOpenDetail={setDetailEntry} onNavigate={navigate} />
+          <DaySlot date={datePrev} onOpenModal={setModal} onOpenDetail={setDetailEntry} onOpenSource={setSourceDetail} onNavigate={navigate} />
+          <DaySlot date={date}     onOpenModal={setModal} onOpenDetail={setDetailEntry} onOpenSource={setSourceDetail} onNavigate={navigate} />
+          <DaySlot date={dateNext} onOpenModal={setModal} onOpenDetail={setDetailEntry} onOpenSource={setSourceDetail} onNavigate={navigate} />
         </div>
       </div>
 
@@ -286,6 +317,27 @@ export default function TodayPage() {
           entry={detailEntry.entry}
           onUpdate={detailEntry.onUpdate}
           onClose={() => setDetailEntry(null)}
+        />
+      )}
+
+      {/* "Page dédiée" d'un repas/complément planifié : recette / repas type / aliment */}
+      {sourceDetail?.source_type === 'recette' && (
+        <RecipeDetailWrapper
+          recetteId={sourceDetail.source_id}
+          onClose={() => setSourceDetail(null)}
+        />
+      )}
+      {sourceDetail?.source_type === 'repas_type' && (
+        <MealTemplateDetailWrapper
+          repasTypeId={sourceDetail.source_id}
+          onClose={() => setSourceDetail(null)}
+        />
+      )}
+      {sourceDetail?.source_type === 'libre' && (
+        <FoodDetailModal
+          key={sourceDetail.id}
+          entry={sourceDetail.items?.[0]}
+          onClose={() => setSourceDetail(null)}
         />
       )}
     </>

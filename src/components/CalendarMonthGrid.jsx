@@ -13,7 +13,7 @@ const STATUS_BG = {
   none: 'transparent',
 }
 
-const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+export const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 // Construit la grille du mois : jours du mois précédent/suivant en padding
 // pour compléter les semaines (lundi = premier jour, convention FR).
@@ -46,15 +46,26 @@ function buildMonthCells(monthDate) {
 // Props :
 //   monthDate       — n'importe quelle date du mois affiché
 //   onChangeMonth(dir) — dir = -1 | 1
-//   selectedDate     — Date actuellement sélectionnée
+//   selectedDate     — Date actuellement sélectionnée (mode single, ignoré si selectedDates fourni)
 //   onSelectDate(date)
 //   dayStatusByDate  — { 'YYYY-MM-DD': 'ok'|'off'|'none' }
-//   hasPlannedByDate — { 'YYYY-MM-DD': true } — jours avec repas planifié non mangé
+//   hasPlannedByDate — { 'YYYY-MM-DD': true|'planned'|'missed' } — jours avec repas planifié
+//                       non mangé ('missed' = date passée, dot corail au lieu de violet)
+//
+// Mode multi-sélection (utilisé par le picker de jours de PlanMealModal) :
+//   selectedDates    — Set<'YYYY-MM-DD'> — si fourni, active le mode multi
+//   onToggleDate(date) — appelé au clic à la place de onSelectDate
+//   minDate          — 'YYYY-MM-DD' — jours antérieurs désactivés/grisés
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CalendarMonthGrid({ monthDate, onChangeMonth, selectedDate, onSelectDate, dayStatusByDate, hasPlannedByDate }) {
+export default function CalendarMonthGrid({
+  monthDate, onChangeMonth, selectedDate, onSelectDate,
+  dayStatusByDate = {}, hasPlannedByDate = {},
+  selectedDates, onToggleDate, minDate,
+}) {
   const cells = useMemo(() => buildMonthCells(monthDate), [monthDate.getFullYear(), monthDate.getMonth()])
   const todayStr = fmt(new Date())
-  const selectedStr = fmt(selectedDate)
+  const isMulti = !!selectedDates
+  const selectedStr = isMulti ? null : fmt(selectedDate)
 
   return (
     <div className="card" style={{ padding: '14px 12px', marginBottom: 12 }}>
@@ -83,21 +94,26 @@ export default function CalendarMonthGrid({ monthDate, onChangeMonth, selectedDa
           const dStr = fmt(date)
           const status = dayStatusByDate[dStr] || 'none'
           const isToday = dStr === todayStr
-          const isSelected = dStr === selectedStr
-          const hasPlanned = !!hasPlannedByDate[dStr]
+          const isSelected = isMulti ? selectedDates.has(dStr) : dStr === selectedStr
+          const plannedStatus = hasPlannedByDate[dStr]
+          const hasPlanned = !!plannedStatus
+          const isMissed = plannedStatus === 'missed'
+          const disabled = minDate ? dStr < minDate : false
 
           return (
             <button
               key={i}
-              onClick={() => onSelectDate(date)}
+              onClick={disabled ? undefined : () => (isMulti ? onToggleDate(date) : onSelectDate(date))}
+              disabled={disabled}
               style={{
                 aspectRatio: '1',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 10,
                 background: isSelected ? 'var(--green)' : STATUS_BG[status],
-                opacity: inMonth ? 1 : 0.35,
+                opacity: disabled ? 0.3 : (inMonth ? 1 : 0.35),
                 border: isToday && !isSelected ? '1.5px solid var(--green)' : '1.5px solid transparent',
                 position: 'relative',
+                cursor: disabled ? 'default' : 'pointer',
               }}
             >
               <span style={{
@@ -116,7 +132,7 @@ export default function CalendarMonthGrid({ monthDate, onChangeMonth, selectedDa
                 <span style={{
                   position: 'absolute', top: 3, right: 3,
                   width: 5, height: 5, borderRadius: '50%',
-                  background: isSelected ? 'white' : 'var(--purple)',
+                  background: isSelected ? 'white' : (isMissed ? 'var(--coral)' : 'var(--purple)'),
                 }} />
               )}
             </button>

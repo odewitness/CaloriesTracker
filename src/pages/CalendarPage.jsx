@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { Calendar, CalendarDays } from 'lucide-react'
+import { Calendar, CalendarDays, Plus, Pill } from 'lucide-react'
 import CalendarMonthGrid from '../components/CalendarMonthGrid'
 import CalendarWeekStrip from '../components/CalendarWeekStrip'
 import DayRecapPanel from '../components/DayRecapPanel'
+import PlanMealModal from '../components/PlanMealModal'
 import { useJournalRange } from '../hooks/useJournalRange'
 import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useSettings } from '../hooks/useSettings'
@@ -31,6 +32,7 @@ export default function CalendarPage() {
   const [view, setView] = useState('month') // 'month' | 'week'
   const [anchorDate, setAnchorDate] = useState(new Date()) // mois ou semaine affiché
   const [selectedDate, setSelectedDate] = useState(new Date())
+  const [planModal, setPlanModal] = useState(null) // 'repas' | 'complement' | null
   const { settings } = useSettings()
 
   // Plage chargée = mois affiché élargi de quelques jours de padding (les
@@ -61,9 +63,12 @@ export default function CalendarPage() {
   }, [journalByDate, settings])
 
   const hasPlannedByDate = useMemo(() => {
+    const todayStr = fmt(new Date())
     const result = {}
     for (const dateStr of Object.keys(planifiesByDate)) {
-      if (planifiesByDate[dateStr].some(r => !r.mange)) result[dateStr] = true
+      if (planifiesByDate[dateStr].some(r => !r.mange)) {
+        result[dateStr] = dateStr < todayStr ? 'missed' : 'planned'
+      }
     }
     return result
   }, [planifiesByDate])
@@ -107,6 +112,31 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button
+          onClick={() => setPlanModal('repas')}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: 'var(--green-light)', color: 'var(--green-dark)',
+            border: 'none', borderRadius: 10, padding: '10px 12px',
+            fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+          }}
+        >
+          <Plus size={14} /> Planifier un repas
+        </button>
+        <button
+          onClick={() => setPlanModal('complement')}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: 'var(--purple-light, #ede9fe)', color: 'var(--purple, #8b5cf6)',
+            border: 'none', borderRadius: 10, padding: '10px 12px',
+            fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+          }}
+        >
+          <Pill size={14} /> Planifier des compléments
+        </button>
+      </div>
+
       {view === 'month' ? (
         <CalendarMonthGrid
           monthDate={anchorDate}
@@ -128,6 +158,15 @@ export default function CalendarPage() {
       )}
 
       <DayRecapPanel date={selectedDate} onPlannedChange={refetchAll} />
+
+      {planModal && (
+        <PlanMealModal
+          kind={planModal}
+          defaultDate={selectedDate}
+          onClose={() => setPlanModal(null)}
+          onPlanned={refetchAll}
+        />
+      )}
     </div>
   )
 }

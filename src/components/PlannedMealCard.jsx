@@ -1,25 +1,38 @@
 import React, { useState } from 'react'
-import { Check, Trash2, ChevronRight } from 'lucide-react'
+import { Check, Trash2, ChevronRight, CalendarX } from 'lucide-react'
+import { fmt } from '../lib/dates'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PlannedMealCard — carte compacte pour un repas planifié (repas_planifies).
 // Props :
-//   repas         — ligne repas_planifies { nom, meal, items, mange, source_type, source_id, ... }
+//   repas         — ligne repas_planifies { nom, meal, items, mange, source_type, source_id, recurrence_group_id, ... }
 //   onMarkEaten() — async, copie les items dans le journal
-//   onDelete()    — async, supprime le repas planifié
+//   onDelete()    — async, supprime cette occurrence du repas planifié
+//   onDeleteSeries(recurrenceGroupId) — optionnel ; si fourni ET que repas
+//                          fait partie d'une série récurrente, affiche un
+//                          second bouton "supprimer toute la série"
 //   onOpenSource(repas) — optionnel ; si fourni, le nom du repas devient
 //                          cliquable et ouvre sa "page dédiée" (recette /
 //                          repas type / aliment)
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PlannedMealCard({ repas, onMarkEaten, onDelete, onOpenSource }) {
+export default function PlannedMealCard({ repas, onMarkEaten, onDelete, onDeleteSeries, onOpenSource }) {
   const [busy, setBusy] = useState(false)
   const items = repas.items || []
   const totalKcal = items.reduce((s, i) => s + (i.energie_kcal || 0), 0)
   const clickable = !!onOpenSource
+  const missed = !repas.mange && repas.date < fmt(new Date())
+  const isSeries = !!repas.recurrence_group_id
 
   const handleMarkEaten = async () => {
     setBusy(true)
     await onMarkEaten(repas)
+    setBusy(false)
+  }
+
+  const handleDeleteSeries = async () => {
+    if (!window.confirm('Supprimer toute la série récurrente ?')) return
+    setBusy(true)
+    await onDeleteSeries(repas.recurrence_group_id)
     setBusy(false)
   }
 
@@ -34,13 +47,16 @@ export default function PlannedMealCard({ repas, onMarkEaten, onDelete, onOpenSo
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{
-            fontSize: 10, fontWeight: 700, color: 'var(--purple)',
-            background: 'var(--purple-light)', borderRadius: 6, padding: '1px 6px',
+            fontSize: 10, fontWeight: 700, color: missed ? 'var(--coral)' : 'var(--purple)',
+            background: missed ? 'var(--coral-light)' : 'var(--purple-light)', borderRadius: 6, padding: '1px 6px',
           }}>
             {repas.meal}
           </span>
           {repas.mange && (
             <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)' }}>✓ Mangé</span>
+          )}
+          {missed && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--coral)' }}>Manqué</span>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 3 }}>
@@ -64,6 +80,18 @@ export default function PlannedMealCard({ repas, onMarkEaten, onDelete, onOpenSo
           title="Marquer mangé"
         >
           <Check size={16} />
+        </button>
+      )}
+      {isSeries && onDeleteSeries && (
+        <button
+          onClick={handleDeleteSeries}
+          disabled={busy}
+          className="btn-icon"
+          style={{ color: 'var(--text-hint)', flexShrink: 0 }}
+          aria-label="Supprimer toute la série"
+          title="Supprimer toute la série récurrente"
+        >
+          <CalendarX size={16} />
         </button>
       )}
       <button

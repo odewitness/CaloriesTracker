@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
 import CalorieRing from './CalorieRing'
 import MacroBar from './MacroBar'
 import VitaminPanel from './VitaminPanel'
@@ -8,15 +7,13 @@ import MealSection from './MealSection'
 import AddFoodModal from './AddFoodModal'
 import FoodDetailModal from './FoodDetailModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from './SupplementSection'
-import PlannedMealCard from './PlannedMealCard'
-import PlanMealModal from './PlanMealModal'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { usePlannedMealsForDate, deletePlannedMeal, markAsEaten } from '../hooks/usePlannedMeals'
+import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
 import { computeTotals, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import Loader from './Loader'
 import { fmt } from '../lib/dates'
@@ -37,8 +34,10 @@ function dateLabel(date) {
 // MacroBar, VitaminPanel, NutrientDetails, puis "Repas du jour" avec un
 // MealSection par repas (toggle, ajout, suppression) + SupplementSection —
 // donc les repas réellement mangés ce jour-là (planifiés ou non) s'affichent
-// tous. Les repas encore planifiés mais pas mangés restent visibles à part,
-// juste au-dessus, avec l'action "Marquer mangé".
+// tous. Les repas/compléments encore planifiés mais pas mangés s'affichent
+// en cartes distinctes DANS chaque MealSection/SupplementSection concernée
+// (plannedItems/plannedSupplements), avec l'action "Marquer mangé" directement
+// là. Le bouton "Planifier..." vit désormais en haut de CalendarPage, pas ici.
 // Props :
 //   date        — Date sélectionnée
 //   onPlannedChange() — notifie le parent (calendrier) qu'un repas planifié a
@@ -48,11 +47,10 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
   const dateStr = fmt(date)
   const { user } = useAuth()
   const toast = useToast()
-  const { entries, loading, addEntry, deleteEntry, updateEntry } = useJournal(dateStr)
+  const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { settings } = useSettings()
-  const { repas: repasPlanifies, loading: loadingPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
+  const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
 
-  const [planModalOpen, setPlanModalOpen] = useState(false)
   const [modal, setModal] = useState(null) // { meal, addEntry } — AddFoodModal, même pattern que TodayPage
   const [detailEntry, setDetailEntry] = useState(null)
   const [sourceDetail, setSourceDetail] = useState(null) // repas_planifies en cours de "voir sa page dédiée"
@@ -82,13 +80,19 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
 
   const handleMarkEaten = async (repas) => {
     const { error } = await markAsEaten(repas, user.id)
-    if (!error) { toast(`✓ ${repas.nom} ajouté au journal`); refetchPlanifies(); onPlannedChange?.() }
+    if (!error) { toast(`✓ ${repas.nom} ajouté au journal`); refetchJournal(); refetchPlanifies(); onPlannedChange?.() }
     else toast('Erreur')
   }
 
   const handleDeletePlanifie = async (id) => {
     const { error } = await deletePlannedMeal(id, user.id)
     if (!error) { toast('Supprimé'); refetchPlanifies(); onPlannedChange?.() }
+    else toast('Erreur')
+  }
+
+  const handleDeleteSeries = async (recurrenceGroupId) => {
+    const { error } = await deletePlannedMealSeries(recurrenceGroupId, user.id)
+    if (!error) { toast('Série supprimée'); refetchPlanifies(); onPlannedChange?.() }
     else toast('Erreur')
   }
   if (loading) {
@@ -107,56 +111,35 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
       <NutrientDetails totals={totals} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
 
       <div style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div className="section-title" style={{ marginBottom: 0 }}>Repas</div>
-          <button
-            onClick={() => setPlanModalOpen(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              background: 'var(--purple-light, #ede9fe)', color: 'var(--purple, #8b5cf6)',
-              border: 'none', borderRadius: 8, padding: '5px 10px',
-              fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
-            }}
-          >
-            <Plus size={13} /> Planifier un repas
-          </button>
-        </div>
+        <div className="section-title">Repas</div>
 
-        {/* Repas encore planifiés, pas encore mangés — au-dessus, distincts */}
-        {!loadingPlanifies && nonMangesPlanifies.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            {nonMangesPlanifies.map(r => (
-              <PlannedMealCard
-                key={r.id}
-                repas={r}
-                onMarkEaten={handleMarkEaten}
-                onDelete={handleDeletePlanifie}
-                onOpenSource={r.source_type ? (repas) => setSourceDetail(repas) : undefined}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Repas réellement mangés — même component/mise en page que TodayPage */}
         {MEALS.map(m => (
           <MealSection
             key={m}
             name={m}
             entries={entries.filter(e => e.meal === m)}
             target={mealTargets[m]}
+            plannedItems={nonMangesPlanifies.filter(r => r.meal === m)}
             onAdd={(meal) => setModal({ meal, addEntry: handleAdd })}
             onDelete={handleDelete}
             onUpdate={handleUpdate}
             onOpenDetail={(entry) => setDetailEntry(entry)}
+            onMarkPlannedEaten={handleMarkEaten}
+            onDeletePlanned={handleDeletePlanifie}
+            onDeleteSeries={handleDeleteSeries}
+            onOpenPlannedSource={(repas) => setSourceDetail(repas)}
           />
         ))}
       </div>
 
       <SupplementSection
         supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
+        plannedSupplements={nonMangesPlanifies.filter(r => r.meal === SUPPLEMENT_MEAL)}
         onOpenModal={setModal}
         onAdd={handleAdd}
         onDelete={handleDelete}
+        onMarkPlannedEaten={handleMarkEaten}
+        onDeletePlanned={handleDeletePlanifie}
       />
 
       {modal && (
@@ -164,14 +147,6 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
           initialMeal={modal.meal}
           onAdd={modal.addEntry}
           onClose={() => setModal(null)}
-        />
-      )}
-
-      {planModalOpen && (
-        <PlanMealModal
-          defaultDate={date}
-          onClose={() => setPlanModalOpen(false)}
-          onPlanned={() => { refetchPlanifies(); onPlannedChange?.() }}
         />
       )}
 

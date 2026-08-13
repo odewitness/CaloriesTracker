@@ -1,8 +1,12 @@
 import React, { useState } from 'react'
 import { Plus, ChevronDown } from 'lucide-react'
 import EditableFoodRow from './EditableFoodRow'
+import PlannedMealCard from './PlannedMealCard'
 
-export default function MealSection({ name, entries, target, onAdd, onDelete, onUpdate, onOpenDetail }) {
+// plannedItems — repas_planifies non mangés pour ce repas, affichés en
+// cartes distinctes au-dessus des aliments déjà mangés (mêmes actions que
+// dans le calendrier : marquer mangé, supprimer, supprimer la série).
+export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource }) {
   const enabled = target?.enabled !== false
   const storageKey = `meal-collapsed:${name}`
   const [collapsed, setCollapsed] = useState(() => {
@@ -96,6 +100,22 @@ export default function MealSection({ name, entries, target, onAdd, onDelete, on
           <Plus size={18} />
         </button>
       </div>
+
+      {/* Planifiés, pas encore mangés — au-dessus, distincts, toujours visibles */}
+      {plannedItems.length > 0 && (
+        <div style={{ padding: '0 10px' }}>
+          {plannedItems.map(r => (
+            <PlannedMealCard
+              key={r.id}
+              repas={r}
+              onMarkEaten={onMarkPlannedEaten}
+              onDelete={onDeletePlanned}
+              onDeleteSeries={onDeleteSeries}
+              onOpenSource={r.source_type ? onOpenPlannedSource : undefined}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Items */}
       {!collapsed && entries.map(entry => (

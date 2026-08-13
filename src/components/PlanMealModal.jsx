@@ -1,16 +1,40 @@
 import React, { useState, useEffect } from 'react'
-import { X, ArrowLeft, Apple, UtensilsCrossed, CalendarDays, Plus, Check } from 'lucide-react'
+import { X, ArrowLeft, Apple, UtensilsCrossed, CalendarDays, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { useBackButton } from '../hooks/useBackButton'
 import { MEALS_ORDER as MEALS, scaleFood } from '../lib/nutrients'
-import { createPlannedMeal } from '../hooks/usePlannedMeals'
+import { createPlannedMeals } from '../hooks/usePlannedMeals'
 import FoodPicker from './FoodPicker'
 import AddFromRecipeModal from './AddFromRecipeModal'
+import CalendarMonthGrid, { WEEKDAYS } from './CalendarMonthGrid'
+import { SUPPLEMENT_MEAL } from './SupplementSection'
 import { fmt } from '../lib/dates'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
+
+const RECURRENCE_CAP = 90
+
+// Génère la liste de dates ('YYYY-MM-DD') correspondant à un motif de
+// récurrence, à partir de startStr (inclus) jusqu'à endStr (inclus).
+// weekdays est un Set d'indices 0=lundi..6=dimanche (même convention que
+// WEEKDAYS/CalendarMonthGrid). Plafonné à RECURRENCE_CAP dates.
+function computeRecurrenceDates(startStr, pattern, weekdays, endStr) {
+  if (pattern === 'once') return [startStr]
+  const start = new Date(startStr + 'T00:00:00')
+  const end = new Date((endStr || startStr) + 'T00:00:00')
+  const dates = []
+  const cur = new Date(start)
+  while (cur <= end && dates.length < RECURRENCE_CAP) {
+    const dow = (cur.getDay() + 6) % 7
+    if (pattern === 'daily' || (pattern === 'weekdays' && weekdays.has(dow))) {
+      dates.push(fmt(cur))
+    }
+    cur.setDate(cur.getDate() + 1)
+  }
+  return dates
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RepasTypePicker — étape "choisir un repas type" (liste simple, comme
@@ -104,54 +128,84 @@ function SourcePicker({ onPick, onClose }) {
   )
 }
 
+const RECURRENCE_PATTERNS = [
+  { id: 'once', label: 'Une seule fois' },
+  { id: 'daily', label: 'Tous les jours' },
+  { id: 'weekdays', label: 'Jours spécifiques' },
+]
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return fmt(d)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// ScheduleStep — étape finale commune : choix des jours (multi) + du repas,
-// puis création d'un repas_planifies par jour sélectionné.
+// ScheduleStep — étape finale commune : choix d'un motif de récurrence (une
+// fois / tous les jours / jours spécifiques) qui pré-coche les jours
+// correspondants sur une grille calendrier cliquable (ajustable au cas par
+// cas), puis choix du repas (sauté si forcedMeal est fourni — cas des
+// compléments), puis création en une seule requête batch (createPlannedMeals).
 // ─────────────────────────────────────────────────────────────────────────────
-function ScheduleStep({ source, defaultDate, onBack, onClose, onPlanned }) {
+function ScheduleStep({ source, defaultDate, forcedMeal, onBack, onClose, onPlanned }) {
   useBackButton(onClose)
   const { user } = useAuth()
   const toast = useToast()
 
   const todayStr = fmt(new Date())
-  const tomorrowStr = fmt(new Date(Date.now() + 86400000))
-  const afterTomorrowStr = fmt(new Date(Date.now() + 2 * 86400000))
+  const startStr = defaultDate ? fmt(defaultDate) : todayStr
 
-  const [selectedDates, setSelectedDates] = useState([defaultDate ? fmt(defaultDate) : todayStr])
-  const [customDate, setCustomDate] = useState('')
-  const [meal, setMeal] = useState(MEALS[0])
+  const [pattern, setPattern] = useState('once')
+  const [weekdays, setWeekdays] = useState(() => new Set([(new Date(startStr + 'T00:00:00').getDay() + 6) % 7]))
+  const [endDate, setEndDate] = useState(addDays(startStr, 30))
+  const [selectedDates, setSelectedDates] = useState(() => new Set([startStr]))
+  const [anchorMonth, setAnchorMonth] = useState(() => new Date(startStr + 'T00:00:00'))
+  const [meal, setMeal] = useState(forcedMeal || MEALS[0])
   const [saving, setSaving] = useState(false)
 
-  const toggleDate = (d) => {
-    setSelectedDates(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort())
+  // Motif/fin/jours changés → régénère intégralement la sélection. Les clics
+  // directs sur la grille (toggleGridDate) ne passent jamais par ici : ils
+  // permettent d'ajuster la sélection générée sans qu'elle ne soit écrasée.
+  useEffect(() => {
+    const dates = computeRecurrenceDates(startStr, pattern, weekdays, endDate)
+    if (dates.length >= RECURRENCE_CAP) toast(`Limité à ${RECURRENCE_CAP} jours`)
+    setSelectedDates(new Set(dates))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pattern, endDate, [...weekdays].sort().join(',')])
+
+  const toggleWeekday = (i) => {
+    setWeekdays(prev => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i); else next.add(i)
+      return next
+    })
   }
 
-  const addCustomDate = () => {
-    if (!customDate) return
-    if (!selectedDates.includes(customDate)) setSelectedDates(prev => [...prev, customDate].sort())
-    setCustomDate('')
+  const toggleGridDate = (date) => {
+    const d = fmt(date)
+    setSelectedDates(prev => {
+      const next = new Set(prev)
+      if (next.has(d)) next.delete(d); else next.add(d)
+      return next
+    })
   }
 
   const confirm = async () => {
-    if (selectedDates.length === 0) { toast('Choisis au moins un jour'); return }
+    if (selectedDates.size === 0) { toast('Choisis au moins un jour'); return }
     setSaving(true)
-    let anyError = false
-    for (const date of selectedDates) {
-      const { error } = await createPlannedMeal({
-        userId: user.id,
-        date,
-        meal,
-        nom: source.nom,
-        items: source.items,
-        sourceType: source.sourceType,
-        sourceId: source.sourceId,
-      })
-      if (error) anyError = true
-    }
+    const { error } = await createPlannedMeals({
+      userId: user.id,
+      dates: [...selectedDates].sort(),
+      meal: forcedMeal || meal,
+      nom: source.nom,
+      items: source.items,
+      sourceType: source.sourceType,
+      sourceId: source.sourceId,
+    })
     setSaving(false)
-    if (anyError) toast('Erreur lors de la planification')
+    if (error) toast('Erreur lors de la planification')
     else {
-      toast(`✓ ${source.nom} planifié sur ${selectedDates.length} jour${selectedDates.length > 1 ? 's' : ''}`)
+      toast(`✓ ${source.nom} planifié sur ${selectedDates.size} jour${selectedDates.size > 1 ? 's' : ''}`)
       onPlanned()
       onClose()
     }
@@ -176,74 +230,102 @@ function ScheduleStep({ source, defaultDate, onBack, onClose, onPlanned }) {
         </div>
 
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-          Jour(s)
+          Récurrence
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-          <button onClick={() => toggleDate(todayStr)} className="chip" style={selectedDates.includes(todayStr) ? { background: 'var(--green)', color: 'white' } : undefined}>
-            Aujourd'hui
-          </button>
-          <button onClick={() => toggleDate(tomorrowStr)} className="chip" style={selectedDates.includes(tomorrowStr) ? { background: 'var(--green)', color: 'white' } : undefined}>
-            Demain
-          </button>
-          <button onClick={() => toggleDate(afterTomorrowStr)} className="chip" style={selectedDates.includes(afterTomorrowStr) ? { background: 'var(--green)', color: 'white' } : undefined}>
-            Après-demain
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-          <input
-            type="date"
-            className="input"
-            value={customDate}
-            min={todayStr}
-            onChange={e => setCustomDate(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button onClick={addCustomDate} className="btn-icon" style={{ background: 'var(--gray-bg)', flexShrink: 0 }} aria-label="Ajouter ce jour">
-            <Plus size={18} color="var(--text-muted)" />
-          </button>
+          {RECURRENCE_PATTERNS.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setPattern(p.id)}
+              className="chip"
+              style={pattern === p.id ? { background: 'var(--green)', color: 'white' } : undefined}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
 
-        {selectedDates.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-            {selectedDates.map(d => (
-              <span key={d} style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                background: 'var(--green-light)', color: 'var(--green-dark)',
-                borderRadius: 20, padding: '4px 10px', fontSize: 11.5, fontWeight: 600,
-              }}>
-                {new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                <button onClick={() => toggleDate(d)} style={{ color: 'var(--green-dark)', lineHeight: 1 }}>×</button>
-              </span>
+        {pattern === 'weekdays' && (
+          <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+            {WEEKDAYS.map((w, i) => (
+              <button
+                key={i}
+                onClick={() => toggleWeekday(i)}
+                style={{
+                  flex: 1, padding: '7px 0', borderRadius: 8,
+                  background: weekdays.has(i) ? 'var(--green)' : 'var(--gray-bg)',
+                  color: weekdays.has(i) ? 'white' : 'var(--text-muted)',
+                  fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+                }}
+              >
+                {w}
+              </button>
             ))}
           </div>
         )}
 
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-          Repas
+        {pattern !== 'once' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 12.5, color: 'var(--text-muted)', flexShrink: 0 }}>Jusqu'au</span>
+            <input
+              type="date"
+              className="input"
+              value={endDate}
+              min={startStr}
+              onChange={e => setEndDate(e.target.value)}
+              style={{ flex: 1 }}
+            />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
+            Jour(s)
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--green-dark)' }}>
+            {selectedDates.size} sélectionné{selectedDates.size > 1 ? 's' : ''}
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
-          {MEALS.map(m => {
-            const active = meal === m
-            return (
-              <button
-                key={m}
-                onClick={() => setMeal(m)}
-                style={{
-                  flex: '1 1 auto', padding: '8px 10px', borderRadius: 8,
-                  background: active ? 'var(--green)' : 'var(--gray-bg)',
-                  color: active ? 'white' : 'var(--text-muted)',
-                  fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)', transition: 'all .15s',
-                }}
-              >
-                {m}
-              </button>
-            )
-          })}
+        <div style={{ marginBottom: 16 }}>
+          <CalendarMonthGrid
+            monthDate={anchorMonth}
+            onChangeMonth={(dir) => setAnchorMonth(d => new Date(d.getFullYear(), d.getMonth() + dir, 1))}
+            selectedDates={selectedDates}
+            onToggleDate={toggleGridDate}
+            minDate={todayStr}
+          />
         </div>
 
-        <button className="btn-primary" onClick={confirm} disabled={saving || selectedDates.length === 0} style={{ opacity: saving || selectedDates.length === 0 ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        {!forcedMeal && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+              Repas
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+              {MEALS.map(m => {
+                const active = meal === m
+                return (
+                  <button
+                    key={m}
+                    onClick={() => setMeal(m)}
+                    style={{
+                      flex: '1 1 auto', padding: '8px 10px', borderRadius: 8,
+                      background: active ? 'var(--green)' : 'var(--gray-bg)',
+                      color: active ? 'white' : 'var(--text-muted)',
+                      fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)', transition: 'all .15s',
+                    }}
+                  >
+                    {m}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        <button className="btn-primary" onClick={confirm} disabled={saving || selectedDates.size === 0} style={{ opacity: saving || selectedDates.size === 0 ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <Check size={16} />
-          {saving ? 'Planification...' : `Planifier sur ${selectedDates.length} jour${selectedDates.length > 1 ? 's' : ''}`}
+          {saving ? 'Planification...' : `Planifier sur ${selectedDates.size} jour${selectedDates.size > 1 ? 's' : ''}`}
         </button>
       </div>
     </div>
@@ -253,14 +335,18 @@ function ScheduleStep({ source, defaultDate, onBack, onClose, onPlanned }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // PlanMealModal — orchestrateur.
 // Props :
+//   kind = 'repas' | 'complement' — 'complement' saute SourcePicker (pas de
+//                  recette/repas type pour un complément) et verrouille le
+//                  repas sur SUPPLEMENT_MEAL dans ScheduleStep.
 //   presetSource — optionnel : { nom, items, sourceType, sourceId } déjà
 //                  connu (ouverture depuis RecipeDetailModal ou MealTemplateCard) →
 //                  saute directement à l'étape "jour(s) + repas".
 //   onClose()
 //   onPlanned()  — appelé après une planification réussie (refresh calendrier)
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PlanMealModal({ presetSource, defaultDate, onClose, onPlanned }) {
-  const [step, setStep] = useState(presetSource ? 'schedule' : 'source')
+export default function PlanMealModal({ kind = 'repas', presetSource, defaultDate, onClose, onPlanned }) {
+  const isComplement = kind === 'complement'
+  const [step, setStep] = useState(presetSource ? 'schedule' : (isComplement ? 'libre' : 'source'))
   const [source, setSource] = useState(presetSource || null)
 
   // FoodPicker et AddFromRecipeModal appellent leur propre onClose() juste
@@ -272,7 +358,7 @@ export default function PlanMealModal({ presetSource, defaultDate, onClose, onPl
   const goToStep = (s) => { stepRef.current = s; setStep(s) }
   const closeIfStillOn = (expectedStep) => () => { if (stepRef.current === expectedStep) onClose() }
 
-  // ── Étape 0 : choix de la source ──────────────────────────────────────
+  // ── Étape 0 : choix de la source (sautée pour un complément) ──────────
   if (step === 'source') {
     return (
       <SourcePicker
@@ -285,7 +371,7 @@ export default function PlanMealModal({ presetSource, defaultDate, onClose, onPl
   if (step === 'libre') {
     return (
       <FoodPicker
-        title="Planifier un aliment"
+        title={isComplement ? 'Planifier un complément' : 'Planifier un aliment'}
         confirmLabel="Continuer"
         contextLabel="Choisis ensuite le(s) jour(s)"
         onConfirm={async (food, qty) => {
@@ -323,12 +409,13 @@ export default function PlanMealModal({ presetSource, defaultDate, onClose, onPl
     )
   }
 
-  // ── Étape finale : jour(s) + repas ─────────────────────────────────────
+  // ── Étape finale : jour(s) + repas (repas verrouillé sur Compléments pour un complément) ──
   return (
     <ScheduleStep
       source={source}
       defaultDate={defaultDate}
-      onBack={presetSource ? null : () => setStep('source')}
+      forcedMeal={isComplement ? SUPPLEMENT_MEAL : undefined}
+      onBack={presetSource ? null : () => setStep(isComplement ? 'libre' : 'source')}
       onClose={onClose}
       onPlanned={onPlanned}
     />

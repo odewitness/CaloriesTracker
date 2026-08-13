@@ -92,8 +92,39 @@ export async function createPlannedMeal({ userId, date, meal, nom, items, source
   return { data, error }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// createPlannedMeals — variante batch de createPlannedMeal : insère UNE ligne
+// par date en une seule requête (au lieu d'une boucle de N awaits). Si
+// plusieurs dates sont fournies (planification récurrente), toutes les lignes
+// partagent le même recurrence_group_id, ce qui permet plus tard de les
+// supprimer ensemble via deletePlannedMealSeries. Une planification d'un seul
+// jour n'a pas de recurrence_group_id (comportement identique à
+// createPlannedMeal).
+// ─────────────────────────────────────────────────────────────────────────────
+export async function createPlannedMeals({ userId, dates, meal, nom, items, sourceType, sourceId }) {
+  const recurrenceGroupId = dates.length > 1 ? crypto.randomUUID() : null
+  const rows = dates.map(date => ({
+    user_id: userId,
+    date: fmt(date),
+    meal,
+    nom,
+    items,
+    source_type: sourceType || null,
+    source_id: sourceId || null,
+    recurrence_group_id: recurrenceGroupId,
+  }))
+  const { data, error } = await supabase.from('repas_planifies').insert(rows).select()
+  return { data, error }
+}
+
 export async function deletePlannedMeal(id, userId) {
   const { error } = await supabase.from('repas_planifies').delete().eq('id', id).eq('user_id', userId)
+  return { error }
+}
+
+// Supprime toutes les occurrences d'une série récurrente (même recurrence_group_id).
+export async function deletePlannedMealSeries(recurrenceGroupId, userId) {
+  const { error } = await supabase.from('repas_planifies').delete().eq('recurrence_group_id', recurrenceGroupId).eq('user_id', userId)
   return { error }
 }
 

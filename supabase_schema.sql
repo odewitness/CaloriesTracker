@@ -486,15 +486,19 @@ create table if not exists repas_planifies (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
   date date not null,
-  meal text not null,
+  meal text not null, -- 'Petit-déjeuner' | 'Déjeuner' | 'Dîner' | 'Collation' | 'Compléments'
   nom text not null,
   items jsonb not null default '[]', -- tableau d'aliments scalés, mêmes champs que journal
   source_type text, -- 'libre' | 'recette' | 'repas_type'
   source_id uuid,
   mange boolean not null default false,
   mange_at timestamptz,
+  recurrence_group_id uuid, -- non-null quand créé via une planification récurrente : partagé par toutes les occurrences de la série (permet un "supprimer toute la série")
   created_at timestamptz not null default now()
 );
+
+create index if not exists idx_repas_planifies_recurrence_group
+  on repas_planifies (recurrence_group_id) where recurrence_group_id is not null;
 
 -- =============================================
 -- RLS
