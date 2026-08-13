@@ -1,0 +1,120 @@
+import React, { useState, useEffect } from 'react'
+import { useBackButton } from '../hooks/useBackButton'
+import { SORT_FIELDS } from '../lib/recipeSort'
+
+// ─── Sélecteur de champ + sens, réutilisé pour le critère principal et secondaire ───
+function FieldPicker({ fields, selected, dir, onSelectField, onToggleDir, allowNone }) {
+  const activeField = SORT_FIELDS.find(f => f.key === selected)
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: selected ? 10 : 0 }}>
+        {allowNone && (
+          <button
+            onClick={() => onSelectField(null)}
+            className="chip"
+            style={selected === null ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+          >
+            Aucun
+          </button>
+        )}
+        {fields.map(f => (
+          <button
+            key={f.key}
+            onClick={() => onSelectField(f.key)}
+            className="chip"
+            style={selected === f.key ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {selected && activeField && (
+        <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
+          {['asc', 'desc'].map(d => (
+            <button
+              key={d}
+              onClick={() => { if (dir !== d) onToggleDir() }}
+              style={{
+                flex: 1, padding: '8px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+                background: dir === d ? 'var(--white)' : 'transparent',
+                color: dir === d ? 'var(--text)' : 'var(--text-muted)',
+                boxShadow: dir === d ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all .15s',
+              }}
+            >
+              {d === 'asc' ? activeField.ascLabel : activeField.descLabel}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SortModal — critère principal + critère secondaire optionnel
+// (ex: "moins caloriques, puis plus de protéines")
+// ─────────────────────────────────────────────────────────────────────────────
+export default function SortModal({ value, onChange, onClose }) {
+  useBackButton(onClose)
+  const [primaryField, setPrimaryField]     = useState(value.primary.field)
+  const [primaryDir, setPrimaryDir]         = useState(value.primary.dir)
+  const [secondaryField, setSecondaryField] = useState(value.secondary?.field || null)
+  const [secondaryDir, setSecondaryDir]     = useState(value.secondary?.dir || 'desc')
+
+  // Si le critère secondaire devient identique au principal, on l'efface
+  useEffect(() => { if (secondaryField === primaryField) setSecondaryField(null) }, [primaryField]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const apply = () => {
+    onChange({
+      primary: { field: primaryField, dir: primaryDir },
+      secondary: secondaryField ? { field: secondaryField, dir: secondaryDir } : null,
+    })
+    onClose()
+  }
+
+  const reset = () => {
+    setPrimaryField('nom'); setPrimaryDir('asc')
+    setSecondaryField(null); setSecondaryDir('desc')
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-sheet">
+        <div className="modal-handle" />
+        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Trier les recettes</h2>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 18 }}>
+          Choisis un critère principal, et éventuellement un second pour départager les égalités.
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+          Trier par
+        </div>
+        <FieldPicker
+          fields={SORT_FIELDS}
+          selected={primaryField}
+          dir={primaryDir}
+          onSelectField={setPrimaryField}
+          onToggleDir={() => setPrimaryDir(d => d === 'asc' ? 'desc' : 'asc')}
+        />
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '18px 0 8px' }}>
+          Puis par <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
+        </div>
+        <FieldPicker
+          fields={SORT_FIELDS.filter(f => f.key !== primaryField)}
+          selected={secondaryField}
+          dir={secondaryDir}
+          onSelectField={setSecondaryField}
+          onToggleDir={() => setSecondaryDir(d => d === 'asc' ? 'desc' : 'asc')}
+          allowNone
+        />
+
+        <button className="btn-primary" onClick={apply} style={{ marginTop: 20 }}>Appliquer</button>
+        <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={reset}>Réinitialiser</button>
+      </div>
+    </div>
+  )
+}
