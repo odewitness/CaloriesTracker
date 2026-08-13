@@ -1,7 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Tri des recettes — critère principal + critère secondaire optionnel
-// (ex: "moins caloriques, puis plus de protéines"). Logique pure, sans JSX,
-// utilisée par components/SortModal.jsx et pages/ManualPage.jsx.
+// Tri + filtre des recettes — critère principal + critère secondaire optionnel
+// (ex: "moins caloriques, puis plus de protéines"), et filtre par catégories
+// (une recette matche si elle a au moins une des catégories sélectionnées).
+// Logique pure, sans JSX, utilisée par components/SortModal.jsx et
+// components/RecipesSection.jsx.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const SORT_FIELDS = [
@@ -17,7 +19,14 @@ export const SORT_BASES = [
   { key: 'portion', label: 'Par portion' },
 ]
 
-export const DEFAULT_SORT = { primary: { field: 'nom', dir: 'asc' }, secondary: null, basis: 'per100g' }
+export const DEFAULT_SORT = { primary: { field: 'nom', dir: 'asc' }, secondary: null, basis: 'per100g', categories: [] }
+
+// Une recette matche le filtre si elle a au moins une des catégories
+// sélectionnées ; aucune catégorie sélectionnée = pas de filtre (tout passe).
+export function filterByCategories(list, categories) {
+  if (!categories || categories.length === 0) return list
+  return list.filter(r => (r.categories || []).some(c => categories.includes(c)))
+}
 
 // Valeur numérique d'un champ pour une recette, selon la base choisie
 // ('per100g' = valeur brute stockée, 'portion' = ramenée au poids d'une
@@ -70,4 +79,8 @@ export function describeSortField({ field, dir }, basis) {
 
 export function isCustomSort(sort) {
   return sort.primary.field !== 'nom' || sort.primary.dir !== 'asc' || !!sort.secondary || sort.basis === 'portion'
+}
+
+export function isCustomFilter(sort) {
+  return !!sort.categories && sort.categories.length > 0
 }

@@ -9,6 +9,7 @@ import EditableFoodRow from './EditableFoodRow'
 import { scaleFood } from '../lib/nutrients'
 import EmptyState from './EmptyState'
 import FieldLabel from './FieldLabel'
+import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,6 +30,10 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [poidsCuitG, setPoidsCuitG] = useState(recette?.poids_cuit_g ? String(recette.poids_cuit_g) : '')
   const [tare,       setTare]       = useState(recette?.tare_g ? String(recette.tare_g) : '')
   const [totalBrut,  setTotalBrut]  = useState('')
+  const [categories, setCategories] = useState(recette?.categories || [])
+
+  const toggleCategory = (cat) =>
+    setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
 
   const [ingredients, setIngredients] = useState(initIngredients)
   const [showSearch,  setShowSearch]  = useState(false)
@@ -84,6 +89,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
       poidsCuitG:      poidsCuitNet > 0 ? poidsCuitNet : null,
       tareG:           parseFloat(tare) > 0 ? parseFloat(tare) : null,
       poidsReferenceG: poidsRef,
+      categories,
       ingredients,
     })
     setSaving(false)
@@ -128,11 +134,27 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
             <FieldLabel>Nom de la recette *</FieldLabel>
             <input className="input" placeholder="Ex: Poulet rôti aux légumes" value={nom} onChange={e => setNom(e.target.value)} />
           </div>
-          <div>
+          <div style={{ marginBottom: 10 }}>
             <FieldLabel>Nombre de portions</FieldLabel>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <input className="input-sm" type="number" min={1} value={portions} onChange={e => setPortions(e.target.value)} style={{ width: 70 }} />
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>portion{parseInt(portions) > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Catégories</FieldLabel>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {RECIPE_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => toggleCategory(cat)}
+                  className="chip"
+                  style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
           </div>
         </div>

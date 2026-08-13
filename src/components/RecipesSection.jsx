@@ -6,7 +6,8 @@ import RecipeFormModal from './RecipeFormModal'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import PlanMealModal from './PlanMealModal'
 import SortModal from './SortModal'
-import { DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort } from '../lib/recipeSort'
+import { DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort, filterByCategories, isCustomFilter } from '../lib/recipeSort'
+import { RECIPE_CATEGORIES, UNCATEGORIZED_LABEL } from '../lib/recipeCategories'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
 
@@ -143,16 +144,43 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
     })
   }, [recettes, ingredientsByRecette, recipeSearch])
 
-  // ── Tri des recettes ──────────────────────────────────────────────────────
+  // ── Tri + filtre des recettes ─────────────────────────────────────────────
   const [recipeSort, setRecipeSort] = useState(DEFAULT_SORT)
   const [sortModalOpen, setSortModalOpen] = useState(false)
 
-  const sortedFilteredRecettes = useMemo(
-    () => sortRecettes(filteredRecettes, recipeSort),
-    [filteredRecettes, recipeSort]
-  )
+  const recipeSortActive   = isCustomSort(recipeSort)
+  const recipeFilterActive = isCustomFilter(recipeSort)
 
-  const recipeSortActive = isCustomSort(recipeSort)
+  // Regroupées par catégorie (une recette avec plusieurs catégories apparaît
+  // dans chaque groupe correspondant). "Sans catégorie" n'apparaît que quand
+  // aucun filtre n'est actif — filtrer par catégorie exclut naturellement les
+  // recettes qui n'en ont aucune.
+  const groupedRecettes = useMemo(() => {
+    const categoryFiltered = filterByCategories(filteredRecettes, recipeSort.categories)
+    const sorted = sortRecettes(categoryFiltered, recipeSort)
+    const groups = []
+    for (const cat of RECIPE_CATEGORIES) {
+      if (recipeSort.categories.length > 0 && !recipeSort.categories.includes(cat)) continue
+      const items = sorted.filter(r => (r.categories || []).includes(cat))
+      if (items.length > 0) groups.push({ key: cat, items })
+    }
+    if (recipeSort.categories.length === 0) {
+      const items = sorted.filter(r => !(r.categories || []).length)
+      if (items.length > 0) groups.push({ key: UNCATEGORIZED_LABEL, items })
+    }
+    return groups
+  }, [filteredRecettes, recipeSort])
+
+  const totalRecettesCount = groupedRecettes.reduce((s, g) => s + g.items.length, 0)
+
+  // ── Plier/déplier chaque groupe de catégorie (déplié par défaut) ─────────
+  const [collapsedCategories, setCollapsedCategories] = useState(() => new Set())
+  const toggleCategoryCollapsed = (key) =>
+    setCollapsedCategories(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
 
   const [recipeModal, setRecipeModal] = useState(null) // null | { type: 'new' | 'edit' | 'detail', recette? }
   const [planTarget, setPlanTarget] = useState(null) // preset source { nom, items, sourceType, sourceId } en cours de planification
@@ -188,8 +216,8 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
               onClick={() => setSortModalOpen(true)}
               style={{
                 width: 44, height: 44, borderRadius: 'var(--radius-sm)', flexShrink: 0,
-                background: recipeSortActive ? 'var(--green-light)' : 'var(--gray-bg)',
-                color: recipeSortActive ? 'var(--green-dark)' : 'var(--text-muted)',
+                background: (recipeSortActive || recipeFilterActive) ? 'var(--green-light)' : 'var(--gray-bg)',
+                color: (recipeSortActive || recipeFilterActive) ? 'var(--green-dark)' : 'var(--text-muted)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 border: '1px solid var(--border)',
               }}
@@ -198,34 +226,51 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
             </button>
           </div>
 
-          {recipeSortActive && (
+          {(recipeSortActive || recipeFilterActive) && (
             <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 10 }}>
-              Trié par {describeSortField(recipeSort.primary, recipeSort.basis)}
-              {recipeSort.secondary ? `, puis ${describeSortField(recipeSort.secondary, recipeSort.basis)}` : ''}
+              {recipeFilterActive && `Filtré par ${recipeSort.categories.join(', ')}`}
+              {recipeFilterActive && recipeSortActive && ' · '}
+              {recipeSortActive && `Trié par ${describeSortField(recipeSort.primary, recipeSort.basis)}${recipeSort.secondary ? `, puis ${describeSortField(recipeSort.secondary, recipeSort.basis)}` : ''}`}
             </div>
           )}
 
           {loadingRecettes && <Loader />}
 
-          {!loadingRecettes && sortedFilteredRecettes.length === 0 && (
+          {!loadingRecettes && totalRecettesCount === 0 && (
             <EmptyState
               icon={<UtensilsCrossed size={40} />}
-              title={recipeSearch ? 'Aucun résultat' : 'Aucune recette'}
-              description={recipeSearch
-                ? `Aucune recette ni ingrédient ne correspond à "${recipeSearch}"`
+              title={recipeSearch || recipeFilterActive ? 'Aucun résultat' : 'Aucune recette'}
+              description={recipeSearch || recipeFilterActive
+                ? "Aucune recette ne correspond à ta recherche/filtre"
                 : "Crée ta première recette pour calculer les calories de tes plats maison"}
             />
           )}
 
-          {sortedFilteredRecettes.map(r => (
-            <RecipeCard
-              key={r.id}
-              recette={r}
-              ingredients={ingredientsByRecette[r.id]}
-              onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
-              onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
-            />
-          ))}
+          {groupedRecettes.map(({ key, items }) => {
+            const collapsed = collapsedCategories.has(key)
+            return (
+              <div key={key} style={{ marginBottom: 14 }}>
+                <button
+                  onClick={() => toggleCategoryCollapsed(key)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: collapsed ? 0 : 6 }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                    {key} <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>({items.length})</span>
+                  </span>
+                  <ChevronDown size={16} color="var(--text-hint)" style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
+                </button>
+                {!collapsed && items.map(r => (
+                  <RecipeCard
+                    key={r.id}
+                    recette={r}
+                    ingredients={ingredientsByRecette[r.id]}
+                    onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+                    onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+                  />
+                ))}
+              </div>
+            )
+          })}
         </>
       )}
 

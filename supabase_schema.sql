@@ -363,7 +363,8 @@ create table if not exists recettes (
   acide_folique numeric,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  tare_g numeric
+  tare_g numeric,
+  categories text[] not null default '{}' -- 'Petit-déjeuner' | 'Collation' | 'Plat' | 'Accompagnement' | 'Boisson' | 'Dessert' (multi)
 );
 
 -- 8. TABLE RECETTE_INGREDIENTS (lignes d'ingrédients d'une recette)
