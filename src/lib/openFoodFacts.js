@@ -1,0 +1,47 @@
+// Convertit un produit brut de l'API Open Food Facts vers le même format
+// qu'un aliment Ciqual/custom, pour que FoodRow/MacroPreview/scaleFood
+// puissent le traiter sans distinction de source.
+export function mapOFFProduct(p) {
+  const n = p.nutriments || {}
+  return {
+    alim_nom: p.product_name || p.product_name_fr || 'Produit inconnu',
+    categorie: p.categories?.split(',')[0]?.trim() || 'Open Food Facts',
+    marque: p.brands?.split(',')[0]?.trim() || '',
+    energie_kcal: Math.round(n['energy-kcal_100g'] || (n['energy_100g'] || 0) / 4.184),
+    proteines: parseFloat((n['proteins_100g'] || 0).toFixed(1)),
+    glucides: parseFloat((n['carbohydrates_100g'] || 0).toFixed(1)),
+    lipides: parseFloat((n['fat_100g'] || 0).toFixed(1)),
+    fibres: parseFloat((n['fiber_100g'] || 0).toFixed(1)),
+    vit_c: parseFloat(((n['vitamin-c_100g'] || 0) * 1000).toFixed(2)),
+    vit_d: parseFloat(((n['vitamin-d_100g'] || 0) * 1000000).toFixed(2)),
+    calcium: parseFloat(((n['calcium_100g'] || 0) * 1000).toFixed(1)),
+    fer: parseFloat(((n['iron_100g'] || 0) * 1000).toFixed(2)),
+    sucres: parseFloat((n['sugars_100g'] || 0).toFixed(1)),
+    acides_gras_satures: parseFloat((n['saturated-fat_100g'] || 0).toFixed(2)),
+    ag_monoinsatures: parseFloat((n['monounsaturated-fat_100g'] || 0).toFixed(2)),
+    ag_polyinsatures: parseFloat((n['polyunsaturated-fat_100g'] || 0).toFixed(2)),
+    cholesterol: parseFloat(((n['cholesterol_100g'] || 0) * 1000).toFixed(1)),
+    sel: parseFloat((n['salt_100g'] || 0).toFixed(2)),
+    magnesium: parseFloat(((n['magnesium_100g'] || 0) * 1000).toFixed(1)),
+    potassium: parseFloat(((n['potassium_100g'] || 0) * 1000).toFixed(1)),
+    zinc: parseFloat(((n['zinc_100g'] || 0) * 1000).toFixed(2)),
+    sodium: parseFloat(((n['sodium_100g'] || 0) * 1000).toFixed(1)),
+    cuivre: parseFloat(((n['copper_100g'] || 0) * 1000).toFixed(2)),
+    iode: parseFloat(((n['iodine_100g'] || 0) * 1000000).toFixed(1)),
+    manganese: parseFloat(((n['manganese_100g'] || 0) * 1000).toFixed(2)),
+    phosphore: parseFloat(((n['phosphorus_100g'] || 0) * 1000).toFixed(1)),
+    selenium: parseFloat(((n['selenium_100g'] || 0) * 1000000).toFixed(1)),
+    vit_b1: parseFloat(((n['vitamin-b1_100g'] || 0) * 1000).toFixed(3)),
+    vit_b2: parseFloat(((n['vitamin-b2_100g'] || 0) * 1000).toFixed(3)),
+    vit_b3: parseFloat(((n['vitamin-pp_100g'] || 0) * 1000).toFixed(2)),
+    vit_b5: parseFloat(((n['pantothenic-acid_100g'] || 0) * 1000).toFixed(2)),
+    vit_b6: parseFloat(((n['vitamin-b6_100g'] || 0) * 1000).toFixed(3)),
+    vit_b12: parseFloat(((n['vitamin-b12_100g'] || 0) * 1000000).toFixed(3)),
+    vit_a: parseFloat(((n['vitamin-a_100g'] || 0) * 1000000).toFixed(2)),
+    vit_e_totale: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
+    vit_k1: parseFloat(((n['vitamin-k_100g'] || 0) * 1000000).toFixed(2)),
+    folates: parseFloat(((n['folates_100g'] || 0) * 1000000).toFixed(1)),
+    portions: p.serving_size ? [{ label: 'Portion recommandée', g: parseFloat(p.serving_size) || 100 }] : [],
+    _source: 'off',
+  }
+}

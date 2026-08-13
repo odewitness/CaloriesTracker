@@ -8,6 +8,10 @@ import { useRecentFoods } from '../hooks/useRecentFoods'
 import BarcodeScanner from './BarcodeScanner'
 import { useBackButton } from '../hooks/useBackButton'
 import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
+import { mapOFFProduct } from '../lib/openFoodFacts'
+import MacroPreview from './MacroPreview'
+import FoodRow from './FoodRow'
+import FavSortToggle from './FavSortToggle'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FoodPicker — composant unique de recherche + configuration de grammage
@@ -27,85 +31,6 @@ import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
 //                          champs additionnels (meal, recette_id...)
 //   onClose        — ferme le picker
 // ─────────────────────────────────────────────────────────────────────────────
-
-function MacroPreview({ food, qty }) {
-  const f = (parseFloat(qty) || 0) / 100
-  const items = [
-    { label: 'kcal', val: Math.round((food.energie_kcal || 0) * f), color: 'var(--text)' },
-    { label: 'Prot.', val: `${((food.proteines || 0) * f).toFixed(1)}g`, color: 'var(--green)' },
-    { label: 'Gluc.', val: `${((food.glucides || 0) * f).toFixed(1)}g`, color: 'var(--amber)' },
-    { label: 'Lip.',  val: `${((food.lipides || 0) * f).toFixed(1)}g`,  color: 'var(--coral)' },
-  ]
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 16 }}>
-      {items.map(({ label, val, color }) => (
-        <div key={label} style={{ background: 'var(--gray-bg)', borderRadius: 8, padding: '8px 4px', textAlign: 'center' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color }}>{val}</div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{label}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function FoodRow({ food, isFav, onSelect, onToggleFav }) {
-  return (
-    <div
-      onClick={() => onSelect(food)}
-      style={{ display: 'flex', alignItems: 'center', padding: '10px 4px', borderBottom: '0.5px solid var(--border)', cursor: 'pointer', gap: 8 }}
-    >
-      <button
-        onClick={e => { e.stopPropagation(); onToggleFav(food) }}
-        className="btn-icon"
-        style={{ flexShrink: 0, color: isFav ? 'var(--amber)' : 'var(--text-hint)' }}
-        aria-label={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-      >
-        <Star size={16} fill={isFav ? 'var(--amber)' : 'none'} />
-      </button>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>{food.alim_nom}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-          {food._source === 'off' ? (food.marque || food.categorie) : food.categorie}
-          {food._source === 'custom' && <span style={{ marginLeft: 6, background: 'var(--purple-light)', color: 'var(--purple)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Perso</span>}
-          {food._source === 'off' && <span style={{ marginLeft: 6, background: 'var(--blue-light)', color: 'var(--blue)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>OFF</span>}
-          {food._source === 'recette' && <span style={{ marginLeft: 6, background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>Mes recettes</span>}
-        </div>
-      </div>
-      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-dark)', flexShrink: 0 }}>{food.energie_kcal} kcal/100g</span>
-    </div>
-  )
-}
-
-const FAV_SORTS = [
-  { id: 'recent', label: 'Récents' },
-  { id: 'alpha',  label: 'A→Z' },
-  { id: 'most',   label: 'Top' },
-]
-
-function FavSortToggle({ value, onChange }) {
-  return (
-    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-      {FAV_SORTS.map(s => {
-        const active = value === s.id
-        return (
-          <button
-            key={s.id}
-            onClick={() => onChange(s.id)}
-            style={{
-              fontSize: 11, fontWeight: 700, fontFamily: 'var(--font)',
-              padding: '3px 9px', borderRadius: 20, border: 'none',
-              background: active ? 'var(--green)' : 'var(--gray-bg)',
-              color: active ? 'white' : 'var(--text-muted)',
-              transition: 'all .15s',
-            }}
-          >
-            {s.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 export default function FoodPicker({
   title = 'Ajouter un aliment',
@@ -176,51 +101,6 @@ export default function FoodPicker({
     const t = setTimeout(() => searchRef.current?.focus(), 50)
     return () => clearTimeout(t)
   }, [step])
-
-  const mapOFFProduct = (p) => {
-    const n = p.nutriments || {}
-    return {
-      alim_nom: p.product_name || p.product_name_fr || 'Produit inconnu',
-      categorie: p.categories?.split(',')[0]?.trim() || 'Open Food Facts',
-      marque: p.brands?.split(',')[0]?.trim() || '',
-      energie_kcal: Math.round(n['energy-kcal_100g'] || (n['energy_100g'] || 0) / 4.184),
-      proteines: parseFloat((n['proteins_100g'] || 0).toFixed(1)),
-      glucides: parseFloat((n['carbohydrates_100g'] || 0).toFixed(1)),
-      lipides: parseFloat((n['fat_100g'] || 0).toFixed(1)),
-      fibres: parseFloat((n['fiber_100g'] || 0).toFixed(1)),
-      vit_c: parseFloat(((n['vitamin-c_100g'] || 0) * 1000).toFixed(2)),
-      vit_d: parseFloat(((n['vitamin-d_100g'] || 0) * 1000000).toFixed(2)),
-      calcium: parseFloat(((n['calcium_100g'] || 0) * 1000).toFixed(1)),
-      fer: parseFloat(((n['iron_100g'] || 0) * 1000).toFixed(2)),
-      sucres: parseFloat((n['sugars_100g'] || 0).toFixed(1)),
-      acides_gras_satures: parseFloat((n['saturated-fat_100g'] || 0).toFixed(2)),
-      ag_monoinsatures: parseFloat((n['monounsaturated-fat_100g'] || 0).toFixed(2)),
-      ag_polyinsatures: parseFloat((n['polyunsaturated-fat_100g'] || 0).toFixed(2)),
-      cholesterol: parseFloat(((n['cholesterol_100g'] || 0) * 1000).toFixed(1)),
-      sel: parseFloat((n['salt_100g'] || 0).toFixed(2)),
-      magnesium: parseFloat(((n['magnesium_100g'] || 0) * 1000).toFixed(1)),
-      potassium: parseFloat(((n['potassium_100g'] || 0) * 1000).toFixed(1)),
-      zinc: parseFloat(((n['zinc_100g'] || 0) * 1000).toFixed(2)),
-      sodium: parseFloat(((n['sodium_100g'] || 0) * 1000).toFixed(1)),
-      cuivre: parseFloat(((n['copper_100g'] || 0) * 1000).toFixed(2)),
-      iode: parseFloat(((n['iodine_100g'] || 0) * 1000000).toFixed(1)),
-      manganese: parseFloat(((n['manganese_100g'] || 0) * 1000).toFixed(2)),
-      phosphore: parseFloat(((n['phosphorus_100g'] || 0) * 1000).toFixed(1)),
-      selenium: parseFloat(((n['selenium_100g'] || 0) * 1000000).toFixed(1)),
-      vit_b1: parseFloat(((n['vitamin-b1_100g'] || 0) * 1000).toFixed(3)),
-      vit_b2: parseFloat(((n['vitamin-b2_100g'] || 0) * 1000).toFixed(3)),
-      vit_b3: parseFloat(((n['vitamin-pp_100g'] || 0) * 1000).toFixed(2)),
-      vit_b5: parseFloat(((n['pantothenic-acid_100g'] || 0) * 1000).toFixed(2)),
-      vit_b6: parseFloat(((n['vitamin-b6_100g'] || 0) * 1000).toFixed(3)),
-      vit_b12: parseFloat(((n['vitamin-b12_100g'] || 0) * 1000000).toFixed(3)),
-      vit_a: parseFloat(((n['vitamin-a_100g'] || 0) * 1000000).toFixed(2)),
-      vit_e_totale: parseFloat(((n['vitamin-e_100g'] || 0) * 1000).toFixed(2)),
-      vit_k1: parseFloat(((n['vitamin-k_100g'] || 0) * 1000000).toFixed(2)),
-      folates: parseFloat(((n['folates_100g'] || 0) * 1000000).toFixed(1)),
-      portions: p.serving_size ? [{ label: 'Portion recommandée', g: parseFloat(p.serving_size) || 100 }] : [],
-      _source: 'off',
-    }
-  }
 
   const doSearch = useCallback(async (q) => {
     if (!q || q.length < 2) { setResults([]); return }
