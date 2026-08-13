@@ -6,6 +6,7 @@ import AddFromRecipeModal from '../components/AddFromRecipeModal'
 import AddFromMealModal from '../components/AddFromMealModal'
 import FoodPicker from '../components/FoodPicker'
 import Loader from '../components/Loader'
+import FieldLabel from '../components/FieldLabel'
 import EmptyState from '../components/EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,16 +71,16 @@ function QuickAddForm({ onAdd, onClose }) {
       </div>
       <div className="page-modal-body">
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Nom *</div>
+          <FieldLabel>Nom *</FieldLabel>
           <input className="input" placeholder="Ex: Sacs poubelle" value={nom} onChange={e => setNom(e.target.value)} autoFocus />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Quantité (g, optionnel)</div>
+            <FieldLabel>Quantité (g, optionnel)</FieldLabel>
             <input className="input" type="number" min={0} placeholder="—" value={qty} onChange={e => setQty(e.target.value)} />
           </div>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Catégorie</div>
+            <FieldLabel>Catégorie</FieldLabel>
             <input className="input" list="categories-suggestions" value={categorie} onChange={e => setCategorie(e.target.value)} />
             <datalist id="categories-suggestions">
               {CATEGORIES_SUGGESTIONS.map(c => <option key={c} value={c} />)}

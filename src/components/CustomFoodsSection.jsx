@@ -6,6 +6,7 @@ import { useAuth } from '../lib/AuthContext'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
+import FieldLabel from './FieldLabel'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -47,9 +48,9 @@ const EMPTY_FORM = {
 function MacroField({ label, id, value, onChange, unit = 'g', required = false, placeholder = '0' }) {
   return (
     <div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+      <FieldLabel>
         {label}{required ? ' *' : ''}
-      </div>
+      </FieldLabel>
       <div style={{ position: 'relative' }}>
         <input
           className="input"
@@ -97,7 +98,7 @@ function ExtraSection({ title, fields, extra, setExtraField }) {
         <div style={{ padding: '0 16px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {fields.map(f => (
             <div key={f.key}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{f.label}</div>
+              <FieldLabel>{f.label}</FieldLabel>
               <div style={{ position: 'relative' }}>
                 <input
                   className="input"
@@ -261,7 +262,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   // ─────────────────────────────────────────────────────────────────────────
   if (view === 'form') {
     return (
-      <div className="page-content">
+      <>
         {/* ── En-tête formulaire ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <button className="btn-icon" onClick={() => { resetForm(); setView('list') }} style={{ marginLeft: -8 }}>
@@ -280,7 +281,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
           <div className="section-title">Informations</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Nom *</div>
+              <FieldLabel>Nom *</FieldLabel>
               <input
                 className="input"
                 placeholder="Ex: Galette de riz maison"
@@ -290,11 +291,11 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Marque</div>
+                <FieldLabel>Marque</FieldLabel>
                 <input className="input" placeholder="Optionnel" value={form.marque} onChange={e => set('marque', e.target.value)} />
               </div>
               <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Catégorie</div>
+                <FieldLabel>Catégorie</FieldLabel>
                 <input className="input" placeholder="Personnalisé" value={form.categorie} onChange={e => set('categorie', e.target.value)} />
               </div>
             </div>
@@ -408,7 +409,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
         <div style={{ fontSize: 12, color: 'var(--text-hint)', textAlign: 'center', marginTop: 10 }}>
           L'aliment sera disponible dans la recherche
         </div>
-      </div>
+      </>
     )
   }
 

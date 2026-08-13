@@ -64,70 +64,75 @@ export default function ManualPage() {
   const foodsRef = useRef(null)
   const recipesRef = useRef(null)
 
-  if (alimentFormOpen) {
-    return <CustomFoodsSection ref={foodsRef} active={false} onFormOpenChange={setAlimentFormOpen} />
-  }
-
+  // Un SEUL <div className="page-content"> englobant, toujours monté — et
+  // CustomFoodsSection/RecipesSection toujours rendus dedans, dans une
+  // position stable de l'arbre (jamais dans deux branches différentes du
+  // return). Ça évite tout remontage (donc toute perte d'état : formulaire
+  // aliment en cours de saisie, recherche/tri recettes...) quand
+  // alimentFormOpen bascule. Seuls le header et le switch d'onglets — sans
+  // état propre à préserver — sont masqués pendant que le formulaire aliment
+  // prend toute la page, pour reproduire le "plein écran" d'avant.
   return (
-    <>
-      <div className="page-content">
-        {/* ── Header ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 20 }}>Mes aliments</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aliments et recettes personnalisés</div>
+    <div className="page-content">
+      {!alimentFormOpen && (
+        <>
+          {/* ── Header ── */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 20 }}>Mes aliments</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aliments et recettes personnalisés</div>
+            </div>
+            <div style={{ position: 'relative' }} ref={menuBtnRef}>
+              <button
+                onClick={() => setMenuOpen(o => !o)}
+                style={{ background: 'var(--green)', color: 'white', borderRadius: 10, padding: '9px 14px', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}
+              >
+                <Plus size={16} /> Nouveau
+              </button>
+              {menuOpen && (
+                <NewMenu
+                  onClose={() => setMenuOpen(false)}
+                  onNewAliment={() => foodsRef.current?.startNew()}
+                  onNewRecette={() => recipesRef.current?.openNew()}
+                />
+              )}
+            </div>
           </div>
-          <div style={{ position: 'relative' }} ref={menuBtnRef}>
-            <button
-              onClick={() => setMenuOpen(o => !o)}
-              style={{ background: 'var(--green)', color: 'white', borderRadius: 10, padding: '9px 14px', fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}
-            >
-              <Plus size={16} /> Nouveau
-            </button>
-            {menuOpen && (
-              <NewMenu
-                onClose={() => setMenuOpen(false)}
-                onNewAliment={() => foodsRef.current?.startNew()}
-                onNewRecette={() => recipesRef.current?.openNew()}
-              />
-            )}
+
+          {/* ── Switch tabs ── */}
+          <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, marginBottom: 16 }}>
+            {[
+              { key: 'aliments', label: 'Aliments', icon: <Apple size={14} /> },
+              { key: 'recettes', label: 'Recettes', icon: <UtensilsCrossed size={14} /> },
+              { key: 'repas',    label: 'Repas types', icon: <CalendarDays size={14} /> },
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
+                  background: tab === t.key ? 'var(--white)' : 'transparent',
+                  color:      tab === t.key ? 'var(--text)'  : 'var(--text-muted)',
+                  boxShadow:  tab === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all .15s',
+                }}
+              >
+                {t.icon} {t.label}
+              </button>
+            ))}
           </div>
-        </div>
+        </>
+      )}
 
-        {/* ── Switch tabs ── */}
-        <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, marginBottom: 16 }}>
-          {[
-            { key: 'aliments', label: 'Aliments', icon: <Apple size={14} /> },
-            { key: 'recettes', label: 'Recettes', icon: <UtensilsCrossed size={14} /> },
-            { key: 'repas',    label: 'Repas types', icon: <CalendarDays size={14} /> },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
-                background: tab === t.key ? 'var(--white)' : 'transparent',
-                color:      tab === t.key ? 'var(--text)'  : 'var(--text-muted)',
-                boxShadow:  tab === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all .15s',
-              }}
-            >
-              {t.icon} {t.label}
-            </button>
-          ))}
-        </div>
+      {/* ── Onglet Aliments ── */}
+      <CustomFoodsSection ref={foodsRef} active={tab === 'aliments'} onFormOpenChange={setAlimentFormOpen} />
 
-        {/* ── Onglet Aliments ── */}
-        <CustomFoodsSection ref={foodsRef} active={tab === 'aliments'} onFormOpenChange={setAlimentFormOpen} />
+      {/* ── Onglet Recettes ── */}
+      <RecipesSection ref={recipesRef} active={tab === 'recettes' && !alimentFormOpen} />
 
-        {/* ── Onglet Recettes ── */}
-        <RecipesSection ref={recipesRef} active={tab === 'recettes'} />
-
-        {/* ── Onglet Repas types ── */}
-        {tab === 'repas' && <MealTemplatesSection />}
-
-      </div>
-    </>
+      {/* ── Onglet Repas types ── */}
+      {tab === 'repas' && !alimentFormOpen && <MealTemplatesSection />}
+    </div>
   )
 }

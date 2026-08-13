@@ -8,6 +8,7 @@ import FoodPicker from './FoodPicker'
 import EditableFoodRow from './EditableFoodRow'
 import { scaleFood } from '../lib/nutrients'
 import EmptyState from './EmptyState'
+import FieldLabel from './FieldLabel'
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -124,11 +125,11 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
         {/* ── Nom + portions ── */}
         <div className="card" style={{ padding: 16, marginBottom: 12 }}>
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Nom de la recette *</div>
+            <FieldLabel>Nom de la recette *</FieldLabel>
             <input className="input" placeholder="Ex: Poulet rôti aux légumes" value={nom} onChange={e => setNom(e.target.value)} />
           </div>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Nombre de portions</div>
+            <FieldLabel>Nombre de portions</FieldLabel>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <input className="input-sm" type="number" min={1} value={portions} onChange={e => setPortions(e.target.value)} style={{ width: 70 }} />
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>portion{parseInt(portions) > 1 ? 's' : ''}</span>
@@ -198,9 +199,9 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
 
                 {/* ① Tare */}
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <FieldLabel>
                     ① Poids du récipient <strong>vide</strong> (tare)
-                  </div>
+                  </FieldLabel>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <input
                       className="input-sm" type="text" inputMode="decimal"
@@ -218,9 +219,9 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
 
                 {/* ② Poids total brut */}
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <FieldLabel>
                     ② Poids total après cuisson <strong>(récipient + nourriture)</strong>
-                  </div>
+                  </FieldLabel>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <input
                       className="input-sm" type="text" inputMode="decimal"
@@ -251,9 +252,9 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
 
                 {/* Poids cuit direct (désactivé si méthode tare active) */}
                 <div style={{ marginBottom: 10, opacity: poidsCuitFromTare > 0 ? 0.45 : 1 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <FieldLabel>
                     Poids cuit net {poidsCuitFromTare > 0 ? <span style={{ color: 'var(--text-hint)' }}>(remplacé par la méthode tare)</span> : <strong>direct</strong>}
-                  </div>
+                  </FieldLabel>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <input
                       className="input-sm" type="text" inputMode="decimal"
