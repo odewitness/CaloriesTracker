@@ -4,6 +4,7 @@ import EditMealTemplatePage from './EditMealTemplatePage'
 import { useMealTemplateDetail, saveMealTemplate } from '../hooks/useMealTemplates'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
+import Loader from './Loader'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MealTemplateDetailWrapper — charge un repas type par id et affiche sa "page
@@ -28,7 +29,7 @@ export default function MealTemplateDetailWrapper({ repasTypeId, onClose, onSave
           <h2>Repas type</h2>
           <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
         </div>
-        <div className="loader"><div className="spinner" /> Chargement...</div>
+        <Loader />
       </div>
     )
   }

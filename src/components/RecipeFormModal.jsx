@@ -7,6 +7,7 @@ import { useBackButton } from '../hooks/useBackButton'
 import FoodPicker from './FoodPicker'
 import EditableFoodRow from './EditableFoodRow'
 import { scaleFood } from '../lib/nutrients'
+import EmptyState from './EmptyState'
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,7 +148,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
         </div>
 
         {ingredients.length === 0 && (
-          <div className="empty" style={{ padding: '24px 0' }}>Aucun ingrédient · appuie sur + Ajouter</div>
+          <EmptyState style={{ padding: '24px 0' }}>Aucun ingrédient · appuie sur + Ajouter</EmptyState>
         )}
 
         {ingredients.map((ing, idx) => (

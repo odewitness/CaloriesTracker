@@ -9,6 +9,8 @@ import { createPlannedMeal } from '../hooks/usePlannedMeals'
 import FoodPicker from './FoodPicker'
 import AddFromRecipeModal from './AddFromRecipeModal'
 import { fmt } from '../lib/dates'
+import Loader from './Loader'
+import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RepasTypePicker — étape "choisir un repas type" (liste simple, comme
@@ -37,13 +39,9 @@ function RepasTypePicker({ onSelect, onClose }) {
         <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
       </div>
       <div className="page-modal-body">
-        {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+        {loading && <Loader />}
         {!loading && repasList.length === 0 && (
-          <div className="empty">
-            <UtensilsCrossed size={40} />
-            <div style={{ marginTop: 8, fontWeight: 600 }}>Aucun repas type</div>
-            <div style={{ marginTop: 4 }}>Crée d'abord un repas type dans "Mes aliments"</div>
-          </div>
+          <EmptyState icon={<UtensilsCrossed size={40} />} title="Aucun repas type" description={`Crée d'abord un repas type dans "Mes aliments"`} />
         )}
         {repasList.map(r => {
           const kcal = (r.items || []).reduce((s, i) => s + (i.energie_kcal || 0), 0)

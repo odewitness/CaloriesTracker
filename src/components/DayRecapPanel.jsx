@@ -18,6 +18,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, markAsEaten } from '../hooks/usePlannedMeals'
 import { computeTotals, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
+import Loader from './Loader'
 import { fmt } from '../lib/dates'
 
 function dateLabel(date) {
@@ -91,7 +92,7 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
     else toast('Erreur')
   }
   if (loading) {
-    return <div className="loader"><div className="spinner" /> Chargement...</div>
+    return <Loader />
   }
 
   return (

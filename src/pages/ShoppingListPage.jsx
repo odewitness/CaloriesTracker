@@ -5,6 +5,8 @@ import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingList
 import AddFromRecipeModal from '../components/AddFromRecipeModal'
 import AddFromMealModal from '../components/AddFromMealModal'
 import FoodPicker from '../components/FoodPicker'
+import Loader from '../components/Loader'
+import EmptyState from '../components/EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NameModal — création / renommage d'une liste
@@ -235,14 +237,10 @@ function ListeDetail({ liste, onBack }) {
       </div>
 
       <div style={{ marginTop: 16, paddingBottom: 90 }}>
-        {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+        {loading && <Loader />}
 
         {!loading && items.length === 0 && (
-          <div className="empty">
-            <ShoppingCart size={40} />
-            <div style={{ marginTop: 8, fontWeight: 600 }}>Liste vide</div>
-            <div style={{ marginTop: 4 }}>Ajoute des articles avec le bouton "+"</div>
-          </div>
+          <EmptyState icon={<ShoppingCart size={40} />} title="Liste vide" description='Ajoute des articles avec le bouton "+"' />
         )}
 
         {grouped.map(([cat, catItems]) => (
@@ -384,14 +382,10 @@ export default function ShoppingListPage() {
         </button>
       </div>
 
-      {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+      {loading && <Loader />}
 
       {!loading && listes.length === 0 && (
-        <div className="empty">
-          <ShoppingCart size={40} />
-          <div style={{ marginTop: 8, fontWeight: 600 }}>Aucune liste</div>
-          <div style={{ marginTop: 4 }}>Crée ta première liste de courses</div>
-        </div>
+        <EmptyState icon={<ShoppingCart size={40} />} title="Aucune liste" description="Crée ta première liste de courses" />
       )}
 
       {listes.map(l => (

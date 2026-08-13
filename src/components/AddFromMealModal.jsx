@@ -3,6 +3,8 @@ import { X, Search, Check, ArrowLeft, Minus, Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { useBackButton } from '../hooks/useBackButton'
+import Loader from './Loader'
+import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AddFromMealModal
@@ -77,15 +79,13 @@ export default function AddFromMealModal({ onAdd, onClose }) {
           />
         </div>
 
-        {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+        {loading && <Loader />}
 
         {!loading && filtered.length === 0 && (
-          <div className="empty">
-            <div style={{ marginTop: 8, fontWeight: 600 }}>Aucun repas type</div>
-            {repasList.length === 0 && (
-              <div style={{ marginTop: 4 }}>Crée d'abord un repas type dans "Mes aliments"</div>
-            )}
-          </div>
+          <EmptyState
+            title="Aucun repas type"
+            description={repasList.length === 0 ? 'Crée d\'abord un repas type dans "Mes aliments"' : null}
+          />
         )}
 
         {filtered.map(r => {

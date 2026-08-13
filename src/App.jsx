@@ -10,6 +10,7 @@ import ShoppingListPage from './pages/ShoppingListPage'
 import HistoryPage from './pages/HistoryPage'
 import ProfilePage from './pages/ProfilePage'
 import CalendarPage from './pages/CalendarPage'
+import Loader from './components/Loader'
 
 const TABS = [
   { path: '/today',    label: "Aujourd'hui", icon: HomeIcon },
@@ -232,7 +233,7 @@ function Gate() {
   if (authLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <div className="loader"><div className="spinner" /> Chargement...</div>
+        <Loader />
       </div>
     )
   }

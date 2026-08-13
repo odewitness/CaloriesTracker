@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill } from 'lucide-react'
 import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
+import Loader from '../components/Loader'
 
 const MEAL_ICONS = { 'Petit-déjeuner': Coffee, 'Déjeuner': Sun, 'Dîner': Moon, 'Collation': Cookie }
 
@@ -236,7 +237,7 @@ export default function ProfilePage() {
     await signOut()
   }
 
-  if (profileLoading || settingsLoading || !goals) return <div className="loader"><div className="spinner" /> Chargement...</div>
+  if (profileLoading || settingsLoading || !goals) return <Loader />
 
   const initials = ((prenom?.[0] || '') + (nom?.[0] || '')).toUpperCase() || (user?.email?.[0] || '?').toUpperCase()
 

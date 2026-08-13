@@ -7,6 +7,8 @@ import RecipeDetailWrapper from './RecipeDetailWrapper'
 import PlanMealModal from './PlanMealModal'
 import SortModal from './SortModal'
 import { DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort } from '../lib/recipeSort'
+import Loader from './Loader'
+import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RecipeCard — carte d'une recette dans la liste
@@ -110,7 +112,7 @@ function RecipeEditWrapper({ recette, onSaved, onClose }) {
         <h2>Chargement...</h2>
         <button className="btn-icon" onClick={() => window.history.back()}><X size={20} color="var(--text-muted)" /></button>
       </div>
-      <div className="loader"><div className="spinner" /> Chargement...</div>
+      <Loader />
     </div>
   )
   return <RecipeFormModal recette={recette} ingredients={ingredients} onSaved={onSaved} onClose={onClose} />
@@ -203,20 +205,16 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
             </div>
           )}
 
-          {loadingRecettes && <div className="loader"><div className="spinner" /> Chargement...</div>}
+          {loadingRecettes && <Loader />}
 
           {!loadingRecettes && sortedFilteredRecettes.length === 0 && (
-            <div className="empty">
-              <UtensilsCrossed size={40} />
-              <div style={{ marginTop: 8, fontWeight: 600 }}>
-                {recipeSearch ? 'Aucun résultat' : 'Aucune recette'}
-              </div>
-              <div style={{ marginTop: 4 }}>
-                {recipeSearch
-                  ? `Aucune recette ni ingrédient ne correspond à "${recipeSearch}"`
-                  : "Crée ta première recette pour calculer les calories de tes plats maison"}
-              </div>
-            </div>
+            <EmptyState
+              icon={<UtensilsCrossed size={40} />}
+              title={recipeSearch ? 'Aucun résultat' : 'Aucune recette'}
+              description={recipeSearch
+                ? `Aucune recette ni ingrédient ne correspond à "${recipeSearch}"`
+                : "Crée ta première recette pour calculer les calories de tes plats maison"}
+            />
           )}
 
           {sortedFilteredRecettes.map(r => (

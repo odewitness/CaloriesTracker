@@ -3,6 +3,8 @@ import { X, Search, Check, ArrowLeft, Minus, Plus } from 'lucide-react'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import { useBackButton } from '../hooks/useBackButton'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import Loader from './Loader'
+import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AddFromRecipeModal
@@ -61,15 +63,13 @@ export default function AddFromRecipeModal({ onAdd, onClose, defaultPortions }) 
           />
         </div>
 
-        {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+        {loading && <Loader />}
 
         {!loading && filtered.length === 0 && (
-          <div className="empty">
-            <div style={{ marginTop: 8, fontWeight: 600 }}>Aucune recette</div>
-            {recettes.length === 0 && (
-              <div style={{ marginTop: 4 }}>Crée d'abord une recette dans "Mes aliments"</div>
-            )}
-          </div>
+          <EmptyState
+            title="Aucune recette"
+            description={recettes.length === 0 ? 'Crée d\'abord une recette dans "Mes aliments"' : null}
+          />
         )}
 
         {filtered.map(r => (
@@ -191,7 +191,7 @@ function IngredientPicker({ recette, onBack, onAdd, onClose, defaultPortions }) 
         <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
       </div>
       <div className="page-modal-body">
-        {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+        {loading && <Loader />}
 
         {!loading && (
           <>

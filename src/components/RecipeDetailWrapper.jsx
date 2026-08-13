@@ -2,6 +2,7 @@ import React from 'react'
 import { X } from 'lucide-react'
 import RecipeDetailModal from './RecipeDetailModal'
 import { useRecetteDetail } from '../hooks/useRecipes'
+import Loader from './Loader'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RecipeDetailWrapper — charge une recette + ses ingrédients par id et
@@ -27,7 +28,7 @@ export default function RecipeDetailWrapper({ recetteId, onEdit, onDelete, onClo
           <h2>Recette</h2>
           <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
         </div>
-        <div className="loader"><div className="spinner" /> Chargement...</div>
+        <Loader />
       </div>
     )
   }

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { X, ChevronRight } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import FoodDetailModal from './FoodDetailModal'
+import EmptyState from './EmptyState'
 
 function fmtVal(val, unit) {
   if (val == null) return '—'
@@ -63,9 +64,9 @@ const rows = useMemo(() => {
 
       <div className="page-modal-body">
         {rows.length === 0 ? (
-          <div className="empty">
+          <EmptyState>
             Aucun aliment renseigné ne contient de {field.label.toLowerCase()} sur cette période.
-          </div>
+          </EmptyState>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {rows.map((r, i) => {

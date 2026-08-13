@@ -9,6 +9,8 @@ import PlanMealModal from './PlanMealModal'
 import EditMealTemplatePage from './EditMealTemplatePage'
 import { useBackButton } from '../hooks/useBackButton'
 import { saveMealTemplate, deleteMealTemplate } from '../hooks/useMealTemplates'
+import Loader from './Loader'
+import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ce fichier est l'ex-MealsPage.jsx, extrait pour vivre comme 3e onglet de
@@ -198,14 +200,10 @@ export default function MealTemplatesSection() {
         </button>
       </div>
 
-      {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+      {loading && <Loader />}
 
       {!loading && repasList.length === 0 && (
-        <div className="empty">
-          <UtensilsCrossed size={40} />
-          <div style={{ marginTop: 8, fontWeight: 600 }}>Aucun repas type</div>
-          <div style={{ marginTop: 4 }}>Crée des groupes d'aliments pour les réutiliser facilement</div>
-        </div>
+        <EmptyState icon={<UtensilsCrossed size={40} />} title="Aucun repas type" description="Crée des groupes d'aliments pour les réutiliser facilement" />
       )}
 
       {repasList.map(r => (

@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import Loader from './Loader'
+import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -414,13 +416,9 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
 
   return (
     <>
-      {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+      {loading && <Loader />}
       {!loading && aliments.length === 0 && (
-        <div className="empty">
-          <Apple size={40} />
-          <div style={{ marginTop: 8, fontWeight: 600 }}>Aucun aliment personnalisé</div>
-          <div style={{ marginTop: 4 }}>Ajoute un aliment qui n'existe pas dans Ciqual</div>
-        </div>
+        <EmptyState icon={<Apple size={40} />} title="Aucun aliment personnalisé" description="Ajoute un aliment qui n'existe pas dans Ciqual" />
       )}
       {aliments.map(a => <FoodCard key={a.id} aliment={a} onEdit={startEdit} onDelete={handleDelete} />)}
     </>

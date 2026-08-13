@@ -5,6 +5,8 @@ import { ALL_NUTRIENT_KEYS, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import AddFoodModal from './AddFoodModal'
 import { useJournal } from '../hooks/useJournal'
 import { useBackButton } from '../hooks/useBackButton'
+import Loader from './Loader'
+import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Extrait de MealTemplatesSection.jsx, pour être réutilisable comme "page dédiée"
@@ -114,12 +116,12 @@ function ImportFromDayModal({ onImport, onClose }) {
           })}
         </div>
 
-        {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+        {loading && <Loader />}
 
         {!loading && mealEntries.length === 0 && (
-          <div className="empty" style={{ padding: '20px 10px' }}>
+          <EmptyState style={{ padding: '20px 10px' }}>
             Aucun aliment enregistré pour « {selectedMeal} » à cette date
-          </div>
+          </EmptyState>
         )}
 
         {!loading && mealEntries.length > 0 && (
@@ -298,7 +300,7 @@ export default function EditMealTemplatePage({ repas, onSave, onClose }) {
           </div>
 
           {items.length === 0 && (
-            <div className="empty" style={{ padding: '20px 10px' }}>Aucun aliment ajouté</div>
+            <EmptyState style={{ padding: '20px 10px' }}>Aucun aliment ajouté</EmptyState>
           )}
 
           {items.map((item, i) => (

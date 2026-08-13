@@ -8,6 +8,8 @@ import CalorieRing from '../components/CalorieRing'
 import VitaminPanel from '../components/VitaminPanel'
 import NutrientDetails from '../components/NutrientDetails'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import Loader from '../components/Loader'
+import EmptyState from '../components/EmptyState'
 
 const TABS = [
   { key: 'jour', label: 'Jour' },
@@ -328,14 +330,10 @@ export default function HistoryPage() {
       )}
       {isCurrentPeriod && <div style={{ marginBottom: 16 }} />}
 
-      {loading && <div className="loader"><div className="spinner" /> Chargement...</div>}
+      {loading && <Loader />}
 
       {!loading && !hasEntries && (
-        <div className="empty">
-          <TrendingDown size={40} />
-          <div style={{ marginTop: 8, fontWeight: 600 }}>Aucune donnée sur cette période</div>
-          <div style={{ marginTop: 4 }}>Logge tes repas pour voir tes stats ici</div>
-        </div>
+        <EmptyState icon={<TrendingDown size={40} />} title="Aucune donnée sur cette période" description="Logge tes repas pour voir tes stats ici" />
       )}
 
       {!loading && hasEntries && (

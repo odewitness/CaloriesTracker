@@ -12,6 +12,8 @@ import { mapOFFProduct } from '../lib/openFoodFacts'
 import MacroPreview from './MacroPreview'
 import FoodRow from './FoodRow'
 import FavSortToggle from './FavSortToggle'
+import Loader from './Loader'
+import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FoodPicker — composant unique de recherche + configuration de grammage
@@ -378,14 +380,14 @@ const selectFood = async (food) => {
 
             {/* Results — scrollable, prend tout l'espace restant */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              {searching && <div className="loader"><div className="spinner" /> Recherche...</div>}
+              {searching && <Loader label="Recherche..." />}
 
               {!searching && query.length >= 2 && results.length === 0 && (
-                <div className="empty">
+                <EmptyState>
                   {searchSource === 'off'
                     ? `Aucun résultat dans Open Food Facts pour « ${query} »`
                     : `Aucun résultat pour « ${query} »`}
-                </div>
+                </EmptyState>
               )}
 
               {!searching && query.length >= 2 && results.map((food, i) => (
@@ -444,11 +446,11 @@ const selectFood = async (food) => {
                   )}
 
                   {(searchSource === 'off' || (favorites.length === 0 && recentsMerged.length === 0)) && (
-                    <div className="empty">
+                    <EmptyState>
                       {searchSource === 'off'
                         ? 'Tape le nom d\'un produit emballé (marque, référence…)'
                         : 'Tape au moins 2 caractères'}
-                    </div>
+                    </EmptyState>
                   )}
                 </>
               )}
