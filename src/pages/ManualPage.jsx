@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef, useMemo  } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple, UtensilsCrossed, X, Search, CalendarDays  } from 'lucide-react'
+import { PlusCircle, ChevronDown, ChevronLeft, Plus, Pencil, Trash2, Apple, UtensilsCrossed, X, Search, CalendarDays, ArrowUpDown  } from 'lucide-react'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import RecipeFormModal from '../components/RecipeFormModal'
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealsSection from '../components/MealsSection'
 import PlanMealModal from '../components/PlanMealModal'
+import SortModal from '../components/SortModal'
+import { DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort } from '../lib/recipeSort'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -301,7 +303,7 @@ export default function ManualPage() {
   const toast    = useToast()
   const { user } = useAuth()
 
-  // ── Onglet actif : 'aliments' | 'recettes' ──────────────────────────────
+  // ── Onglet actif : 'aliments' | 'recettes' | 'repas' ────────────────────
   const [tab, setTab] = useState('aliments')
 
   // ── Aliments ─────────────────────────────────────────────────────────────
@@ -316,20 +318,32 @@ export default function ManualPage() {
 
   // ── Recettes ──────────────────────────────────────────────────────────────
   const { recettes, ingredientsByRecette, loading: loadingRecettes, deleteRecette, refetch: refetchRecettes } = useRecipes()
-const [recipeSearch, setRecipeSearch] = useState('')
+  const [recipeSearch, setRecipeSearch] = useState('')
 
-// Normalise pour une recherche insensible à la casse et aux accents
-const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  // Normalise pour une recherche insensible à la casse et aux accents
+  const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
-const filteredRecettes = useMemo(() => {
-  const q = normalize(recipeSearch.trim())
-  if (!q) return recettes
-  return recettes.filter(r => {
-    if (normalize(r.nom).includes(q)) return true
-    const ings = ingredientsByRecette[r.id] || []
-    return ings.some(ing => normalize(ing.food_name).includes(q))
-  })
-}, [recettes, ingredientsByRecette, recipeSearch])
+  const filteredRecettes = useMemo(() => {
+    const q = normalize(recipeSearch.trim())
+    if (!q) return recettes
+    return recettes.filter(r => {
+      if (normalize(r.nom).includes(q)) return true
+      const ings = ingredientsByRecette[r.id] || []
+      return ings.some(ing => normalize(ing.food_name).includes(q))
+    })
+  }, [recettes, ingredientsByRecette, recipeSearch])
+
+  // ── Tri des recettes ──────────────────────────────────────────────────────
+  const [recipeSort, setRecipeSort] = useState(DEFAULT_SORT)
+  const [sortModalOpen, setSortModalOpen] = useState(false)
+
+  const sortedFilteredRecettes = useMemo(
+    () => sortRecettes(filteredRecettes, recipeSort),
+    [filteredRecettes, recipeSort]
+  )
+
+  const recipeSortActive = isCustomSort(recipeSort)
+
   const [recipeModal, setRecipeModal] = useState(null) // null | { type: 'new' | 'edit' | 'detail', recette? }
   const [planTarget, setPlanTarget] = useState(null) // preset source { nom, items, sourceType, sourceId } en cours de planification
 
@@ -645,58 +659,81 @@ const filteredRecettes = useMemo(() => {
         )}
 
         {/* ── Onglet Recettes ── */}
-              {tab === 'recettes' && (
-        <>
-          {/* ── Barre de recherche ── */}
-          <div style={{ position: 'relative', marginBottom: 14 }}>
-            <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              className="input"
-              placeholder="Rechercher une recette ou un ingrédient..."
-              value={recipeSearch}
-              onChange={e => setRecipeSearch(e.target.value)}
-              style={{ paddingLeft: 36, paddingRight: recipeSearch ? 36 : 12 }}
-            />
-            {recipeSearch && (
+        {tab === 'recettes' && (
+          <>
+            {/* ── Barre de recherche + tri ── */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  className="input"
+                  placeholder="Rechercher une recette ou un ingrédient..."
+                  value={recipeSearch}
+                  onChange={e => setRecipeSearch(e.target.value)}
+                  style={{ paddingLeft: 36, paddingRight: recipeSearch ? 36 : 12 }}
+                />
+                {recipeSearch && (
+                  <button
+                    onClick={() => setRecipeSearch('')}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
               <button
-                onClick={() => setRecipeSearch('')}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }}
+                onClick={() => setSortModalOpen(true)}
+                style={{
+                  width: 44, height: 44, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                  background: recipeSortActive ? 'var(--green-light)' : 'var(--gray-bg)',
+                  color: recipeSortActive ? 'var(--green-dark)' : 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '1px solid var(--border)',
+                }}
               >
-                <X size={16} />
+                <ArrowUpDown size={17} />
               </button>
-            )}
-          </div>
-
-          {loadingRecettes && <div className="loader"><div className="spinner" /> Chargement...</div>}
-
-          {!loadingRecettes && filteredRecettes.length === 0 && (
-            <div className="empty">
-              <UtensilsCrossed size={40} />
-              <div style={{ marginTop: 8, fontWeight: 600 }}>
-                {recipeSearch ? 'Aucun résultat' : 'Aucune recette'}
-              </div>
-              <div style={{ marginTop: 4 }}>
-                {recipeSearch
-                  ? `Aucune recette ni ingrédient ne correspond à "${recipeSearch}"`
-                  : "Crée ta première recette pour calculer les calories de tes plats maison"}
-              </div>
             </div>
-          )}
 
-    {filteredRecettes.map(r => (
-  <RecipeCard
-    key={r.id}
-    recette={r}
-    ingredients={ingredientsByRecette[r.id]}
-    onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
-    onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
-  />
-))}
-  </>
-)}
-      {/* ── Onglet Repas types ── */}
-              {tab === 'repas' && <MealsSection />}
-      
+            {recipeSortActive && (
+              <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 10 }}>
+                Trié par {describeSortField(recipeSort.primary)}
+                {recipeSort.secondary ? `, puis ${describeSortField(recipeSort.secondary)}` : ''}
+              </div>
+            )}
+
+            {loadingRecettes && <div className="loader"><div className="spinner" /> Chargement...</div>}
+
+            {!loadingRecettes && sortedFilteredRecettes.length === 0 && (
+              <div className="empty">
+                <UtensilsCrossed size={40} />
+                <div style={{ marginTop: 8, fontWeight: 600 }}>
+                  {recipeSearch ? 'Aucun résultat' : 'Aucune recette'}
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  {recipeSearch
+                    ? `Aucune recette ni ingrédient ne correspond à "${recipeSearch}"`
+                    : "Crée ta première recette pour calculer les calories de tes plats maison"}
+                </div>
+              </div>
+            )}
+
+            {sortedFilteredRecettes.map(r => (
+              <RecipeCard
+                key={r.id}
+                recette={r}
+                ingredients={ingredientsByRecette[r.id]}
+                onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+                onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+              />
+            ))}
+          </>
+        )}
+
+        {/* ── Onglet Repas types ── */}
+        {tab === 'repas' && <MealsSection />}
+
       </div>
 
       {/* ── Modals recettes ── */}
@@ -741,6 +778,15 @@ const filteredRecettes = useMemo(() => {
           recette={recipeModal.recette}
           onSaved={() => { setRecipeModal(null); refetchRecettes() }}
           onClose={() => setRecipeModal(null)}
+        />
+      )}
+
+      {/* ── Tri des recettes ── */}
+      {sortModalOpen && (
+        <SortModal
+          value={recipeSort}
+          onChange={setRecipeSort}
+          onClose={() => setSortModalOpen(false)}
         />
       )}
     </>
