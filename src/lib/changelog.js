@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Ajuste une recette sans la modifier',
+    description: "Quand tu ajoutes une recette au journal (depuis son détail ou depuis le \"+\" de l'accueil), tu peux maintenant corriger le grammage d'un ou plusieurs ingrédients juste pour cette fois — par exemple si tu as mis moins de riz que prévu. Tape sur le grammage pour le modifier ; la recette enregistrée, elle, ne change pas. Depuis l'accueil, un bouton \"Modifier les quantités\" ouvre ce réglage.",
+  },
+  {
+    date: '2026-08-14',
     title: 'Les catégories sont plus faciles à repérer',
     description: "Dans Aliments et Recettes, chaque catégorie a maintenant un petit emoji et une pastille de couleur devant son nom, pour mieux distinguer les groupes quand tu parcours la liste.",
   },

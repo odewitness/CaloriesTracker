@@ -135,33 +135,57 @@ function IngredientPicker({ recette, onBack, onAdd, onClose, defaultPortions }) 
   // null = "tous sélectionnés" (état par défaut avant toute interaction)
   const [selectedIds, setSelectedIds] = useState(null)
   const [adding, setAdding] = useState(false)
+  // Ajustements ponctuels de grammage pour ce repas uniquement (ne touche
+  // jamais la recette enregistrée) : { [ingredientId]: grammesSouhaités }
+  const [overrides, setOverrides] = useState({})
+  const [editingId, setEditingId] = useState(null)
 
   const factor = nbPortionsBase > 0 ? portionsSouhaitees / nbPortionsBase : 1
   const scaled = factor !== 1
+
+  const handlePortionsChange = (v) => {
+    setPortionsSouhaitees(v)
+    // Un changement de portions remet à l'échelle toute la recette : les
+    // ajustements ponctuels précédents n'ont plus de sens, on les efface.
+    setOverrides({})
+  }
 
   // Ingrédients avec TOUTES leurs valeurs (grammage ET nutriments) mises à
   // l'échelle du nb de portions souhaité — c'est ce tableau qui sert à la
   // fois à l'affichage et à l'ajout/planification. Avant, seul qty_g était
   // recalculé : sélectionner 1 portion sur 4 affichait le bon grammage mais
   // gardait les kcal/macros du plat entier.
+  // Un ajustement ponctuel (overrides) applique un facteur supplémentaire
+  // par ingrédient, calculé par rapport au grammage déjà mis à l'échelle.
   const scaledIngredients = useMemo(
     () => ingredients.map(i => {
+      const baseQty = i.qty_g != null ? i.qty_g * factor : null
+      const override = overrides[i.id]
+      const adjustFactor = (override != null && baseQty) ? override / baseQty : 1
+      const totalFactor = factor * adjustFactor
       const scaled = {
         ...i,
-        qty_g:        i.qty_g        != null ? Math.round(i.qty_g * factor * 10) / 10 : i.qty_g,
-        energie_kcal: i.energie_kcal != null ? parseFloat((i.energie_kcal * factor).toFixed(1)) : i.energie_kcal,
-        proteines:    i.proteines    != null ? parseFloat((i.proteines    * factor).toFixed(2)) : i.proteines,
-        glucides:     i.glucides     != null ? parseFloat((i.glucides     * factor).toFixed(2)) : i.glucides,
-        lipides:      i.lipides      != null ? parseFloat((i.lipides      * factor).toFixed(2)) : i.lipides,
-        fibres:       i.fibres       != null ? parseFloat((i.fibres       * factor).toFixed(2)) : i.fibres,
+        qty_g:        baseQty        != null ? Math.round(baseQty * adjustFactor * 10) / 10 : i.qty_g,
+        energie_kcal: i.energie_kcal != null ? parseFloat((i.energie_kcal * totalFactor).toFixed(1)) : i.energie_kcal,
+        proteines:    i.proteines    != null ? parseFloat((i.proteines    * totalFactor).toFixed(2)) : i.proteines,
+        glucides:     i.glucides     != null ? parseFloat((i.glucides     * totalFactor).toFixed(2)) : i.glucides,
+        lipides:      i.lipides      != null ? parseFloat((i.lipides      * totalFactor).toFixed(2)) : i.lipides,
+        fibres:       i.fibres       != null ? parseFloat((i.fibres       * totalFactor).toFixed(2)) : i.fibres,
       }
       for (const key of ALL_NUTRIENT_KEYS) {
-        scaled[key] = i[key] != null ? parseFloat((i[key] * factor).toFixed(4)) : i[key]
+        scaled[key] = i[key] != null ? parseFloat((i[key] * totalFactor).toFixed(4)) : i[key]
       }
       return scaled
     }),
-    [ingredients, factor]
+    [ingredients, factor, overrides]
   )
+
+  const commitOverride = (id, rawValue) => {
+    setEditingId(null)
+    const val = parseFloat(String(rawValue).replace(',', '.'))
+    if (!isFinite(val) || val <= 0) return
+    setOverrides(prev => ({ ...prev, [id]: val }))
+  }
 
   const isSelected = (id) => selectedIds === null || selectedIds.includes(id)
 
@@ -198,7 +222,7 @@ function IngredientPicker({ recette, onBack, onAdd, onClose, defaultPortions }) 
             {/* Sélecteur de portions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Portions :</span>
-              <PortionsStepper value={portionsSouhaitees} onChange={setPortionsSouhaitees} />
+              <PortionsStepper value={portionsSouhaitees} onChange={handlePortionsChange} />
             </div>
             {scaled && (
               <div style={{ fontSize: 12, color: 'var(--green-dark)', marginBottom: 10 }}>
@@ -208,16 +232,18 @@ function IngredientPicker({ recette, onBack, onAdd, onClose, defaultPortions }) 
 
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, marginTop: scaled ? 0 : 6 }}>
               Décoche les ingrédients que tu as déjà, ou que tu ne veux pas acheter.
+              Appuie sur un grammage pour l'ajuster pour cette fois (la recette elle-même ne change pas).
             </div>
 
             {scaledIngredients.map(ing => {
               const sel = isSelected(ing.id)
+              const isEditing = editingId === ing.id
               return (
-                <button
+                <div
                   key={ing.id}
-                  onClick={() => toggle(ing.id)}
+                  onClick={() => !isEditing && toggle(ing.id)}
                   className="card"
-                  style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}
+                  style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', cursor: 'pointer' }}
                 >
                   <div style={{
                     width: 20, height: 20, borderRadius: 6, flexShrink: 0,
@@ -231,8 +257,30 @@ function IngredientPicker({ recette, onBack, onAdd, onClose, defaultPortions }) 
                   <div style={{ flex: 1, minWidth: 0, opacity: sel ? 1 : 0.5 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{ing.food_name}</div>
                   </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0, opacity: sel ? 1 : 0.5 }}>{ing.qty_g} g</span>
-                </button>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      autoFocus
+                      defaultValue={ing.qty_g}
+                      onClick={e => e.stopPropagation()}
+                      onFocus={e => e.target.select()}
+                      onBlur={e => commitOverride(ing.id, e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { e.target.value = ing.qty_g; e.target.blur() } }}
+                      style={{ width: 56, fontSize: 12, textAlign: 'right', border: '1px solid var(--border-md)', borderRadius: 6, padding: '3px 6px', flexShrink: 0 }}
+                    />
+                  ) : (
+                    <span
+                      onClick={e => { e.stopPropagation(); setEditingId(ing.id) }}
+                      style={{
+                        fontSize: 12, color: 'var(--text-muted)', flexShrink: 0, opacity: sel ? 1 : 0.5,
+                        textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2,
+                      }}
+                    >
+                      {ing.qty_g} g
+                    </span>
+                  )}
+                </div>
               )
             })}
 

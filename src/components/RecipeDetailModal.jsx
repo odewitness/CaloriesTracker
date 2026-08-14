@@ -37,18 +37,6 @@ function normalizeUrl(url) {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`
 }
 
-// Applique un facteur d'échelle à un objet de totaux nutritionnels (macros +
-// tous les micronutriments) — le même facteur alimente la grille macro, la
-// liste d'ingrédients, les instructions annotées et les panneaux vitamines/
-// minéraux/sucres/acides gras, pour éviter tout décalage entre blocs.
-function scaleTotals(totals, factor) {
-  const t = {}
-  for (const key of Object.keys(totals)) {
-    t[key] = totals[key] != null ? totals[key] * factor : totals[key]
-  }
-  return t
-}
-
 const CHIP_STYLE = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
   background: 'var(--white)', border: '0.5px solid var(--border-md)', color: 'var(--text-muted)',
@@ -144,12 +132,26 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
   const [portionsSouhaitees, setPortionsSouhaitees] = useState(1)
   const [customQty, setCustomQty] = useState('')
 
+  // Ajustements ponctuels de grammage, juste pour l'ajout au journal ou la
+  // planification en cours — ne touchent jamais la recette enregistrée
+  // (contrairement à onUpdateIngredient, déclenché en tapant le reste de la
+  // ligne). { [ingredientId]: grammesSouhaités à l'échelle affichée actuelle }
+  const [overrides, setOverrides] = useState({})
+  const [editingQtyId, setEditingQtyId] = useState(null)
+
   useEffect(() => {
     setScale('portion')
     setPortionsSouhaitees(1)
     setCustomQty('')
     setActiveTab('ingredients')
+    setOverrides({})
   }, [recette.id])
+
+  // Un changement d'échelle de lecture remet tout à l'échelle : les
+  // ajustements ponctuels précédents n'ont plus de sens.
+  useEffect(() => {
+    setOverrides({})
+  }, [scale, portionsSouhaitees, customQty])
 
   const selectScale = (next) => {
     setScale(next)
@@ -164,28 +166,42 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
 
   const factor = poidsRef > 0 && displayQtyG > 0 ? displayQtyG / poidsRef : 0
 
-  const displayTotals = useMemo(() => scaleTotals(totaux, factor), [totaux, factor])
-
   // Ingrédients mis à l'échelle affichée — nom, grammage et TOUS les
   // nutriments (macros + micronutriments). Sert à l'affichage, aux
   // instructions annotées, à "Planifier" et à "Ajouter au journal".
   const scaledIngredients = useMemo(() => ingredients.map(ing => {
+    const baseQty = (ing.qty_g || 0) * factor
+    const override = overrides[ing.id]
+    const adjustFactor = (override != null && baseQty) ? override / baseQty : 1
+    const totalFactor = factor * adjustFactor
     const s = {
       food_name:    ing.food_name,
       food_source:  ing.food_source,
       food_ref_id:  ing.food_ref_id,
-      qty_g:        (ing.qty_g || 0) * factor,
-      energie_kcal: (ing.energie_kcal || 0) * factor,
-      proteines:    (ing.proteines || 0) * factor,
-      glucides:     (ing.glucides || 0) * factor,
-      lipides:      (ing.lipides || 0) * factor,
-      fibres:       (ing.fibres || 0) * factor,
+      qty_g:        baseQty * adjustFactor,
+      energie_kcal: (ing.energie_kcal || 0) * totalFactor,
+      proteines:    (ing.proteines || 0) * totalFactor,
+      glucides:     (ing.glucides || 0) * totalFactor,
+      lipides:      (ing.lipides || 0) * totalFactor,
+      fibres:       (ing.fibres || 0) * totalFactor,
     }
     for (const key of ALL_NUTRIENT_KEYS) {
-      s[key] = ing[key] != null ? ing[key] * factor : null
+      s[key] = ing[key] != null ? ing[key] * totalFactor : null
     }
     return s
-  }), [ingredients, factor])
+  }), [ingredients, factor, overrides])
+
+  // Totaux affichés (grille macro, panneaux vitamines/nutriments, total de
+  // l'onglet Ingrédients) — recalculés depuis scaledIngredients pour
+  // refléter les ajustements ponctuels éventuels.
+  const displayTotals = useMemo(() => sumIngredients(scaledIngredients), [scaledIngredients])
+
+  const commitQtyOverride = (id, rawValue) => {
+    setEditingQtyId(null)
+    const val = parseFloat(String(rawValue).replace(',', '.'))
+    if (!isFinite(val) || val <= 0) return
+    setOverrides(prev => ({ ...prev, [id]: val }))
+  }
 
   // Instructions annotées : grammage (mis à l'échelle affichée) inséré entre
   // parenthèses à la 1ʳᵉ mention de chaque ingrédient — recherche uniquement
@@ -195,7 +211,7 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
     [instructionSteps, scaledIngredients]
   )
 
-  const totalIngredientsQty = poidsCruG * factor
+  const totalIngredientsQty = scaledIngredients.reduce((s, i) => s + (i.qty_g || 0), 0)
 
   const scaleLabel =
     scale === '100g'  ? '100 g' :
@@ -437,7 +453,7 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
         {activeTab === 'ingredients' && (
           <>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 9 }}>
-              Grammages pour <strong style={{ color: 'var(--text)' }}>{scaleLabel}</strong> · touche une ligne pour l'ajuster
+              Grammages pour <strong style={{ color: 'var(--text)' }}>{scaleLabel}</strong> · touche une ligne pour modifier la recette, ou juste le grammage pour l'ajuster une seule fois
             </div>
 
             {ingredientsLoading ? (
@@ -448,24 +464,48 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
               <>
                 {ingredients.map((ing, idx) => {
                   const s = scaledIngredients[idx]
+                  const isEditingQty = editingQtyId === ing.id
                   return (
-                    <button
+                    <div
                       key={ing.id || idx}
-                      onClick={() => setSelectedIngredient(ing)}
+                      onClick={() => !isEditingQty && setSelectedIngredient(ing)}
                       className="card"
-                      style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}
+                      style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', cursor: 'pointer' }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ing.food_name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                          {Math.round(s.qty_g)} g&nbsp;·&nbsp;
-                          <span className="c-prot">P {(s.proteines || 0).toFixed(1)}</span>&nbsp;
-                          <span className="c-gluc">G {(s.glucides || 0).toFixed(1)}</span>&nbsp;
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                          {isEditingQty ? (
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              autoFocus
+                              defaultValue={Math.round(s.qty_g)}
+                              onClick={e => e.stopPropagation()}
+                              onFocus={e => e.target.select()}
+                              onBlur={e => commitQtyOverride(ing.id, e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') e.target.blur()
+                                if (e.key === 'Escape') { e.target.value = Math.round(s.qty_g); e.target.blur() }
+                              }}
+                              style={{ width: 48, fontSize: 11, textAlign: 'right', border: '1px solid var(--border-md)', borderRadius: 5, padding: '1px 4px' }}
+                            />
+                          ) : (
+                            <span
+                              onClick={e => { e.stopPropagation(); setEditingQtyId(ing.id) }}
+                              style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer' }}
+                            >
+                              {Math.round(s.qty_g)} g
+                            </span>
+                          )}
+                          <span>·</span>
+                          <span className="c-prot">P {(s.proteines || 0).toFixed(1)}</span>
+                          <span className="c-gluc">G {(s.glucides || 0).toFixed(1)}</span>
                           <span className="c-lip">L {(s.lipides || 0).toFixed(1)}</span>
                         </div>
                       </div>
                       <span style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{Math.round(s.energie_kcal || 0)} kcal</span>
-                    </button>
+                    </div>
                   )
                 })}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 3px 0' }}>

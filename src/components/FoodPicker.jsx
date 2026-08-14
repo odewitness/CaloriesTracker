@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { X, Search, ScanLine, Camera, ArrowLeft, Star } from 'lucide-react'
+import { X, Search, ScanLine, Camera, ArrowLeft, Star, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
@@ -13,6 +13,7 @@ import { COMPLEMENT_CATEGORY } from '../lib/foodCategories'
 import { getComplementNutrients } from '../lib/complementNutrients'
 import MacroPreview from './MacroPreview'
 import ComplementNutrientPills from './ComplementNutrientPills'
+import RecipeQuantityAdjustModal from './RecipeQuantityAdjustModal'
 import FoodRow from './FoodRow'
 import FavSortToggle from './FavSortToggle'
 import Loader from './Loader'
@@ -67,6 +68,7 @@ export default function FoodPicker({
   const [barcode, setBarcode] = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [adjustingRecipeQty, setAdjustingRecipeQty] = useState(false)
   const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false)
   const [favSort, setFavSort] = useState('most') // 'recent' | 'alpha' | 'most'
@@ -636,6 +638,25 @@ const setDoseCount = (text) => {
                   </div>
                 )}
 
+                {/* Recette : possibilité de corriger le grammage de certains
+                    ingrédients pour cette fois, sans toucher à la recette */}
+                {selected._source === 'recette' && (
+                  <button
+                    onClick={() => setAdjustingRecipeQty(true)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 7,
+                      marginBottom: 14, padding: '9px 12px', width: '100%',
+                      background: 'var(--gray-bg)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--text-muted)', fontSize: 12.5, fontWeight: 600,
+                      fontFamily: 'var(--font)',
+                    }}
+                  >
+                    <Pencil size={14} />
+                    Modifier les quantités des ingrédients
+                  </button>
+                )}
+
                 {/* Toggle mode soustraction */}
                 <button
                   onClick={() => {
@@ -779,6 +800,19 @@ const setDoseCount = (text) => {
         <BarcodeScanner
           onDetected={handleScanDetected}
           onClose={() => setScannerOpen(false)}
+        />
+      )}
+
+      {adjustingRecipeQty && selected && (
+        <RecipeQuantityAdjustModal
+          recetteId={selected.id}
+          recetteNom={selected.alim_nom}
+          currentQtyG={parseFloat(qty) || 0}
+          onApply={(newQtyG, newPer100) => {
+            setQty(String(newQtyG))
+            if (newPer100) setSelected(prev => ({ ...prev, ...newPer100 }))
+          }}
+          onClose={() => setAdjustingRecipeQty(false)}
         />
       )}
     </div>
