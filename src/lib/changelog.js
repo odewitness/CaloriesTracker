@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Le point rouge sur la cloche ne ratait plus les nouveautés',
+    description: "Quand plusieurs nouveautés arrivaient le même jour, le petit point rouge sur la cloche ne s'affichait pas si tu avais déjà consulté la page \"Nouveautés\" une première fois dans la journée. C'est corrigé : chaque nouvelle entrée déclenche bien le point rouge, même le même jour.",
+  },
+  {
+    date: '2026-08-14',
     title: 'Un mode cuisine pour garder l\'écran allumé',
     description: "Quand tu regardes une recette, une icône toque de cuisinier est apparue en haut de l'écran : active-la pour empêcher ton téléphone de s'endormir pendant que tu cuisines. Elle se désactive automatiquement quand tu quittes la recette.",
   },
@@ -105,4 +110,13 @@ export const CHANGELOG = [
 
 export function getLatestChangelogDate() {
   return CHANGELOG.reduce((max, e) => (e.date > max ? e.date : max), '')
+}
+
+// Identifiant de la dernière entrée (utilisé pour le badge "non lu" sur la
+// cloche) : basé sur le titre plutôt que sur la seule date, car plusieurs
+// entrées peuvent partager la même date (plusieurs pushs le même jour) — une
+// comparaison par date seule raterait alors les nouvelles entrées du jour.
+export function getLatestChangelogKey() {
+  const latest = CHANGELOG[0]
+  return latest ? `${latest.date}::${latest.title}` : ''
 }

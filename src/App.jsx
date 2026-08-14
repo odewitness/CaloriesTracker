@@ -13,7 +13,7 @@ import ProfilePage from './pages/ProfilePage'
 import CalendarPage from './pages/CalendarPage'
 import WhatsNewPage from './pages/WhatsNewPage'
 import Loader from './components/Loader'
-import { getLatestChangelogDate } from './lib/changelog'
+import { getLatestChangelogKey } from './lib/changelog'
 
 const WHATSNEW_SEEN_KEY = 'whatsnew_last_seen'
 
@@ -173,11 +173,11 @@ function AppShell() {
   // Petit point rouge sur la cloche tant que la dernière entrée du
   // changelog n'a pas été vue (comparaison de dates via localStorage).
   const [hasUnreadNews, setHasUnreadNews] = useState(() => {
-    try { return localStorage.getItem(WHATSNEW_SEEN_KEY) !== getLatestChangelogDate() } catch { return false }
+    try { return localStorage.getItem(WHATSNEW_SEEN_KEY) !== getLatestChangelogKey() } catch { return false }
   })
   const openWhatsNew = () => {
     openOverlay('/whatsnew')
-    try { localStorage.setItem(WHATSNEW_SEEN_KEY, getLatestChangelogDate()) } catch { /* ignore */ }
+    try { localStorage.setItem(WHATSNEW_SEEN_KEY, getLatestChangelogKey()) } catch { /* ignore */ }
     setHasUnreadNews(false)
   }
 
