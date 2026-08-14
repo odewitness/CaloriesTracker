@@ -31,6 +31,10 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [tare,       setTare]       = useState(recette?.tare_g ? String(recette.tare_g) : '')
   const [totalBrut,  setTotalBrut]  = useState('')
   const [categories, setCategories] = useState(recette?.categories || [])
+  const [instructions, setInstructions] = useState(recette?.instructions || '')
+  const [tempsPreparation, setTempsPreparation] = useState(recette?.temps_preparation_min ? String(recette.temps_preparation_min) : '')
+  const [tempsCuisson,     setTempsCuisson]     = useState(recette?.temps_cuisson_min ? String(recette.temps_cuisson_min) : '')
+  const [tempsRepos,       setTempsRepos]       = useState(recette?.temps_repos_min ? String(recette.temps_repos_min) : '')
 
   const toggleCategory = (cat) =>
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
@@ -90,6 +94,10 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
       tareG:           parseFloat(tare) > 0 ? parseFloat(tare) : null,
       poidsReferenceG: poidsRef,
       categories,
+      instructions,
+      tempsPreparationMin: parseInt(tempsPreparation, 10) || null,
+      tempsCuissonMin:     parseInt(tempsCuisson, 10)     || null,
+      tempsReposMin:       parseInt(tempsRepos, 10)       || null,
       ingredients,
     })
     setSaving(false)
@@ -141,6 +149,29 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>portion{parseInt(portions) > 1 ? 's' : ''}</span>
             </div>
           </div>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+            <div>
+              <FieldLabel>Préparation</FieldLabel>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input className="input-sm" type="number" min={0} placeholder="—" value={tempsPreparation} onChange={e => setTempsPreparation(e.target.value)} style={{ width: 70 }} />
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>min</span>
+              </div>
+            </div>
+            <div>
+              <FieldLabel>Cuisson</FieldLabel>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input className="input-sm" type="number" min={0} placeholder="—" value={tempsCuisson} onChange={e => setTempsCuisson(e.target.value)} style={{ width: 70 }} />
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>min</span>
+              </div>
+            </div>
+            <div>
+              <FieldLabel>Repos</FieldLabel>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input className="input-sm" type="number" min={0} placeholder="—" value={tempsRepos} onChange={e => setTempsRepos(e.target.value)} style={{ width: 70 }} />
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>min</span>
+              </div>
+            </div>
+          </div>
           <div>
             <FieldLabel>Catégories</FieldLabel>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -182,6 +213,19 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
             onDelete={() => removeIngredient(idx)}
           />
         ))}
+
+        {/* ── Instructions ── */}
+        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+          <FieldLabel>Instructions</FieldLabel>
+          <textarea
+            className="input"
+            placeholder="Une étape par ligne — collé automatiquement numéroté à l'affichage"
+            value={instructions}
+            onChange={e => setInstructions(e.target.value)}
+            rows={5}
+            style={{ width: '100%', resize: 'vertical', fontSize: 14, lineHeight: 1.5 }}
+          />
+        </div>
 
         {/* ── Section pesée ── */}
         {ingredients.length > 0 && (

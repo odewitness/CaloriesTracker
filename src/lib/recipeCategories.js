@@ -11,6 +11,7 @@ export const RECIPE_CATEGORIES = [
   'Accompagnement',
   'Boisson',
   'Dessert',
+  'Pain / pâtes',
 ]
 
 // Libellé du groupe pour les recettes sans catégorie assignée

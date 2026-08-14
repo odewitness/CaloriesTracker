@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { X, Pencil, Trash2, Minus, Plus, CalendarPlus } from 'lucide-react'
+import { X, Pencil, Trash2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import FoodDetailModal from './FoodDetailModal'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
 import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
+import { parseInstructionSteps } from '../lib/recipeInstructions'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MacroGrid — grille 5 colonnes kcal / P / G / L / F
@@ -136,6 +137,9 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
   // Totaux bruts (plat entier, à l'échelle de base de la recette)
   const totaux = useMemo(() => sumIngredients(ingredients), [ingredients])
 
+  // Instructions découpées en étapes numérotées (une ligne = une étape)
+  const instructionSteps = useMemo(() => parseInstructionSteps(recette.instructions), [recette.instructions])
+
   // Référence de poids (cuit si renseigné, sinon cru) — à l'échelle de base
   const poidsCruG  = ingredients.reduce((s, i) => s + (parseFloat(i.qty_g) || 0), 0)
   const poidsCuitG = parseFloat(recette.poids_cuit_g) || 0
@@ -251,6 +255,21 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
               ⚖️ pesé cuit
             </span>
           )}
+          {recette.temps_preparation_min > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
+              <Clock size={12} /> Prépa {recette.temps_preparation_min} min
+            </span>
+          )}
+          {recette.temps_cuisson_min > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
+              <Flame size={12} /> Cuisson {recette.temps_cuisson_min} min
+            </span>
+          )}
+          {recette.temps_repos_min > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
+              <Hourglass size={12} /> Repos {recette.temps_repos_min} min
+            </span>
+          )}
         </div>
 
         {/* ── Valeurs /100g ── */}
@@ -311,6 +330,26 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
             </button>
           )
         })}
+
+        {/* ── Instructions ── */}
+        {instructionSteps.length > 0 && (
+          <div className="card" style={{ padding: 16, marginTop: 12, marginBottom: 12 }}>
+            <div className="section-title">Instructions</div>
+            {instructionSteps.map((step, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 10, marginBottom: idx < instructionSteps.length - 1 ? 10 : 0 }}>
+                <div style={{
+                  flexShrink: 0, width: 22, height: 22, borderRadius: '50%',
+                  background: 'var(--green-light)', color: 'var(--green-dark)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700,
+                }}>
+                  {idx + 1}
+                </div>
+                <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--text)', paddingTop: 2 }}>{step}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Vitamines / minéraux / sucres / gras (basés sur /100g) ── */}
         {per100 && (

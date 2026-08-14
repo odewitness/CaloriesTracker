@@ -6,7 +6,11 @@ import RecipeFormModal from './RecipeFormModal'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import PlanMealModal from './PlanMealModal'
 import SortModal from './SortModal'
-import { DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort, filterByCategories, isCustomFilter } from '../lib/recipeSort'
+import {
+  DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort,
+  filterByCategories, filterByTimeRanges, isCustomFilter, describeActiveFilters,
+  PREP_TIME_RANGES, COOK_TIME_RANGES, REST_TIME_RANGES,
+} from '../lib/recipeSort'
 import { RECIPE_CATEGORIES, UNCATEGORIZED_LABEL } from '../lib/recipeCategories'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
@@ -156,8 +160,11 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
   // aucun filtre n'est actif — filtrer par catégorie exclut naturellement les
   // recettes qui n'en ont aucune.
   const groupedRecettes = useMemo(() => {
-    const categoryFiltered = filterByCategories(filteredRecettes, recipeSort.categories)
-    const sorted = sortRecettes(categoryFiltered, recipeSort)
+    let timeFiltered = filterByCategories(filteredRecettes, recipeSort.categories)
+    timeFiltered = filterByTimeRanges(timeFiltered, 'temps_preparation_min', recipeSort.prepRanges, PREP_TIME_RANGES)
+    timeFiltered = filterByTimeRanges(timeFiltered, 'temps_cuisson_min',     recipeSort.cookRanges, COOK_TIME_RANGES)
+    timeFiltered = filterByTimeRanges(timeFiltered, 'temps_repos_min',       recipeSort.restRanges, REST_TIME_RANGES)
+    const sorted = sortRecettes(timeFiltered, recipeSort)
     const groups = []
     for (const cat of RECIPE_CATEGORIES) {
       if (recipeSort.categories.length > 0 && !recipeSort.categories.includes(cat)) continue
@@ -228,7 +235,7 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
 
           {(recipeSortActive || recipeFilterActive) && (
             <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 10 }}>
-              {recipeFilterActive && `Filtré par ${recipeSort.categories.join(', ')}`}
+              {recipeFilterActive && `Filtré par ${describeActiveFilters(recipeSort).join(', ')}`}
               {recipeFilterActive && recipeSortActive && ' · '}
               {recipeSortActive && `Trié par ${describeSortField(recipeSort.primary, recipeSort.basis)}${recipeSort.secondary ? `, puis ${describeSortField(recipeSort.secondary, recipeSort.basis)}` : ''}`}
             </div>

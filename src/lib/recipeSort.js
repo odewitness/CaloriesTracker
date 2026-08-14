@@ -19,13 +19,43 @@ export const SORT_BASES = [
   { key: 'portion', label: 'Par portion' },
 ]
 
-export const DEFAULT_SORT = { primary: { field: 'nom', dir: 'asc' }, secondary: null, basis: 'per100g', categories: [] }
+export const DEFAULT_SORT = {
+  primary: { field: 'nom', dir: 'asc' }, secondary: null, basis: 'per100g',
+  categories: [], prepRanges: [], cookRanges: [], restRanges: [],
+}
 
 // Une recette matche le filtre si elle a au moins une des catégories
 // sélectionnées ; aucune catégorie sélectionnée = pas de filtre (tout passe).
 export function filterByCategories(list, categories) {
   if (!categories || categories.length === 0) return list
   return list.filter(r => (r.categories || []).some(c => categories.includes(c)))
+}
+
+// ── Filtres par durée (préparation / cuisson / repos) ──────────────────────
+// Tranches prédéfinies, affichées comme des puces à cocher (même logique
+// "au moins une tranche sélectionnée matche" que les catégories).
+export const PREP_TIME_RANGES = [
+  { key: 'p15',  label: '≤ 15 min',  test: v => v != null && v <= 15 },
+  { key: 'p30',  label: '15-30 min', test: v => v != null && v > 15 && v <= 30 },
+  { key: 'p60',  label: '30-60 min', test: v => v != null && v > 30 && v <= 60 },
+  { key: 'p60p', label: '> 1h',      test: v => v != null && v > 60 },
+]
+
+export const COOK_TIME_RANGES = PREP_TIME_RANGES
+
+export const REST_TIME_RANGES = [
+  { key: 'r0',    label: 'Sans repos',  test: v => v == null || v <= 0 },
+  { key: 'r30',   label: '≤ 30 min',    test: v => v != null && v > 0 && v <= 30 },
+  { key: 'r120',  label: '30 min - 2h', test: v => v != null && v > 30 && v <= 120 },
+  { key: 'r120p', label: '> 2h',        test: v => v != null && v > 120 },
+]
+
+// Filtre générique par tranches de durée sur un champ de la recette.
+// selectedKeys vide = pas de filtre (tout passe).
+export function filterByTimeRanges(list, field, selectedKeys, ranges) {
+  if (!selectedKeys || selectedKeys.length === 0) return list
+  const activeRanges = ranges.filter(r => selectedKeys.includes(r.key))
+  return list.filter(r => activeRanges.some(range => range.test(r[field])))
 }
 
 // Valeur numérique d'un champ pour une recette, selon la base choisie
@@ -82,5 +112,22 @@ export function isCustomSort(sort) {
 }
 
 export function isCustomFilter(sort) {
-  return !!sort.categories && sort.categories.length > 0
+  return [sort.categories, sort.prepRanges, sort.cookRanges, sort.restRanges].some(a => a && a.length > 0)
+}
+
+// Libellés lisibles de tous les filtres actifs (catégories + tranches de
+// durée), pour l'affichage "Filtré par ..." de RecipesSection.
+export function describeActiveFilters(sort) {
+  const labels = [...(sort.categories || [])]
+  for (const [selected, ranges] of [
+    [sort.prepRanges, PREP_TIME_RANGES],
+    [sort.cookRanges, COOK_TIME_RANGES],
+    [sort.restRanges, REST_TIME_RANGES],
+  ]) {
+    for (const key of selected || []) {
+      const range = ranges.find(r => r.key === key)
+      if (range) labels.push(range.label)
+    }
+  }
+  return labels
 }

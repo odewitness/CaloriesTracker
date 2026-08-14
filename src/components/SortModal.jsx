@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { SORT_FIELDS, SORT_BASES } from '../lib/recipeSort'
+import { SORT_FIELDS, SORT_BASES, PREP_TIME_RANGES, COOK_TIME_RANGES, REST_TIME_RANGES } from '../lib/recipeSort'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import FieldPicker from './FieldPicker'
 
@@ -16,6 +16,9 @@ export default function SortModal({ value, onChange, onClose }) {
   const [secondaryDir, setSecondaryDir]     = useState(value.secondary?.dir || 'desc')
   const [basis, setBasis]                   = useState(value.basis || 'per100g')
   const [categories, setCategories]         = useState(value.categories || [])
+  const [prepRanges, setPrepRanges]         = useState(value.prepRanges || [])
+  const [cookRanges, setCookRanges]         = useState(value.cookRanges || [])
+  const [restRanges, setRestRanges]         = useState(value.restRanges || [])
 
   // Si le critère secondaire devient identique au principal, on l'efface
   useEffect(() => { if (secondaryField === primaryField) setSecondaryField(null) }, [primaryField]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -23,12 +26,18 @@ export default function SortModal({ value, onChange, onClose }) {
   const toggleCategory = (cat) =>
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
 
+  const toggleRange = (setter) => (key) =>
+    setter(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
+
   const apply = () => {
     onChange({
       primary: { field: primaryField, dir: primaryDir },
       secondary: secondaryField ? { field: secondaryField, dir: secondaryDir } : null,
       basis,
       categories,
+      prepRanges,
+      cookRanges,
+      restRanges,
     })
     onClose()
   }
@@ -38,6 +47,7 @@ export default function SortModal({ value, onChange, onClose }) {
     setSecondaryField(null); setSecondaryDir('desc')
     setBasis('per100g')
     setCategories([])
+    setPrepRanges([]); setCookRanges([]); setRestRanges([])
   }
 
   return (
@@ -61,6 +71,54 @@ export default function SortModal({ value, onChange, onClose }) {
               style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
             >
               {cat}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+          Temps de préparation <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+          {PREP_TIME_RANGES.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => toggleRange(setPrepRanges)(key)}
+              className="chip"
+              style={prepRanges.includes(key) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+          Temps de cuisson <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+          {COOK_TIME_RANGES.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => toggleRange(setCookRanges)(key)}
+              className="chip"
+              style={cookRanges.includes(key) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+          Temps de repos <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+          {REST_TIME_RANGES.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => toggleRange(setRestRanges)(key)}
+              className="chip"
+              style={restRanges.includes(key) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+            >
+              {label}
             </button>
           ))}
         </div>
