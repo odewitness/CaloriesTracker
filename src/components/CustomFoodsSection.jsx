@@ -378,7 +378,13 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
       supabase.from('marques').select('nom').eq('user_id', user.id).order('nom'),
     ])
     setAliments(alimentsData || [])
-    setMarques((marquesData || []).map(m => m.nom))
+    // Fusionne la table `marques` avec les marques déjà tapées sur des aliments
+    // existants (texte libre sur aliments_custom.marque) — au cas où elles n'y
+    // auraient pas encore été reprises (ex: backfill SQL jamais rejoué), pour
+    // que le menu déroulant les propose quand même.
+    const marqueSet = new Set((marquesData || []).map(m => m.nom))
+    for (const a of (alimentsData || [])) { if (a.marque) marqueSet.add(a.marque) }
+    setMarques([...marqueSet].sort((a, b) => a.localeCompare(b, 'fr')))
     setLoading(false)
   }
 
