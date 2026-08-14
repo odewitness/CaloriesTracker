@@ -368,7 +368,10 @@ create table if not exists recettes (
   instructions text,
   temps_preparation_min integer,
   temps_cuisson_min integer,
-  temps_repos_min integer
+  temps_repos_min integer,
+  source_type text, -- 'lien' | 'livre'
+  source_valeur text, -- URL si 'lien', titre du livre si 'livre'
+  source_page integer -- n° de page, utilisé seulement si source_type = 'livre'
 );
 
 -- 8. TABLE RECETTE_INGREDIENTS (lignes d'ingrédients d'une recette)

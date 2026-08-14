@@ -35,6 +35,9 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [tempsPreparation, setTempsPreparation] = useState(recette?.temps_preparation_min ? String(recette.temps_preparation_min) : '')
   const [tempsCuisson,     setTempsCuisson]     = useState(recette?.temps_cuisson_min ? String(recette.temps_cuisson_min) : '')
   const [tempsRepos,       setTempsRepos]       = useState(recette?.temps_repos_min ? String(recette.temps_repos_min) : '')
+  const [sourceType,   setSourceType]   = useState(recette?.source_type || 'lien')
+  const [sourceValeur, setSourceValeur] = useState(recette?.source_valeur || '')
+  const [sourcePage,   setSourcePage]   = useState(recette?.source_page ? String(recette.source_page) : '')
 
   const toggleCategory = (cat) =>
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
@@ -98,6 +101,9 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
       tempsPreparationMin: parseInt(tempsPreparation, 10) || null,
       tempsCuissonMin:     parseInt(tempsCuisson, 10)     || null,
       tempsReposMin:       parseInt(tempsRepos, 10)       || null,
+      sourceType,
+      sourceValeur,
+      sourcePage: parseInt(sourcePage, 10) || null,
       ingredients,
     })
     setSaving(false)
@@ -225,6 +231,42 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
             rows={5}
             style={{ width: '100%', resize: 'vertical', fontSize: 14, lineHeight: 1.5 }}
           />
+        </div>
+
+        {/* ── Source ── */}
+        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+          <FieldLabel>Source</FieldLabel>
+          <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, marginBottom: 10 }}>
+            {[{ key: 'lien', label: 'Lien' }, { key: 'livre', label: 'Livre' }].map(t => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setSourceType(t.key)}
+                style={{
+                  flex: 1, padding: '8px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+                  background: sourceType === t.key ? 'var(--white)' : 'transparent',
+                  color: sourceType === t.key ? 'var(--text)' : 'var(--text-muted)',
+                  boxShadow: sourceType === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all .15s',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <input
+            className="input"
+            type="text"
+            placeholder={sourceType === 'lien' ? 'https://...' : 'Titre du livre'}
+            value={sourceValeur}
+            onChange={e => setSourceValeur(e.target.value)}
+          />
+          {sourceType === 'livre' && (
+            <div style={{ marginTop: 10 }}>
+              <FieldLabel>N° de page</FieldLabel>
+              <input className="input-sm" type="number" min={1} placeholder="—" value={sourcePage} onChange={e => setSourcePage(e.target.value)} style={{ width: 70 }} />
+            </div>
+          )}
         </div>
 
         {/* ── Section pesée ── */}

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { X, Pencil, Trash2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass } from 'lucide-react'
+import { X, Pencil, Trash2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import FoodDetailModal from './FoodDetailModal'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
 import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
-import { parseInstructionSteps } from '../lib/recipeInstructions'
+import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeInstructions'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MacroGrid — grille 5 colonnes kcal / P / G / L / F
@@ -29,6 +29,11 @@ function MacroGrid({ totals }) {
       ))}
     </div>
   )
+}
+
+// Ajoute https:// si l'utilisateur a saisi une URL sans protocole (ex: "monsite.com")
+function normalizeUrl(url) {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -205,6 +210,15 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
     return scaled
   }), [ingredients, factor])
 
+  // Instructions annotées : grammage (mis à l'échelle du nb de portions
+  // souhaité) inséré entre parenthèses à la 1ʳᵉ mention de chaque ingrédient
+  // — recherche uniquement dans les ingrédients DE la recette, jamais dans
+  // tout Ciqual (cf. annotateInstructionSteps).
+  const annotatedSteps = useMemo(
+    () => annotateInstructionSteps(instructionSteps, scaledIngredientsForPlan),
+    [instructionSteps, scaledIngredientsForPlan]
+  )
+
   return (
     <div className="page-modal">
       {/* Header */}
@@ -335,8 +349,8 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
         {instructionSteps.length > 0 && (
           <div className="card" style={{ padding: 16, marginTop: 12, marginBottom: 12 }}>
             <div className="section-title">Instructions</div>
-            {instructionSteps.map((step, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: 10, marginBottom: idx < instructionSteps.length - 1 ? 10 : 0 }}>
+            {annotatedSteps.map((segments, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 10, marginBottom: idx < annotatedSteps.length - 1 ? 10 : 0 }}>
                 <div style={{
                   flexShrink: 0, width: 22, height: 22, borderRadius: '50%',
                   background: 'var(--green-light)', color: 'var(--green-dark)',
@@ -345,9 +359,38 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
                 }}>
                   {idx + 1}
                 </div>
-                <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--text)', paddingTop: 2 }}>{step}</div>
+                <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--text)', paddingTop: 2 }}>
+                  {segments.map((seg, i) => seg.highlight
+                    ? <strong key={i} style={{ color: 'var(--green-dark)' }}>{seg.text}</strong>
+                    : <React.Fragment key={i}>{seg.text}</React.Fragment>
+                  )}
+                </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── Source ── */}
+        {recette.source_valeur && (
+          <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+            <div className="section-title">Source</div>
+            {recette.source_type === 'lien' ? (
+              <a
+                href={normalizeUrl(recette.source_valeur)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--green-dark)', wordBreak: 'break-all' }}
+              >
+                <Link2 size={14} style={{ flexShrink: 0 }} />
+                {recette.source_valeur}
+              </a>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--text)' }}>
+                <BookOpen size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                {recette.source_valeur}
+                {recette.source_page > 0 && <span style={{ color: 'var(--text-muted)' }}>· p. {recette.source_page}</span>}
+              </div>
+            )}
           </div>
         )}
 

@@ -154,7 +154,7 @@ export function calcPer100g(totaux, poidsReferenceG) {
 // ─────────────────────────────────────────────────────────────────────────────
 // saveRecette — crée ou met à jour une recette + remplace ses ingrédients
 // ─────────────────────────────────────────────────────────────────────────────
-export async function saveRecette({ userId, recetteId, nom, portions, poidsReferenceG, poidsCuitG, poidsCruG, tareG, categories, instructions, tempsPreparationMin, tempsCuissonMin, tempsReposMin, ingredients }) {
+export async function saveRecette({ userId, recetteId, nom, portions, poidsReferenceG, poidsCuitG, poidsCruG, tareG, categories, instructions, tempsPreparationMin, tempsCuissonMin, tempsReposMin, sourceType, sourceValeur, sourcePage, ingredients }) {
   const totaux  = sumIngredients(ingredients)
   const per100  = calcPer100g(totaux, poidsReferenceG)
 
@@ -169,6 +169,9 @@ export async function saveRecette({ userId, recetteId, nom, portions, poidsRefer
     temps_preparation_min:   tempsPreparationMin  || null,
     temps_cuisson_min:       tempsCuissonMin      || null,
     temps_repos_min:         tempsReposMin        || null,
+    source_type:             sourceValeur?.trim() ? sourceType : null,
+    source_valeur:           sourceValeur?.trim() || null,
+    source_page:             sourceType === 'livre' ? (sourcePage || null) : null,
     energie_kcal:         per100?.energie_kcal         ?? null,
     proteines:            per100?.proteines            ?? null,
     glucides:             per100?.glucides             ?? null,
