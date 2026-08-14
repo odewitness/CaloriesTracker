@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Tes repas types ont eux aussi un nouveau look',
+    description: "Dans \"Mes aliments\", l'onglet Repas types reprend le style des Aliments et des Recettes : les macros de la portion s'affichent directement sur chaque carte, avec un badge quand le repas est riche en protéines ou en fibres. Les boutons modifier, planifier et supprimer sont regroupés dans le menu \"...\" en haut de la carte, et tu peux maintenant créer un repas type directement depuis le bouton \"Nouveau\" en haut de la page.",
+  },
+  {
+    date: '2026-08-14',
     title: 'Tes aliments personnalisés ont le même look que tes recettes',
     description: "La liste de tes aliments personnalisés reprend le style des recettes : macros pour 100 g et pour une portion en pastilles, et un badge quand un aliment est riche en protéines ou en fibres. Et pour la marque, tu n'as plus besoin de la retaper à chaque fois : elle te propose maintenant tes marques déjà utilisées dans un menu déroulant, ou tu peux en créer une nouvelle directement.",
   },

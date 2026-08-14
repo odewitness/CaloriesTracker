@@ -7,7 +7,7 @@ import MealTemplatesSection from '../components/MealTemplatesSection'
 // ─────────────────────────────────────────────────────────────────────────────
 // Sous-menu "Nouveau" (dropdown)
 // ─────────────────────────────────────────────────────────────────────────────
-function NewMenu({ onNewAliment, onNewRecette, onClose }) {
+function NewMenu({ onNewAliment, onNewRecette, onNewRepas, onClose }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -32,10 +32,17 @@ function NewMenu({ onNewAliment, onNewRecette, onClose }) {
       </button>
       <button
         onClick={() => { onClose(); onNewRecette() }}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', fontWeight: 600, fontSize: 14, fontFamily: 'var(--font)', color: 'var(--text)' }}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', fontWeight: 600, fontSize: 14, fontFamily: 'var(--font)', color: 'var(--text)', borderBottom: '0.5px solid var(--border)' }}
       >
         <UtensilsCrossed size={17} color="var(--green)" />
         Nouvelle recette
+      </button>
+      <button
+        onClick={() => { onClose(); onNewRepas() }}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', fontWeight: 600, fontSize: 14, fontFamily: 'var(--font)', color: 'var(--text)' }}
+      >
+        <CalendarDays size={17} color="var(--green)" />
+        Nouveau repas type
       </button>
     </div>
   )
@@ -44,9 +51,10 @@ function NewMenu({ onNewAliment, onNewRecette, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // ManualPage — page principale : switch d'onglets Aliments / Recettes / Repas
 // types + menu "Nouveau" partagé. Chaque onglet est extrait dans son propre
-// composant (CustomFoodsSection, RecipesSection, MealTemplatesSection) mais
-// reste monté en permanence (sauf Repas types, déjà ainsi avant ce découpage)
-// pour ne pas perdre son état quand on change d'onglet.
+// composant (CustomFoodsSection, RecipesSection, MealTemplatesSection) et
+// reste monté en permanence pour ne pas perdre son état quand on change
+// d'onglet, et pour que le menu "Nouveau" puisse ouvrir n'importe lequel des
+// 3 formulaires quel que soit l'onglet affiché.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ManualPage() {
   // ── Onglet actif : 'aliments' | 'recettes' | 'repas' ────────────────────
@@ -63,6 +71,7 @@ export default function ManualPage() {
 
   const foodsRef = useRef(null)
   const recipesRef = useRef(null)
+  const mealTemplatesRef = useRef(null)
 
   // Un SEUL <div className="page-content"> englobant, toujours monté — et
   // CustomFoodsSection/RecipesSection toujours rendus dedans, dans une
@@ -94,6 +103,7 @@ export default function ManualPage() {
                   onClose={() => setMenuOpen(false)}
                   onNewAliment={() => foodsRef.current?.startNew()}
                   onNewRecette={() => recipesRef.current?.openNew()}
+                  onNewRepas={() => mealTemplatesRef.current?.openNew()}
                 />
               )}
             </div>
@@ -132,7 +142,7 @@ export default function ManualPage() {
       <RecipesSection ref={recipesRef} active={tab === 'recettes' && !alimentFormOpen} />
 
       {/* ── Onglet Repas types ── */}
-      {tab === 'repas' && !alimentFormOpen && <MealTemplatesSection />}
+      <MealTemplatesSection ref={mealTemplatesRef} active={tab === 'repas' && !alimentFormOpen} />
     </div>
   )
 }
