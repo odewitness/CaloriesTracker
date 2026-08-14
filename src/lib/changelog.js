@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Trier et filtrer tes aliments, en plus simple',
+    description: "Dans \"Mes aliments\", la fenêtre de tri et de filtre reprend maintenant le même fonctionnement que celle des recettes : deux onglets \"Filtrer\" et \"Trier\", et un résumé de tes choix en haut que tu peux retirer d'un tap sans rouvrir toute la fenêtre.",
+  },
+  {
+    date: '2026-08-14',
     title: 'Tes repas types ont eux aussi un nouveau look',
     description: "Dans \"Mes aliments\", l'onglet Repas types reprend le style des Aliments et des Recettes : les macros de la portion s'affichent directement sur chaque carte, avec un badge quand le repas est riche en protéines ou en fibres. Les boutons modifier, planifier et supprimer sont regroupés dans le menu \"...\" en haut de la carte, et tu peux maintenant créer un repas type directement depuis le bouton \"Nouveau\" en haut de la page.",
   },
