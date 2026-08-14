@@ -355,6 +355,7 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
       {recipeModal?.type === 'detail' && recipeModal.recette && (
         <RecipeDetailWrapper
           recetteId={recipeModal.recette.id}
+          initialRecette={recipeModal.recette}
           onEdit={() => setRecipeModal({ type: 'edit', recette: recipeModal.recette })}
           onDelete={async () => {
             await deleteRecette(recipeModal.recette.id)

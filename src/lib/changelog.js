@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Un mode cuisine pour garder l\'écran allumé',
+    description: "Quand tu regardes une recette, une icône toque de cuisinier est apparue en haut de l'écran : active-la pour empêcher ton téléphone de s'endormir pendant que tu cuisines. Elle se désactive automatiquement quand tu quittes la recette.",
+  },
+  {
+    date: '2026-08-14',
+    title: 'Tes recettes ne se réinitialisent plus si ton écran s\'éteint',
+    description: "Avant, si ton téléphone s'endormait pendant que tu regardais ou créais une recette, l'onglet et le nombre de portions que tu avais choisis repartaient à zéro. C'est corrigé. L'ouverture d'une recette est aussi plus fluide, sans petit écran de chargement qui change d'apparence au passage.",
+  },
+  {
+    date: '2026-08-14',
     title: 'Trier et filtrer tes aliments, en plus simple',
     description: "Dans \"Mes aliments\", la fenêtre de tri et de filtre reprend maintenant le même fonctionnement que celle des recettes : deux onglets \"Filtrer\" et \"Trier\", et un résumé de tes choix en haut que tu peux retirer d'un tap sans rouvrir toute la fenêtre.",
   },

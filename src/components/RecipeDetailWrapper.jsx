@@ -12,6 +12,10 @@ import Loader from './Loader'
 //
 // Props :
 //   recetteId       — id de la recette à afficher
+//   initialRecette  — optionnel ; recette déjà connue (ex: carte cliquée dans
+//                   une liste déjà chargée). Permet d'afficher l'écran final
+//                   immédiatement au lieu d'un écran de chargement générique,
+//                   le temps que les ingrédients arrivent.
 //   onClose()
 //   onEdit()        — optionnel ; si absent, le bouton "Modifier" est masqué
 //   onDelete()      — optionnel ; si absent, le bouton "Supprimer" est masqué
@@ -19,10 +23,11 @@ import Loader from './Loader'
 //   onAddToJournal(items, recette) — optionnel ; si absent, le bouton
 //                   "Ajouter au journal" est masqué
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailWrapper({ recetteId, onEdit, onDelete, onClose, onPlan, onAddToJournal }) {
+export default function RecipeDetailWrapper({ recetteId, initialRecette, onEdit, onDelete, onClose, onPlan, onAddToJournal }) {
   const { recette, ingredients, loading, updateIngredient } = useRecetteDetail(recetteId)
+  const displayRecette = recette || initialRecette
 
-  if (loading || !recette) {
+  if (!displayRecette) {
     return (
       <div className="page-modal">
         <div className="page-modal-header">
@@ -37,8 +42,9 @@ export default function RecipeDetailWrapper({ recetteId, onEdit, onDelete, onClo
 
   return (
     <RecipeDetailModal
-      recette={recette}
+      recette={displayRecette}
       ingredients={ingredients}
+      ingredientsLoading={loading}
       onEdit={onEdit}
       onDelete={onDelete}
       onClose={onClose}

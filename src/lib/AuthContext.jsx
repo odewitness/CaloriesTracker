@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 
 const AuthContext = createContext(null)
@@ -58,9 +58,16 @@ export function AuthProvider({ children }) {
     return { error }
   }
 
+  // Supabase redéclenche onAuthStateChange (ex: TOKEN_REFRESHED) à chaque
+  // réveil de l'app après mise en veille, avec un nouvel objet `session.user`
+  // même quand c'est le même utilisateur. On stabilise la référence tant que
+  // l'id ne change pas, pour éviter de re-déclencher les useEffect qui
+  // dépendent de `user` (et donc de démonter/remonter des écrans en cours).
+  const user = useMemo(() => session?.user || null, [session?.user?.id])
+
   const value = {
     session,
-    user: session?.user || null,
+    user,
     authLoading,
     signUp,
     signIn,

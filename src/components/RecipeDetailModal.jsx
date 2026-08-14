@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, Pencil, MoreVertical, Trash2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen } from 'lucide-react'
+import { ArrowLeft, Pencil, MoreVertical, Trash2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen, ChefHat } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import FoodDetailModal from './FoodDetailModal'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
+import { useWakeLock } from '../hooks/useWakeLock'
 import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
 import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeInstructions'
 
@@ -110,11 +111,12 @@ const SCALE_SEGMENTS = [
 //                                    journal" est masqué. items = ingrédients
 //                                    mis à l'échelle actuellement affichée.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailModal({ recette, ingredients, onEdit, onDelete, onClose, onUpdateIngredient, onPlan, onAddToJournal }) {
+export default function RecipeDetailModal({ recette, ingredients, ingredientsLoading, onEdit, onDelete, onClose, onUpdateIngredient, onPlan, onAddToJournal }) {
   useBackButton(onClose)
   const [selectedIngredient, setSelectedIngredient] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('ingredients') // 'ingredients' | 'preparation' | 'nutriments'
+  const { active: cookModeOn, supported: wakeLockSupported, toggle: toggleCookMode } = useWakeLock()
 
   // Totaux bruts (plat entier, à l'échelle de base de la recette)
   const totaux = useMemo(() => sumIngredients(ingredients), [ingredients])
@@ -243,6 +245,21 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
           )}
         </div>
         <div style={{ display: 'flex', gap: 2, flexShrink: 0, position: 'relative' }}>
+          {wakeLockSupported && (
+            <button
+              className="btn-icon"
+              onClick={toggleCookMode}
+              style={{
+                color: cookModeOn ? 'var(--green-dark)' : 'var(--text-hint)',
+                background: cookModeOn ? 'var(--green-light)' : undefined,
+                borderRadius: 10,
+              }}
+              aria-label={cookModeOn ? 'Désactiver le mode cuisine' : 'Activer le mode cuisine'}
+              title={cookModeOn ? 'Mode cuisine actif — l\'écran reste allumé' : 'Mode cuisine — garder l\'écran allumé'}
+            >
+              <ChefHat size={18} />
+            </button>
+          )}
           {onEdit && (
             <button className="btn-icon" onClick={onEdit} style={{ color: 'var(--text-hint)' }}><Pencil size={18} /></button>
           )}
@@ -271,7 +288,11 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
 
         {/* ── Carte "Je regarde" — sélecteur d'échelle (onglet Ingrédients) ── */}
         {activeTab === 'ingredients' && (
-          per100 ? (
+          ingredientsLoading ? (
+            <div className="card" style={{ padding: 16, marginBottom: 12, textAlign: 'center', color: 'var(--text-hint)', fontSize: 13 }}>
+              Chargement…
+            </div>
+          ) : per100 ? (
             <div className="card" style={{ padding: '14px 14px 16px', marginBottom: 12 }}>
               <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 9 }}>
                 Je regarde
@@ -344,7 +365,7 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
         )}
 
         {/* ── Rappel d'échelle compact (onglet Nutriments) ── */}
-        {activeTab === 'nutriments' && per100 && (
+        {activeTab === 'nutriments' && !ingredientsLoading && per100 && (
           <div className="card" style={{ padding: '11px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -419,7 +440,9 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
               Grammages pour <strong style={{ color: 'var(--text)' }}>{scaleLabel}</strong> · touche une ligne pour l'ajuster
             </div>
 
-            {ingredients.length === 0 ? (
+            {ingredientsLoading ? (
+              <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Chargement des ingrédients…</div>
+            ) : ingredients.length === 0 ? (
               <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Aucun ingrédient renseigné.</div>
             ) : (
               <>
@@ -484,7 +507,11 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
 
         {/* ── Onglet Nutriments ── */}
         {activeTab === 'nutriments' && (
-          per100 ? (
+          ingredientsLoading ? (
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Chargement…</div>
+            </div>
+          ) : per100 ? (
             <>
               <VitaminPanel totals={displayTotals} hasEntries={true} defaultOpen />
               <NutrientDetails totals={displayTotals} hasEntries={true} defaultOpen />
