@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
+import { useMeasurements } from '../hooks/useMeasurements'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill } from 'lucide-react'
+import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill, ChevronRight } from 'lucide-react'
 import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
 import Loader from '../components/Loader'
 
@@ -135,15 +137,20 @@ function MealTargetCard({ meal, target, allTargets, goalKcal, onChange, onReset,
 
 export default function ProfilePage() {
   const toast = useToast()
+  const navigate = useNavigate()
+  const location = useLocation()
   const { user, signOut } = useAuth()
   const { profile, loading: profileLoading, updateProfile } = useProfile()
   const { settings, loading: settingsLoading, update: updateSettings } = useSettings()
+  const { entries: measurementEntries } = useMeasurements()
+
+  const openMeasurements = () => navigate('/mensurations', { state: { backgroundLocation: location.state?.backgroundLocation || location } })
+  const latestWeight = measurementEntries.find(e => e.poids_kg != null)?.poids_kg
 
   // ── Infos personnelles ──────────────────────────────────────────────────
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [age, setAge] = useState('')
-  const [poids, setPoids] = useState('')
   const [profileDirty, setProfileDirty] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
 
@@ -152,7 +159,6 @@ export default function ProfilePage() {
       setPrenom(profile.prenom || '')
       setNom(profile.nom || '')
       setAge(profile.age ?? '')
-      setPoids(profile.poids_kg ?? '')
     }
   }, [profile])
 
@@ -164,7 +170,6 @@ export default function ProfilePage() {
       prenom: prenom.trim() || null,
       nom: nom.trim() || null,
       age: age !== '' ? parseInt(age) : null,
-      poids_kg: poids !== '' ? parseFloat(poids) : null,
     })
     setSavingProfile(false)
     if (!error) { toast('✓ Profil mis à jour !'); setProfileDirty(false) }
@@ -262,9 +267,15 @@ export default function ProfilePage() {
         <Row icon={<Calendar size={18} />} label="Âge">
           <input className="input-sm" type="number" value={age} onChange={e => markProfileDirty(setAge)(e.target.value)} placeholder="—" />
         </Row>
-        <Row icon={<Scale size={18} />} label="Poids (kg)">
-          <input className="input-sm" type="number" step="0.1" value={poids} onChange={e => markProfileDirty(setPoids)(e.target.value)} placeholder="—" />
-        </Row>
+        <div
+          onClick={openMeasurements}
+          style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderBottom: '0.5px solid var(--border)', gap: 12, cursor: 'pointer' }}
+        >
+          <div style={{ color: 'var(--green)', flexShrink: 0 }}><Scale size={18} /></div>
+          <div style={{ flex: 1, fontSize: 14 }}>Poids & mensurations</div>
+          <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>{latestWeight != null ? `${latestWeight} kg` : '—'}</div>
+          <ChevronRight size={16} color="var(--text-hint)" />
+        </div>
         <Row icon={<Mail size={18} />} label="Email">
           <span style={{ fontSize: 13, color: 'var(--text-hint)' }}>{user?.email}</span>
         </Row>
