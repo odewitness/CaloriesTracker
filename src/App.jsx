@@ -11,7 +11,11 @@ import ShoppingListPage from './pages/ShoppingListPage'
 import HistoryPage from './pages/HistoryPage'
 import ProfilePage from './pages/ProfilePage'
 import CalendarPage from './pages/CalendarPage'
+import WhatsNewPage from './pages/WhatsNewPage'
 import Loader from './components/Loader'
+import { getLatestChangelogDate } from './lib/changelog'
+
+const WHATSNEW_SEEN_KEY = 'whatsnew_last_seen'
 
 const TABS = [
   { path: '/today',    label: "Aujourd'hui", icon: HomeIcon },
@@ -89,10 +93,19 @@ function CalendarButtonIcon() {
   )
 }
 
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+    </svg>
+  )
+}
+
 // Bouton rond en haut à droite : ouvre ProfilePage en plein écran par-dessus
 // l'app, sans occuper d'onglet dans la bottom nav.
 // hidden=true → le bandeau se rétracte (scroll vers le bas), voir handleScroll.
-function ProfileButton({ onClick, onCalendarClick, hidden }) {
+function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, hasUnreadNews, hidden }) {
   const { user } = useAuth()
   const { profile } = useProfile()
   const initials = ((profile?.prenom?.[0] || '') + (profile?.nom?.[0] || '')).toUpperCase()
@@ -102,6 +115,10 @@ function ProfileButton({ onClick, onCalendarClick, hidden }) {
     <div className={`top-bar${hidden ? ' top-bar-hidden' : ''}`}>
       <button className="profile-avatar-btn" onClick={onCalendarClick} aria-label="Calendrier">
         <CalendarButtonIcon />
+      </button>
+      <button className="profile-avatar-btn" onClick={onWhatsNewClick} aria-label="Nouveautés" style={{ position: 'relative' }}>
+        <BellIcon />
+        {hasUnreadNews && <span className="notif-dot" />}
       </button>
       <button className="profile-avatar-btn" onClick={onClick} aria-label="Profil">
         {initials ? initials : <ProfileIcon />}
@@ -153,6 +170,17 @@ function AppShell() {
   const openOverlay = (path) => navigate(path, { state: { backgroundLocation: backgroundLocation || location } })
   const closeOverlay = () => navigate(-1)
 
+  // Petit point rouge sur la cloche tant que la dernière entrée du
+  // changelog n'a pas été vue (comparaison de dates via localStorage).
+  const [hasUnreadNews, setHasUnreadNews] = useState(() => {
+    try { return localStorage.getItem(WHATSNEW_SEEN_KEY) !== getLatestChangelogDate() } catch { return false }
+  })
+  const openWhatsNew = () => {
+    openOverlay('/whatsnew')
+    try { localStorage.setItem(WHATSNEW_SEEN_KEY, getLatestChangelogDate()) } catch { /* ignore */ }
+    setHasUnreadNews(false)
+  }
+
   // Le calendrier s'ouvre PAR-DESSUS l'onglet actif sans le démonter (sa
   // route de fond reste rendue) — donc TodayPage garde son ancien useJournal
   // en mémoire même après un ajout/suppression/"marquer mangé" fait depuis
@@ -168,7 +196,13 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <ProfileButton onClick={() => openOverlay('/profile')} onCalendarClick={() => openOverlay('/calendar')} hidden={headerHidden} />
+      <ProfileButton
+        onClick={() => openOverlay('/profile')}
+        onCalendarClick={() => openOverlay('/calendar')}
+        onWhatsNewClick={openWhatsNew}
+        hasUnreadNews={hasUnreadNews}
+        hidden={headerHidden}
+      />
 
       {/* overflow visible ici — c'est page-content qui scroll en interne */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }} onScrollCapture={handleScroll}>
@@ -219,6 +253,19 @@ function AppShell() {
               </div>
               <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
                 <CalendarPage />
+              </div>
+            </div>
+          } />
+          <Route path="/whatsnew" element={
+            <div className="page-modal">
+              <div className="page-modal-header">
+                <h2>Nouveautés</h2>
+                <button className="btn-icon" onClick={closeOverlay} aria-label="Fermer">
+                  <CloseIcon />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+                <WhatsNewPage />
               </div>
             </div>
           } />

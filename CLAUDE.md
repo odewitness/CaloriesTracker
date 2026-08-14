@@ -6,6 +6,7 @@ App personnelle de suivi calorique. React 18 + Vite, backend Supabase, déployé
 
 - `npm run dev` — serveur de dev local
 - `npm run build` — build de prod. **Erreur connue et sans gravité** : `Dynamic require of "workbox-build" is not supported` (vite-plugin-pwa). Elle existait déjà avant tout refactor, elle ne bloque pas le build Netlify (confirmé en prod) — ignorer cette erreur précise, ne pas essayer de la "corriger" sans que ce soit explicitement demandé.
+- Ne pas lancer de serveur de dev ni de tests navigateur automatisés (chromium-cli, Playwright, etc.) : l'utilisateur teste lui-même manuellement sur `http://localhost:5173`. Se limiter à `npm run build` pour vérifier que ça compile, puis laisser l'utilisateur valider le comportement.
 
 ## Environnement
 
@@ -22,6 +23,13 @@ App personnelle de suivi calorique. React 18 + Vite, backend Supabase, déployé
 - Changements ponctuels/mécaniques (petits refactors, corrections de bug ciblées) : commit direct sur `main`, push après confirmation.
 - Changements plus gros ou risqués (migration, découpage de fichiers majeurs) : créer une branche dédiée, vérifier (`npm run build` + test manuel dans le navigateur), puis merge + push vers `main` après confirmation.
 - Toujours demander confirmation avant un `git push`, même sur des changements mineurs.
+
+## Changelog "Nouveautés" (icône cloche du header)
+
+- `src/lib/changelog.js` alimente la page "Nouveautés" (icône cloche à droite du calendrier dans le header, `src/pages/WhatsNewPage.jsx`). C'est un fil conducteur destiné à l'utilisatrice de l'app pour qu'elle voie les évolutions sans lire le code.
+- **À chaque push sur `main` qui apporte un changement visible pour l'utilisatrice** (nouvelle fonctionnalité, refonte d'écran, correction de bug gênant), ajouter une entrée en tête de `CHANGELOG` dans `src/lib/changelog.js` : `{ date: 'YYYY-MM-DD', title, description }`, en français, ton simple et direct (pas de jargon technique, pas de nom de commit).
+- Ne pas ajouter d'entrée pour les changements purement internes (refactor, nettoyage, migration technique, dépendances) sans impact perceptible par l'utilisatrice.
+- Le point rouge sur la cloche (badge "non lu") se base sur la date la plus récente du changelog comparée à une valeur stockée dans `localStorage` — pas d'action requise à ce sujet, ça se met à jour automatiquement dès qu'une nouvelle entrée est ajoutée.
 
 ## Notes utiles
 
