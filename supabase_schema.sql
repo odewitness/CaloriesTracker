@@ -507,6 +507,18 @@ create table if not exists repas_planifies (
 create index if not exists idx_repas_planifies_recurrence_group
   on repas_planifies (recurrence_group_id) where recurrence_group_id is not null;
 
+-- 13. TABLE MARQUES (marques d'aliments custom, réutilisables via menu déroulant)
+-- aliments_custom.marque reste un champ texte libre (pas de FK) : cette table
+-- sert uniquement à peupler le menu déroulant du formulaire (BrandCombobox) et
+-- à éviter de retaper une marque déjà utilisée. Ajoutée le 2026-08-14.
+create table if not exists marques (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  nom text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, nom)
+);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -517,6 +529,7 @@ alter table journal disable row level security;
 alter table repas_types disable row level security;
 alter table settings disable row level security;
 alter table aliments_custom disable row level security;
+alter table marques disable row level security;
 
 -- Statut RLS non vérifié pour les 7 tables ajoutées à cette reconstruction
 -- (profiles, recettes, recette_ingredients, favoris, listes_courses,

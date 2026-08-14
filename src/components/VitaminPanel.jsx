@@ -1,30 +1,8 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { VITAMIN_FIELDS, MINERAL_FIELDS } from '../lib/nutrients'
+import { getNutrientStatus as getStatus, NUTRIENT_STATUS_COLOR as STATUS_COLOR } from '../lib/nutrientStatus'
 import NutrientBreakdownModal from './NutrientBreakdownModal'
-
-// Pour les nutriments normaux (RNP = besoin minimum) : plus on s'approche de
-// la ref, mieux c'est. Pour les nutriments "limite" (v.limite = true, ex. Sel,
-// Sodium) c'est l'inverse : ref = objectif max à ne pas dépasser, donc rester
-// en dessous = bien (vert), dépasser = pas bien (ambre/rouge).
-function getStatus(val, ref, lss, limite) {
-  if (limite) {
-    if (lss !== null && val >= lss) return 'excess'
-    if (val >= ref) return 'mid'
-    return 'ok'
-  }
-  if (lss !== null && val >= lss) return 'excess'
-  if (val >= ref)                  return 'ok'
-  if (val >= ref * 0.5)            return 'mid'
-  return 'low'
-}
-
-const STATUS_COLOR = {
-  excess: 'var(--coral)',
-  ok:     '#1D9E75',
-  mid:    'var(--amber)',
-  low:    'var(--coral)',
-}
 
 function NutrientRow({ v, totals, hasEntries, onClick }) {
   const val = (v.sumKeys || [v.key]).reduce((s, k) => s + (totals[k] ?? 0), 0)

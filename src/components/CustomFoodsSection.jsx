@@ -6,10 +6,15 @@ import { useAuth } from '../lib/AuthContext'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { FOOD_CATEGORIES, COMPLEMENT_CATEGORY } from '../lib/foodCategories'
 import { DEFAULT_SORT, sortAliments, describeSortField, filterByCategories, isCustomSort, isCustomFilter } from '../lib/foodSort'
+import { getNutriBadge } from '../lib/nutriBadge'
+import { getComplementNutrients } from '../lib/complementNutrients'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
 import FieldLabel from './FieldLabel'
 import FoodSortModal from './FoodSortModal'
+import MacroPillsRow from './MacroPillsRow'
+import BrandCombobox from './BrandCombobox'
+import ComplementNutrientPills from './ComplementNutrientPills'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -147,29 +152,92 @@ function ExtraSection({ title, fields, extra, setExtraField }) {
 // FoodCard — carte aliment dans la liste
 // ─────────────────────────────────────────────────────────────────────────────
 function FoodCard({ aliment, onEdit, onDelete }) {
+  const isComplement = aliment.categorie === COMPLEMENT_CATEGORY
   // Pour un complément, les valeurs sont stockées pour 100g (comme le reste du
   // schéma) mais l'utilisateur les pense "par dose" — on reconvertit pour
-  // l'affichage à partir de la dose (1ère portion), plutôt que d'afficher un
-  // "kcal/100g" démesuré et sans rapport avec ce qui a été saisi.
-  const dose  = aliment.categorie === COMPLEMENT_CATEGORY ? aliment.portions?.[0] : null
-  const scale = dose?.g > 0 ? dose.g / 100 : 1
-  const unit  = dose?.g > 0 ? `/${dose.label}` : '/100g'
+  // l'affichage à partir de sa "portion courante" (portions[1] — la dose de
+  // base, portions[0], sert uniquement d'unité de saisie, pas d'affichage).
+  // Si aucune portion courante n'a été définie, on retombe sur la dose seule.
+  // La notion de "100g" n'a pas de sens pour un complément (pas de badge
+  // nutritionnel non plus, les seuils /100g ne sont pas pertinents ici).
+  const dose = isComplement ? (aliment.portions?.[1] || aliment.portions?.[0]) : null
+  const doseScale = dose?.g > 0 ? dose.g / 100 : 1
+  const complementNutrients = isComplement ? getComplementNutrients(aliment, doseScale) : null
+
+  // "Portion recommandée" = 1ère entrée des "Portions courantes" définies sur
+  // l'aliment (pas de notion de portion unique en base, on prend la première).
+  const portion = !isComplement ? aliment.portions?.[0] : null
+  const portionScale = portion?.g > 0 ? portion.g / 100 : null
+
+  const badge = !isComplement ? getNutriBadge(aliment) : null
 
   return (
-    <div className="card" style={{ marginBottom: 10, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+    <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {aliment.nom}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-          {aliment.marque ? `${aliment.marque} · ` : ''}{Math.round((aliment.energie_kcal || 0) * scale)} kcal{unit}
-          &nbsp;·&nbsp;<span className="c-prot">P {Math.round((aliment.proteines || 0) * scale)}g</span>
-          &nbsp;<span className="c-gluc">G {Math.round((aliment.glucides || 0) * scale)}g</span>
-          &nbsp;<span className="c-lip">L {Math.round((aliment.lipides || 0) * scale)}g</span>
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+          <button className="btn-icon" onClick={() => onEdit(aliment)}      style={{ color: 'var(--text-hint)' }}><Pencil size={16} /></button>
+          <button className="btn-icon" onClick={() => onDelete(aliment.id)} style={{ color: 'var(--text-hint)' }}><Trash2 size={16} /></button>
         </div>
       </div>
-      <button className="btn-icon" onClick={() => onEdit(aliment)}      style={{ color: 'var(--text-hint)' }}><Pencil size={16} /></button>
-      <button className="btn-icon" onClick={() => onDelete(aliment.id)} style={{ color: 'var(--text-hint)' }}><Trash2 size={16} /></button>
+
+      {/* ── Compléments : dose + marque + vitamines/minéraux en %AJR sur une même ligne ── */}
+      {isComplement ? (
+        <>
+          {(dose?.label || aliment.marque || complementNutrients.length > 0) && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {dose?.label && (
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--green-dark)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                  {dose.label}
+                </span>
+              )}
+              {aliment.marque && (
+                <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
+                  {aliment.marque}
+                </span>
+              )}
+              <ComplementNutrientPills nutrients={complementNutrients} />
+            </div>
+          )}
+          {complementNutrients.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: (dose?.label || aliment.marque) ? 6 : 0 }}>Aucune vitamine ou minéral renseigné</div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* ── Chips marque / badge nutritionnel ── */}
+          {(aliment.marque || badge) && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              {aliment.marque && (
+                <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
+                  {aliment.marque}
+                </span>
+              )}
+              {badge && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: badge.bg, color: badge.color, borderRadius: 20, padding: '2px 9px 2px 7px', fontSize: 10.5, fontWeight: 700 }}>
+                  {badge.emoji} {badge.label}
+                </span>
+              )}
+            </div>
+          )}
+          <MacroPillsRow
+            label="100 g" labelColor="var(--text-hint)" bg="var(--gray-bg)"
+            kcal={aliment.energie_kcal || 0} kcalColor="var(--text)"
+            proteines={aliment.proteines || 0} glucides={aliment.glucides || 0} lipides={aliment.lipides || 0}
+            marginBottom={portionScale != null ? 6 : 0}
+          />
+          {portionScale != null && (
+            <MacroPillsRow
+              label="Portion" labelColor="var(--green-dark)" bg="var(--green-light)"
+              kcal={(aliment.energie_kcal || 0) * portionScale} kcalColor="var(--green-dark)"
+              proteines={(aliment.proteines || 0) * portionScale} glucides={(aliment.glucides || 0) * portionScale} lipides={(aliment.lipides || 0) * portionScale}
+              hint={portion.label}
+            />
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -197,6 +265,16 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   const [portions,  setPortions]  = useState([{ label: '', g: '' }])
   const [saving,    setSaving]    = useState(false)
 
+  // Portions courantes des compléments — exprimées en nombre de doses (ex: "2"
+  // pour "2 gélules") plutôt qu'en grammes, puisque l'utilisateur pense en
+  // nombre de prises et pas en poids. Converties en {label, g} à la sauvegarde
+  // (voir save()) à partir de la dose de base ci-dessous.
+  const [complementPortions, setComplementPortions] = useState([])
+
+  // Marques connues de l'utilisateur, pour le menu déroulant du champ marque
+  // (table `marques` — voir BrandCombobox). Rechargées avec les aliments.
+  const [marques, setMarques] = useState([])
+
   // Saisie "par dose" pour la catégorie Compléments alimentaires — voir save()
   // et startEdit() pour la conversion vers/depuis les valeurs pour 100g stockées.
   const [doseTypeKey, setDoseTypeKey] = useState(DOSE_TYPES[0].key)
@@ -215,6 +293,28 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
     if (doseTypeKey === 'autre') return doseLabel.trim() || 'Dose'
     return `1 ${DOSE_TYPES.find(d => d.key === doseTypeKey).label.toLowerCase()}`
   }
+
+  // Nom (singulier, sans "1 ") de l'unité de dose courante, pour composer les
+  // libellés "N gélules" des portions courantes.
+  const doseNoun = () => (
+    doseTypeKey === 'autre'
+      ? (doseLabel.trim() || 'dose').replace(/^1\s+/, '')
+      : DOSE_TYPES.find(d => d.key === doseTypeKey).label.toLowerCase()
+  )
+
+  const pluralizeWord = (word, n) => (n === 1 || /[sx]$/i.test(word) ? word : `${word}s`)
+
+  // Libellé auto d'une portion complément exprimée en nombre de doses (ex: 2 → "2 gélules").
+  const doseUnitLabel = (n) => {
+    if (doseTypeKey === 'ml') return `${n} ${doseNoun()}` // "ml" ne se pluralise pas
+    const words = doseNoun().split(' ')
+    words[0] = pluralizeWord(words[0], n)
+    return `${n} ${words.join(' ')}`
+  }
+
+  const addComplementPortion    = () => setComplementPortions(p => [...p, ''])
+  const removeComplementPortion = (i) => setComplementPortions(p => p.filter((_, idx) => idx !== i))
+  const updateComplementPortion = (i, v) => setComplementPortions(p => p.map((x, idx) => idx === i ? v : x))
 
   // ── Recherche + tri/filtre + regroupement par catégorie (liste) ──────────
   const [foodSearch, setFoodSearch]     = useState('')
@@ -271,15 +371,23 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   useEffect(() => { onFormOpenChange?.(view === 'form') }, [view])
 
   const load = async () => {
-    if (!user) { setAliments([]); setLoading(false); return }
+    if (!user) { setAliments([]); setMarques([]); setLoading(false); return }
     setLoading(true)
-    const { data } = await supabase
-      .from('aliments_custom')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    setAliments(data || [])
+    const [{ data: alimentsData }, { data: marquesData }] = await Promise.all([
+      supabase.from('aliments_custom').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('marques').select('nom').eq('user_id', user.id).order('nom'),
+    ])
+    setAliments(alimentsData || [])
+    setMarques((marquesData || []).map(m => m.nom))
     setLoading(false)
+  }
+
+  // Enregistre la marque saisie si elle est nouvelle, pour qu'elle réapparaisse
+  // dans le menu déroulant sans avoir à la retaper la prochaine fois.
+  const ensureMarque = async (nom) => {
+    if (!nom || marques.some(m => m.toLowerCase() === nom.toLowerCase())) return
+    const { error } = await supabase.from('marques').upsert([{ nom, user_id: user.id }], { onConflict: 'user_id,nom', ignoreDuplicates: true })
+    if (!error) setMarques(m => [...m, nom].sort((a, b) => a.localeCompare(b, 'fr')))
   }
 
   const set           = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -290,7 +398,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
 
   const resetForm = () => {
     setForm(EMPTY_FORM); setExtra({}); setPortions([{ label: '', g: '' }]); setEditingId(null)
-    setDoseType(DOSE_TYPES[0].key); setDoseLabel('')
+    setDoseType(DOSE_TYPES[0].key); setDoseLabel(''); setComplementPortions([])
   }
   const startNew  = () => { resetForm(); setView('form') }
 
@@ -310,8 +418,12 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
       const matched = DOSE_TYPES.find(d => d.key !== 'autre' && `1 ${d.label.toLowerCase()}` === (firstPortion?.label || '').toLowerCase())
       if (matched) { setDoseTypeKey(matched.key) } else { setDoseTypeKey('autre'); setDoseLabel(firstPortion?.label || '') }
       setDoseWeight(String(doseW))
+      // Portions courantes = toutes les entrées après la dose de base (portions[0]),
+      // reconverties en nombre de doses pour l'affichage.
+      const extraPortions = Array.isArray(aliment.portions) ? aliment.portions.slice(1) : []
+      setComplementPortions(extraPortions.map(p => String(round(p.g / doseW))))
     } else {
-      setDoseType(DOSE_TYPES[0].key); setDoseLabel('')
+      setDoseType(DOSE_TYPES[0].key); setDoseLabel(''); setComplementPortions([])
     }
 
     const scale = v => v == null ? '' : String(round(v * factor))
@@ -351,7 +463,13 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
     // vers l'équivalent pour 100g attendu par le schéma (comme ciqual/recettes).
     const factor = isComplement ? 100 / doseW : 1
     const cleanPortions = isComplement
-      ? [{ label: resolveDoseLabel(), g: doseW }]
+      ? [
+          { label: resolveDoseLabel(), g: doseW },
+          ...complementPortions
+            .map(c => parseFloat(c))
+            .filter(c => c > 0)
+            .map(c => ({ label: doseUnitLabel(c), g: round(c * doseW) })),
+        ]
       : portions.filter(p => p.label && p.g).map(p => ({ label: p.label, g: parseFloat(p.g) }))
     const extraValues   = {}
     for (const key of ALL_NUTRIENT_KEYS) {
@@ -372,6 +490,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
       ...extraValues,
       portions: cleanPortions,
     }
+    if (payload.marque) await ensureMarque(payload.marque)
     const { error } = editingId
       ? await supabase.from('aliments_custom').update(payload).eq('id', editingId).eq('user_id', user.id)
       : await supabase.from('aliments_custom').insert([{ ...payload, user_id: user.id }])
@@ -415,7 +534,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
                 <FieldLabel>Marque</FieldLabel>
-                <input className="input" placeholder="Optionnel" value={form.marque} onChange={e => set('marque', e.target.value)} />
+                <BrandCombobox value={form.marque} onChange={v => set('marque', v)} options={marques} />
               </div>
               <div>
                 <FieldLabel>Catégorie</FieldLabel>
@@ -515,20 +634,45 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
           />
         ))}
 
-        {/* ── Portions courantes (pas pour les compléments : la dose ci-dessus
-              sert déjà de portion unique) ── */}
-        {!isComplement && (
-          <div className="card" style={{ padding: '16px', marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div className="section-title" style={{ marginBottom: 0 }}>Portions courantes</div>
-              <button
-                onClick={addPortion}
-                style={{ color: 'var(--green)', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4 }}
-              >
-                <PlusCircle size={14} /> Ajouter
-              </button>
-            </div>
-            {portions.map((p, i) => (
+        {/* ── Portions courantes — pour les compléments, exprimées en nombre de
+              doses (ex: "2" → "2 gélules") plutôt qu'en grammes, en plus de la
+              dose de base définie plus haut. ── */}
+        <div className="card" style={{ padding: '16px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div className="section-title" style={{ marginBottom: 0 }}>Portions courantes</div>
+            <button
+              onClick={isComplement ? addComplementPortion : addPortion}
+              style={{ color: 'var(--green)', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <PlusCircle size={14} /> Ajouter
+            </button>
+          </div>
+
+          {isComplement ? (
+            complementPortions.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-hint)' }}>
+                Optionnel — en plus de la dose ci-dessus, ajoute une quantité que tu prends parfois (ex : 2 gélules).
+              </div>
+            ) : complementPortions.map((count, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="2"
+                  value={count}
+                  onChange={e => updateComplementPortion(i, e.target.value)}
+                  style={{ width: 70 }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {parseFloat(count) > 0 ? `× ${doseNoun()} → ${doseUnitLabel(parseFloat(count))}` : `× ${doseNoun()}`}
+                </span>
+                <button onClick={() => removeComplementPortion(i)} style={{ color: 'var(--coral)', flexShrink: 0, fontSize: 18, lineHeight: 1 }}>×</button>
+              </div>
+            ))
+          ) : (
+            portions.map((p, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                 <input
                   className="input"
@@ -550,9 +694,9 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
                   <button onClick={() => removePortion(i)} style={{ color: 'var(--coral)', flexShrink: 0, fontSize: 18, lineHeight: 1 }}>×</button>
                 )}
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
 
         {/* ── Bouton sauvegarde ── */}
         <button className="btn-primary" onClick={save} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>
