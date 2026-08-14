@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useState, useMemo } from 'react'
-import { ChevronDown, Trash2, X, Search, ArrowUpDown, UtensilsCrossed } from 'lucide-react'
+import { ChevronDown, Trash2, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -19,72 +19,160 @@ import Loader from './Loader'
 import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
+// getNutriBadge — petit badge nutritionnel (emoji + libellé) calculé sur les
+// valeurs /100g de la recette. Protéines et fibres utilisent les seuils des
+// allégations nutritionnelles officielles (règlement UE n°1924/2006, annexe) :
+// "riche en protéines" ≥ 20% de l'énergie apportée par les protéines,
+// "riche en fibres" ≥ 6g/100g. Il n'existe pas d'allégation officielle "riche
+// en glucides/lipides" (aucun intérêt nutritionnel à le valoriser) — pour ces
+// deux-là on retombe sur un simple critère de dominance : le macro fournit à
+// lui seul plus de la moitié de l'énergie de la recette. Un seul badge par
+// recette (le premier qui matche) ; pas de badge si aucun ne matche — mieux
+// vaut l'absence de badge qu'un badge peu pertinent.
+// ─────────────────────────────────────────────────────────────────────────────
+function getNutriBadge(r) {
+  if (r.energie_kcal == null) return null
+  const kcalP = (r.proteines || 0) * 4
+  const kcalG = (r.glucides  || 0) * 4
+  const kcalL = (r.lipides   || 0) * 9
+  const totalKcal = kcalP + kcalG + kcalL
+  if (totalKcal <= 0) return null
+  if (kcalP / totalKcal >= 0.20) {
+    return { emoji: '💪', label: 'Riche en protéines', bg: 'var(--green-light)', color: 'var(--green-dark)' }
+  }
+  if ((r.fibres || 0) >= 6) {
+    return { emoji: '🌾', label: 'Riche en fibres', bg: 'var(--amber-light)', color: '#8A5A0F' }
+  }
+  if (kcalG / totalKcal > 0.50) {
+    return { emoji: '⚡', label: 'Riche en glucides', bg: 'var(--amber-light)', color: 'var(--amber)' }
+  }
+  if (kcalL / totalKcal > 0.50) {
+    return { emoji: '🥑', label: 'Riche en lipides', bg: 'var(--coral-light)', color: 'var(--coral)' }
+  }
+  return null
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MacroPillsRow — une rangée de 4 pastilles (kcal, P, G, L) pour une échelle
+// donnée (100g ou portion).
+// ─────────────────────────────────────────────────────────────────────────────
+function MacroPillsRow({ label, labelColor, bg, kcal, kcalColor, proteines, glucides, lipides, marginBottom }) {
+  const pillStyle = { background: bg, borderRadius: 8, padding: '4px 9px', fontSize: 11.5, fontWeight: 700 }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom }}>
+      <span style={{ fontSize: 9.5, fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: 0.4, width: 44, flexShrink: 0 }}>
+        {label}
+      </span>
+      <span style={{ ...pillStyle, color: kcalColor }}>
+        {Math.round(kcal)}<span style={{ fontWeight: 500, color: 'var(--text-hint)' }}> kcal</span>
+      </span>
+      <span className="c-prot" style={pillStyle}>{proteines.toFixed(1)}g P</span>
+      <span className="c-gluc" style={pillStyle}>{glucides.toFixed(1)}g G</span>
+      <span className="c-lip"  style={pillStyle}>{lipides.toFixed(1)}g L</span>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RecipeCard — carte d'une recette dans la liste
 // ─────────────────────────────────────────────────────────────────────────────
 function RecipeCard({ recette, ingredients, onOpen, onDelete }) {
   const [expanded, setExpanded] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const hasIngredients = ingredients && ingredients.length > 0
 
+  const portions        = recette.portions || 1
+  const poidsRef         = recette.poids_cuit_g || recette.poids_cru_g || null
+  const poidsParPortion  = poidsRef ? poidsRef / portions : null
+  const factor           = poidsParPortion ? poidsParPortion / 100 : null
+
+  const totalTempsMin = (recette.temps_preparation_min || 0) + (recette.temps_cuisson_min || 0) + (recette.temps_repos_min || 0)
+  const badge = getNutriBadge(recette)
+
   return (
-    <div className="card" style={{ marginBottom: 10, padding: '13px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <div
-          style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+    <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+        <span
+          style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
           onClick={() => onOpen(recette)}
         >
-          <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {recette.nom}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {recette.energie_kcal != null ? `${Math.round(recette.energie_kcal)} kcal/100g` : 'Aucun ingrédient'}
-            {recette.portions > 1 && <span style={{ marginLeft: 6, color: 'var(--text-hint)' }}>· {recette.portions} portions</span>}
-            {recette.poids_cuit_g && <span style={{ marginLeft: 6, color: 'var(--blue)', fontSize: 11 }}>⚖️ pesé</span>}
-          </div>
-
-          {recette.energie_kcal != null && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-              <span className="c-prot">P {Math.round(recette.proteines || 0)}g</span>&nbsp;
-              <span className="c-gluc">G {Math.round(recette.glucides  || 0)}g</span>&nbsp;
-              <span className="c-lip">L {Math.round(recette.lipides   || 0)}g</span>
-              <span style={{ color: 'var(--text-hint)' }}> /100g</span>
-            </div>
+          {recette.nom}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, position: 'relative' }}>
+          {hasIngredients && (
+            <button
+              onClick={e => { e.stopPropagation(); setExpanded(x => !x) }}
+              className="btn-icon"
+              style={{ color: 'var(--text-hint)' }}
+            >
+              <ChevronDown size={18} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+            </button>
           )}
-
-          {(() => {
-            const portions       = recette.portions || 1
-            const poidsRef        = recette.poids_cuit_g || recette.poids_cru_g || null
-            const poidsParPortion = poidsRef ? poidsRef / portions : null
-            const factor          = poidsParPortion ? poidsParPortion / 100 : null
-            if (recette.energie_kcal == null || factor == null) return null
-            return (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                {Math.round(recette.energie_kcal * factor)} kcal&nbsp;·&nbsp;
-                <span className="c-prot">P {Math.round((recette.proteines || 0) * factor)}g</span>&nbsp;
-                <span className="c-gluc">G {Math.round((recette.glucides  || 0) * factor)}g</span>&nbsp;
-                <span className="c-lip">L {Math.round((recette.lipides   || 0) * factor)}g</span>
-                <span style={{ color: 'var(--text-hint)' }}> /portion ({Math.round(poidsParPortion)}g)</span>
-              </div>
-            )
-          })()}
-        </div>
-
-        {/* ── Toggle ingrédients ── */}
-        {hasIngredients && (
           <button
-            onClick={e => { e.stopPropagation(); setExpanded(x => !x) }}
+            onClick={e => { e.stopPropagation(); setMenuOpen(o => !o) }}
             className="btn-icon"
-            style={{ color: 'var(--text-hint)', flexShrink: 0 }}
+            style={{ color: 'var(--text-hint)' }}
           >
-            <ChevronDown size={18} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+            <MoreVertical size={16} />
           </button>
+          {menuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={e => { e.stopPropagation(); setMenuOpen(false) }} />
+              <div className="card" style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, padding: 4, minWidth: 150 }}>
+                <button
+                  onClick={e => { e.stopPropagation(); setMenuOpen(false); onDelete(recette.id) }}
+                  style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--coral)', display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  <Trash2 size={14} /> Supprimer
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div onClick={() => onOpen(recette)} style={{ cursor: 'pointer' }}>
+        {/* ── Chips catégorie / temps / badge nutritionnel ── */}
+        {(recette.categories?.length > 0 || totalTempsMin > 0 || badge) && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {recette.categories?.length > 0 && (
+              <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
+                {recette.categories.join(', ')}
+              </span>
+            )}
+            {totalTempsMin > 0 && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--text-hint)', fontSize: 11, fontWeight: 600 }}>
+                <Clock size={11} />{totalTempsMin} min
+              </span>
+            )}
+            {badge && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: badge.bg, color: badge.color, borderRadius: 20, padding: '2px 9px 2px 7px', fontSize: 10.5, fontWeight: 700 }}>
+                {badge.emoji} {badge.label}
+              </span>
+            )}
+          </div>
         )}
-        <button
-          className="btn-icon"
-          onClick={e => { e.stopPropagation(); onDelete(recette.id) }}
-          style={{ color: 'var(--text-hint)', flexShrink: 0 }}
-        >
-          <Trash2 size={16} />
-        </button>
+
+        {/* ── Macros en pastilles ── */}
+        {recette.energie_kcal == null ? (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aucun ingrédient</div>
+        ) : (
+          <>
+            <MacroPillsRow
+              label="100 g" labelColor="var(--text-hint)" bg="var(--gray-bg)"
+              kcal={recette.energie_kcal} kcalColor="var(--text)"
+              proteines={recette.proteines || 0} glucides={recette.glucides || 0} lipides={recette.lipides || 0}
+              marginBottom={factor != null ? 6 : 0}
+            />
+            {factor != null && (
+              <MacroPillsRow
+                label="Portion" labelColor="var(--green-dark)" bg="var(--green-light)"
+                kcal={recette.energie_kcal * factor} kcalColor="var(--green-dark)"
+                proteines={(recette.proteines || 0) * factor} glucides={(recette.glucides || 0) * factor} lipides={(recette.lipides || 0) * factor}
+              />
+            )}
+          </>
+        )}
       </div>
 
       {/* ── Liste ingrédients + grammage (dépliable) ── */}

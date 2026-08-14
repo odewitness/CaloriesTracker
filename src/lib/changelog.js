@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Tes recettes en un coup d\'œil',
+    description: "La liste de tes recettes a un nouveau look : les calories et les macros pour 100 g et pour une portion s'affichent directement sur chaque carte, sans avoir à l'ouvrir. Un petit badge t'indique aussi quand une recette est riche en protéines ou en fibres.",
+  },
+  {
+    date: '2026-08-14',
     title: 'La croix pour fermer les fenêtres était cachée sur iPhone',
     description: "Sur certains iPhone, la croix en haut des fenêtres (fiche recette, fiche aliment...) était cachée sous l'encoche ou la barre du haut, ce qui empêchait de refermer une fenêtre. C'est corrigé.",
   },
