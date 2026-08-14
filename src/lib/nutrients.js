@@ -43,36 +43,38 @@ export const FAT_FIELDS = [
 ]
 
 // ── Vitamines avec jauge (ref = RNP/AS adulte indicatif ANSES, non personnalisé ; lss = limite de sécurité si connue) ──
+// `short` = libellé compact (lettre/chiffre) utilisé dans les pastilles où la place manque (ex. carte complément alimentaire).
 export const VITAMIN_FIELDS = [
-  { key: 'vit_c',  label: 'Vitamine C',          ref: 110,  lss: 1000, unit: 'mg', color: 'var(--green)'  },
-  { key: 'vit_d',  label: 'Vitamine D',          ref: 15,   lss: 100,  unit: 'µg', color: 'var(--amber)'  },
-  { key: 'vit_e_totale', sumKeys: ['vit_e_totale', 'vit_e'], label: 'Vitamine E', ref: 13, lss: 300, unit: 'mg', color: 'var(--blue)' },
-  { key: 'vit_k1', sumKeys: ['vit_k1', 'vit_k2'], label: 'Vitamine K', ref: 79, lss: null, unit: 'µg', color: 'var(--purple)' },
-  { key: 'vit_b1', label: 'Vitamine B1',         ref: 1.3,  lss: null, unit: 'mg', color: 'var(--coral)'  },
-  { key: 'vit_b2', label: 'Vitamine B2',         ref: 1.6,  lss: null, unit: 'mg', color: 'var(--amber)'  },
-  { key: 'vit_b3', label: 'Vitamine B3',         ref: 14,   lss: 900,  unit: 'mg', color: 'var(--coral)'  },
-  { key: 'vit_b5', label: 'Vitamine B5',         ref: 5,    lss: null, unit: 'mg', color: 'var(--green)'  },
-  { key: 'vit_b6', label: 'Vitamine B6',         ref: 1.7,  lss: 25,   unit: 'mg', color: 'var(--blue)'   },
-  { key: 'folates', sumKeys: ['folates', 'folates_intrinseques'], label: 'Folates (B9)', ref: 330, lss: 1000, unit: 'µg', color: 'var(--purple)' },
-  { key: 'vit_b12',label: 'Vitamine B12',        ref: 4,    lss: null, unit: 'µg', color: 'var(--purple)' },
-  { key: 'vit_a',  label: 'Vitamine A',          ref: 650,  lss: 3000, unit: 'µg', color: 'var(--coral)'  },
+  { key: 'vit_c',  label: 'Vitamine C',          short: 'C',   ref: 110,  lss: 1000, unit: 'mg', color: 'var(--green)'  },
+  { key: 'vit_d',  label: 'Vitamine D',          short: 'D',   ref: 15,   lss: 100,  unit: 'µg', color: 'var(--amber)'  },
+  { key: 'vit_e_totale', sumKeys: ['vit_e_totale', 'vit_e'], label: 'Vitamine E', short: 'E', ref: 13, lss: 300, unit: 'mg', color: 'var(--blue)' },
+  { key: 'vit_k1', sumKeys: ['vit_k1', 'vit_k2'], label: 'Vitamine K', short: 'K', ref: 79, lss: null, unit: 'µg', color: 'var(--purple)' },
+  { key: 'vit_b1', label: 'Vitamine B1',         short: 'B1',  ref: 1.3,  lss: null, unit: 'mg', color: 'var(--coral)'  },
+  { key: 'vit_b2', label: 'Vitamine B2',         short: 'B2',  ref: 1.6,  lss: null, unit: 'mg', color: 'var(--amber)'  },
+  { key: 'vit_b3', label: 'Vitamine B3',         short: 'B3',  ref: 14,   lss: 900,  unit: 'mg', color: 'var(--coral)'  },
+  { key: 'vit_b5', label: 'Vitamine B5',         short: 'B5',  ref: 5,    lss: null, unit: 'mg', color: 'var(--green)'  },
+  { key: 'vit_b6', label: 'Vitamine B6',         short: 'B6',  ref: 1.7,  lss: 25,   unit: 'mg', color: 'var(--blue)'   },
+  { key: 'folates', sumKeys: ['folates', 'folates_intrinseques'], label: 'Folates (B9)', short: 'B9', ref: 330, lss: 1000, unit: 'µg', color: 'var(--purple)' },
+  { key: 'vit_b12',label: 'Vitamine B12',        short: 'B12', ref: 4,    lss: null, unit: 'µg', color: 'var(--purple)' },
+  { key: 'vit_a',  label: 'Vitamine A',          short: 'A',   ref: 650,  lss: 3000, unit: 'µg', color: 'var(--coral)'  },
 ]
 
 // ── Minéraux avec jauge ───────────────────────────────────────────────────────
+// `short` = 3 premières lettres, utilisé dans les pastilles où la place manque.
 export const MINERAL_FIELDS = [
-  { key: 'calcium',   label: 'Calcium',   ref: 950,  lss: 2500, unit: 'mg', color: 'var(--blue)'  },
-  { key: 'fer',       label: 'Fer',       ref: 16,   lss: 40,   unit: 'mg', color: 'var(--coral)' },
-  { key: 'magnesium', label: 'Magnésium', ref: 300,  lss: 2500, unit: 'mg', color: 'var(--green)' },
-  { key: 'potassium', label: 'Potassium', ref: 3500, lss: null, unit: 'mg', color: 'var(--amber)' },
-  { key: 'zinc',      label: 'Zinc',      ref: 11,   lss: 25,   unit: 'mg', color: 'var(--coral)' },
-  { key: 'sodium',    label: 'Sodium',    ref: 2000, lss: 2300, unit: 'mg', color: 'var(--amber)', limite: true },
-  { key: 'sel',       label: 'Sel',       ref: 5,    lss: 8,    unit: 'g',  color: 'var(--coral)', limite: true },
-  { key: 'chlorure',  label: 'Chlorure',  ref: 3100, lss: null, unit: 'mg', color: 'var(--blue)'  },
-  { key: 'cuivre',    label: 'Cuivre',    ref: 1.5,  lss: 5,    unit: 'mg', color: 'var(--coral)' },
-  { key: 'iode',      label: 'Iode',      ref: 150,  lss: 600,  unit: 'µg', color: 'var(--purple)'},
-  { key: 'manganese', label: 'Manganèse', ref: 3,    lss: null, unit: 'mg', color: 'var(--green)' },
-  { key: 'phosphore', label: 'Phosphore', ref: 550,  lss: null, unit: 'mg', color: 'var(--blue)'  },
-  { key: 'selenium',  label: 'Sélénium',  ref: 70,   lss: 300,  unit: 'µg', color: 'var(--amber)' },
+  { key: 'calcium',   label: 'Calcium',   short: 'Cal', ref: 950,  lss: 2500, unit: 'mg', color: 'var(--blue)'  },
+  { key: 'fer',       label: 'Fer',       short: 'Fer', ref: 16,   lss: 40,   unit: 'mg', color: 'var(--coral)' },
+  { key: 'magnesium', label: 'Magnésium', short: 'Mag', ref: 300,  lss: 2500, unit: 'mg', color: 'var(--green)' },
+  { key: 'potassium', label: 'Potassium', short: 'Pot', ref: 3500, lss: null, unit: 'mg', color: 'var(--amber)' },
+  { key: 'zinc',      label: 'Zinc',      short: 'Zin', ref: 11,   lss: 25,   unit: 'mg', color: 'var(--coral)' },
+  { key: 'sodium',    label: 'Sodium',    short: 'Sod', ref: 2000, lss: 2300, unit: 'mg', color: 'var(--amber)', limite: true },
+  { key: 'sel',       label: 'Sel',       short: 'Sel', ref: 5,    lss: 8,    unit: 'g',  color: 'var(--coral)', limite: true },
+  { key: 'chlorure',  label: 'Chlorure',  short: 'Chl', ref: 3100, lss: null, unit: 'mg', color: 'var(--blue)'  },
+  { key: 'cuivre',    label: 'Cuivre',    short: 'Cui', ref: 1.5,  lss: 5,    unit: 'mg', color: 'var(--coral)' },
+  { key: 'iode',      label: 'Iode',      short: 'Iod', ref: 150,  lss: 600,  unit: 'µg', color: 'var(--purple)'},
+  { key: 'manganese', label: 'Manganèse', short: 'Man', ref: 3,    lss: null, unit: 'mg', color: 'var(--green)' },
+  { key: 'phosphore', label: 'Phosphore', short: 'Pho', ref: 550,  lss: null, unit: 'mg', color: 'var(--blue)'  },
+  { key: 'selenium',  label: 'Sélénium',  short: 'Sél', ref: 70,   lss: 300,  unit: 'µg', color: 'var(--amber)' },
 ]
 
 // Sous-détails sans jauge dédiée (déjà couverts par une valeur "totale" ci-dessus :

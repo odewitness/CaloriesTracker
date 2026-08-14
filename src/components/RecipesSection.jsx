@@ -15,63 +15,10 @@ import {
   PREP_TIME_RANGES, COOK_TIME_RANGES, REST_TIME_RANGES,
 } from '../lib/recipeSort'
 import { RECIPE_CATEGORIES, UNCATEGORIZED_LABEL } from '../lib/recipeCategories'
+import { getNutriBadge } from '../lib/nutriBadge'
+import MacroPillsRow from './MacroPillsRow'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// getNutriBadge — petit badge nutritionnel (emoji + libellé) calculé sur les
-// valeurs /100g de la recette. Protéines et fibres utilisent les seuils des
-// allégations nutritionnelles officielles (règlement UE n°1924/2006, annexe) :
-// "riche en protéines" ≥ 20% de l'énergie apportée par les protéines,
-// "riche en fibres" ≥ 6g/100g. Il n'existe pas d'allégation officielle "riche
-// en glucides/lipides" (aucun intérêt nutritionnel à le valoriser) — pour ces
-// deux-là on retombe sur un simple critère de dominance : le macro fournit à
-// lui seul plus de la moitié de l'énergie de la recette. Un seul badge par
-// recette (le premier qui matche) ; pas de badge si aucun ne matche — mieux
-// vaut l'absence de badge qu'un badge peu pertinent.
-// ─────────────────────────────────────────────────────────────────────────────
-function getNutriBadge(r) {
-  if (r.energie_kcal == null) return null
-  const kcalP = (r.proteines || 0) * 4
-  const kcalG = (r.glucides  || 0) * 4
-  const kcalL = (r.lipides   || 0) * 9
-  const totalKcal = kcalP + kcalG + kcalL
-  if (totalKcal <= 0) return null
-  if (kcalP / totalKcal >= 0.20) {
-    return { emoji: '💪', label: 'Riche en protéines', bg: 'var(--green-light)', color: 'var(--green-dark)' }
-  }
-  if ((r.fibres || 0) >= 6) {
-    return { emoji: '🌾', label: 'Riche en fibres', bg: 'var(--amber-light)', color: '#8A5A0F' }
-  }
-  if (kcalG / totalKcal > 0.50) {
-    return { emoji: '⚡', label: 'Riche en glucides', bg: 'var(--amber-light)', color: 'var(--amber)' }
-  }
-  if (kcalL / totalKcal > 0.50) {
-    return { emoji: '🥑', label: 'Riche en lipides', bg: 'var(--coral-light)', color: 'var(--coral)' }
-  }
-  return null
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MacroPillsRow — une rangée de 4 pastilles (kcal, P, G, L) pour une échelle
-// donnée (100g ou portion).
-// ─────────────────────────────────────────────────────────────────────────────
-function MacroPillsRow({ label, labelColor, bg, kcal, kcalColor, proteines, glucides, lipides, marginBottom }) {
-  const pillStyle = { background: bg, borderRadius: 8, padding: '4px 9px', fontSize: 11.5, fontWeight: 700 }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom }}>
-      <span style={{ fontSize: 9.5, fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: 0.4, width: 44, flexShrink: 0 }}>
-        {label}
-      </span>
-      <span style={{ ...pillStyle, color: kcalColor }}>
-        {Math.round(kcal)}<span style={{ fontWeight: 500, color: 'var(--text-hint)' }}> kcal</span>
-      </span>
-      <span className="c-prot" style={pillStyle}>{proteines.toFixed(1)}g P</span>
-      <span className="c-gluc" style={pillStyle}>{glucides.toFixed(1)}g G</span>
-      <span className="c-lip"  style={pillStyle}>{lipides.toFixed(1)}g L</span>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RecipeCard — carte d'une recette dans la liste

@@ -9,7 +9,10 @@ import BarcodeScanner from './BarcodeScanner'
 import { useBackButton } from '../hooks/useBackButton'
 import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
 import { mapOFFProduct } from '../lib/openFoodFacts'
+import { COMPLEMENT_CATEGORY } from '../lib/foodCategories'
+import { getComplementNutrients } from '../lib/complementNutrients'
 import MacroPreview from './MacroPreview'
+import ComplementNutrientPills from './ComplementNutrientPills'
 import FoodRow from './FoodRow'
 import FavSortToggle from './FavSortToggle'
 import Loader from './Loader'
@@ -53,6 +56,11 @@ export default function FoodPicker({
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState(null)
   const [qty, setQty] = useState("100")
+  // Pour un complément alimentaire, l'utilisateur pense en "nombre de doses"
+  // (ex: 2 gélules) plutôt qu'en grammes — `qty` reste la source de vérité en
+  // grammes (utilisée par scaleFood/MacroPreview), mais ce texte séparé porte
+  // la saisie du nombre de doses, synchronisée avec `qty` via `doseUnitG`.
+  const [doseCountText, setDoseCountText] = useState('1')
   const [subtractMode, setSubtractMode] = useState(false)
   const [grossWeight, setGrossWeight] = useState("")
   const [wasteWeight, setWasteWeight] = useState("")
@@ -174,6 +182,7 @@ export default function FoodPicker({
       alim_nom: c.nom,
       categorie: c.categorie || 'Personnalisé',
       _source: 'custom',
+      _fresh: true, // déjà lu en direct depuis aliments_custom — pas besoin de re-fetch dans selectFood
     }))
 
     let recettesMapped = []
@@ -263,13 +272,69 @@ const selectFood = async (food) => {
     if (per100) enriched = { ...food, ...per100 }
   }
 
+  // Un aliment perso venant des Favoris (snapshot figé à la création du
+  // favori, jamais mis à jour) ou des Récents (categorie forcée à 'Récent'
+  // pour l'affichage, portions remplacées par une "Dernière quantité"
+  // synthétique — voir useRecentFoods) peut être périmé ou catégorisé à
+  // tort. On retombe sur la vraie ligne aliments_custom, en particulier pour
+  // que categorie/portions pilotent correctement l'UI dose-based des
+  // compléments alimentaires plus bas.
+  if (food._source === 'custom' && food.id && !food._fresh) {
+    const { data: fresh } = await supabase
+      .from('aliments_custom')
+      .select('*')
+      .eq('id', food.id)
+      .eq('user_id', user.id)
+      .single()
+    if (fresh) {
+      const isComp = fresh.categorie === COMPLEMENT_CATEGORY
+      enriched = {
+        ...fresh,
+        alim_nom: fresh.nom,
+        categorie: fresh.categorie || 'Personnalisé',
+        _source: 'custom',
+        // Pour un complément, les portions viennent uniquement de la dose +
+        // portions courantes définies sur l'aliment (portions[0] doit rester
+        // la vraie dose pour que le calcul du nombre de doses reste juste) —
+        // on ignore la "Dernière quantité"/les portions favorites fusionnées
+        // en amont. Pour un aliment normal, on les garde en priorité (la
+        // dernière quantité utilisée reste proposée par défaut, comme avant).
+        portions: isComp ? fresh.portions : mergePortions(food.portions || [], fresh.portions || []),
+      }
+    }
+  }
+
   setSelected(enriched)
-  const defaultPortion = enriched.portions?.[0]?.g || 100
-  setQty(String(defaultPortion))
+  const isComp = enriched.categorie === COMPLEMENT_CATEGORY
+  if (isComp) {
+    // Portion par défaut = la "portion courante" (portions[1]) si elle existe,
+    // sinon la dose seule (portions[0]) — cohérent avec la carte Aliments.
+    const doseUnit = enriched.portions?.[0]?.g || 1
+    const defaultPortion = enriched.portions?.[1]?.g ?? enriched.portions?.[0]?.g ?? doseUnit
+    setQty(String(defaultPortion))
+    setDoseCountText(String(Math.round((defaultPortion / doseUnit) * 100) / 100))
+  } else {
+    const defaultPortion = enriched.portions?.[0]?.g || 100
+    setQty(String(defaultPortion))
+    setDoseCountText('1')
+  }
   setSubtractMode(false)
   setGrossWeight("")
   setWasteWeight("")
   setStep('configure')
+}
+
+const isComplementFood = selected?.categorie === COMPLEMENT_CATEGORY
+// Poids d'une dose = 1ère "portion" de l'aliment (voir CustomFoodsSection —
+// portions[0] est toujours la dose de base pour un complément).
+const doseUnitG = isComplementFood ? (selected.portions?.[0]?.g || 1) : null
+
+// Change le nombre de doses (bouton −/+ ou saisie directe) : recalcule `qty`
+// (grammes, source de vérité pour scaleFood) à partir du nombre de doses.
+const setDoseCount = (text) => {
+  setDoseCountText(text)
+  const n = parseFloat(text)
+  if (!isNaN(n) && n >= 0) setQty(String(n * doseUnitG))
 }
 
   const handleScanDetected = (code) => {
@@ -495,131 +560,194 @@ const selectFood = async (food) => {
           <>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{selected.categorie}</div>
 
-            {/* Portions chips */}
-            {selected.portions?.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 6 }}>Portions courantes</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {selected.portions.map((p, i) => (
-                    <button key={i} className="chip" onClick={() => setQty(String(p.g))}>
-                      {p.label} · {p.g}g
-                    </button>
-                  ))}
-                  <button className="chip" onClick={() => setQty('100')}>100g</button>
-                </div>
-              </div>
-            )}
-
-            {/* Toggle mode soustraction */}
-            <button
-              onClick={() => {
-                const next = !subtractMode
-                setSubtractMode(next)
-                if (!next) { setGrossWeight(""); setWasteWeight("") }
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                marginBottom: 14, padding: '9px 12px',
-                background: subtractMode ? 'var(--amber-light)' : 'var(--gray-bg)',
-                border: `1px solid ${subtractMode ? 'var(--amber)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-sm)', width: '100%',
-                color: subtractMode ? 'var(--amber)' : 'var(--text-muted)',
-                fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)',
-                transition: 'all .15s',
-              }}
-            >
-              <span style={{ fontSize: 16 }}>⚖️</span>
-              <span style={{ flex: 1, textAlign: 'left' }}>
-                {subtractMode ? 'Mode soustraction actif' : 'Peser avec soustraction'}
-              </span>
-              <span style={{
-                width: 32, height: 18, borderRadius: 9, flexShrink: 0,
-                background: subtractMode ? 'var(--amber)' : 'var(--border-md)',
-                position: 'relative', transition: 'background .15s',
-              }}>
-                <span style={{
-                  position: 'absolute', top: 2, left: subtractMode ? 16 : 2,
-                  width: 14, height: 14, borderRadius: '50%', background: 'white',
-                  transition: 'left .15s',
-                }} />
-              </span>
-            </button>
-
-            {subtractMode ? (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Poids brut (avec os / peau)</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <input
-                        className="input-sm" type="text" inputMode="decimal" placeholder="—"
-                        value={grossWeight}
-                        onChange={e => {
-                          const g = e.target.value; setGrossWeight(g)
-                          const net = (parseFloat(g) || 0) - (parseFloat(wasteWeight) || 0)
-                          if (net > 0) setQty(String(net))
-                        }}
-                        style={{ width: 72 }}
-                      />
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
+            {isComplementFood ? (
+              <>
+                {/* Portions chips — pas de grammage affiché, ça n'a pas de sens pour un complément */}
+                {selected.portions?.length > 1 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 6 }}>Portions courantes</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {selected.portions.map((p, i) => (
+                        <button key={i} className="chip" onClick={() => setDoseCount(String(p.g / doseUnitG))}>
+                          {p.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <div style={{ fontSize: 20, color: 'var(--text-hint)', paddingBottom: 6, flexShrink: 0 }}>−</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Déchet (os, peau…)</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <input
-                        className="input-sm" type="text" inputMode="decimal" placeholder="—"
-                        value={wasteWeight}
-                        onChange={e => {
-                          const w = e.target.value; setWasteWeight(w)
-                          const net = (parseFloat(grossWeight) || 0) - (parseFloat(w) || 0)
-                          if (net > 0) setQty(String(net))
-                        }}
-                        style={{ width: 72 }}
-                      />
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
-                    </div>
+                )}
+
+                {/* Nombre de doses */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 6 }}>
+                    Nombre de doses ({selected.portions?.[0]?.label || '1 dose'})
                   </div>
-                  <div style={{ flexShrink: 0, paddingBottom: 6, fontSize: 20, color: 'var(--text-hint)' }}>=</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Net consommé</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{
-                        width: 72, textAlign: 'center', padding: '8px 4px',
-                        background: 'var(--amber-light)', borderRadius: 'var(--radius-xs)',
-                        fontSize: 15, fontWeight: 700, color: 'var(--amber)',
-                        border: '1px solid var(--amber)',
-                      }}>
-                        {(() => { const net = (parseFloat(grossWeight) || 0) - (parseFloat(wasteWeight) || 0); return net > 0 ? Math.round(net) : '—' })()}
-                      </div>
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button
+                      className="btn-icon"
+                      style={{ background: 'var(--gray-bg)' }}
+                      onClick={() => setDoseCount(String(Math.max(0, (parseFloat(doseCountText) || 0) - 1)))}
+                    >−</button>
+                    <input
+                      className="input-sm"
+                      type="text"
+                      inputMode="decimal"
+                      value={doseCountText}
+                      onChange={e => setDoseCount(e.target.value)}
+                      style={{ width: 60, textAlign: 'center' }}
+                    />
+                    <button
+                      className="btn-icon"
+                      style={{ background: 'var(--gray-bg)' }}
+                      onClick={() => setDoseCount(String((parseFloat(doseCountText) || 0) + 1))}
+                    >+</button>
                   </div>
                 </div>
-                {!grossWeight && (
-                  <div style={{ fontSize: 12, color: 'var(--text-hint)', fontStyle: 'italic' }}>Pèse d'abord l'aliment entier, puis reviens peser le déchet.</div>
-                )}
-                {grossWeight && !wasteWeight && (
-                  <div style={{ fontSize: 12, color: 'var(--amber)', fontStyle: 'italic' }}>✓ Poids brut noté. Va peser le déchet, puis reviens ici.</div>
-                )}
-              </div>
+
+                {/* Aperçu %AJR — les macros n'ont pas d'intérêt pour un complément */}
+                {(() => {
+                  const nutrients = getComplementNutrients(selected, (parseFloat(qty) || 0) / 100)
+                  return (
+                    <div style={{ marginBottom: 16 }}>
+                      {nutrients.length > 0 ? (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <ComplementNutrientPills nutrients={nutrients} />
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aucune vitamine ou minéral renseigné</div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </>
             ) : (
-              /* Mode normal */
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <input
-                  className="input-sm"
-                  type="text"
-                  inputMode="decimal"
-                  value={qty}
-                  onChange={e => setQty(e.target.value)}
-                />
-                <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
-              </div>
-            )}
+              <>
+                {/* Portions chips */}
+                {selected.portions?.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 6 }}>Portions courantes</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {selected.portions.map((p, i) => (
+                        <button key={i} className="chip" onClick={() => setQty(String(p.g))}>
+                          {p.label} · {p.g}g
+                        </button>
+                      ))}
+                      <button className="chip" onClick={() => setQty('100')}>100g</button>
+                    </div>
+                  </div>
+                )}
 
-            {/* Macro preview */}
-            <MacroPreview food={selected} qty={qty} />
+                {/* Toggle mode soustraction */}
+                <button
+                  onClick={() => {
+                    const next = !subtractMode
+                    setSubtractMode(next)
+                    if (!next) { setGrossWeight(""); setWasteWeight("") }
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    marginBottom: 14, padding: '9px 12px',
+                    background: subtractMode ? 'var(--amber-light)' : 'var(--gray-bg)',
+                    border: `1px solid ${subtractMode ? 'var(--amber)' : 'var(--border)'}`,
+                    borderRadius: 'var(--radius-sm)', width: '100%',
+                    color: subtractMode ? 'var(--amber)' : 'var(--text-muted)',
+                    fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)',
+                    transition: 'all .15s',
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>⚖️</span>
+                  <span style={{ flex: 1, textAlign: 'left' }}>
+                    {subtractMode ? 'Mode soustraction actif' : 'Peser avec soustraction'}
+                  </span>
+                  <span style={{
+                    width: 32, height: 18, borderRadius: 9, flexShrink: 0,
+                    background: subtractMode ? 'var(--amber)' : 'var(--border-md)',
+                    position: 'relative', transition: 'background .15s',
+                  }}>
+                    <span style={{
+                      position: 'absolute', top: 2, left: subtractMode ? 16 : 2,
+                      width: 14, height: 14, borderRadius: '50%', background: 'white',
+                      transition: 'left .15s',
+                    }} />
+                  </span>
+                </button>
+
+                {subtractMode ? (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Poids brut (avec os / peau)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            className="input-sm" type="text" inputMode="decimal" placeholder="—"
+                            value={grossWeight}
+                            onChange={e => {
+                              const g = e.target.value; setGrossWeight(g)
+                              const net = (parseFloat(g) || 0) - (parseFloat(wasteWeight) || 0)
+                              if (net > 0) setQty(String(net))
+                            }}
+                            style={{ width: 72 }}
+                          />
+                          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 20, color: 'var(--text-hint)', paddingBottom: 6, flexShrink: 0 }}>−</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Déchet (os, peau…)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            className="input-sm" type="text" inputMode="decimal" placeholder="—"
+                            value={wasteWeight}
+                            onChange={e => {
+                              const w = e.target.value; setWasteWeight(w)
+                              const net = (parseFloat(grossWeight) || 0) - (parseFloat(w) || 0)
+                              if (net > 0) setQty(String(net))
+                            }}
+                            style={{ width: 72 }}
+                          />
+                          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
+                        </div>
+                      </div>
+                      <div style={{ flexShrink: 0, paddingBottom: 6, fontSize: 20, color: 'var(--text-hint)' }}>=</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Net consommé</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{
+                            width: 72, textAlign: 'center', padding: '8px 4px',
+                            background: 'var(--amber-light)', borderRadius: 'var(--radius-xs)',
+                            fontSize: 15, fontWeight: 700, color: 'var(--amber)',
+                            border: '1px solid var(--amber)',
+                          }}>
+                            {(() => { const net = (parseFloat(grossWeight) || 0) - (parseFloat(wasteWeight) || 0); return net > 0 ? Math.round(net) : '—' })()}
+                          </div>
+                          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
+                        </div>
+                      </div>
+                    </div>
+                    {!grossWeight && (
+                      <div style={{ fontSize: 12, color: 'var(--text-hint)', fontStyle: 'italic' }}>Pèse d'abord l'aliment entier, puis reviens peser le déchet.</div>
+                    )}
+                    {grossWeight && !wasteWeight && (
+                      <div style={{ fontSize: 12, color: 'var(--amber)', fontStyle: 'italic' }}>✓ Poids brut noté. Va peser le déchet, puis reviens ici.</div>
+                    )}
+                  </div>
+                ) : (
+                  /* Mode normal */
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                    <input
+                      className="input-sm"
+                      type="text"
+                      inputMode="decimal"
+                      value={qty}
+                      onChange={e => setQty(e.target.value)}
+                    />
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
+                  </div>
+                )}
+
+                {/* Macro preview */}
+                <MacroPreview food={selected} qty={qty} />
+              </>
+            )}
 
             {/* Contexte (ex: repas ciblé — non modifiable, déjà choisi via le "+") */}
             {contextLabel && (
