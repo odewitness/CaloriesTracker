@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { SORT_FIELDS, SORT_BASES, PREP_TIME_RANGES, COOK_TIME_RANGES, REST_TIME_RANGES, describeSortField } from '../lib/recipeSort'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
+import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import FieldPicker from './FieldPicker'
 
 // Les 3 groupes de durée (prépa/cuisson/repos) partagent un seul sélecteur :
@@ -52,7 +53,7 @@ export default function SortModal({ value, onChange, onClose }) {
   // à rouvrir l'onglet/la section où il a été posé.
   const activeChips = [
     ...categories.map(cat => ({
-      id: `cat:${cat}`, label: cat, onRemove: () => toggleCategory(cat),
+      id: `cat:${cat}`, label: `${getRecipeCategoryIcon(cat)} ${cat}`, onRemove: () => toggleCategory(cat),
     })),
     ...DURATION_DIMENSIONS.flatMap(dim =>
       rangeValues[dim.setter].map(key => ({
@@ -184,7 +185,7 @@ export default function SortModal({ value, onChange, onClose }) {
                     className="chip"
                     style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
                   >
-                    {cat}
+                    {getRecipeCategoryIcon(cat)} {cat}
                   </button>
                 ))}
               </div>

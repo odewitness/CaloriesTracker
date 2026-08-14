@@ -10,6 +10,7 @@ import { scaleFood } from '../lib/nutrients'
 import EmptyState from './EmptyState'
 import FieldLabel from './FieldLabel'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
+import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -189,7 +190,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
                   className="chip"
                   style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
                 >
-                  {cat}
+                  {getRecipeCategoryIcon(cat)} {cat}
                 </button>
               ))}
             </div>

@@ -5,6 +5,7 @@ import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { SUGAR_FIELDS, FAT_FIELDS, VITAMIN_FIELDS, MINERAL_FIELDS, DETAIL_ONLY_FIELDS, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { FOOD_CATEGORIES, COMPLEMENT_CATEGORY } from '../lib/foodCategories'
+import { getFoodCategoryIcon, getFoodCategoryColor } from '../lib/categoryIcons'
 import { DEFAULT_SORT, sortAliments, describeSortField, filterByCategories, isCustomSort, isCustomFilter } from '../lib/foodSort'
 import { getNutriBadge } from '../lib/nutriBadge'
 import { getComplementNutrients } from '../lib/complementNutrients'
@@ -546,7 +547,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
                 <FieldLabel>Catégorie</FieldLabel>
                 <select className="input" value={form.categorie} onChange={e => set('categorie', e.target.value)}>
                   {(FOOD_CATEGORIES.includes(form.categorie) ? FOOD_CATEGORIES : [form.categorie, ...FOOD_CATEGORIES]).map(c => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>{getFoodCategoryIcon(c)} {c}</option>
                   ))}
                 </select>
               </div>
@@ -782,14 +783,18 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
 
       {groupedAliments.map(({ key, items }) => {
         const collapsed = collapsedCategories.has(key)
+        const { accent, bg } = getFoodCategoryColor(key)
         return (
-          <div key={key} style={{ marginBottom: 14 }}>
+          <div key={key} style={{ marginBottom: 18 }}>
             <button
               onClick={() => toggleCategoryCollapsed(key)}
               style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: collapsed ? 0 : 6 }}
             >
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                {key} <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>({items.length})</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ background: bg, color: accent, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+                  {getFoodCategoryIcon(key)} {key}
+                </span>
+                <span style={{ color: 'var(--text-hint)', fontSize: 12, fontWeight: 600 }}>({items.length})</span>
               </span>
               <ChevronDown size={16} color="var(--text-hint)" style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
             </button>

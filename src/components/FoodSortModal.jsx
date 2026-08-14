@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { SORT_FIELDS, describeSortField } from '../lib/foodSort'
 import { FOOD_CATEGORIES } from '../lib/foodCategories'
+import { getFoodCategoryIcon } from '../lib/categoryIcons'
 import FieldPicker from './FieldPicker'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ export default function FoodSortModal({ value, onChange, onClose }) {
   // à rouvrir l'onglet où il a été posé.
   const activeChips = [
     ...categories.map(cat => ({
-      id: `cat:${cat}`, label: cat, onRemove: () => toggleCategory(cat),
+      id: `cat:${cat}`, label: `${getFoodCategoryIcon(cat)} ${cat}`, onRemove: () => toggleCategory(cat),
     })),
     ...(primaryField !== 'nom' || primaryDir !== 'asc' ? [{
       id: 'sort-primary',
@@ -146,7 +147,7 @@ export default function FoodSortModal({ value, onChange, onClose }) {
                     className="chip"
                     style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
                   >
-                    {cat}
+                    {getFoodCategoryIcon(cat)} {cat}
                   </button>
                 ))}
               </div>

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Les catégories sont plus faciles à repérer',
+    description: "Dans Aliments et Recettes, chaque catégorie a maintenant un petit emoji et une pastille de couleur devant son nom, pour mieux distinguer les groupes quand tu parcours la liste.",
+  },
+  {
+    date: '2026-08-14',
     title: 'Suis ton poids et tes mensurations dans le temps',
     description: "Depuis ton Profil, la ligne \"Poids & mensurations\" ouvre un nouvel écran : ajoute un relevé daté (poids, poitrine, taille, hanches, bras, cuisses...), rien n'est obligatoire. Une courbe suit leur évolution : tape sur une puce en haut pour changer la donnée affichée, sur un point de la courbe pour voir sa valeur exacte, et choisis la période (1 mois, 3 mois, 6 mois, 1 an, tout).",
   },

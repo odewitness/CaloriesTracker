@@ -9,6 +9,7 @@ import RecipeDetailWrapper from './RecipeDetailWrapper'
 import PlanMealModal from './PlanMealModal'
 import SortModal from './SortModal'
 import AddToJournalSheet from './AddToJournalSheet'
+import { getRecipeCategoryIcon, getRecipeCategoryColor } from '../lib/categoryIcons'
 import {
   DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort,
   filterByCategories, filterByTimeRanges, isCustomFilter, describeActiveFilters,
@@ -84,7 +85,7 @@ function RecipeCard({ recette, ingredients, onOpen, onDelete }) {
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
             {recette.categories?.length > 0 && (
               <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
-                {recette.categories.join(', ')}
+                {recette.categories.map(c => `${getRecipeCategoryIcon(c)} ${c}`).join(', ')}
               </span>
             )}
             {totalTempsMin > 0 && (
@@ -313,14 +314,18 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
 
           {groupedRecettes.map(({ key, items }) => {
             const collapsed = collapsedCategories.has(key)
+            const { accent, bg } = getRecipeCategoryColor(key)
             return (
-              <div key={key} style={{ marginBottom: 14 }}>
+              <div key={key} style={{ marginBottom: 18 }}>
                 <button
                   onClick={() => toggleCategoryCollapsed(key)}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: collapsed ? 0 : 6 }}
                 >
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                    {key} <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>({items.length})</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ background: bg, color: accent, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+                      {getRecipeCategoryIcon(key)} {key}
+                    </span>
+                    <span style={{ color: 'var(--text-hint)', fontSize: 12, fontWeight: 600 }}>({items.length})</span>
                   </span>
                   <ChevronDown size={16} color="var(--text-hint)" style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
                 </button>
