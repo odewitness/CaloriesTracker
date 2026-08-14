@@ -93,7 +93,7 @@ function RecipeCard({ recette, ingredients, onOpen, onDelete }) {
     <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
         <span
-          style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           onClick={() => onOpen(recette)}
         >
           {recette.nom}

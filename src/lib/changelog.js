@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Les noms de recettes ne sont plus coupés',
+    description: "Dans la liste de tes recettes, les noms trop longs passaient à la ligne suivante avec des points de suspension. Maintenant ils s'affichent en entier, sur plusieurs lignes si besoin.",
+  },
+  {
+    date: '2026-08-14',
     title: 'Tes recettes en un coup d\'œil',
     description: "La liste de tes recettes a un nouveau look : les calories et les macros pour 100 g et pour une portion s'affichent directement sur chaque carte, sans avoir à l'ouvrir. Un petit badge t'indique aussi quand une recette est riche en protéines ou en fibres.",
   },
