@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-14',
+    title: 'Feuille de tri et filtre des recettes revue',
+    description: "La feuille « Trier & filtrer » des recettes passe en deux onglets, et affiche en haut des puces pour retirer un filtre ou un critère de tri actif d'un tap, sans avoir à le rechercher.",
+  },
+  {
+    date: '2026-08-14',
     title: 'Nouvel écran de détail recette',
     description: "La fiche recette est repensée : lecture par portion ou pour 100 g, onglets Infos / Instructions, et un bouton pour ajouter la recette directement au journal.",
   },

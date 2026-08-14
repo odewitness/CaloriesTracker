@@ -1,15 +1,28 @@
 import React, { useState, useEffect } from 'react'
+import { X } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
-import { SORT_FIELDS, SORT_BASES, PREP_TIME_RANGES, COOK_TIME_RANGES, REST_TIME_RANGES } from '../lib/recipeSort'
+import { SORT_FIELDS, SORT_BASES, PREP_TIME_RANGES, COOK_TIME_RANGES, REST_TIME_RANGES, describeSortField } from '../lib/recipeSort'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import FieldPicker from './FieldPicker'
 
+// Les 3 groupes de durée (prépa/cuisson/repos) partagent un seul sélecteur :
+// une dimension active à la fois, une seule rangée de puces affichée.
+const DURATION_DIMENSIONS = [
+  { key: 'prep', label: 'Prépa',   ranges: PREP_TIME_RANGES, setter: 'prepRanges' },
+  { key: 'cook', label: 'Cuisson', ranges: COOK_TIME_RANGES, setter: 'cookRanges' },
+  { key: 'rest', label: 'Repos',   ranges: REST_TIME_RANGES, setter: 'restRanges' },
+]
+
 // ─────────────────────────────────────────────────────────────────────────────
-// SortModal — critère principal + critère secondaire optionnel
-// (ex: "moins caloriques, puis plus de protéines")
+// SortModal — feuille « Trier & filtrer » à onglets (Filtrer / Trier), avec un
+// résumé de chips supprimables sous le titre pour retirer un filtre ou un
+// critère de tri sans rouvrir la section où il a été posé.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function SortModal({ value, onChange, onClose }) {
   useBackButton(onClose)
+  const [activeTab, setActiveTab] = useState('filtrer') // 'filtrer' | 'trier'
+  const [activeDurationDim, setActiveDurationDim] = useState('prep') // 'prep' | 'cook' | 'rest'
+
   const [primaryField, setPrimaryField]     = useState(value.primary.field)
   const [primaryDir, setPrimaryDir]         = useState(value.primary.dir)
   const [secondaryField, setSecondaryField] = useState(value.secondary?.field || null)
@@ -28,6 +41,42 @@ export default function SortModal({ value, onChange, onClose }) {
 
   const toggleRange = (setter) => (key) =>
     setter(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
+
+  const rangeSetters = { prepRanges: setPrepRanges, cookRanges: setCookRanges, restRanges: setRestRanges }
+  const rangeValues  = { prepRanges, cookRanges, restRanges }
+
+  const filterCount = categories.length + prepRanges.length + cookRanges.length + restRanges.length
+  const sortIsCustom = primaryField !== 'nom' || primaryDir !== 'asc' || !!secondaryField || basis === 'portion'
+
+  // Résumé des filtres + du tri actifs, chacun retirable d'un tap sans avoir
+  // à rouvrir l'onglet/la section où il a été posé.
+  const activeChips = [
+    ...categories.map(cat => ({
+      id: `cat:${cat}`, label: cat, onRemove: () => toggleCategory(cat),
+    })),
+    ...DURATION_DIMENSIONS.flatMap(dim =>
+      rangeValues[dim.setter].map(key => ({
+        id: `${dim.key}:${key}`,
+        label: `${dim.label} ${dim.ranges.find(r => r.key === key)?.label || ''}`,
+        onRemove: () => toggleRange(rangeSetters[dim.setter])(key),
+      }))
+    ),
+    ...(primaryField !== 'nom' || primaryDir !== 'asc' ? [{
+      id: 'sort-primary',
+      label: `Trier : ${describeSortField({ field: primaryField, dir: primaryDir }, basis)}`,
+      onRemove: () => { setPrimaryField('nom'); setPrimaryDir('asc') },
+    }] : []),
+    ...(secondaryField ? [{
+      id: 'sort-secondary',
+      label: `Puis : ${describeSortField({ field: secondaryField, dir: secondaryDir }, basis)}`,
+      onRemove: () => setSecondaryField(null),
+    }] : []),
+    ...(basis === 'portion' ? [{
+      id: 'sort-basis',
+      label: 'Par portion',
+      onRemove: () => setBasis('per100g'),
+    }] : []),
+  ]
 
   const apply = () => {
     onChange({
@@ -50,125 +99,187 @@ export default function SortModal({ value, onChange, onClose }) {
     setPrepRanges([]); setCookRanges([]); setRestRanges([])
   }
 
+  const activeDim = DURATION_DIMENSIONS.find(d => d.key === activeDurationDim)
+
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-sheet">
-        <div className="modal-handle" />
-        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Trier / filtrer les recettes</h2>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 18 }}>
-          Choisis un critère principal, et éventuellement un second pour départager les égalités.
-        </div>
+      <div className="modal-sheet" style={{ display: 'flex', flexDirection: 'column', padding: 0, maxHeight: '86dvh' }}>
 
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-          Filtrer par catégorie <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-          {RECIPE_CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => toggleCategory(cat)}
-              className="chip"
-              style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-            >
-              {cat}
+        {/* En-tête fixe : poignée, titre + fermer, résumé des filtres/tri actifs, onglets */}
+        <div style={{ flexShrink: 0, padding: '14px 20px 0' }}>
+          <div className="modal-handle" />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <span style={{ fontSize: 17, fontWeight: 700 }}>Trier &amp; filtrer</span>
+            <button className="btn-icon" onClick={onClose} style={{ color: 'var(--text-muted)' }} aria-label="Fermer">
+              <X size={19} />
             </button>
-          ))}
-        </div>
+          </div>
 
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-          Temps de préparation <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-          {PREP_TIME_RANGES.map(({ key, label }) => (
+          {activeChips.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+              {activeChips.map(chip => (
+                <button
+                  key={chip.id}
+                  onClick={chip.onRemove}
+                  className="chip"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, paddingRight: 8 }}
+                >
+                  {chip.label}
+                  <X size={12} />
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 6, background: 'var(--gray-bg)', borderRadius: 12, padding: 4, marginBottom: 16 }}>
             <button
-              key={key}
-              onClick={() => toggleRange(setPrepRanges)(key)}
-              className="chip"
-              style={prepRanges.includes(key) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-          Temps de cuisson <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-          {COOK_TIME_RANGES.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => toggleRange(setCookRanges)(key)}
-              className="chip"
-              style={cookRanges.includes(key) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-          Temps de repos <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-          {REST_TIME_RANGES.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => toggleRange(setRestRanges)(key)}
-              className="chip"
-              style={restRanges.includes(key) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
-          Trier par
-        </div>
-        <FieldPicker
-          fields={SORT_FIELDS}
-          selected={primaryField}
-          dir={primaryDir}
-          onSelectField={setPrimaryField}
-          onToggleDir={() => setPrimaryDir(d => d === 'asc' ? 'desc' : 'asc')}
-        />
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '18px 0 8px' }}>
-          Puis par <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
-        </div>
-        <FieldPicker
-          fields={SORT_FIELDS.filter(f => f.key !== primaryField)}
-          selected={secondaryField}
-          dir={secondaryDir}
-          onSelectField={setSecondaryField}
-          onToggleDir={() => setSecondaryDir(d => d === 'asc' ? 'desc' : 'asc')}
-          allowNone
-        />
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '18px 0 8px' }}>
-          Base de calcul
-        </div>
-        <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
-          {SORT_BASES.map(b => (
-            <button
-              key={b.key}
-              onClick={() => setBasis(b.key)}
+              onClick={() => setActiveTab('filtrer')}
               style={{
-                flex: 1, padding: '8px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
-                background: basis === b.key ? 'var(--white)' : 'transparent',
-                color: basis === b.key ? 'var(--text)' : 'var(--text-muted)',
-                boxShadow: basis === b.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                flex: 1, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                fontSize: 13, fontWeight: activeTab === 'filtrer' ? 700 : 600, fontFamily: 'var(--font)',
+                background: activeTab === 'filtrer' ? 'var(--white)' : 'transparent',
+                color: activeTab === 'filtrer' ? 'var(--text)' : 'var(--text-muted)',
+                boxShadow: activeTab === 'filtrer' ? '0 1px 3px rgba(0,0,0,.12)' : 'none',
                 transition: 'all .15s',
               }}
             >
-              {b.label}
+              Filtrer
+              {filterCount > 0 && (
+                <span style={{ background: 'var(--green)', color: '#fff', borderRadius: 9, minWidth: 18, height: 18, padding: '0 5px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {filterCount}
+                </span>
+              )}
             </button>
-          ))}
+            <button
+              onClick={() => setActiveTab('trier')}
+              style={{
+                flex: 1, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                fontSize: 13, fontWeight: activeTab === 'trier' ? 700 : 600, fontFamily: 'var(--font)',
+                background: activeTab === 'trier' ? 'var(--white)' : 'transparent',
+                color: activeTab === 'trier' ? 'var(--text)' : 'var(--text-muted)',
+                boxShadow: activeTab === 'trier' ? '0 1px 3px rgba(0,0,0,.12)' : 'none',
+                transition: 'all .15s',
+              }}
+            >
+              Trier
+              {sortIsCustom && (
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
+              )}
+            </button>
+          </div>
         </div>
 
-        <button className="btn-primary" onClick={apply} style={{ marginTop: 20 }}>Appliquer</button>
-        <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={reset}>Réinitialiser</button>
+        {/* Contenu scrollable */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 14px' }}>
+          {activeTab === 'filtrer' ? (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 9 }}>
+                Catégories
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+                {RECIPE_CATEGORIES.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => toggleCategory(cat)}
+                    className="chip"
+                    style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 9 }}>
+                Durée
+              </div>
+              <div style={{ display: 'flex', gap: 4, background: 'var(--gray-bg)', borderRadius: 11, padding: 3, marginBottom: 12 }}>
+                {DURATION_DIMENSIONS.map(dim => (
+                  <button
+                    key={dim.key}
+                    onClick={() => setActiveDurationDim(dim.key)}
+                    style={{
+                      flex: 1, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      fontSize: 12, fontWeight: activeDurationDim === dim.key ? 700 : 600, fontFamily: 'var(--font)',
+                      background: activeDurationDim === dim.key ? 'var(--white)' : 'transparent',
+                      color: activeDurationDim === dim.key ? 'var(--text)' : 'var(--text-muted)',
+                      boxShadow: activeDurationDim === dim.key ? '0 1px 3px rgba(0,0,0,.12)' : 'none',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {dim.label}
+                    {rangeValues[dim.setter].length > 0 && (
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                {activeDim.ranges.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => toggleRange(rangeSetters[activeDim.setter])(key)}
+                    className="chip"
+                    style={rangeValues[activeDim.setter].includes(key) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+                Trier par
+              </div>
+              <FieldPicker
+                fields={SORT_FIELDS}
+                selected={primaryField}
+                dir={primaryDir}
+                onSelectField={setPrimaryField}
+                onToggleDir={() => setPrimaryDir(d => d === 'asc' ? 'desc' : 'asc')}
+              />
+
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '18px 0 8px' }}>
+                Puis par <span style={{ textTransform: 'none', fontWeight: 400, color: 'var(--text-hint)' }}>(optionnel)</span>
+              </div>
+              <FieldPicker
+                fields={SORT_FIELDS.filter(f => f.key !== primaryField)}
+                selected={secondaryField}
+                dir={secondaryDir}
+                onSelectField={setSecondaryField}
+                onToggleDir={() => setSecondaryDir(d => d === 'asc' ? 'desc' : 'asc')}
+                allowNone
+              />
+
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '18px 0 8px' }}>
+                Base de calcul
+              </div>
+              <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
+                {SORT_BASES.map(b => (
+                  <button
+                    key={b.key}
+                    onClick={() => setBasis(b.key)}
+                    style={{
+                      flex: 1, padding: '8px 0', borderRadius: 7, fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+                      background: basis === b.key ? 'var(--white)' : 'transparent',
+                      color: basis === b.key ? 'var(--text)' : 'var(--text-muted)',
+                      boxShadow: basis === b.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Pied fixe */}
+        <div style={{ flexShrink: 0, padding: '12px 20px calc(18px + env(safe-area-inset-bottom))', borderTop: '.5px solid var(--border)' }}>
+          <button className="btn-primary" onClick={apply}>Appliquer</button>
+          <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 8 }} onClick={reset}>Réinitialiser</button>
+        </div>
       </div>
     </div>
   )

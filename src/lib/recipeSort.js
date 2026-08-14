@@ -84,7 +84,11 @@ export function compareByField(a, b, field, dir, basis) {
   if (av == null && bv == null) return 0
   if (av == null) return 1
   if (bv == null) return -1
-  const cmp = av - bv
+  // Comparaison sur la valeur arrondie telle qu'affichée à l'écran : deux
+  // recettes visuellement à égalité (ex. "53g" toutes les deux) doivent
+  // laisser la main au critère de tri secondaire plutôt que se départager
+  // sur un écart décimal invisible pour l'utilisatrice.
+  const cmp = Math.round(av) - Math.round(bv)
   return dir === 'desc' ? -cmp : cmp
 }
 
