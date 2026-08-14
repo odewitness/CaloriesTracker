@@ -3,11 +3,10 @@ import { Plus, Trash2, ChevronRight, Check, Pencil, UtensilsCrossed, CalendarPlu
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
-import { MEALS_ORDER as MEALS } from '../lib/nutrients'
 import AddFoodModal from './AddFoodModal'
 import PlanMealModal from './PlanMealModal'
 import EditMealTemplatePage from './EditMealTemplatePage'
-import { useBackButton } from '../hooks/useBackButton'
+import AddToJournalSheet from './AddToJournalSheet'
 import { saveMealTemplate, deleteMealTemplate } from '../hooks/useMealTemplates'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
@@ -73,65 +72,6 @@ function MealTemplateCard({ repas, onDelete, onEdit, onAddToJournal, onPlan }) {
   )
 }
 
-
-function AddToJournalSheet({ repas, journalDate, onDateChange, journalMeal, onMealChange, onConfirm, onClose }) {
-  useBackButton(onClose)
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
-  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-
-  return (
-    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-sheet">
-        <div className="modal-handle" />
-        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Ajouter au journal</h2>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-          Pour quel jour et quel repas « {repas.nom} » ?
-        </div>
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Jour</div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          <button
-            onClick={() => onDateChange(yesterdayStr)}
-            className="chip"
-            style={journalDate === yesterdayStr ? { background: 'var(--green)', color: 'white' } : undefined}
-          >
-            Hier
-          </button>
-          <button
-            onClick={() => onDateChange(todayStr)}
-            className="chip"
-            style={journalDate === todayStr ? { background: 'var(--green)', color: 'white' } : undefined}
-          >
-            Aujourd'hui
-          </button>
-          <button
-            onClick={() => onDateChange(tomorrowStr)}
-            className="chip"
-            style={journalDate === tomorrowStr ? { background: 'var(--green)', color: 'white' } : undefined}
-          >
-            Demain
-          </button>
-        </div>
-        <input
-          type="date"
-          className="input"
-          value={journalDate}
-          onChange={e => onDateChange(e.target.value)}
-          style={{ marginBottom: 16 }}
-        />
-
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Repas</div>
-        <select className="input" value={journalMeal} onChange={e => onMealChange(e.target.value)} style={{ marginBottom: 16 }}>
-          {MEALS.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-
-        <button className="btn-primary" onClick={onConfirm}>Ajouter</button>
-        <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={onClose}>Annuler</button>
-      </div>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MealTemplatesSection — contenu de l'onglet "Repas types" dans ManualPage.
@@ -223,7 +163,7 @@ export default function MealTemplatesSection() {
 
       {addToJournalTarget && (
         <AddToJournalSheet
-          repas={addToJournalTarget}
+          nom={addToJournalTarget.nom}
           journalDate={journalDate}
           onDateChange={setJournalDate}
           journalMeal={journalMeal}

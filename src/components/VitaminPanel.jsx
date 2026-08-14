@@ -107,7 +107,7 @@ export default function VitaminPanel({ totals, hasEntries, defaultOpen = false, 
   const canBreakdown = entries && entries.length > 0
 
   return (
-    <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
+    <div className="card" style={{ marginBottom: 12, overflow: 'hidden', flexShrink: 0 }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}

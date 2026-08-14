@@ -16,8 +16,10 @@ import Loader from './Loader'
 //   onEdit()        — optionnel ; si absent, le bouton "Modifier" est masqué
 //   onDelete()      — optionnel ; si absent, le bouton "Supprimer" est masqué
 //   onPlan(source)  — optionnel ; si absent, le bouton "Planifier" est masqué
+//   onAddToJournal(items, recette) — optionnel ; si absent, le bouton
+//                   "Ajouter au journal" est masqué
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailWrapper({ recetteId, onEdit, onDelete, onClose, onPlan }) {
+export default function RecipeDetailWrapper({ recetteId, onEdit, onDelete, onClose, onPlan, onAddToJournal }) {
   const { recette, ingredients, loading, updateIngredient } = useRecetteDetail(recetteId)
 
   if (loading || !recette) {
@@ -42,6 +44,7 @@ export default function RecipeDetailWrapper({ recetteId, onEdit, onDelete, onClo
       onClose={onClose}
       onUpdateIngredient={updateIngredient}
       onPlan={onPlan}
+      onAddToJournal={onAddToJournal}
     />
   )
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { X, Pencil, Trash2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen } from 'lucide-react'
+import { ArrowLeft, Pencil, MoreVertical, Trash2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import FoodDetailModal from './FoodDetailModal'
@@ -9,22 +9,22 @@ import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
 import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeInstructions'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MacroGrid — grille 5 colonnes kcal / P / G / L / F
+// MacroGrid — grille 4 colonnes P / G / L / Fibres (les kcal sont affichées
+// séparément, en grand chiffre, par le composant appelant).
 // ─────────────────────────────────────────────────────────────────────────────
 function MacroGrid({ totals }) {
   const items = [
-    { label: 'kcal',   val: Math.round(totals.energie_kcal || 0), color: 'var(--text)'  },
     { label: 'Prot.',  val: `${(totals.proteines || 0).toFixed(1)}g`, color: 'var(--green)' },
     { label: 'Gluc.',  val: `${(totals.glucides  || 0).toFixed(1)}g`, color: 'var(--amber)' },
     { label: 'Lip.',   val: `${(totals.lipides   || 0).toFixed(1)}g`, color: 'var(--coral)' },
     { label: 'Fibres', val: `${(totals.fibres    || 0).toFixed(1)}g`, color: 'var(--blue)'  },
   ]
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, marginBottom: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
       {items.map(({ label, val, color }) => (
-        <div key={label} style={{ background: 'var(--gray-bg)', borderRadius: 8, padding: '8px 4px', textAlign: 'center' }}>
+        <div key={label} style={{ background: 'var(--gray-bg)', borderRadius: 10, padding: '9px 4px', textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color }}>{val}</div>
-          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>{label}</div>
+          <div style={{ fontSize: 9.5, color: 'var(--text-muted)', marginTop: 1 }}>{label}</div>
         </div>
       ))}
     </div>
@@ -36,11 +36,27 @@ function normalizeUrl(url) {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`
 }
 
+// Applique un facteur d'échelle à un objet de totaux nutritionnels (macros +
+// tous les micronutriments) — le même facteur alimente la grille macro, la
+// liste d'ingrédients, les instructions annotées et les panneaux vitamines/
+// minéraux/sucres/acides gras, pour éviter tout décalage entre blocs.
+function scaleTotals(totals, factor) {
+  const t = {}
+  for (const key of Object.keys(totals)) {
+    t[key] = totals[key] != null ? totals[key] * factor : totals[key]
+  }
+  return t
+}
+
+const CHIP_STYLE = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  background: 'var(--white)', border: '0.5px solid var(--border-md)', color: 'var(--text-muted)',
+  borderRadius: 20, padding: '4px 10px', fontSize: 11.5, fontWeight: 600,
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PortionsStepper — augmente/diminue le nombre de portions souhaité.
-// N'affecte pas la recette en base : c'est juste un multiplicateur d'affichage
-// qui recalcule en temps réel le grammage de chaque ingrédient et les totaux
-// du plat entier (les valeurs /100g et /portion restent, elles, inchangées).
+// N'affecte pas la recette en base : c'est juste un multiplicateur d'affichage.
 // ─────────────────────────────────────────────────────────────────────────────
 function PortionsStepper({ value, onChange, min = 1 }) {
   return (
@@ -72,72 +88,33 @@ function PortionsStepper({ value, onChange, min = 1 }) {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CustomPortionCard — calcule les valeurs nutritionnelles pour un grammage
-// choisi librement par l'utilisateur (ni 100g, ni le plat entier).
-// Basé sur les valeurs /100g de la recette (indépendant du nb de portions).
-// ─────────────────────────────────────────────────────────────────────────────
-function CustomPortionCard({ per100, defaultQty }) {
-  const [qty, setQty] = useState(String(defaultQty || 100))
-
-  useEffect(() => { setQty(String(defaultQty || 100)) }, [defaultQty])
-
-  const totals = useMemo(() => {
-    const q = parseFloat(qty)
-    if (!per100 || !q || q <= 0) return null
-    const factor = q / 100
-    const t = {}
-    t.energie_kcal = per100.energie_kcal * factor
-    t.proteines    = per100.proteines    * factor
-    t.glucides     = per100.glucides     * factor
-    t.lipides      = per100.lipides      * factor
-    t.fibres       = per100.fibres       * factor
-    for (const key of ALL_NUTRIENT_KEYS) {
-      t[key] = per100[key] != null ? per100[key] * factor : null
-    }
-    return t
-  }, [per100, qty])
-
-  if (!per100) return null
-
-  return (
-    <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-      <div className="section-title">Portion personnalisée</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <input
-          className="input-sm"
-          type="text"
-          inputMode="decimal"
-          value={qty}
-          onChange={e => setQty(e.target.value)}
-          style={{ width: 90 }}
-        />
-        <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
-      </div>
-      {totals ? (
-        <MacroGrid totals={totals} />
-      ) : (
-        <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Indique un grammage valide.</div>
-      )}
-    </div>
-  )
-}
-
+const SCALE_SEGMENTS = [
+  { key: '100g',    label: '100 g' },
+  { key: 'portion', label: '1 portion' },
+  { key: 'plat',    label: 'Tout' },
+  { key: 'libre',   label: '… g' },
+]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RecipeDetailModal
 // Props :
-//   recette            — objet recette (ligne Supabase)
-//   ingredients        — tableau des ingrédients (lignes recette_ingredients)
-//   onEdit()           — ouvre RecipeFormModal en mode édition
-//   onDelete()         — supprime la recette
-//   onClose()          — ferme la modal
+//   recette              — objet recette (ligne Supabase)
+//   ingredients          — tableau des ingrédients (lignes recette_ingredients)
+//   onEdit()              — optionnel ; si absent, "Modifier" est masqué
+//   onDelete()            — optionnel ; si absent, "Supprimer" est masqué
+//   onClose()
 //   onUpdateIngredient(id, patch) — optionnel, persiste l'ajustement du
 //                                   grammage d'un ingrédient (cf. useRecetteDetail)
+//   onPlan(source)        — optionnel ; si absent, "Planifier" est masqué
+//   onAddToJournal(items, recette) — optionnel ; si absent, "Ajouter au
+//                                    journal" est masqué. items = ingrédients
+//                                    mis à l'échelle actuellement affichée.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailModal({ recette, ingredients, onEdit, onDelete, onClose, onUpdateIngredient, onPlan }) {
+export default function RecipeDetailModal({ recette, ingredients, onEdit, onDelete, onClose, onUpdateIngredient, onPlan, onAddToJournal }) {
   useBackButton(onClose)
   const [selectedIngredient, setSelectedIngredient] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('ingredients') // 'ingredients' | 'preparation' | 'nutriments'
 
   // Totaux bruts (plat entier, à l'échelle de base de la recette)
   const totaux = useMemo(() => sumIngredients(ingredients), [ingredients])
@@ -151,49 +128,47 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
   const poidsRef   = poidsCuitG > 0 ? poidsCuitG : poidsCruG
   const estCuit    = poidsCuitG > 0
 
-  // Valeurs /100g — indépendantes du nombre de portions
+  // Valeurs /100g — indépendantes de l'échelle choisie, utilisées pour le
+  // rappel "Autres échelles" et le pré-remplissage du grammage libre.
   const per100 = useMemo(() => calcPer100g(totaux, poidsRef), [totaux, poidsRef])
 
-  // Nombre de portions de base (celui enregistré sur la recette)
   const nbPortionsBase = parseInt(recette.portions, 10) || 1
+  const grammesParPortion = poidsRef > 0 ? poidsRef / nbPortionsBase : null
 
-  // Nombre de portions SOUHAITÉ — modifiable via le stepper. Par défaut 1
-  // portion (pas le nb de portions de la recette de base) : c'est la valeur
-  // la plus utile aussi bien pour consulter "ce que je mange vraiment" que
-  // pour planifier — réinitialisé à 1 à chaque fois qu'on ouvre une recette
-  // différente.
+  // ── Échelle de lecture unifiée : un seul multiplicateur pilote tout
+  // l'écran (macros, micronutriments, grammages d'ingrédients, grammages
+  // annotés dans les instructions) ────────────────────────────────────────
+  const [scale, setScale] = useState('portion') // '100g' | 'portion' | 'plat' | 'libre'
   const [portionsSouhaitees, setPortionsSouhaitees] = useState(1)
-  useEffect(() => { setPortionsSouhaitees(1) }, [recette.id])
+  const [customQty, setCustomQty] = useState('')
 
-  // Facteur d'échelle appliqué au plat entier et à la liste d'ingrédients.
-  // La taille d'UNE portion (grammesParPortion, kcalParPortion) ne change
-  // pas : seul le nombre de portions — donc la quantité totale — varie.
-  const factor = nbPortionsBase > 0 ? portionsSouhaitees / nbPortionsBase : 1
-  const scaled = factor !== 1
+  useEffect(() => {
+    setScale('portion')
+    setPortionsSouhaitees(1)
+    setCustomQty('')
+    setActiveTab('ingredients')
+  }, [recette.id])
 
-  const grammesParPortion = poidsRef > 0 ? Math.round(poidsRef / nbPortionsBase) : null
-  const kcalParPortion    = per100 && grammesParPortion ? Math.round(per100.energie_kcal * grammesParPortion / 100) : null
+  const selectScale = (next) => {
+    setScale(next)
+    if (next === 'portion') setPortionsSouhaitees(1)
+    else if (next === 'plat') setPortionsSouhaitees(nbPortionsBase)
+    else if (next === 'libre') setCustomQty(String(Math.round(grammesParPortion || 100)))
+  }
 
-  // Totaux mis à l'échelle pour le nombre de portions souhaité
-  const totauxScaled = useMemo(() => {
-    const t = {}
-    for (const key of Object.keys(totaux)) {
-      t[key] = totaux[key] != null ? totaux[key] * factor : totaux[key]
-    }
-    return t
-  }, [totaux, factor])
-  const poidsRefScaled = poidsRef * factor
+  const displayQtyG = scale === '100g' ? 100
+    : scale === 'libre' ? (parseFloat(customQty) || 0)
+    : poidsRef > 0 ? poidsRef * (portionsSouhaitees / nbPortionsBase) : 0
 
-  // Totaux /100g sous forme "totals" pour VitaminPanel et NutrientDetails
-  // (toujours à l'échelle 100g, jamais mis à l'échelle des portions)
-  const totals100 = per100 || {}
+  const factor = poidsRef > 0 && displayQtyG > 0 ? displayQtyG / poidsRef : 0
 
-  // Ingrédients mis à l'échelle du nb de portions souhaité, TOUS champs
-  // nutritionnels compris (pas seulement qty_g) — utilisé pour "Planifier",
-  // qui a besoin d'items nutritionnellement corrects, pas juste d'un
-  // grammage réaffiché.
-  const scaledIngredientsForPlan = useMemo(() => ingredients.map(ing => {
-    const scaled = {
+  const displayTotals = useMemo(() => scaleTotals(totaux, factor), [totaux, factor])
+
+  // Ingrédients mis à l'échelle affichée — nom, grammage et TOUS les
+  // nutriments (macros + micronutriments). Sert à l'affichage, aux
+  // instructions annotées, à "Planifier" et à "Ajouter au journal".
+  const scaledIngredients = useMemo(() => ingredients.map(ing => {
+    const s = {
       food_name:    ing.food_name,
       food_source:  ing.food_source,
       food_ref_id:  ing.food_ref_id,
@@ -205,205 +180,345 @@ export default function RecipeDetailModal({ recette, ingredients, onEdit, onDele
       fibres:       (ing.fibres || 0) * factor,
     }
     for (const key of ALL_NUTRIENT_KEYS) {
-      scaled[key] = ing[key] != null ? ing[key] * factor : null
+      s[key] = ing[key] != null ? ing[key] * factor : null
     }
-    return scaled
+    return s
   }), [ingredients, factor])
 
-  // Instructions annotées : grammage (mis à l'échelle du nb de portions
-  // souhaité) inséré entre parenthèses à la 1ʳᵉ mention de chaque ingrédient
-  // — recherche uniquement dans les ingrédients DE la recette, jamais dans
-  // tout Ciqual (cf. annotateInstructionSteps).
+  // Instructions annotées : grammage (mis à l'échelle affichée) inséré entre
+  // parenthèses à la 1ʳᵉ mention de chaque ingrédient — recherche uniquement
+  // dans les ingrédients DE la recette, jamais dans tout Ciqual.
   const annotatedSteps = useMemo(
-    () => annotateInstructionSteps(instructionSteps, scaledIngredientsForPlan),
-    [instructionSteps, scaledIngredientsForPlan]
+    () => annotateInstructionSteps(instructionSteps, scaledIngredients),
+    [instructionSteps, scaledIngredients]
+  )
+
+  const totalIngredientsQty = poidsCruG * factor
+
+  const scaleLabel =
+    scale === '100g'  ? '100 g' :
+    scale === 'libre' ? `${Math.round(displayQtyG)} g` :
+    `${portionsSouhaitees} portion${portionsSouhaitees > 1 ? 's' : ''}`
+
+  const totalTempsMin = (recette.temps_preparation_min || 0) + (recette.temps_cuisson_min || 0) + (recette.temps_repos_min || 0)
+
+  const sousTitreParts = [
+    recette.categories?.length ? recette.categories.join(', ') : null,
+    `${nbPortionsBase} portion${nbPortionsBase > 1 ? 's' : ''}`,
+    estCuit ? 'pesé cuit' : null,
+  ].filter(Boolean)
+
+  const sourceChip = recette.source_valeur && (
+    recette.source_type === 'lien' ? (
+      <a
+        href={normalizeUrl(recette.source_valeur)}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ ...CHIP_STYLE, color: 'var(--green-dark)', textDecoration: 'none', maxWidth: '100%', minWidth: 0 }}
+      >
+        <Link2 size={12} style={{ flexShrink: 0 }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{recette.source_valeur}</span>
+      </a>
+    ) : (
+      <span style={{ ...CHIP_STYLE, maxWidth: '100%', minWidth: 0 }}>
+        <BookOpen size={12} style={{ flexShrink: 0 }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {recette.source_valeur}{recette.source_page > 0 ? ` · p. ${recette.source_page}` : ''}
+        </span>
+      </span>
+    )
   )
 
   return (
     <div className="page-modal">
       {/* Header */}
       <div className="page-modal-header">
-        <div style={{ width: 32, flexShrink: 0 }} />
-        <h2 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{recette.nom}</h2>
-        <div style={{ display: 'flex', gap: 2 }}>
-          {onPlan && (
-            <button
-              className="btn-icon"
-              onClick={() => onPlan({ nom: recette.nom, items: scaledIngredientsForPlan, sourceType: 'recette', sourceId: recette.id })}
-              style={{ color: 'var(--purple, #8b5cf6)' }}
-              aria-label="Planifier"
-              title="Planifier"
-            >
-              <CalendarPlus size={18} />
-            </button>
+        <button className="btn-icon" onClick={onClose} style={{ flexShrink: 0 }}><ArrowLeft size={20} color="var(--text-muted)" /></button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{recette.nom}</div>
+          {sousTitreParts.length > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {sousTitreParts.join(' · ')}
+            </div>
           )}
+        </div>
+        <div style={{ display: 'flex', gap: 2, flexShrink: 0, position: 'relative' }}>
           {onEdit && (
             <button className="btn-icon" onClick={onEdit} style={{ color: 'var(--text-hint)' }}><Pencil size={18} /></button>
           )}
           {onDelete && (
-            <button className="btn-icon" onClick={onDelete} style={{ color: 'var(--text-hint)' }}><Trash2 size={18} /></button>
+            <>
+              <button className="btn-icon" onClick={() => setMenuOpen(o => !o)} style={{ color: 'var(--text-hint)' }}><MoreVertical size={18} /></button>
+              {menuOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setMenuOpen(false)} />
+                  <div className="card" style={{ position: 'absolute', top: 38, right: 0, zIndex: 10, padding: 4, minWidth: 150 }}>
+                    <button
+                      onClick={() => { setMenuOpen(false); onDelete() }}
+                      style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--coral)', display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      <Trash2 size={14} /> Supprimer
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
           )}
-          <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
         </div>
       </div>
 
       <div className="page-modal-body">
-        {/* Meta recette + sélecteur de portions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Portions :</span>
-          <PortionsStepper value={portionsSouhaitees} onChange={setPortionsSouhaitees} />
-        </div>
-        {scaled && (
-          <div style={{ fontSize: 12, color: 'var(--green-dark)', marginBottom: 10 }}>
-            × {factor.toFixed(2).replace(/\.?0+$/, '')} par rapport à la recette de base ({nbPortionsBase} portion{nbPortionsBase > 1 ? 's' : ''})
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          {grammesParPortion && (
-            <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
-              ~{grammesParPortion} g / portion
-            </span>
-          )}
-          {estCuit && (
-            <span style={{ background: 'var(--blue-light)', color: 'var(--blue)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
-              ⚖️ pesé cuit
-            </span>
-          )}
-          {recette.temps_preparation_min > 0 && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
-              <Clock size={12} /> Prépa {recette.temps_preparation_min} min
-            </span>
-          )}
-          {recette.temps_cuisson_min > 0 && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
-              <Flame size={12} /> Cuisson {recette.temps_cuisson_min} min
-            </span>
-          )}
-          {recette.temps_repos_min > 0 && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
-              <Hourglass size={12} /> Repos {recette.temps_repos_min} min
-            </span>
-          )}
-        </div>
 
-        {/* ── Valeurs /100g ── */}
-        {per100 ? (
-          <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-            <div className="section-title">Pour 100 g de plat {estCuit ? 'cuit' : 'cru'}</div>
-            <MacroGrid totals={per100} />
-            {kcalParPortion && (
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                → <strong style={{ color: 'var(--text)' }}>{kcalParPortion} kcal</strong> par portion ({grammesParPortion} g)
+        {/* ── Carte "Je regarde" — sélecteur d'échelle (onglet Ingrédients) ── */}
+        {activeTab === 'ingredients' && (
+          per100 ? (
+            <div className="card" style={{ padding: '14px 14px 16px', marginBottom: 12 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 9 }}>
+                Je regarde
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Aucun ingrédient renseigné.</div>
-          </div>
-        )}
+              <div style={{ display: 'flex', gap: 4, background: 'var(--gray-bg)', borderRadius: 11, padding: 3, marginBottom: 14 }}>
+                {SCALE_SEGMENTS.map(seg => (
+                  <button
+                    key={seg.key}
+                    onClick={() => selectScale(seg.key)}
+                    style={{
+                      flex: 1, height: 30, borderRadius: 9, fontSize: 12, fontWeight: scale === seg.key ? 700 : 600,
+                      background: scale === seg.key ? 'var(--white)' : 'transparent',
+                      color: scale === seg.key ? 'var(--text)' : 'var(--text-muted)',
+                      boxShadow: scale === seg.key ? '0 1px 3px rgba(0,0,0,.12)' : 'none',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {seg.label}
+                  </button>
+                ))}
+              </div>
 
-        {/* ── Valeurs plat entier (mises à l'échelle du nb de portions choisi) ── */}
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div className="section-title">
-            Plat entier ({Math.round(poidsRefScaled)} g) {scaled && <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>· pour {portionsSouhaitees} portions</span>}
-          </div>
-          <MacroGrid totals={totauxScaled} />
-        </div>
-
-        {/* ── Portion personnalisée ── */}
-        <CustomPortionCard per100={per100} defaultQty={grammesParPortion || 100} />
-
-        {/* ── Liste ingrédients (grammages mis à l'échelle pour affichage) ── */}
-        <div className="section-title" style={{ marginTop: 4 }}>
-          Ingrédients ({ingredients.length}) {scaled && <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>· pour {portionsSouhaitees} portions</span>}
-        </div>
-        {ingredients.map((ing, idx) => {
-          const qtyScaled  = (ing.qty_g || 0) * factor
-          const kcalScaled = (ing.energie_kcal || 0) * factor
-          const protScaled = (ing.proteines || 0) * factor
-          const glucScaled = (ing.glucides || 0) * factor
-          const lipScaled  = (ing.lipides || 0) * factor
-          return (
-            <button
-              key={ing.id || idx}
-              onClick={() => setSelectedIngredient(ing)}
-              className="card"
-              style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ing.food_name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {Math.round(qtyScaled)}g&nbsp;·&nbsp;
-                  <span className="c-prot">P {protScaled.toFixed(1)}g</span>&nbsp;
-                  <span className="c-gluc">G {glucScaled.toFixed(1)}g</span>&nbsp;
-                  <span className="c-lip">L {lipScaled.toFixed(1)}g</span>
+              {scale === 'libre' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <input
+                    className="input-sm" type="text" inputMode="decimal"
+                    value={customQty} onChange={e => setCustomQty(e.target.value)}
+                    style={{ width: 90 }}
+                  />
+                  <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
                 </div>
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{Math.round(kcalScaled)} kcal</span>
-            </button>
-          )
-        })}
+              )}
 
-        {/* ── Instructions ── */}
-        {instructionSteps.length > 0 && (
-          <div className="card" style={{ padding: 16, marginTop: 12, marginBottom: 12 }}>
-            <div className="section-title">Instructions</div>
-            {annotatedSteps.map((segments, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: 10, marginBottom: idx < annotatedSteps.length - 1 ? 10 : 0 }}>
-                <div style={{
-                  flexShrink: 0, width: 22, height: 22, borderRadius: '50%',
-                  background: 'var(--green-light)', color: 'var(--green-dark)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 12, fontWeight: 700,
-                }}>
-                  {idx + 1}
-                </div>
-                <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--text)', paddingTop: 2 }}>
-                  {segments.map((seg, i) => seg.highlight
-                    ? <strong key={i} style={{ color: 'var(--green-dark)' }}>{seg.text}</strong>
-                    : <React.Fragment key={i}>{seg.text}</React.Fragment>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              {factor > 0 ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <span style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, letterSpacing: '-1.4px', color: 'var(--green-dark)' }}>
+                          {Math.round(displayTotals.energie_kcal || 0)}
+                        </span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-muted)' }}>kcal</span>
+                      </div>
+                      {(scale === 'portion' || scale === 'plat') && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 5 }}>
+                          {portionsSouhaitees} portion{portionsSouhaitees > 1 ? 's' : ''} = <strong style={{ color: 'var(--text)' }}>{Math.round(displayQtyG)} g</strong> de plat {estCuit ? 'cuit' : 'cru'}
+                        </div>
+                      )}
+                    </div>
+                    {(scale === 'portion' || scale === 'plat') && (
+                      <PortionsStepper value={portionsSouhaitees} onChange={setPortionsSouhaitees} />
+                    )}
+                  </div>
 
-        {/* ── Source ── */}
-        {recette.source_valeur && (
-          <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-            <div className="section-title">Source</div>
-            {recette.source_type === 'lien' ? (
-              <a
-                href={normalizeUrl(recette.source_valeur)}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--green-dark)', wordBreak: 'break-all' }}
-              >
-                <Link2 size={14} style={{ flexShrink: 0 }} />
-                {recette.source_valeur}
-              </a>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--text)' }}>
-                <BookOpen size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                {recette.source_valeur}
-                {recette.source_page > 0 && <span style={{ color: 'var(--text-muted)' }}>· p. {recette.source_page}</span>}
-              </div>
-            )}
-          </div>
-        )}
+                  <MacroGrid totals={displayTotals} />
 
-        {/* ── Vitamines / minéraux / sucres / gras (basés sur /100g) ── */}
-        {per100 && (
-          <>
-            <div style={{ marginTop: 12 }}>
-              <VitaminPanel totals={totals100} hasEntries={true} />
+                  <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 10 }}>
+                    Autres échelles : {Math.round(per100.energie_kcal)} kcal / 100 g · {Math.round(totaux.energie_kcal)} kcal le plat entier ({Math.round(poidsRef)} g)
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Indique un grammage valide.</div>
+              )}
             </div>
-            <NutrientDetails totals={totals100} hasEntries={true} />
+          ) : (
+            <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Aucun ingrédient renseigné.</div>
+            </div>
+          )
+        )}
+
+        {/* ── Rappel d'échelle compact (onglet Nutriments) ── */}
+        {activeTab === 'nutriments' && per100 && (
+          <div className="card" style={{ padding: '11px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {scale === '100g'
+                  ? `Pour 100 g de plat ${estCuit ? 'cuit' : 'cru'}`
+                  : scale === 'libre'
+                  ? `Pour ${Math.round(displayQtyG)} g de plat ${estCuit ? 'cuit' : 'cru'}`
+                  : `Pour ${portionsSouhaitees} portion${portionsSouhaitees > 1 ? 's' : ''} (${Math.round(displayQtyG)} g)`}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                {Math.round(displayTotals.energie_kcal || 0)} kcal · <span className="c-prot">P {(displayTotals.proteines || 0).toFixed(1)}</span>{' '}
+                <span className="c-gluc">G {(displayTotals.glucides || 0).toFixed(1)}</span>{' '}
+                <span className="c-lip">L {(displayTotals.lipides || 0).toFixed(1)}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('ingredients')}
+              style={{ height: 28, padding: '0 10px', borderRadius: 9, background: 'var(--gray-bg)', fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', flexShrink: 0 }}
+            >
+              Changer
+            </button>
+          </div>
+        )}
+
+        {/* ── Ligne de chips (temps + source) — visible quel que soit l'onglet ── */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+          {activeTab === 'nutriments' ? (
+            totalTempsMin > 0 && (
+              <span style={CHIP_STYLE}><Clock size={12} /> {totalTempsMin} min au total</span>
+            )
+          ) : (
+            <>
+              {recette.temps_preparation_min > 0 && (
+                <span style={CHIP_STYLE}><Clock size={12} /> Prépa {recette.temps_preparation_min} min</span>
+              )}
+              {recette.temps_cuisson_min > 0 && (
+                <span style={CHIP_STYLE}><Flame size={12} /> Cuisson {recette.temps_cuisson_min} min</span>
+              )}
+              {recette.temps_repos_min > 0 && (
+                <span style={CHIP_STYLE}><Hourglass size={12} /> Repos {recette.temps_repos_min} min</span>
+              )}
+            </>
+          )}
+          {sourceChip}
+        </div>
+
+        {/* ── Onglets ── */}
+        <div style={{ display: 'flex', gap: 18, borderBottom: '0.5px solid var(--border-md)', marginBottom: 14 }}>
+          {[
+            { key: 'ingredients', label: 'Ingrédients', count: ingredients.length },
+            { key: 'preparation', label: 'Préparation', count: null },
+            { key: 'nutriments',  label: 'Nutriments',  count: null },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '0 0 9px', fontSize: 13, fontWeight: activeTab === tab.key ? 700 : 600,
+                color: activeTab === tab.key ? 'var(--text)' : 'var(--text-muted)',
+                borderBottom: activeTab === tab.key ? '2px solid var(--green)' : '2px solid transparent',
+              }}
+            >
+              {tab.label}{tab.count != null && <span style={{ color: 'var(--text-hint)', fontWeight: 600 }}> {tab.count}</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Onglet Ingrédients ── */}
+        {activeTab === 'ingredients' && (
+          <>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 9 }}>
+              Grammages pour <strong style={{ color: 'var(--text)' }}>{scaleLabel}</strong> · touche une ligne pour l'ajuster
+            </div>
+
+            {ingredients.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Aucun ingrédient renseigné.</div>
+            ) : (
+              <>
+                {ingredients.map((ing, idx) => {
+                  const s = scaledIngredients[idx]
+                  return (
+                    <button
+                      key={ing.id || idx}
+                      onClick={() => setSelectedIngredient(ing)}
+                      className="card"
+                      style={{ width: '100%', marginBottom: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ing.food_name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                          {Math.round(s.qty_g)} g&nbsp;·&nbsp;
+                          <span className="c-prot">P {(s.proteines || 0).toFixed(1)}</span>&nbsp;
+                          <span className="c-gluc">G {(s.glucides || 0).toFixed(1)}</span>&nbsp;
+                          <span className="c-lip">L {(s.lipides || 0).toFixed(1)}</span>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{Math.round(s.energie_kcal || 0)} kcal</span>
+                    </button>
+                  )
+                })}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 3px 0' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total ingrédients</span>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{Math.round(totalIngredientsQty)} g crus · {Math.round(displayTotals.energie_kcal || 0)} kcal</span>
+                </div>
+              </>
+            )}
           </>
         )}
+
+        {/* ── Onglet Préparation ── */}
+        {activeTab === 'preparation' && (
+          <div className="card" style={{ padding: 16 }}>
+            {instructionSteps.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Aucune instruction renseignée.</div>
+            ) : (
+              annotatedSteps.map((segments, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 10, marginBottom: idx < annotatedSteps.length - 1 ? 10 : 0 }}>
+                  <div style={{
+                    flexShrink: 0, width: 22, height: 22, borderRadius: '50%',
+                    background: 'var(--green-light)', color: 'var(--green-dark)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700,
+                  }}>
+                    {idx + 1}
+                  </div>
+                  <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--text)', paddingTop: 2 }}>
+                    {segments.map((seg, i) => seg.highlight
+                      ? <strong key={i} style={{ color: 'var(--green-dark)' }}>{seg.text}</strong>
+                      : <React.Fragment key={i}>{seg.text}</React.Fragment>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── Onglet Nutriments ── */}
+        {activeTab === 'nutriments' && (
+          per100 ? (
+            <>
+              <VitaminPanel totals={displayTotals} hasEntries={true} defaultOpen />
+              <NutrientDetails totals={displayTotals} hasEntries={true} defaultOpen />
+            </>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Aucun ingrédient renseigné.</div>
+          )
+        )}
       </div>
+
+      {/* ── Barre d'action fixe ── */}
+      {(onAddToJournal || onPlan) && (
+        <div style={{ flexShrink: 0, padding: '10px 16px 14px', background: 'rgba(255,255,255,.96)', borderTop: '0.5px solid var(--border-md)', display: 'flex', gap: 8 }}>
+          {onAddToJournal && (
+            <button
+              className="btn-primary"
+              onClick={() => onAddToJournal(scaledIngredients, recette)}
+              style={{ flex: '1 1 0%', width: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              <Plus size={17} /> Ajouter au journal
+            </button>
+          )}
+          {onPlan && (
+            <button
+              onClick={() => onPlan({ nom: recette.nom, items: scaledIngredients, sourceType: 'recette', sourceId: recette.id })}
+              style={{ width: 44, height: 44, borderRadius: 13, background: 'var(--purple-light)', color: 'var(--purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              aria-label="Planifier"
+              title="Planifier"
+            >
+              <CalendarPlus size={19} />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Détail d'un ingrédient — affiche et permet de modifier le
            grammage DE BASE (non mis à l'échelle), comme avant. ── */}

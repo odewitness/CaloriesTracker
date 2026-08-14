@@ -138,7 +138,7 @@ export default function NutrientDetails({ totals, hasEntries, defaultOpen = fals
   const [selectedField, setSelectedField] = useState(null)
 
   return (
-    <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
+    <div className="card" style={{ marginBottom: 12, overflow: 'hidden', flexShrink: 0 }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}

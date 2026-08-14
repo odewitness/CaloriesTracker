@@ -1,11 +1,14 @@
 import React, { forwardRef, useImperativeHandle, useState, useMemo } from 'react'
 import { ChevronDown, Trash2, X, Search, ArrowUpDown, UtensilsCrossed } from 'lucide-react'
 import { useToast } from '../lib/toast'
+import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabase'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import RecipeFormModal from './RecipeFormModal'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import PlanMealModal from './PlanMealModal'
 import SortModal from './SortModal'
+import AddToJournalSheet from './AddToJournalSheet'
 import {
   DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort,
   filterByCategories, filterByTimeRanges, isCustomFilter, describeActiveFilters,
@@ -132,6 +135,7 @@ function RecipeEditWrapper({ recette, onSaved, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
   const toast = useToast()
+  const { user } = useAuth()
   const { recettes, ingredientsByRecette, loading: loadingRecettes, deleteRecette, refetch: refetchRecettes } = useRecipes()
   const [recipeSearch, setRecipeSearch] = useState('')
 
@@ -191,6 +195,25 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
 
   const [recipeModal, setRecipeModal] = useState(null) // null | { type: 'new' | 'edit' | 'detail', recette? }
   const [planTarget, setPlanTarget] = useState(null) // preset source { nom, items, sourceType, sourceId } en cours de planification
+
+  // ── "Ajouter au journal" depuis le détail d'une recette ───────────────────
+  const [addToJournalTarget, setAddToJournalTarget] = useState(null) // { nom, items } | null
+  const [journalDate, setJournalDate] = useState(new Date().toISOString().slice(0, 10))
+  const [journalMeal, setJournalMeal] = useState('Déjeuner')
+
+  const handleAddToJournal = (items, recette) => {
+    setJournalDate(new Date().toISOString().slice(0, 10))
+    setAddToJournalTarget({ nom: recette.nom, items })
+  }
+
+  const confirmAddToJournal = async () => {
+    if (!addToJournalTarget) return
+    const rows = addToJournalTarget.items.map(item => ({ ...item, date: journalDate, meal: journalMeal, user_id: user.id }))
+    const { error } = await supabase.from('journal').insert(rows)
+    if (!error) toast(`✓ ${addToJournalTarget.nom} ajouté au journal !`)
+    else toast('Erreur')
+    setAddToJournalTarget(null)
+  }
 
   useImperativeHandle(ref, () => ({ openNew: () => setRecipeModal({ type: 'new' }) }))
 
@@ -305,6 +328,20 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
           }}
           onClose={() => setRecipeModal(null)}
           onPlan={setPlanTarget}
+          onAddToJournal={handleAddToJournal}
+        />
+      )}
+
+      {/* ── Ajouter au journal (recette) ── */}
+      {addToJournalTarget && (
+        <AddToJournalSheet
+          nom={addToJournalTarget.nom}
+          journalDate={journalDate}
+          onDateChange={setJournalDate}
+          journalMeal={journalMeal}
+          onMealChange={setJournalMeal}
+          onConfirm={confirmAddToJournal}
+          onClose={() => setAddToJournalTarget(null)}
         />
       )}
 
