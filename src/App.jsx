@@ -12,6 +12,7 @@ import HistoryPage from './pages/HistoryPage'
 import ProfilePage from './pages/ProfilePage'
 import CalendarPage from './pages/CalendarPage'
 import WhatsNewPage from './pages/WhatsNewPage'
+import MeasurementsPage from './pages/MeasurementsPage'
 import Loader from './components/Loader'
 import { getLatestChangelogKey } from './lib/changelog'
 
@@ -266,6 +267,19 @@ function AppShell() {
               </div>
               <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
                 <WhatsNewPage />
+              </div>
+            </div>
+          } />
+          <Route path="/mensurations" element={
+            <div className="page-modal">
+              <div className="page-modal-header">
+                <h2>Poids & mensurations</h2>
+                <button className="btn-icon" onClick={closeOverlay} aria-label="Fermer">
+                  <CloseIcon />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+                <MeasurementsPage />
               </div>
             </div>
           } />

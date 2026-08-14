@@ -519,6 +519,26 @@ create table if not exists marques (
   unique (user_id, nom)
 );
 
+-- 14. TABLE MENSURATIONS (poids + mensurations corporelles datés, un relevé
+-- par jour max par utilisateur — ressaisir le même jour met à jour l'entrée
+-- existante via upsert côté client). Tous les champs de mesure sont
+-- nullable : aucune obligation de tout remplir à chaque relevé.
+create table if not exists mensurations (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date date not null default current_date,
+  poids_kg numeric,
+  poitrine_cm numeric,
+  taille_cm numeric,
+  hanches_cm numeric,
+  cuisse_droite_cm numeric,
+  cuisse_gauche_cm numeric,
+  bras_droit_cm numeric,
+  bras_gauche_cm numeric,
+  created_at timestamptz not null default now(),
+  unique (user_id, date)
+);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -530,6 +550,7 @@ alter table repas_types disable row level security;
 alter table settings disable row level security;
 alter table aliments_custom disable row level security;
 alter table marques disable row level security;
+alter table mensurations disable row level security;
 
 -- Statut RLS non vérifié pour les 7 tables ajoutées à cette reconstruction
 -- (profiles, recettes, recette_ingredients, favoris, listes_courses,
