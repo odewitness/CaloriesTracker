@@ -41,9 +41,10 @@ export function useJournalPartageDetail(partageId) {
       const { error } = await supabase.from('reactions_journal').delete().eq('id', mine.id)
       if (!error) setReactions(rs => rs.filter(r => r.id !== mine.id))
     } else {
+      const { data: myProfile } = await supabase.from('profiles').select('pseudo, prenom').eq('id', user.id).single()
       const { data, error } = await supabase
         .from('reactions_journal')
-        .insert({ partage_id: partageId, user_id: user.id, emoji })
+        .insert({ partage_id: partageId, user_id: user.id, emoji, user_pseudo: myProfile?.pseudo || null, user_prenom: myProfile?.prenom || null })
         .select()
         .single()
       if (!error && data) setReactions(rs => [...rs, data])

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Users, UtensilsCrossed, Search, UserPlus, Check, X, UserMinus, Clock } from 'lucide-react'
+import { Users, UtensilsCrossed, Search, UserPlus, Check, X, UserMinus, Clock, Bell, MessageCircle } from 'lucide-react'
 import { useProfile } from '../hooks/useProfile'
 import { useFriends } from '../hooks/useFriends'
 import { useFeed } from '../hooks/useFeed'
@@ -342,58 +342,184 @@ function JournalPartageDetailContainer({ partageId, onClose, onDeleted, deletePa
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FilTab — liste des recettes partagées par soi-même et ses amies
+// FilTab — liste des recettes partagées par soi-même et ses amies. Reçoit les
+// données de useFeed() en props (chargées une seule fois au niveau
+// SocialPage) pour que l'onglet Activité puisse ouvrir le même détail sans
+// dupliquer les requêtes.
 // ─────────────────────────────────────────────────────────────────────────────
-function FilTab() {
-  const toast = useToast()
+function FilTab({ partages, reactionsByPartage, commentCounts, loading, onDelete, toggleReaction, onOpen }) {
   const { user } = useAuth()
+
+  if (loading) return <Loader />
+
+  if (partages.length === 0) {
+    return (
+      <EmptyState
+        icon={<UtensilsCrossed size={40} />}
+        title="Ton fil est vide"
+        description="Partage une recette (menu ⋮) ou une journée/un repas (icône de partage) pour que tes amies les voient ici."
+      />
+    )
+  }
+
+  return partages.map(p => (
+    p._type === 'recette' ? (
+      <PartageCard
+        key={p.id}
+        partage={p}
+        isOwn={p.auteur_id === user.id}
+        reactions={reactionsByPartage[p.id] || []}
+        userId={user.id}
+        onToggleReaction={toggleReaction}
+        commentCount={commentCounts[p.id] || 0}
+        onOpen={onOpen}
+        onDelete={onDelete}
+      />
+    ) : (
+      <JournalPartageCard
+        key={p.id}
+        partage={p}
+        isOwn={p.auteur_id === user.id}
+        reactions={reactionsByPartage[p.id] || []}
+        userId={user.id}
+        onToggleReaction={toggleReaction}
+        commentCount={commentCounts[p.id] || 0}
+        onOpen={onOpen}
+        onDelete={onDelete}
+      />
+    )
+  ))
+}
+
+const NOTIF_ICON = { reaction: null, comment: <MessageCircle size={14} />, reply: <MessageCircle size={14} /> }
+
+function formatWhen(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return "à l'instant"
+  if (diffMin < 60) return `il y a ${diffMin} min`
+  const diffH = Math.floor(diffMin / 60)
+  if (diffH < 24) return `il y a ${diffH} h`
+  const diffJ = Math.floor(diffH / 24)
+  if (diffJ < 7) return `il y a ${diffJ} j`
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+function describeNotif(item) {
+  const name = item.pseudo || item.prenom || 'Une amie'
+  const target = item.partageType === 'recette' ? 'ta recette' : 'ton partage'
+  if (item.type === 'reaction') {
+    return <>{name} a réagi {item.emoji} à {target}{item.targetLabel ? <> « {item.targetLabel} »</> : null}</>
+  }
+  if (item.type === 'comment') {
+    return <>{name} a commenté {target}{item.targetLabel ? <> « {item.targetLabel} »</> : null} : « {item.contenu} »</>
+  }
+  return <>{name} a répondu à ton commentaire{item.targetLabel ? <> sur « {item.targetLabel} »</> : null} : « {item.contenu} »</>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NotificationsTab — fil d'activité sur mes propres partages : réactions,
+// commentaires reçus, réponses à mes commentaires. Un tap ouvre le partage
+// concerné (même détail que l'onglet Fil).
+// ─────────────────────────────────────────────────────────────────────────────
+function NotificationsTab({ items, loading, onOpen }) {
+  if (loading) return <Loader />
+
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon={<Bell size={40} />}
+        title="Aucune activité pour l'instant"
+        description="Les réactions et commentaires de tes amies sur tes partages apparaîtront ici."
+      />
+    )
+  }
+
+  return (
+    <div className="card" style={{ padding: '0 16px' }}>
+      {items.map(item => (
+        <button
+          key={item.id}
+          onClick={() => onOpen({ id: item.partageId, _type: item.partageType })}
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', textAlign: 'left',
+            padding: '11px 0', borderBottom: '0.5px solid var(--border)', fontFamily: 'var(--font)',
+          }}
+        >
+          <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: 'var(--gray-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-hint)', marginTop: 1 }}>
+            {NOTIF_ICON[item.type]}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, lineHeight: 1.4 }}>{describeNotif(item)}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2 }}>{formatWhen(item.createdAt)}</div>
+          </div>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SocialPage — onglets internes "Fil" / "Activité" / "Amies". Les données
+// d'activité (items, hasUnseen, markSeen) viennent d'App.jsx : c'est là
+// qu'elles pilotent aussi la pastille de l'icône du header, et il faut la
+// MÊME instance du hook pour que "marquer vu" ici se répercute là-bas.
+// ─────────────────────────────────────────────────────────────────────────────
+export default function SocialPage({ hasUnseenActivity, activityItems, activityLoading, markActivitySeen }) {
+  const [tab, setTab] = useState('fil')
+  const toast = useToast()
   const { partages, reactionsByPartage, commentCounts, loading, deletePartage, toggleReaction } = useFeed()
-  const [selected, setSelected] = useState(null) // partage complet (avec _type) | null
+  const [selected, setSelected] = useState(null) // partage complet ({ id, _type }) | null
 
   const handleDelete = async (partage) => {
     await deletePartage(partage)
     toast('Partage retiré')
   }
 
-  if (loading) return <Loader />
+  const openActivite = () => {
+    setTab('activite')
+    if (hasUnseenActivity) markActivitySeen()
+  }
 
   return (
-    <>
-      {partages.length === 0 ? (
-        <EmptyState
-          icon={<UtensilsCrossed size={40} />}
-          title="Ton fil est vide"
-          description="Partage une recette (menu ⋮) ou une journée/un repas (icône de partage) pour que tes amies les voient ici."
+    <div className="page-content">
+      <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, marginBottom: 16 }}>
+        {[
+          { key: 'fil',       label: 'Fil',       icon: <UtensilsCrossed size={14} />, onClick: () => setTab('fil'), dot: false },
+          { key: 'activite',  label: 'Activité',  icon: <Bell size={14} />,            onClick: openActivite,        dot: hasUnseenActivity },
+          { key: 'amies',     label: 'Amies',     icon: <Users size={14} />,           onClick: () => setTab('amies'), dot: false },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={t.onClick}
+            style={{
+              position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
+              background: tab === t.key ? 'var(--white)' : 'transparent',
+              color:      tab === t.key ? 'var(--text)'  : 'var(--text-muted)',
+              boxShadow:  tab === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all .15s',
+            }}
+          >
+            {t.icon} {t.label}
+            {t.dot && <span style={{ position: 'absolute', top: 6, right: '22%', width: 7, height: 7, borderRadius: '50%', background: 'var(--coral)' }} />}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'fil' && (
+        <FilTab
+          partages={partages}
+          reactionsByPartage={reactionsByPartage}
+          commentCounts={commentCounts}
+          loading={loading}
+          onDelete={handleDelete}
+          toggleReaction={toggleReaction}
+          onOpen={setSelected}
         />
-      ) : (
-        partages.map(p => (
-          p._type === 'recette' ? (
-            <PartageCard
-              key={p.id}
-              partage={p}
-              isOwn={p.auteur_id === user.id}
-              reactions={reactionsByPartage[p.id] || []}
-              userId={user.id}
-              onToggleReaction={toggleReaction}
-              commentCount={commentCounts[p.id] || 0}
-              onOpen={partage => setSelected(partage)}
-              onDelete={handleDelete}
-            />
-          ) : (
-            <JournalPartageCard
-              key={p.id}
-              partage={p}
-              isOwn={p.auteur_id === user.id}
-              reactions={reactionsByPartage[p.id] || []}
-              userId={user.id}
-              onToggleReaction={toggleReaction}
-              commentCount={commentCounts[p.id] || 0}
-              onOpen={partage => setSelected(partage)}
-              onDelete={handleDelete}
-            />
-          )
-        ))
       )}
+      {tab === 'activite' && <NotificationsTab items={activityItems} loading={activityLoading} onOpen={setSelected} />}
+      {tab === 'amies' && <AmisTab />}
 
       {selected?._type === 'recette' && (
         <PartageDetailContainer
@@ -411,41 +537,6 @@ function FilTab() {
           onDeleted={() => { setSelected(null); toast('Partage retiré') }}
         />
       )}
-    </>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SocialPage — onglets internes "Fil" / "Amies"
-// ─────────────────────────────────────────────────────────────────────────────
-export default function SocialPage() {
-  const [tab, setTab] = useState('fil')
-
-  return (
-    <div className="page-content">
-      <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, marginBottom: 16 }}>
-        {[
-          { key: 'fil',   label: 'Fil',    icon: <UtensilsCrossed size={14} /> },
-          { key: 'amies', label: 'Amies',  icon: <Users size={14} /> },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
-              background: tab === t.key ? 'var(--white)' : 'transparent',
-              color:      tab === t.key ? 'var(--text)'  : 'var(--text-muted)',
-              boxShadow:  tab === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all .15s',
-            }}
-          >
-            {t.icon} {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'fil' ? <FilTab /> : <AmisTab />}
     </div>
   )
 }

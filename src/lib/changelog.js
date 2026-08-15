@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-15',
+    title: 'Un onglet "Activité" dans ton espace Amies',
+    description: "Un nouvel onglet \"Activité\" est apparu à côté de \"Fil\" et \"Amies\" : tu y retrouves qui a réagi ou commenté sur tes recettes et tes journées partagées, et qui a répondu à tes commentaires. Tape sur une notification pour ouvrir directement le partage concerné.",
+  },
+  {
+    date: '2026-08-15',
     title: 'Partage aussi tes journées et tes repas',
     description: "En plus des recettes, tu peux maintenant partager une journée complète ou un seul repas (petit-déj, déjeuner, dîner, collation) avec tes amies. Depuis la page du jour ou le calendrier, une icône de partage apparaît sur chaque repas rempli et à côté de \"Repas du jour\" pour la journée entière. Tu choisis à chaque fois si tu montres seulement tes macros ou le détail de tes aliments. Le bouton \"Partager\" d'une recette est aussi accessible directement depuis la liste (menu \"...\" sur une carte), sans avoir à l'ouvrir.",
   },

@@ -150,7 +150,7 @@ function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { incomingRequests } = useFriends()
-  const { hasUnseen: hasSocialActivity, markSeen: markSocialSeen } = useSocialNotifications()
+  const { hasUnseen: hasSocialActivity, items: socialItems, loading: socialLoading, markSeen: markSocialSeen } = useSocialNotifications()
 
   // Le profil et le calendrier s'ouvrent comme des routes "par-dessus" la
   // route de fond (pattern React Router du modal avec sa propre URL) : on
@@ -202,12 +202,14 @@ function AppShell() {
     setHasUnreadNews(false)
   }
 
-  // Marque l'activité sociale (réactions/commentaires/réponses reçus) comme
-  // vue à l'ouverture — les demandes d'amies, elles, restent indiquées tant
-  // qu'elles n'ont pas été traitées (pas une histoire de "vu").
+  // L'activité sociale (réactions/commentaires/réponses reçus) n'est marquée
+  // vue que lorsque l'utilisatrice ouvre spécifiquement l'onglet "Activité"
+  // (voir markSeen passé à SocialPage) — pas juste à l'ouverture de la page,
+  // pour que la pastille reste visible tant qu'elle n'a pas vraiment consulté
+  // le détail. Les demandes d'amies, elles, restent indiquées tant qu'elles
+  // n'ont pas été traitées (pas une histoire de "vu").
   const openSocial = () => {
     openOverlay('/social')
-    markSocialSeen()
   }
 
   // Le calendrier s'ouvre PAR-DESSUS l'onglet actif sans le démonter (sa
@@ -322,7 +324,12 @@ function AppShell() {
                 </button>
               </div>
               <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
-                <SocialPage />
+                <SocialPage
+                  hasUnseenActivity={hasSocialActivity}
+                  activityItems={socialItems}
+                  activityLoading={socialLoading}
+                  markActivitySeen={markSocialSeen}
+                />
               </div>
             </div>
           } />

@@ -197,9 +197,10 @@ export function useFeed() {
       const { error } = await supabase.from(table).delete().eq('id', mine.id)
       if (!error) setReactionsByPartage(prev => ({ ...prev, [partage.id]: (prev[partage.id] || []).filter(r => r.id !== mine.id) }))
     } else {
+      const { data: myProfile } = await supabase.from('profiles').select('pseudo, prenom').eq('id', user.id).single()
       const { data, error } = await supabase
         .from(table)
-        .insert({ partage_id: partage.id, user_id: user.id, emoji })
+        .insert({ partage_id: partage.id, user_id: user.id, emoji, user_pseudo: myProfile?.pseudo || null, user_prenom: myProfile?.prenom || null })
         .select()
         .single()
       if (!error && data) setReactionsByPartage(prev => ({ ...prev, [partage.id]: [...(prev[partage.id] || []), data] }))
