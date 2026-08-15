@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-15',
+    title: 'Modifie tes compléments directement depuis l\'accueil',
+    description: "Tu peux maintenant taper sur un complément déjà pris ou programmé pour changer sa dose (gélules, comprimés...), avec le même écran que quand tu l'ajoutes, %AJR des vitamines et minéraux inclus.",
+  },
+  {
     date: '2026-08-14',
     title: 'Ajuste une recette sans la modifier',
     description: "Quand tu ajoutes une recette au journal (depuis son détail ou depuis le \"+\" de l'accueil), tu peux maintenant corriger le grammage d'un ou plusieurs ingrédients juste pour cette fois — par exemple si tu as mis moins de riz que prévu. Tape sur le grammage pour le modifier ; la recette enregistrée, elle, ne change pas. Depuis l'accueil, un bouton \"Modifier les quantités\" ouvre ce réglage.",

@@ -6,6 +6,7 @@ import NutrientDetails from './NutrientDetails'
 import MealSection from './MealSection'
 import AddFoodModal from './AddFoodModal'
 import FoodDetailModal from './FoodDetailModal'
+import EditSupplementModal from './EditSupplementModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from './SupplementSection'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
@@ -140,6 +141,8 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
         onDelete={handleDelete}
         onMarkPlannedEaten={handleMarkEaten}
         onDeletePlanned={handleDeletePlanifie}
+        onOpenDetail={(entry) => setDetailEntry(entry)}
+        onOpenPlannedSource={(repas) => setSourceDetail(repas)}
       />
 
       {modal && (
@@ -151,12 +154,21 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
       )}
 
       {detailEntry && (
-        <FoodDetailModal
-          key={detailEntry.id}
-          entry={detailEntry}
-          onUpdate={handleUpdate}
-          onClose={() => setDetailEntry(null)}
-        />
+        detailEntry.meal === SUPPLEMENT_MEAL ? (
+          <EditSupplementModal
+            key={detailEntry.id}
+            entry={detailEntry}
+            onUpdate={handleUpdate}
+            onClose={() => setDetailEntry(null)}
+          />
+        ) : (
+          <FoodDetailModal
+            key={detailEntry.id}
+            entry={detailEntry}
+            onUpdate={handleUpdate}
+            onClose={() => setDetailEntry(null)}
+          />
+        )
       )}
 
       {/* "Page dédiée" d'un repas planifié : recette / repas type / aliment */}
@@ -173,11 +185,19 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
         />
       )}
       {sourceDetail?.source_type === 'libre' && (
-        <FoodDetailModal
-          key={sourceDetail.id}
-          entry={sourceDetail.items?.[0]}
-          onClose={() => setSourceDetail(null)}
-        />
+        sourceDetail.meal === SUPPLEMENT_MEAL ? (
+          <EditSupplementModal
+            key={sourceDetail.id}
+            entry={{ ...sourceDetail.items?.[0], meal: sourceDetail.meal }}
+            onClose={() => setSourceDetail(null)}
+          />
+        ) : (
+          <FoodDetailModal
+            key={sourceDetail.id}
+            entry={sourceDetail.items?.[0]}
+            onClose={() => setSourceDetail(null)}
+          />
+        )
       )}
     </div>
   )

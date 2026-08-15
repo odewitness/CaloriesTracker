@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Pill, Check } from 'lucide-react'
+import { Plus, Trash2, Pill, Check, ChevronRight } from 'lucide-react'
 import { fmt } from '../lib/dates'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -33,7 +33,7 @@ function complementPortionLabel(portions, qtyG) {
 // plannedSupplements — repas_planifies (meal='Compléments') non mangés,
 // affichés en lignes distinctes (bordure pointillée) au-dessus des
 // compléments déjà pris, avec une action de validation directe.
-export default function SupplementSection({ supplements, plannedSupplements = [], onOpenModal, onAdd, onDelete, onMarkPlannedEaten, onDeletePlanned }) {
+export default function SupplementSection({ supplements, plannedSupplements = [], onOpenModal, onAdd, onDelete, onMarkPlannedEaten, onDeletePlanned, onOpenDetail, onOpenPlannedSource }) {
   const { user } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
   const todayStr = fmt(new Date())
@@ -122,6 +122,7 @@ export default function SupplementSection({ supplements, plannedSupplements = []
           {plannedSupplements.map(r => {
             const item = (r.items || [])[0]
             const missed = !r.mange && r.date < todayStr
+            const clickable = !!(onOpenPlannedSource && r.source_type)
             return (
               <div
                 key={r.id}
@@ -133,9 +134,16 @@ export default function SupplementSection({ supplements, plannedSupplements = []
                 }}
               >
                 <Pill size={13} color={missed ? 'var(--coral)' : 'var(--purple, #8b5cf6)'} style={{ flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
-                    {r.nom}{missed && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--coral)', marginLeft: 6 }}>Manqué</span>}
+                <div
+                  onClick={clickable ? () => onOpenPlannedSource(r) : undefined}
+                  style={{ flex: 1, minWidth: 0, cursor: clickable ? 'pointer' : 'default' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.nom}
+                    </span>
+                    {missed && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--coral)', flexShrink: 0 }}>Manqué</span>}
+                    {clickable && <ChevronRight size={13} color="var(--text-hint)" style={{ flexShrink: 0 }} />}
                   </div>
                   {item && (
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
@@ -188,7 +196,10 @@ export default function SupplementSection({ supplements, plannedSupplements = []
                 }}
               >
                 <Pill size={13} color="var(--purple, #8b5cf6)" style={{ flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  onClick={onOpenDetail ? () => onOpenDetail(s) : undefined}
+                  style={{ flex: 1, minWidth: 0, cursor: onOpenDetail ? 'pointer' : 'default' }}
+                >
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
                     {s.food_name}
                   </div>
