@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-15',
+    title: 'Partage tes recettes avec tes amies',
+    description: "Une nouvelle icône est apparue en haut, à côté du calendrier : elle ouvre ton espace \"Amies\". Choisis-toi un pseudo pour que tes amies puissent te trouver (onglet \"Amies\"), envoie et accepte des demandes, puis partage une recette depuis son menu \"...\" (\"Partager\") — elle apparaît dans le \"Fil\" de tes amies, avec ses ingrédients et sa préparation. Tu peux réagir avec des emojis directement depuis le fil, commenter et répondre aux commentaires, et une amie peut ajouter une recette que tu as partagée directement dans ses propres recettes en un clic. Un point rouge sur l'icône te prévient dès qu'une amie réagit ou commente chez toi.",
+  },
+  {
+    date: '2026-08-15',
     title: 'Vois toutes tes programmations en un coup d\'œil',
     description: "Sur la page Calendrier, un nouveau bouton \"Mes programmations\" liste tous tes repas et compléments programmés à l'avance — les programmations récurrentes tiennent sur une seule ligne. Tu peux supprimer une programmation entière (toutes ses occurrences) en un clic, pratique si tu t'es trompée en programmant plusieurs jours d'un coup.",
   },

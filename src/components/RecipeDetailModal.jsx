@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, Pencil, MoreVertical, Trash2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen, ChefHat } from 'lucide-react'
+import { ArrowLeft, Pencil, MoreVertical, Trash2, Share2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen, ChefHat } from 'lucide-react'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
 import FoodDetailModal from './FoodDetailModal'
@@ -13,7 +13,7 @@ import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeIn
 // MacroGrid — grille 4 colonnes P / G / L / Fibres (les kcal sont affichées
 // séparément, en grand chiffre, par le composant appelant).
 // ─────────────────────────────────────────────────────────────────────────────
-function MacroGrid({ totals }) {
+export function MacroGrid({ totals }) {
   const items = [
     { label: 'Prot.',  val: `${(totals.proteines || 0).toFixed(1)}g`, color: 'var(--green)' },
     { label: 'Gluc.',  val: `${(totals.glucides  || 0).toFixed(1)}g`, color: 'var(--amber)' },
@@ -99,7 +99,7 @@ const SCALE_SEGMENTS = [
 //                                    journal" est masqué. items = ingrédients
 //                                    mis à l'échelle actuellement affichée.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailModal({ recette, ingredients, ingredientsLoading, onEdit, onDelete, onClose, onUpdateIngredient, onPlan, onAddToJournal }) {
+export default function RecipeDetailModal({ recette, ingredients, ingredientsLoading, onEdit, onDelete, onShare, onClose, onUpdateIngredient, onPlan, onAddToJournal }) {
   useBackButton(onClose)
   const [selectedIngredient, setSelectedIngredient] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -279,19 +279,29 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
           {onEdit && (
             <button className="btn-icon" onClick={onEdit} style={{ color: 'var(--text-hint)' }}><Pencil size={18} /></button>
           )}
-          {onDelete && (
+          {(onDelete || onShare) && (
             <>
               <button className="btn-icon" onClick={() => setMenuOpen(o => !o)} style={{ color: 'var(--text-hint)' }}><MoreVertical size={18} /></button>
               {menuOpen && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setMenuOpen(false)} />
-                  <div className="card" style={{ position: 'absolute', top: 38, right: 0, zIndex: 10, padding: 4, minWidth: 150 }}>
-                    <button
-                      onClick={() => { setMenuOpen(false); onDelete() }}
-                      style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--coral)', display: 'flex', alignItems: 'center', gap: 8 }}
-                    >
-                      <Trash2 size={14} /> Supprimer
-                    </button>
+                  <div className="card" style={{ position: 'absolute', top: 38, right: 0, zIndex: 10, padding: 4, minWidth: 170 }}>
+                    {onShare && (
+                      <button
+                        onClick={() => { setMenuOpen(false); onShare() }}
+                        style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
+                      >
+                        <Share2 size={14} /> Partager
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        onClick={() => { setMenuOpen(false); onDelete() }}
+                        style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--coral)', display: 'flex', alignItems: 'center', gap: 8 }}
+                      >
+                        <Trash2 size={14} /> Supprimer
+                      </button>
+                    )}
                   </div>
                 </>
               )}

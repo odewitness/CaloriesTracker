@@ -19,11 +19,12 @@ import Loader from './Loader'
 //   onClose()
 //   onEdit()        — optionnel ; si absent, le bouton "Modifier" est masqué
 //   onDelete()      — optionnel ; si absent, le bouton "Supprimer" est masqué
+//   onShare()       — optionnel ; si absent, l'item "Partager" est masqué
 //   onPlan(source)  — optionnel ; si absent, le bouton "Planifier" est masqué
 //   onAddToJournal(items, recette) — optionnel ; si absent, le bouton
 //                   "Ajouter au journal" est masqué
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailWrapper({ recetteId, initialRecette, onEdit, onDelete, onClose, onPlan, onAddToJournal }) {
+export default function RecipeDetailWrapper({ recetteId, initialRecette, onEdit, onDelete, onShare, onClose, onPlan, onAddToJournal }) {
   const { recette, ingredients, loading, updateIngredient } = useRecetteDetail(recetteId)
   const displayRecette = recette || initialRecette
 
@@ -47,6 +48,7 @@ export default function RecipeDetailWrapper({ recetteId, initialRecette, onEdit,
       ingredientsLoading={loading}
       onEdit={onEdit}
       onDelete={onDelete}
+      onShare={onShare ? () => onShare(displayRecette, ingredients) : undefined}
       onClose={onClose}
       onUpdateIngredient={updateIngredient}
       onPlan={onPlan}

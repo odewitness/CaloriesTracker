@@ -13,8 +13,11 @@ import ProfilePage from './pages/ProfilePage'
 import CalendarPage from './pages/CalendarPage'
 import WhatsNewPage from './pages/WhatsNewPage'
 import MeasurementsPage from './pages/MeasurementsPage'
+import SocialPage from './pages/SocialPage'
 import Loader from './components/Loader'
 import { getLatestChangelogKey } from './lib/changelog'
+import { useFriends } from './hooks/useFriends'
+import { useSocialNotifications } from './hooks/useSocialNotifications'
 
 const WHATSNEW_SEEN_KEY = 'whatsnew_last_seen'
 
@@ -103,10 +106,21 @@ function BellIcon() {
   )
 }
 
+function SocialButtonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  )
+}
+
 // Bouton rond en haut à droite : ouvre ProfilePage en plein écran par-dessus
 // l'app, sans occuper d'onglet dans la bottom nav.
 // hidden=true → le bandeau se rétracte (scroll vers le bas), voir handleScroll.
-function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, hasUnreadNews, hidden }) {
+function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClick, hasUnreadNews, hasFriendRequests, hidden }) {
   const { user } = useAuth()
   const { profile } = useProfile()
   const initials = ((profile?.prenom?.[0] || '') + (profile?.nom?.[0] || '')).toUpperCase()
@@ -116,6 +130,10 @@ function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, hasUnreadNew
     <div className={`top-bar${hidden ? ' top-bar-hidden' : ''}`}>
       <button className="profile-avatar-btn" onClick={onCalendarClick} aria-label="Calendrier">
         <CalendarButtonIcon />
+      </button>
+      <button className="profile-avatar-btn" onClick={onSocialClick} aria-label="Amies" style={{ position: 'relative' }}>
+        <SocialButtonIcon />
+        {hasFriendRequests && <span className="notif-dot" />}
       </button>
       <button className="profile-avatar-btn" onClick={onWhatsNewClick} aria-label="Nouveautés" style={{ position: 'relative' }}>
         <BellIcon />
@@ -131,6 +149,8 @@ function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, hasUnreadNew
 function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { incomingRequests } = useFriends()
+  const { hasUnseen: hasSocialActivity, markSeen: markSocialSeen } = useSocialNotifications()
 
   // Le profil et le calendrier s'ouvrent comme des routes "par-dessus" la
   // route de fond (pattern React Router du modal avec sa propre URL) : on
@@ -182,6 +202,14 @@ function AppShell() {
     setHasUnreadNews(false)
   }
 
+  // Marque l'activité sociale (réactions/commentaires/réponses reçus) comme
+  // vue à l'ouverture — les demandes d'amies, elles, restent indiquées tant
+  // qu'elles n'ont pas été traitées (pas une histoire de "vu").
+  const openSocial = () => {
+    openOverlay('/social')
+    markSocialSeen()
+  }
+
   // Le calendrier s'ouvre PAR-DESSUS l'onglet actif sans le démonter (sa
   // route de fond reste rendue) — donc TodayPage garde son ancien useJournal
   // en mémoire même après un ajout/suppression/"marquer mangé" fait depuis
@@ -201,7 +229,9 @@ function AppShell() {
         onClick={() => openOverlay('/profile')}
         onCalendarClick={() => openOverlay('/calendar')}
         onWhatsNewClick={openWhatsNew}
+        onSocialClick={openSocial}
         hasUnreadNews={hasUnreadNews}
+        hasFriendRequests={incomingRequests.length > 0 || hasSocialActivity}
         hidden={headerHidden}
       />
 
@@ -280,6 +310,19 @@ function AppShell() {
               </div>
               <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
                 <MeasurementsPage />
+              </div>
+            </div>
+          } />
+          <Route path="/social" element={
+            <div className="page-modal">
+              <div className="page-modal-header">
+                <h2>Amies</h2>
+                <button className="btn-icon" onClick={closeOverlay} aria-label="Fermer">
+                  <CloseIcon />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+                <SocialPage />
               </div>
             </div>
           } />

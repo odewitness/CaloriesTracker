@@ -4,11 +4,13 @@ import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
+import { useFeed } from '../hooks/useFeed'
 import RecipeFormModal from './RecipeFormModal'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import PlanMealModal from './PlanMealModal'
 import SortModal from './SortModal'
 import AddToJournalSheet from './AddToJournalSheet'
+import ShareRecipeModal from './ShareRecipeModal'
 import { getRecipeCategoryIcon, getRecipeCategoryColor } from '../lib/categoryIcons'
 import {
   DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort,
@@ -173,6 +175,7 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
   const toast = useToast()
   const { user } = useAuth()
   const { recettes, ingredientsByRecette, loading: loadingRecettes, deleteRecette, refetch: refetchRecettes } = useRecipes()
+  const { shareRecette } = useFeed()
   const [recipeSearch, setRecipeSearch] = useState('')
 
   // Normalise pour une recherche insensible à la casse et aux accents
@@ -231,6 +234,14 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
 
   const [recipeModal, setRecipeModal] = useState(null) // null | { type: 'new' | 'edit' | 'detail', recette? }
   const [planTarget, setPlanTarget] = useState(null) // preset source { nom, items, sourceType, sourceId } en cours de planification
+  const [shareTarget, setShareTarget] = useState(null) // { recette, ingredients } | null
+
+  const confirmShare = async (message) => {
+    const { error } = await shareRecette({ recette: shareTarget.recette, ingredients: shareTarget.ingredients, message })
+    if (!error) toast('✓ Recette partagée avec tes amies !')
+    else toast('Erreur lors du partage')
+    setShareTarget(null)
+  }
 
   // ── "Ajouter au journal" depuis le détail d'une recette ───────────────────
   const [addToJournalTarget, setAddToJournalTarget] = useState(null) // { nom, items } | null
@@ -368,8 +379,18 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
             setRecipeModal(null)
           }}
           onClose={() => setRecipeModal(null)}
+          onShare={(recette, ingredients) => setShareTarget({ recette, ingredients })}
           onPlan={setPlanTarget}
           onAddToJournal={handleAddToJournal}
+        />
+      )}
+
+      {/* ── Partager une recette avec ses amies ── */}
+      {shareTarget && (
+        <ShareRecipeModal
+          recette={shareTarget.recette}
+          onConfirm={confirmShare}
+          onClose={() => setShareTarget(null)}
         />
       )}
 
