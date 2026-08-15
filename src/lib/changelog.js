@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-15',
+    title: 'Fini les chiffres soulignés en bleu sur iPhone',
+    description: "Sur iPhone, Safari transformait parfois des nombres (calories, dates...) en liens bleus soulignés comme s'il s'agissait d'un numéro de téléphone. C'est corrigé, le texte garde sa couleur normale partout dans l'app.",
+  },
+  {
+    date: '2026-08-15',
     title: 'Un onglet "Activité" dans ton espace Amies',
     description: "Un nouvel onglet \"Activité\" est apparu à côté de \"Fil\" et \"Amies\" : tu y retrouves qui a réagi ou commenté sur tes recettes et tes journées partagées, et qui a répondu à tes commentaires. Tape sur une notification pour ouvrir directement le partage concerné.",
   },
