@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
-import { Plus, ChevronDown } from 'lucide-react'
+import { Plus, ChevronDown, Share2 } from 'lucide-react'
 import EditableFoodRow from './EditableFoodRow'
 import PlannedMealCard from './PlannedMealCard'
 
 // plannedItems — repas_planifies non mangés pour ce repas, affichés en
 // cartes distinctes au-dessus des aliments déjà mangés (mêmes actions que
 // dans le calendrier : marquer mangé, supprimer, supprimer la série).
-export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource }) {
+// onShare(name) — optionnel ; si absent, pas de bouton "Partager" (masqué
+// aussi si le repas est vide, rien à partager).
+export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare }) {
   const enabled = target?.enabled !== false
   const storageKey = `meal-collapsed:${name}`
   const [collapsed, setCollapsed] = useState(() => {
@@ -93,6 +95,16 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
             )}
           </div>
         </button>
+        {onShare && entries.length > 0 && (
+          <button
+            onClick={() => onShare(name)}
+            style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--gray-bg)', color: 'var(--text-hint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 6 }}
+            aria-label={`Partager ${name}`}
+            title={`Partager ${name}`}
+          >
+            <Share2 size={15} />
+          </button>
+        )}
         <button
           onClick={() => onAdd(name)}
           style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--green-light)', color: 'var(--green-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}

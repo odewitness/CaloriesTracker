@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { MoreVertical, Trash2, MessageCircle } from 'lucide-react'
+import { MoreVertical, Trash2, MessageCircle, UtensilsCrossed } from 'lucide-react'
 import MacroPillsRow from './MacroPillsRow'
 import ReactionBar from './ReactionBar'
 
@@ -12,19 +12,17 @@ function formatDate(iso) {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
+function formatJournalDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// PartageCard — carte d'un partage de recette dans le fil. Les réactions sont
-// disponibles directement sur la carte (comme un fil social classique), sans
-// avoir à ouvrir le détail.
+// JournalPartageCard — carte d'un partage de journée/repas dans le fil.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PartageCard({ partage, isOwn, commentCount, reactions, userId, onToggleReaction, onOpen, onDelete }) {
+export default function JournalPartageCard({ partage, isOwn, commentCount, reactions, userId, onToggleReaction, onOpen, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false)
-
-  const poidsRef = partage.poids_cuit_g || partage.poids_cru_g || null
-  const poidsParPortion = poidsRef ? poidsRef / (partage.portions || 1) : null
-  const factor = poidsParPortion ? poidsParPortion / 100 : null
-
   const auteurLabel = partage.auteur_pseudo || partage.auteur_prenom || 'Une amie'
+  const label = partage.meal ? partage.meal : 'Journée complète'
 
   return (
     <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16, cursor: 'pointer' }} onClick={() => onOpen(partage)}>
@@ -33,7 +31,10 @@ export default function PartageCard({ partage, isOwn, commentCount, reactions, u
           <div style={{ fontSize: 11.5, color: 'var(--text-hint)', fontWeight: 600 }}>
             {auteurLabel} · {formatDate(partage.created_at)}
           </div>
-          <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{partage.nom}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2, textTransform: 'capitalize' }}>{formatJournalDate(partage.date)}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+            <UtensilsCrossed size={12} /> {label}
+          </div>
         </div>
         {isOwn && (
           <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -65,24 +66,12 @@ export default function PartageCard({ partage, isOwn, commentCount, reactions, u
         <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8, lineHeight: 1.4 }}>{partage.message}</div>
       )}
 
-      {partage.energie_kcal != null && (
-        <>
-          <MacroPillsRow
-            label="100 g" labelColor="var(--text-hint)" bg="var(--gray-bg)"
-            kcal={partage.energie_kcal} kcalColor="var(--text)"
-            proteines={partage.proteines || 0} glucides={partage.glucides || 0} lipides={partage.lipides || 0}
-            marginBottom={factor != null ? 6 : 8}
-          />
-          {factor != null && (
-            <MacroPillsRow
-              label="Portion" labelColor="var(--green-dark)" bg="var(--green-light)"
-              kcal={partage.energie_kcal * factor} kcalColor="var(--green-dark)"
-              proteines={(partage.proteines || 0) * factor} glucides={(partage.glucides || 0) * factor} lipides={(partage.lipides || 0) * factor}
-              marginBottom={8}
-            />
-          )}
-        </>
-      )}
+      <MacroPillsRow
+        label="Total" labelColor="var(--green-dark)" bg="var(--green-light)"
+        kcal={partage.energie_kcal || 0} kcalColor="var(--green-dark)"
+        proteines={partage.proteines || 0} glucides={partage.glucides || 0} lipides={partage.lipides || 0}
+        marginBottom={8}
+      />
 
       <div onClick={e => e.stopPropagation()}>
         <ReactionBar reactions={reactions} userId={userId} onToggle={emoji => onToggleReaction(partage, emoji)} />

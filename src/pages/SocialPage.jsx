@@ -4,6 +4,7 @@ import { useProfile } from '../hooks/useProfile'
 import { useFriends } from '../hooks/useFriends'
 import { useFeed } from '../hooks/useFeed'
 import { usePartageDetail } from '../hooks/usePartageDetail'
+import { useJournalPartageDetail } from '../hooks/useJournalPartageDetail'
 import { saveRecette } from '../hooks/useRecipes'
 import { scaleFood } from '../lib/nutrients'
 import { supabase } from '../lib/supabase'
@@ -13,6 +14,8 @@ import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
 import PartageCard from '../components/PartageCard'
 import PartageDetailModal from '../components/PartageDetailModal'
+import JournalPartageCard from '../components/JournalPartageCard'
+import JournalPartageDetailModal from '../components/JournalPartageDetailModal'
 import ReactionBar from '../components/ReactionBar'
 import CommentsList from '../components/CommentsList'
 
@@ -306,8 +309,31 @@ function PartageDetailContainer({ partageId, onClose, onDeleted, deletePartage }
       ingredients={ingredients}
       loading={loading}
       isOwn={isOwn}
-      onDelete={async () => { await deletePartage(partageId); onDeleted() }}
+      onDelete={async () => { await deletePartage({ id: partageId, _type: 'recette' }); onDeleted() }}
       onAddToMyRecipes={!isOwn && partage ? addToMyRecipes : undefined}
+      onClose={onClose}
+      reactionsSlot={partage && <ReactionBar reactions={reactions} userId={user.id} onToggle={toggleReaction} />}
+      commentsSlot={partage && <CommentsList comments={comments} userId={user.id} onAdd={addComment} onDelete={deleteComment} />}
+    />
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JournalPartageDetailContainer — charge un partage de journée/repas par id
+// et affiche son détail
+// ─────────────────────────────────────────────────────────────────────────────
+function JournalPartageDetailContainer({ partageId, onClose, onDeleted, deletePartage }) {
+  const { user } = useAuth()
+  const { partage, aliments, reactions, comments, loading, toggleReaction, addComment, deleteComment } = useJournalPartageDetail(partageId)
+  const isOwn = partage?.auteur_id === user.id
+
+  return (
+    <JournalPartageDetailModal
+      partage={partage}
+      aliments={aliments}
+      loading={loading}
+      isOwn={isOwn}
+      onDelete={async () => { await deletePartage({ id: partageId, _type: 'journal' }); onDeleted() }}
       onClose={onClose}
       reactionsSlot={partage && <ReactionBar reactions={reactions} userId={user.id} onToggle={toggleReaction} />}
       commentsSlot={partage && <CommentsList comments={comments} userId={user.id} onAdd={addComment} onDelete={deleteComment} />}
@@ -322,7 +348,12 @@ function FilTab() {
   const toast = useToast()
   const { user } = useAuth()
   const { partages, reactionsByPartage, commentCounts, loading, deletePartage, toggleReaction } = useFeed()
-  const [selectedId, setSelectedId] = useState(null)
+  const [selected, setSelected] = useState(null) // partage complet (avec _type) | null
+
+  const handleDelete = async (partage) => {
+    await deletePartage(partage)
+    toast('Partage retiré')
+  }
 
   if (loading) return <Loader />
 
@@ -332,30 +363,52 @@ function FilTab() {
         <EmptyState
           icon={<UtensilsCrossed size={40} />}
           title="Ton fil est vide"
-          description="Partage une recette depuis Mes aliments > Recettes (menu ⋮ d'une recette) pour que tes amies la voient ici."
+          description="Partage une recette (menu ⋮) ou une journée/un repas (icône de partage) pour que tes amies les voient ici."
         />
       ) : (
         partages.map(p => (
-          <PartageCard
-            key={p.id}
-            partage={p}
-            isOwn={p.auteur_id === user.id}
-            reactions={reactionsByPartage[p.id] || []}
-            userId={user.id}
-            onToggleReaction={toggleReaction}
-            commentCount={commentCounts[p.id] || 0}
-            onOpen={partage => setSelectedId(partage.id)}
-            onDelete={async id => { await deletePartage(id); toast('Partage retiré') }}
-          />
+          p._type === 'recette' ? (
+            <PartageCard
+              key={p.id}
+              partage={p}
+              isOwn={p.auteur_id === user.id}
+              reactions={reactionsByPartage[p.id] || []}
+              userId={user.id}
+              onToggleReaction={toggleReaction}
+              commentCount={commentCounts[p.id] || 0}
+              onOpen={partage => setSelected(partage)}
+              onDelete={handleDelete}
+            />
+          ) : (
+            <JournalPartageCard
+              key={p.id}
+              partage={p}
+              isOwn={p.auteur_id === user.id}
+              reactions={reactionsByPartage[p.id] || []}
+              userId={user.id}
+              onToggleReaction={toggleReaction}
+              commentCount={commentCounts[p.id] || 0}
+              onOpen={partage => setSelected(partage)}
+              onDelete={handleDelete}
+            />
+          )
         ))
       )}
 
-      {selectedId && (
+      {selected?._type === 'recette' && (
         <PartageDetailContainer
-          partageId={selectedId}
+          partageId={selected.id}
           deletePartage={deletePartage}
-          onClose={() => setSelectedId(null)}
-          onDeleted={() => { setSelectedId(null); toast('Partage retiré') }}
+          onClose={() => setSelected(null)}
+          onDeleted={() => { setSelected(null); toast('Partage retiré') }}
+        />
+      )}
+      {selected?._type === 'journal' && (
+        <JournalPartageDetailContainer
+          partageId={selected.id}
+          deletePartage={deletePartage}
+          onClose={() => setSelected(null)}
+          onDeleted={() => { setSelected(null); toast('Partage retiré') }}
         />
       )}
     </>

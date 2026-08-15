@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react'
 import CalorieRing from '../components/CalorieRing'
 import MacroBar from '../components/MacroBar'
 import VitaminPanel from '../components/VitaminPanel'
@@ -11,8 +11,10 @@ import EditSupplementModal from '../components/EditSupplementModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from '../components/SupplementSection'
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
+import ShareJournalModal from '../components/ShareJournalModal'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
+import { useFeed } from '../hooks/useFeed'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
@@ -69,6 +71,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings } = useSettings()
+  const { shareJournal } = useFeed()
+  const [shareTarget, setShareTarget] = useState(null) // { meal: string|null, entries: [...] } | null
 
   const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
 
@@ -124,6 +128,13 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     else toast('Erreur')
   }
 
+  const confirmShareJournal = async (message, includeDetail) => {
+    const { error } = await shareJournal({ date: dateStr, meal: shareTarget.meal, entries: shareTarget.entries, includeDetail, message })
+    if (!error) toast('✓ Partagé avec tes amies !')
+    else toast('Erreur lors du partage')
+    setShareTarget(null)
+  }
+
   return (
     <div style={{
   width: '33.333%',
@@ -141,7 +152,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         <VitaminPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
         <NutrientDetails totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
         <div style={{ marginTop: 16 }}>
-          <div className="section-title">Repas du jour</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="section-title" style={{ marginBottom: 0 }}>Repas du jour</div>
+            {entries.length > 0 && (
+              <button
+                onClick={() => setShareTarget({ meal: null, entries })}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--text-hint)', padding: '4px 2px' }}
+              >
+                <Share2 size={13} /> Partager ma journée
+              </button>
+            )}
+          </div>
           {MEALS.map(m => (
             <MealSection
               key={m}
@@ -157,6 +178,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
               onDeletePlanned={handleDeletePlanned}
               onDeleteSeries={handleDeleteSeries}
               onOpenPlannedSource={onOpenSource}
+              onShare={(meal) => setShareTarget({ meal, entries: entries.filter(e => e.meal === meal) })}
             />
           ))}
         </div>
@@ -172,6 +194,15 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onOpenPlannedSource={onOpenSource}
         />
       </>
+
+      {shareTarget && (
+        <ShareJournalModal
+          title={shareTarget.meal ? `Partager ce repas` : 'Partager cette journée'}
+          subtitle={shareTarget.meal ? shareTarget.meal : dateLabel(date)}
+          onConfirm={confirmShareJournal}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { Share2 } from 'lucide-react'
 import CalorieRing from './CalorieRing'
 import MacroBar from './MacroBar'
 import VitaminPanel from './VitaminPanel'
@@ -10,8 +11,10 @@ import EditSupplementModal from './EditSupplementModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from './SupplementSection'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
+import ShareJournalModal from './ShareJournalModal'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
+import { useFeed } from '../hooks/useFeed'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
@@ -51,10 +54,12 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { settings } = useSettings()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
+  const { shareJournal } = useFeed()
 
   const [modal, setModal] = useState(null) // { meal, addEntry } — AddFoodModal, même pattern que TodayPage
   const [detailEntry, setDetailEntry] = useState(null)
   const [sourceDetail, setSourceDetail] = useState(null) // repas_planifies en cours de "voir sa page dédiée"
+  const [shareTarget, setShareTarget] = useState(null) // { meal: string|null, entries: [...] } | null
 
   const totals = useMemo(() => computeTotals(entries), [entries])
   const hasEntries = entries.length > 0
@@ -96,6 +101,14 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
     if (!error) { toast('Série supprimée'); refetchPlanifies(); onPlannedChange?.() }
     else toast('Erreur')
   }
+
+  const confirmShareJournal = async (message, includeDetail) => {
+    const { error } = await shareJournal({ date: dateStr, meal: shareTarget.meal, entries: shareTarget.entries, includeDetail, message })
+    if (!error) toast('✓ Partagé avec tes amies !')
+    else toast('Erreur lors du partage')
+    setShareTarget(null)
+  }
+
   if (loading) {
     return <Loader />
   }
@@ -112,7 +125,17 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
       <NutrientDetails totals={totals} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
 
       <div style={{ marginTop: 16 }}>
-        <div className="section-title">Repas</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="section-title" style={{ marginBottom: 0 }}>Repas</div>
+          {entries.length > 0 && (
+            <button
+              onClick={() => setShareTarget({ meal: null, entries })}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--text-hint)', padding: '4px 2px' }}
+            >
+              <Share2 size={13} /> Partager cette journée
+            </button>
+          )}
+        </div>
 
         {MEALS.map(m => (
           <MealSection
@@ -129,6 +152,7 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
             onDeletePlanned={handleDeletePlanifie}
             onDeleteSeries={handleDeleteSeries}
             onOpenPlannedSource={(repas) => setSourceDetail(repas)}
+            onShare={(meal) => setShareTarget({ meal, entries: entries.filter(e => e.meal === meal) })}
           />
         ))}
       </div>
@@ -198,6 +222,15 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
             onClose={() => setSourceDetail(null)}
           />
         )
+      )}
+
+      {shareTarget && (
+        <ShareJournalModal
+          title={shareTarget.meal ? 'Partager ce repas' : 'Partager cette journée'}
+          subtitle={shareTarget.meal ? shareTarget.meal : dateLabel(date)}
+          onConfirm={confirmShareJournal}
+          onClose={() => setShareTarget(null)}
+        />
       )}
     </div>
   )

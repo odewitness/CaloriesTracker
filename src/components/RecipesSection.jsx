@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useState, useMemo } from 'react'
-import { ChevronDown, Trash2, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock } from 'lucide-react'
+import { ChevronDown, Trash2, Share2, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -26,7 +26,7 @@ import EmptyState from './EmptyState'
 // ─────────────────────────────────────────────────────────────────────────────
 // RecipeCard — carte d'une recette dans la liste
 // ─────────────────────────────────────────────────────────────────────────────
-function RecipeCard({ recette, ingredients, onOpen, onDelete }) {
+function RecipeCard({ recette, ingredients, onOpen, onDelete, onShare }) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const hasIngredients = ingredients && ingredients.length > 0
@@ -69,6 +69,12 @@ function RecipeCard({ recette, ingredients, onOpen, onDelete }) {
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={e => { e.stopPropagation(); setMenuOpen(false) }} />
               <div className="card" style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, padding: 4, minWidth: 150 }}>
+                <button
+                  onClick={e => { e.stopPropagation(); setMenuOpen(false); onShare(recette) }}
+                  style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  <Share2 size={14} /> Partager
+                </button>
                 <button
                   onClick={e => { e.stopPropagation(); setMenuOpen(false); onDelete(recette.id) }}
                   style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--coral)', display: 'flex', alignItems: 'center', gap: 8 }}
@@ -236,6 +242,14 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
   const [planTarget, setPlanTarget] = useState(null) // preset source { nom, items, sourceType, sourceId } en cours de planification
   const [shareTarget, setShareTarget] = useState(null) // { recette, ingredients } | null
 
+  // Depuis la carte (liste), on n'a que food_name/qty_g en mémoire
+  // (ingredientsByRecette) — on recharge les ingrédients complets (macros)
+  // juste avant d'ouvrir la modale de partage.
+  const handleShareFromCard = async (recette) => {
+    const { data } = await supabase.from('recette_ingredients').select('*').eq('recette_id', recette.id).eq('user_id', user.id)
+    setShareTarget({ recette, ingredients: data || [] })
+  }
+
   const confirmShare = async (message) => {
     const { error } = await shareRecette({ recette: shareTarget.recette, ingredients: shareTarget.ingredients, message })
     if (!error) toast('✓ Recette partagée avec tes amies !')
@@ -347,6 +361,7 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
                     ingredients={ingredientsByRecette[r.id]}
                     onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
                     onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+                    onShare={handleShareFromCard}
                   />
                 ))}
               </div>
