@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { Calendar, CalendarDays, Plus, Pill } from 'lucide-react'
+import { Calendar, CalendarDays, Plus, Pill, CalendarClock } from 'lucide-react'
 import CalendarMonthGrid from '../components/CalendarMonthGrid'
 import CalendarWeekStrip from '../components/CalendarWeekStrip'
 import DayRecapPanel from '../components/DayRecapPanel'
 import PlanMealModal from '../components/PlanMealModal'
+import PlannedSeriesModal from '../components/PlannedSeriesModal'
 import { useJournalRange } from '../hooks/useJournalRange'
 import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useSettings } from '../hooks/useSettings'
@@ -33,6 +34,7 @@ export default function CalendarPage() {
   const [anchorDate, setAnchorDate] = useState(new Date()) // mois ou semaine affiché
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [planModal, setPlanModal] = useState(null) // 'repas' | 'complement' | null
+  const [showSeries, setShowSeries] = useState(false)
   const { settings } = useSettings()
 
   // Plage chargée = mois affiché élargi de quelques jours de padding (les
@@ -135,6 +137,18 @@ export default function CalendarPage() {
         >
           <Pill size={14} /> Planifier des compléments
         </button>
+        <button
+          onClick={() => setShowSeries(true)}
+          aria-label="Mes programmations"
+          title="Mes programmations"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--gray-bg)', color: 'var(--text-muted)',
+            border: 'none', borderRadius: 10, padding: '0 12px', flexShrink: 0,
+          }}
+        >
+          <CalendarClock size={16} />
+        </button>
       </div>
 
       {view === 'month' ? (
@@ -165,6 +179,13 @@ export default function CalendarPage() {
           defaultDate={selectedDate}
           onClose={() => setPlanModal(null)}
           onPlanned={refetchAll}
+        />
+      )}
+
+      {showSeries && (
+        <PlannedSeriesModal
+          onClose={() => setShowSeries(false)}
+          onChange={refetchAll}
         />
       )}
     </div>

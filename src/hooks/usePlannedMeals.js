@@ -71,6 +71,61 @@ export function usePlannedMealsForDate(date) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// usePlannedSeries — charge toutes les programmations non mangées de
+// l'utilisateur (indépendamment du mois affiché sur le calendrier),
+// regroupées par recurrence_group_id : une série récurrente devient UNE
+// ligne (nom, repas, plage de dates, nombre d'occurrences) au lieu d'une
+// ligne par jour planifié. Une programmation isolée (sans
+// recurrence_group_id) reste sa propre ligne. Utilisé par
+// PlannedSeriesModal ("Mes programmations") pour supprimer une série
+// entière en un clic plutôt que jour par jour.
+// ─────────────────────────────────────────────────────────────────────────────
+export function usePlannedSeries() {
+  const { user } = useAuth()
+  const [series, setSeries] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchSeries = useCallback(async () => {
+    if (!user?.id) { setSeries([]); setLoading(false); return }
+    setLoading(true)
+    const { data } = await supabase
+      .from('repas_planifies')
+      .select('id, date, meal, nom, source_type, recurrence_group_id')
+      .eq('user_id', user.id)
+      .eq('mange', false)
+      .order('date', { ascending: true })
+    const groups = new Map()
+    for (const r of data || []) {
+      const key = r.recurrence_group_id || r.id
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          recurrenceGroupId: r.recurrence_group_id,
+          id: r.id,
+          nom: r.nom,
+          meal: r.meal,
+          sourceType: r.source_type,
+          dates: [],
+        })
+      }
+      groups.get(key).dates.push(r.date)
+    }
+    const result = [...groups.values()].map(g => ({
+      ...g,
+      count: g.dates.length,
+      firstDate: g.dates[0],
+      lastDate: g.dates[g.dates.length - 1],
+    }))
+    setSeries(result)
+    setLoading(false)
+  }, [user?.id])
+
+  useEffect(() => { fetchSeries() }, [fetchSeries])
+
+  return { series, loading, refetch: fetchSeries }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // createPlannedMeal — crée UN repas planifié pour UNE date. Le caller
 // (PlanMealModal) boucle sur les dates choisies pour planifier plusieurs
 // jours d'un coup.

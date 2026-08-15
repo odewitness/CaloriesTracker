@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-15',
+    title: 'Vois toutes tes programmations en un coup d\'œil',
+    description: "Sur la page Calendrier, un nouveau bouton \"Mes programmations\" liste tous tes repas et compléments programmés à l'avance — les programmations récurrentes tiennent sur une seule ligne. Tu peux supprimer une programmation entière (toutes ses occurrences) en un clic, pratique si tu t'es trompée en programmant plusieurs jours d'un coup.",
+  },
+  {
+    date: '2026-08-15',
     title: 'Modifie tes compléments directement depuis l\'accueil',
     description: "Tu peux maintenant taper sur un complément déjà pris ou programmé pour changer sa dose (gélules, comprimés...), avec le même écran que quand tu l'ajoutes, %AJR des vitamines et minéraux inclus.",
   },
