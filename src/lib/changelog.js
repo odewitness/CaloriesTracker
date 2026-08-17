@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-17',
+    title: 'Favoris plus faciles à parcourir',
+    description: "Quand tu ajoutes un aliment à ton journal, la liste de tes favoris ne s'affiche plus qu'en partie (les 20 premiers) avec un bouton pour voir les suivants — plus pratique maintenant que tu en as beaucoup. Le nombre total de favoris est aussi indiqué à côté du titre. Et le bouton + de la page Explorer a maintenant le même style que celui d'Aujourd'hui.",
+  },
+  {
+    date: '2026-08-17',
     title: 'Quatre nouveautés dans Explorer',
     description: "Un bouton + est apparu sur chaque carte de l'explorateur : il ajoute direct l'aliment à ton journal, avec la quantité déjà calculée si tu combles un manque. Tu peux maintenant trier par « les plus utilisés » pour retrouver tes habitudes en un coup d'œil. Quand aucun aliment seul ne comble bien un manque dans tes calories restantes, l'explorateur te propose parfois deux aliments à combiner. Et sur la fiche d'un aliment, s'il existe une variante de la même famille nettement plus riche en ce qui te manque aujourd'hui, elle t'est suggérée — un appui dessus l'affiche à sa place.",
   },

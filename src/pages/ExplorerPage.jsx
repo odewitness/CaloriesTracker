@@ -189,8 +189,7 @@ function ExplorerRow({ food, sortField, sort, isFav, onSelect, onToggleFav, gapF
               ajuster avant de confirmer. */}
           <button
             onClick={e => { e.stopPropagation(); onQuickAdd(food, quickAddGrams) }}
-            className="btn-icon"
-            style={{ width: 24, height: 24, color: 'var(--green-dark)' }}
+            style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--green-light)', color: 'var(--green-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
             aria-label={`Ajouter ${food.alim_nom} au journal`}
           >
             <Plus size={15} />

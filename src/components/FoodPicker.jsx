@@ -38,6 +38,8 @@ import EmptyState from './EmptyState'
 //   onClose        — ferme le picker
 // ─────────────────────────────────────────────────────────────────────────────
 
+const FAVORITES_STEP = 20
+
 export default function FoodPicker({
   title = 'Ajouter un aliment',
   confirmLabel = 'Ajouter',
@@ -71,6 +73,7 @@ export default function FoodPicker({
   const [adjustingRecipeQty, setAdjustingRecipeQty] = useState(false)
   const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false)
+  const [favoritesVisible, setFavoritesVisible] = useState(FAVORITES_STEP)
   const [favSort, setFavSort] = useState('most') // 'recent' | 'alpha' | 'most'
   const [favSortDir, setFavSortDir] = useState('desc') // 'asc' | 'desc'
   const searchRef = useRef(null)
@@ -136,6 +139,10 @@ export default function FoodPicker({
     if (!fav) return r
     return { ...r, portions: mergePortions(r.portions, fav.food_data.portions) }
   })
+
+  // Revenir à la limite de base dès qu'on change le tri des favoris : garder
+  // une liste dépliée après un changement de critère n'a aucun sens.
+  useEffect(() => { setFavoritesVisible(FAVORITES_STEP) }, [favSort, favSortDir])
 
   // Pas d'autofocus à l'ouverture — évite l'ouverture automatique du clavier sur mobile.
   // Le focus est déclenché uniquement quand l'utilisateur revient à l'étape search
@@ -510,6 +517,9 @@ const setDoseCount = (text) => {
                           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                         >
                           <span className="section-title" style={{ margin: 0 }}>★ Favoris</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-hint)', fontWeight: 600 }}>
+                            {favorites.length}
+                          </span>
                           <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
                             {favoritesCollapsed ? '▸' : '▾'}
                           </span>
@@ -518,7 +528,7 @@ const setDoseCount = (text) => {
                           <FavSortToggle value={favSort} dir={favSortDir} onChange={handleFavSortChange} />
                         )}
                       </div>
-                      {!favoritesCollapsed && sortedFavorites.map((f, i) => (
+                      {!favoritesCollapsed && sortedFavorites.slice(0, favoritesVisible).map((f, i) => (
                         <FoodRow
                           key={f.id}
                           food={favoritesMerged[i]}
@@ -527,6 +537,15 @@ const setDoseCount = (text) => {
                           onToggleFav={() => toggleFavorite(f.food_data)}
                         />
                       ))}
+                      {!favoritesCollapsed && favoritesVisible < sortedFavorites.length && (
+                        <button
+                          className="btn-ghost"
+                          style={{ width: '100%', marginTop: 4, marginBottom: 4, color: 'var(--green-dark)', fontWeight: 600 }}
+                          onClick={() => setFavoritesVisible(v => v + FAVORITES_STEP)}
+                        >
+                          Afficher plus ({sortedFavorites.length - favoritesVisible} restants)
+                        </button>
+                      )}
                     </>
                   )}
 
