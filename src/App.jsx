@@ -14,6 +14,7 @@ import CalendarPage from './pages/CalendarPage'
 import WhatsNewPage from './pages/WhatsNewPage'
 import MeasurementsPage from './pages/MeasurementsPage'
 import SocialPage from './pages/SocialPage'
+import ExplorerPage from './pages/ExplorerPage'
 import Loader from './components/Loader'
 import { getLatestChangelogKey } from './lib/changelog'
 import { useFriends } from './hooks/useFriends'
@@ -106,6 +107,18 @@ function BellIcon() {
   )
 }
 
+// Boussole : l'explorateur sert à s'orienter dans la base Ciqual pour trouver
+// des aliments répondant à un besoin nutritionnel, pas à chercher un aliment
+// précis (ça, c'est la loupe de l'ajout au journal).
+function ExplorerButtonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+    </svg>
+  )
+}
+
 function SocialButtonIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -120,7 +133,7 @@ function SocialButtonIcon() {
 // Bouton rond en haut à droite : ouvre ProfilePage en plein écran par-dessus
 // l'app, sans occuper d'onglet dans la bottom nav.
 // hidden=true → le bandeau se rétracte (scroll vers le bas), voir handleScroll.
-function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClick, hasUnreadNews, hasFriendRequests, hidden }) {
+function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClick, onExplorerClick, hasUnreadNews, hasFriendRequests, hidden }) {
   const { user } = useAuth()
   const { profile } = useProfile()
   const initials = ((profile?.prenom?.[0] || '') + (profile?.nom?.[0] || '')).toUpperCase()
@@ -128,6 +141,9 @@ function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClic
 
   return (
     <div className={`top-bar${hidden ? ' top-bar-hidden' : ''}`}>
+      <button className="profile-avatar-btn" onClick={onExplorerClick} aria-label="Explorer les aliments">
+        <ExplorerButtonIcon />
+      </button>
       <button className="profile-avatar-btn" onClick={onCalendarClick} aria-label="Calendrier">
         <CalendarButtonIcon />
       </button>
@@ -230,6 +246,7 @@ function AppShell() {
       <ProfileButton
         onClick={() => openOverlay('/profile')}
         onCalendarClick={() => openOverlay('/calendar')}
+        onExplorerClick={() => openOverlay('/explorer')}
         onWhatsNewClick={openWhatsNew}
         onSocialClick={openSocial}
         hasUnreadNews={hasUnreadNews}
@@ -286,6 +303,19 @@ function AppShell() {
               </div>
               <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
                 <CalendarPage />
+              </div>
+            </div>
+          } />
+          <Route path="/explorer" element={
+            <div className="page-modal">
+              <div className="page-modal-header">
+                <h2>Explorer les aliments</h2>
+                <button className="btn-icon" onClick={closeOverlay} aria-label="Fermer">
+                  <CloseIcon />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+                <ExplorerPage />
               </div>
             </div>
           } />
