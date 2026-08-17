@@ -1,6 +1,6 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { SORT_GROUPS, SORT_BASES, findField } from '../lib/ciqualExplorer'
+import { SORT_GROUPS, SORT_BASES } from '../lib/ciqualExplorer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerSortSheet — choix du nutriment de tri, du sens, et surtout de la
@@ -20,7 +20,6 @@ const BASE_HINTS = {
 
 export default function ExplorerSortSheet({ sort, onChange, onClose }) {
   useBackButton(onClose)
-  const current = findField(sort.field)
 
   const pickField = (key) => onChange({ ...sort, field: key })
 
@@ -58,8 +57,8 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
           {[
-            { dir: 'desc', label: `Les + riches en ${current.label.toLowerCase()}` },
-            { dir: 'asc',  label: `Les - riches en ${current.label.toLowerCase()}` },
+            { dir: 'desc', label: `Les + élevés d'abord` },
+            { dir: 'asc',  label: `Les - élevés d'abord` },
           ].map(o => (
             <button
               key={o.dir}

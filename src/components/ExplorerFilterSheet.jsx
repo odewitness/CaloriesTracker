@@ -48,7 +48,8 @@ export default function ExplorerFilterSheet({ filters, categories, onChange, onC
 
   const activeCount =
     filters.claims.length + filters.categories.length +
-    (filters.favoritesOnly ? 1 : 0) + (filters.showSeasonings ? 1 : 0)
+    (filters.favoritesOnly ? 1 : 0) + (filters.showSeasonings ? 1 : 0) +
+    (filters.fitsRemainingKcal ? 1 : 0)
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>

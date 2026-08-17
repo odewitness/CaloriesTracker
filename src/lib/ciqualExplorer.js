@@ -116,27 +116,50 @@ export function fieldValue(food, field, base) {
 // pas d'allégation « riche en sel » à valoriser.
 export const CLAIM_MICRO_FIELDS = [...VITAMIN_FIELDS, ...MINERAL_FIELDS].filter(f => !f.limite)
 
-const PROT_FIELD   = MACRO_FIELDS.find(f => f.key === 'proteines')
-const FIBRES_FIELD = MACRO_FIELDS.find(f => f.key === 'fibres')
+const macro = (key) => MACRO_FIELDS.find(f => f.key === key)
+const PROT_FIELD   = macro('proteines')
+const GLUC_FIELD   = macro('glucides')
+const LIP_FIELD    = macro('lipides')
+const FIBRES_FIELD = macro('fibres')
 
 export const CLAIM_GROUPS = [
-  { label: 'Macros',    fields: [PROT_FIELD, FIBRES_FIELD] },
+  { label: 'Macros',    fields: [PROT_FIELD, GLUC_FIELD, LIP_FIELD, FIBRES_FIELD] },
   { label: 'Vitamines', fields: VITAMIN_FIELDS },
   { label: 'Minéraux',  fields: MINERAL_FIELDS.filter(f => !f.limite) },
 ]
 
+// Part de l'énergie totale apportée par un macro (4 kcal/g pour protéines et
+// glucides, 9 pour les lipides).
+function energyShare(food, key) {
+  const kcal = food.energie_kcal
+  if (!kcal || kcal <= 0) return null
+  const perG = key === 'lipides' ? 9 : 4
+  return ((food[key] || 0) * perG) / kcal
+}
+
 // 'riche' | 'source' | null — pour UN nutriment donné, sur les valeurs /100 g.
 export function getClaimLevel(food, field) {
+  // Protéines et fibres ont des seuils d'allégation officiels (UE 1924/2006).
   if (field.key === 'proteines') {
-    const kcal = food.energie_kcal
-    if (!kcal || kcal <= 0) return null
-    const share = ((food.proteines || 0) * 4) / kcal
+    const share = energyShare(food, 'proteines')
+    if (share == null) return null
     return share >= 0.20 ? 'riche' : share >= 0.12 ? 'source' : null
   }
   if (field.key === 'fibres') {
     const v = food.fibres
     if (v == null) return null
     return v >= 6 ? 'riche' : v >= 3 ? 'source' : null
+  }
+  // Glucides et lipides n'ont AUCUNE allégation officielle « riche en » — le
+  // règlement ne valorise pas ces deux macros. On retombe donc sur le critère
+  // de dominance énergétique déjà utilisé par getNutriBadge() dans
+  // nutriBadge.js, pour que « riche en lipides » veuille dire la même chose
+  // ici et sur les cartes de recettes/aliments : le macro fournit à lui seul
+  // plus de la moitié de l'énergie de l'aliment.
+  if (field.key === 'glucides' || field.key === 'lipides') {
+    const share = energyShare(food, field.key)
+    if (share == null) return null
+    return share > 0.50 ? 'riche' : share > 0.30 ? 'source' : null
   }
   if (!field.ref || field.limite) return null
   const v = rawValue(food, field)
@@ -150,7 +173,7 @@ export function getClaimLevel(food, field) {
 // aussi les « source de » noierait la carte sous huit pastilles.
 export function getRichClaims(food, max = 3) {
   const out = []
-  for (const field of [PROT_FIELD, FIBRES_FIELD, ...CLAIM_MICRO_FIELDS]) {
+  for (const field of [PROT_FIELD, FIBRES_FIELD, GLUC_FIELD, LIP_FIELD, ...CLAIM_MICRO_FIELDS]) {
     if (getClaimLevel(food, field) === 'riche') out.push(field)
     if (out.length >= max) break
   }
@@ -212,6 +235,36 @@ export function filterFoods(foods, filters, { isFavorite, remainingKcal } = {}) 
     }
     return true
   })
+}
+
+// ── Résumé des filtres actifs ───────────────────────────────────────────────
+// Les filtres doivent rester VISIBLES sur la page, pas seulement dans la
+// feuille de réglages : sans ça, une liste restreinte à « riche en vitamine D »
+// donne l'impression que le tri ne répond plus, alors que c'est le filtre qui
+// limite les résultats. Chaque entrée est retirable individuellement.
+export function describeActiveFilters(filters, remainingKcal) {
+  const out = []
+  for (const k of filters.claims) {
+    out.push({ id: `claim:${k}`, kind: 'claim', value: k, label: `Riche en ${findField(k).label.toLowerCase()}` })
+  }
+  for (const c of filters.categories) {
+    out.push({ id: `cat:${c}`, kind: 'category', value: c, label: c })
+  }
+  if (filters.favoritesOnly) out.push({ id: 'fav', kind: 'favoritesOnly', label: 'Mes favoris' })
+  if (filters.fitsRemainingKcal) {
+    out.push({
+      id: 'kcal', kind: 'fitsRemainingKcal',
+      label: remainingKcal != null ? `≤ ${Math.round(remainingKcal)} kcal` : 'Calories restantes',
+    })
+  }
+  if (filters.showSeasonings) out.push({ id: 'seasoning', kind: 'showSeasonings', label: 'Épices affichées' })
+  return out
+}
+
+export function removeFilter(filters, item) {
+  if (item.kind === 'claim')    return { ...filters, claims: filters.claims.filter(k => k !== item.value) }
+  if (item.kind === 'category') return { ...filters, categories: filters.categories.filter(c => c !== item.value) }
+  return { ...filters, [item.kind]: false }
 }
 
 // Les valeurs manquantes finissent TOUJOURS en fin de liste, quel que soit le

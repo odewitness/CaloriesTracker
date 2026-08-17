@@ -10,6 +10,7 @@ import {
   DEFAULT_FILTERS, DEFAULT_SORT, SORT_BASES,
   filterFoods, sortFoods, findField, fieldValue, formatValue,
   listCategories, getRichClaims, getPortion, getNutrientGaps,
+  describeActiveFilters, removeFilter,
 } from '../lib/ciqualExplorer'
 import NutrientGapsBanner from '../components/NutrientGapsBanner'
 import ExplorerFilterSheet from '../components/ExplorerFilterSheet'
@@ -40,6 +41,29 @@ function loadStored(key, fallback) {
     // version antérieure n'a pas forcément toutes les clés attendues.
     return raw ? { ...fallback, ...JSON.parse(raw) } : fallback
   } catch { return fallback }
+}
+
+// Bouton de contrôle "Trier" / "Filtrer" : même gabarit pour les deux, avec
+// l'intitulé du réglage au-dessus et sa valeur courante en dessous.
+function ControlButton({ icon, caption, value, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 11px', textAlign: 'left',
+        background: 'var(--white)', borderRadius: 'var(--radius-sm)',
+        border: `1px solid ${active ? 'var(--green)' : 'var(--border-md)'}`,
+        color: active ? 'var(--green-dark)' : 'var(--text-muted)',
+      }}
+    >
+      <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 10, color: 'var(--text-hint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{caption}</span>
+        <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</span>
+      </span>
+    </button>
+  )
 }
 
 // Une ligne de résultat. La valeur mise en avant à droite est celle du tri
@@ -147,6 +171,8 @@ export default function ExplorerPage() {
     setSort(s => ({ ...s, field: key, dir: 'desc' }))
   }
 
+  const activeFilters = useMemo(() => describeActiveFilters(filters, remaining), [filters, remaining])
+
   const activeFilterCount =
     filters.claims.length + filters.categories.length +
     (filters.favoritesOnly ? 1 : 0) + (filters.fitsRemainingKcal ? 1 : 0)
@@ -154,26 +180,15 @@ export default function ExplorerPage() {
   return (
     <div className="page-content" style={{ padding: '12px 16px 24px' }}>
       {/* ── Recherche ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <div style={{ flex: 1, position: 'relative' }}>
-          <Search size={16} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }} />
-          <input
-            className="input"
-            style={{ paddingLeft: 34 }}
-            placeholder="Chercher un aliment…"
-            value={filters.query}
-            onChange={e => setFilters(f => ({ ...f, query: e.target.value }))}
-          />
-        </div>
-        <button
-          className="btn-icon"
-          onClick={() => setFilterOpen(true)}
-          style={{ flexShrink: 0, position: 'relative', color: activeFilterCount ? 'var(--green)' : 'var(--text-muted)' }}
-          aria-label="Filtrer"
-        >
-          <SlidersHorizontal size={18} />
-          {activeFilterCount > 0 && <span className="notif-dot" />}
-        </button>
+      <div style={{ position: 'relative', marginBottom: 12 }}>
+        <Search size={16} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }} />
+        <input
+          className="input"
+          style={{ paddingLeft: 34 }}
+          placeholder="Chercher un aliment…"
+          value={filters.query}
+          onChange={e => setFilters(f => ({ ...f, query: e.target.value }))}
+        />
       </div>
 
       <NutrientGapsBanner
@@ -186,24 +201,60 @@ export default function ExplorerPage() {
         onToggleFits={() => setFilters(f => ({ ...f, fitsRemainingKcal: !f.fitsRemainingKcal }))}
       />
 
-      {/* ── Barre de tri active ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <button
+      {/* ── Trier / Filtrer ──
+          Deux boutons distincts et de même poids visuel : ce sont deux gestes
+          différents (l'un classe, l'autre retire) et les confondre rend la
+          page incompréhensible. Chacun affiche son état courant en toutes
+          lettres plutôt qu'un simple point de notification. */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <ControlButton
+          icon={<ArrowUpDown size={14} />}
+          caption={`Trier · ${SORT_BASES.find(b => b.key === sort.base)?.label}`}
+          value={`${sortField.label} ${sort.dir === 'desc' ? '↓' : '↑'}`}
           onClick={() => setSortOpen(true)}
-          style={{ flex: 1, textAlign: 'left', fontSize: 12.5, color: 'var(--text-muted)', padding: '6px 0' }}
-        >
-          Trié par <strong style={{ color: 'var(--text)' }}>{sortField.label}</strong>
-          {' '}{sort.dir === 'desc' ? '↓' : '↑'}
-          {' · '}{SORT_BASES.find(b => b.key === sort.base)?.label}
-        </button>
+        />
+        <ControlButton
+          icon={<SlidersHorizontal size={14} />}
+          caption="Filtrer"
+          value={activeFilterCount ? `${activeFilterCount} actif${activeFilterCount > 1 ? 's' : ''}` : 'Aucun'}
+          active={activeFilterCount > 0}
+          onClick={() => setFilterOpen(true)}
+        />
+      </div>
+
+      {/* Critères en cours, tous retirables d'un appui — c'est ce qui manquait :
+          une liste restreinte par un filtre invisible donne l'impression que le
+          tri ne répond plus. Le sens du tri est la première pastille pour que
+          l'inversion reste à un seul appui. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
         <button
-          className="btn-icon"
+          className="chip"
           onClick={() => setSort(s => ({ ...s, dir: s.dir === 'desc' ? 'asc' : 'desc' }))}
-          style={{ flexShrink: 0, color: 'var(--text-muted)' }}
-          aria-label="Inverser le sens du tri"
+          style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
         >
-          <ArrowUpDown size={16} />
+          {sort.dir === 'desc' ? '↓ Les + élevés' : '↑ Les - élevés'}
         </button>
+
+        {activeFilters.map(item => (
+          <button
+            key={item.id}
+            className="chip"
+            onClick={() => setFilters(f => removeFilter(f, item))}
+            style={{ background: 'var(--green-light)', color: 'var(--green-dark)' }}
+          >
+            {item.label}<span style={{ marginLeft: 6, opacity: 0.6 }}>✕</span>
+          </button>
+        ))}
+
+        {activeFilters.length > 1 && (
+          <button
+            className="chip"
+            onClick={() => setFilters(f => ({ ...DEFAULT_FILTERS, query: f.query }))}
+            style={{ background: 'transparent', color: 'var(--text-hint)' }}
+          >
+            Tout effacer
+          </button>
+        )}
       </div>
 
       {/* ── Résultats ── */}

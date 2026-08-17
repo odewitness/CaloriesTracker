@@ -10,6 +10,9 @@ import React from 'react'
 // (déjà calculé pour la page Aujourd'hui) et des RNP de VITAMIN_FIELDS /
 // MINERAL_FIELDS — rien de nouveau à saisir.
 //
+// `.card` n'a pas de padding dans index.css (chaque usage pose le sien) :
+// il est donc défini ici, comme dans CalorieRing ou CalendarWeekStrip.
+//
 // Props :
 //   gaps              — sortie de getNutrientGaps() : [{ field, pct }]
 //   hasEntries        — false si rien n'est encore noté aujourd'hui
@@ -21,24 +24,26 @@ import React from 'react'
 export default function NutrientGapsBanner({
   gaps, hasEntries, remainingKcal, activeClaims, onPickGap, fitsRemainingKcal, onToggleFits,
 }) {
+  const showKcalToggle = remainingKcal != null && remainingKcal > 0
+
   return (
-    <div className="card" style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+    <div className="card" style={{ padding: '16px 16px 18px', marginBottom: 14 }}>
+      <div className="section-title" style={{ marginBottom: 12 }}>
         Ce qui te manque aujourd'hui
       </div>
 
       {!hasEntries ? (
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          Tu n'as encore rien noté aujourd'hui — explore librement, ou reviens ici
+        <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+          Tu n'as encore rien noté aujourd'hui. Explore librement — ou reviens ici
           après ton premier repas pour voir ce qu'il te reste à combler.
         </div>
       ) : gaps.length === 0 ? (
-        <div style={{ fontSize: 13, color: 'var(--green-dark)' }}>
+        <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--green-dark)' }}>
           Tous tes apports sont au niveau. Rien à combler pour l'instant 👏
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {gaps.map(({ field, pct }) => {
               const active = activeClaims.includes(field.key)
               return (
@@ -46,31 +51,39 @@ export default function NutrientGapsBanner({
                   key={field.key}
                   className="chip"
                   onClick={() => onPickGap(field.key)}
-                  style={active ? { background: 'var(--green)', color: 'var(--white)' } : undefined}
+                  style={{
+                    padding: '7px 13px',
+                    ...(active ? { background: 'var(--green)', color: 'var(--white)' } : null),
+                  }}
                 >
-                  {field.label} <span style={{ opacity: 0.75, fontWeight: 500 }}>{pct} %</span>
+                  {field.label}
+                  <span style={{ marginLeft: 5, opacity: 0.7, fontWeight: 500 }}>{pct} %</span>
                 </button>
               )
             })}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8 }}>
-            Touche un nutriment pour ne voir que les aliments qui en sont riches.
+          <div style={{ fontSize: 11.5, lineHeight: 1.5, color: 'var(--text-hint)', marginTop: 12 }}>
+            Touche un nutriment : la liste ne garde que les aliments qui en sont
+            riches, du plus riche au moins riche.
           </div>
         </>
       )}
 
-      {remainingKcal != null && remainingKcal > 0 && (
-        <button
-          className="chip"
-          onClick={onToggleFits}
-          style={{
-            marginTop: 10,
-            background: fitsRemainingKcal ? 'var(--green)' : 'var(--gray-bg)',
-            color:      fitsRemainingKcal ? 'var(--white)' : 'var(--text-muted)',
-          }}
-        >
-          {fitsRemainingKcal ? '✓ ' : ''}Tient dans mes {Math.round(remainingKcal)} kcal restantes
-        </button>
+      {showKcalToggle && (
+        <>
+          <div style={{ height: 0.5, background: 'var(--border)', margin: '14px -16px 12px' }} />
+          <button
+            className="chip"
+            onClick={onToggleFits}
+            style={{
+              padding: '7px 13px',
+              background: fitsRemainingKcal ? 'var(--green)' : 'var(--gray-bg)',
+              color:      fitsRemainingKcal ? 'var(--white)' : 'var(--text-muted)',
+            }}
+          >
+            {fitsRemainingKcal ? '✓ ' : ''}Tient dans mes {Math.round(remainingKcal)} kcal restantes
+          </button>
+        </>
       )}
     </div>
   )
