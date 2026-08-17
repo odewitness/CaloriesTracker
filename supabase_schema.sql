@@ -4,6 +4,10 @@
 -- (information_schema.columns + table_constraints), pas depuis un
 -- historique de migrations. Sert de référence pour Claude Code, pas
 -- de script d'installation à rejouer tel quel sur une base existante.
+-- Complété le 2026-08-17 : tables 15-23 (fil social) + colonne
+-- profiles.pseudo, depuis un nouvel export information_schema.columns
+-- (pas de table_constraints cette fois — FK/CHECK sur ces tables
+-- déduits du code client, marqués "non confirmé" quand incertains).
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -286,7 +290,10 @@ create table if not exists profiles (
   poids_kg numeric,
   email text,
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  -- Ajoutée après coup pour le fil social (recherche d'amies, affichage des
+  -- auteures) ; unicité non confirmée côté base.
+  pseudo text
 );
 
 -- 7. TABLE RECETTES (plats maison, valeurs nutritionnelles pour 100g)
@@ -539,6 +546,157 @@ create table if not exists mensurations (
   unique (user_id, date)
 );
 
+-- 15. TABLE AMITIES (relations d'amitié entre utilisatrices : demande +
+-- acceptation mutuelle, voir useFriends.js). Champs pseudo/prenom
+-- dénormalisés des deux côtés pour éviter une lecture cross-utilisatrice de
+-- `profiles` (RLS probablement restrictif sur profiles).
+create table if not exists amities (
+  id uuid default gen_random_uuid() primary key,
+  demandeur_id uuid not null references auth.users(id),
+  destinataire_id uuid not null references auth.users(id),
+  demandeur_pseudo text,
+  demandeur_prenom text,
+  destinataire_pseudo text,
+  destinataire_prenom text,
+  statut text not null default 'en_attente', -- 'en_attente' | 'acceptee' (CHECK non confirmé)
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 16. TABLE PARTAGES_RECETTES (fil social : partage d'une recette, snapshot
+-- au moment du partage — reste affiché même si la recette source est
+-- ensuite modifiée/supprimée, voir shareRecette dans useFeed.js)
+create table if not exists partages_recettes (
+  id uuid default gen_random_uuid() primary key,
+  auteur_id uuid not null references auth.users(id),
+  auteur_pseudo text,
+  auteur_prenom text,
+  recette_id uuid references recettes(id), -- nullable : la recette source peut disparaître sans supprimer le partage
+  nom text not null,
+  portions integer not null default 1,
+  poids_cru_g numeric,
+  poids_cuit_g numeric,
+  tare_g numeric,
+  categories text[] not null default '{}',
+  instructions text,
+  temps_preparation_min integer,
+  temps_cuisson_min integer,
+  temps_repos_min integer,
+  energie_kcal numeric,
+  proteines numeric,
+  glucides numeric,
+  lipides numeric,
+  fibres numeric,
+  sel numeric,
+  sucres numeric,
+  acides_gras_satures numeric,
+  message text,
+  created_at timestamptz not null default now()
+);
+
+-- 17. TABLE PARTAGE_RECETTE_INGREDIENTS (ingrédients snapshotés d'un
+-- partage de recette)
+create table if not exists partage_recette_ingredients (
+  id uuid default gen_random_uuid() primary key,
+  partage_id uuid not null references partages_recettes(id), -- cascade probable, non confirmé
+  food_name text not null,
+  food_source text,
+  food_ref_id text,
+  qty_g numeric not null,
+  energie_kcal numeric,
+  proteines numeric,
+  glucides numeric,
+  lipides numeric,
+  fibres numeric,
+  ordre integer not null default 0
+);
+
+-- 18. TABLE PARTAGES_JOURNAL (fil social : partage d'une journée entière ou
+-- d'un seul repas, voir shareJournal dans useFeed.js)
+create table if not exists partages_journal (
+  id uuid default gen_random_uuid() primary key,
+  auteur_id uuid not null references auth.users(id),
+  auteur_pseudo text,
+  auteur_prenom text,
+  date date not null,
+  meal text, -- null = journée entière ; sinon 'Petit-déjeuner' | 'Déjeuner' | 'Dîner' | 'Collation'
+  include_detail boolean not null default false, -- si vrai, détail aliment par aliment snapshotté dans partage_journal_aliments
+  energie_kcal numeric,
+  proteines numeric,
+  glucides numeric,
+  lipides numeric,
+  fibres numeric,
+  message text,
+  created_at timestamptz not null default now()
+);
+
+-- 19. TABLE PARTAGE_JOURNAL_ALIMENTS (aliments snapshotés d'un partage de
+-- journée/repas, présents seulement si include_detail = true)
+create table if not exists partage_journal_aliments (
+  id uuid default gen_random_uuid() primary key,
+  partage_id uuid not null references partages_journal(id), -- cascade probable, non confirmé
+  meal text not null,
+  food_name text not null,
+  qty_g numeric not null,
+  energie_kcal numeric,
+  proteines numeric,
+  glucides numeric,
+  lipides numeric,
+  fibres numeric,
+  ordre integer not null default 0
+);
+
+-- 20. TABLE REACTIONS_PARTAGES (réactions emoji sur un partage de recette)
+create table if not exists reactions_partages (
+  id uuid default gen_random_uuid() primary key,
+  partage_id uuid not null references partages_recettes(id), -- cascade probable, non confirmé
+  user_id uuid not null references auth.users(id),
+  -- CHECK confirmé côté base (voir commentaire dans src/lib/reactions.js),
+  -- doit rester synchronisé manuellement avec REACTION_EMOJIS.
+  emoji text not null,
+  created_at timestamptz not null default now(),
+  user_pseudo text,
+  user_prenom text
+);
+
+-- 21. TABLE REACTIONS_JOURNAL (réactions emoji sur un partage de
+-- journée/repas — même structure que reactions_partages)
+create table if not exists reactions_journal (
+  id uuid default gen_random_uuid() primary key,
+  partage_id uuid not null references partages_journal(id), -- cascade probable, non confirmé
+  user_id uuid not null references auth.users(id),
+  emoji text not null,
+  created_at timestamptz not null default now(),
+  user_pseudo text,
+  user_prenom text
+);
+
+-- 22. TABLE COMMENTAIRES_PARTAGES (commentaires + réponses sur un partage
+-- de recette)
+create table if not exists commentaires_partages (
+  id uuid default gen_random_uuid() primary key,
+  partage_id uuid not null references partages_recettes(id), -- cascade probable, non confirmé
+  parent_id uuid references commentaires_partages(id), -- réponse à un commentaire ; suppression en cascade confirmée côté base
+  auteur_id uuid not null references auth.users(id),
+  auteur_pseudo text,
+  auteur_prenom text,
+  contenu text not null,
+  created_at timestamptz not null default now()
+);
+
+-- 23. TABLE COMMENTAIRES_JOURNAL (commentaires + réponses sur un partage de
+-- journée/repas — même structure que commentaires_partages)
+create table if not exists commentaires_journal (
+  id uuid default gen_random_uuid() primary key,
+  partage_id uuid not null references partages_journal(id), -- cascade probable, non confirmé
+  parent_id uuid references commentaires_journal(id), -- suppression en cascade confirmée côté base
+  auteur_id uuid not null references auth.users(id),
+  auteur_pseudo text,
+  auteur_prenom text,
+  contenu text not null,
+  created_at timestamptz not null default now()
+);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -557,6 +715,15 @@ alter table mensurations disable row level security;
 -- liste_courses_items, repas_planifies) — toutes ont un user_id filtré
 -- côté client, mais ça ne dit rien sur RLS côté base. À vérifier avant de
 -- s'appuyer dessus pour la sécurité.
+
+-- RLS confirmé ACTIF sur les 9 tables du fil social (amities,
+-- partages_recettes, partage_recette_ingredients, partages_journal,
+-- partage_journal_aliments, reactions_partages, reactions_journal,
+-- commentaires_partages, commentaires_journal) : le code client ne filtre
+-- jamais par user_id/auteur_id/demandeur_id sur ces tables (voir
+-- commentaires dans useFeed.js et usePartageDetail.js — "déjà filtré côté
+-- base par RLS"), la visibilité (auteure ou amie acceptée) est donc
+-- entièrement portée par des policies RLS non reproduites ici.
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)
@@ -700,3 +867,15 @@ returns setof ciqual language sql stable as $$
     alim_nom
   limit lim;
 $$;
+
+-- =============================================
+-- FUNCTION : find_profile_by_pseudo
+-- =============================================
+-- Appelée via supabase.rpc('find_profile_by_pseudo', { p_pseudo }) dans
+-- useFriends.js pour la recherche d'amies (correspondance exacte,
+-- retourne { id, pseudo, prenom } ou aucune ligne). Signature déduite de
+-- l'usage client — corps de la fonction non introspecté, à récupérer
+-- séparément si besoin (probablement security definer pour contourner RLS
+-- de profiles le temps de la recherche).
+-- create or replace function find_profile_by_pseudo(p_pseudo text)
+-- returns table (id uuid, pseudo text, prenom text) ...

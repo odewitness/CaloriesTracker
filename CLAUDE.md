@@ -32,6 +32,12 @@ App personnelle de suivi calorique. React 18 + Vite, backend Supabase, déployé
 - Ne pas ajouter d'entrée pour les changements purement internes (refactor, nettoyage, migration technique, dépendances) sans impact perceptible par l'utilisatrice.
 - Le point rouge sur la cloche (badge "non lu") se base sur la date la plus récente du changelog comparée à une valeur stockée dans `localStorage` — pas d'action requise à ce sujet, ça se met à jour automatiquement dès qu'une nouvelle entrée est ajoutée.
 
+## Schéma Supabase
+
+- `supabase_schema.sql` à la racine documente le schéma de la vraie base de production (tables, colonnes, index, RLS). Ce n'est pas un script d'installation à rejouer tel quel, c'est une référence pour Claude Code.
+- **À chaque modification du schéma de la base** (nouvelle table, colonne ajoutée/supprimée, changement de contrainte, RLS activé/désactivé) faite dans le cadre d'une session, mettre à jour `supabase_schema.sql` en conséquence dans le même changement.
+- Comme il n'y a pas d'accès direct à la base depuis cette session (pas de CLI Supabase connectée), le fichier peut diverger de la vraie base si des changements sont faits ailleurs (SQL editor Supabase, autre session). Si un doute apparaît sur son exactitude, demander à l'utilisatrice de fournir un extrait à jour plutôt que de supposer.
+
 ## Notes utiles
 
 - Le hook `useBackButton.js` gère le bouton retour Android/navigateur via `history.pushState`/`popstate` — indépendant du routing React Router (`react-router-dom`), ne change jamais le pathname de l'URL.
