@@ -364,11 +364,45 @@ export function listCategories(foods) {
     .sort((a, b) => a.localeCompare(b, 'fr'))
 }
 
+// ── État de cuisson ─────────────────────────────────────────────────────────
+// Ciqual ne stocke pas la cuisson dans une colonne : elle n'existe que dans le
+// libellé (« Carotte, crue », « Riz basmati, cuit », « Croquette, à cuire »).
+// On la déduit donc du nom — environ un tiers des 3 552 aliments porte un
+// marqueur, les autres restent « non précisé » et ne sont jamais exclus tant
+// que le filtre n'est pas utilisé.
+//
+// Les modes de cuisson (rôti, grillé, poêlé, sauté…) sont inclus car ils
+// rattrapent ~130 aliments qui ne portent pas le mot « cuit » (« Veau,
+// escalope, poêlée »). Mais ces mots sont ambigus : ils désignent parfois une
+// DÉCOUPE (« Veau, rôti cru ») ou un NOM DE PLAT (« Poêlée de légumes,
+// surgelée, crue »). D'où l'ordre de priorité ci-dessous — « à cuire » puis
+// « cru » l'emportent toujours, ce qui tranche correctement ces cas.
+// Restent quelques produits type « Poêlée de légumes surgelée » sans mention
+// « crue », classés à tort comme cuits : une poignée sur 3 552.
+const COOKING_PATTERNS = [
+  ['a_cuire', /(^|[^a-z])a cuire([^a-z]|$)/],
+  ['cru',     /(^|[^a-z])(cru|crus|crue|crues)([^a-z]|$)/],
+  ['cuit',    /(^|[^a-z])(cuit|cuits|cuite|cuites|precuit|precuits|precuite|precuites|bouilli|bouillis|bouillie|bouillies|roti|rotis|rotie|roties|grille|grilles|grillee|grillees|poele|poeles|poelee|poelees|frit|frits|frite|frites|braise|braises|braisee|braisees|saute|sautes|sautee|sautees|mijote|mijotee|vapeur|etouffee)([^a-z]|$)/],
+]
+
+export const COOKING_OPTIONS = [
+  { key: 'cru',     label: 'Cru' },
+  { key: 'cuit',    label: 'Cuit' },
+  { key: 'a_cuire', label: 'À cuire' },
+]
+
+export function getCookingState(food) {
+  const s = normalize(food.alim_nom)
+  for (const [state, re] of COOKING_PATTERNS) if (re.test(s)) return state
+  return null
+}
+
 // ── Filtre + tri ────────────────────────────────────────────────────────────
 export const DEFAULT_FILTERS = {
   query: '',
   categories: [],
   claims: [],          // clés de nutriments dont on veut « riche en »
+  cooking: [],         // états de cuisson retenus (OU logique, cf. filterFoods)
   favoritesOnly: false,
   fitsRemainingKcal: false,
   showSeasonings: false,
@@ -407,6 +441,11 @@ export function filterFoods(foods, filters, { isFavorite, remainingKcal } = {}) 
     // Plusieurs pastilles « riche en » = ET logique : on cherche l'aliment qui
     // coche tous les besoins à la fois, pas l'union des trois listes.
     if (claimFields.length && !claimFields.every(f => getClaimLevel(food, f) === 'riche')) return false
+    // Contrairement aux pastilles « riche en », la cuisson est un OU : un
+    // aliment ne peut pas être cru ET cuit, cocher les deux veut dire « l'un
+    // ou l'autre ». Calculé seulement si le filtre est utilisé — l'analyse du
+    // libellé tournerait sinon sur 3 552 aliments à chaque frappe.
+    if (filters.cooking?.length && !filters.cooking.includes(getCookingState(food))) return false
     if (filters.favoritesOnly && !isFavorite?.(food)) return false
     if (filters.fitsRemainingKcal && remainingKcal != null) {
       const kcalPortion = ((food.energie_kcal || 0) * getPortion(food).g) / 100
@@ -436,6 +475,10 @@ export function describeActiveFilters(filters, remainingKcal) {
   for (const c of filters.categories) {
     out.push({ id: `cat:${c}`, kind: 'category', value: c, label: c })
   }
+  for (const k of filters.cooking || []) {
+    const opt = COOKING_OPTIONS.find(o => o.key === k)
+    if (opt) out.push({ id: `cook:${k}`, kind: 'cooking', value: k, label: opt.label })
+  }
   if (filters.favoritesOnly) out.push({ id: 'fav', kind: 'favoritesOnly', label: 'Mes favoris' })
   if (filters.fitsRemainingKcal) {
     out.push({
@@ -450,6 +493,7 @@ export function describeActiveFilters(filters, remainingKcal) {
 export function removeFilter(filters, item) {
   if (item.kind === 'claim')    return { ...filters, claims: filters.claims.filter(k => k !== item.value) }
   if (item.kind === 'category') return { ...filters, categories: filters.categories.filter(c => c !== item.value) }
+  if (item.kind === 'cooking')  return { ...filters, cooking: filters.cooking.filter(k => k !== item.value) }
   return { ...filters, [item.kind]: false }
 }
 

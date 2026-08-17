@@ -1,6 +1,6 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { CLAIM_GROUPS, DEFAULT_FILTERS, chipLabel } from '../lib/ciqualExplorer'
+import { CLAIM_GROUPS, DEFAULT_FILTERS, chipLabel, COOKING_OPTIONS } from '../lib/ciqualExplorer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerFilterSheet — filtres de l'explorateur Ciqual.
@@ -47,7 +47,7 @@ export default function ExplorerFilterSheet({ filters, categories, onChange, onC
   const set = (patch) => onChange({ ...filters, ...patch })
 
   const activeCount =
-    filters.claims.length + filters.categories.length +
+    filters.claims.length + filters.categories.length + filters.cooking.length +
     (filters.favoritesOnly ? 1 : 0) + (filters.showSeasonings ? 1 : 0) +
     (filters.fitsRemainingKcal ? 1 : 0)
 
@@ -93,6 +93,36 @@ export default function ExplorerFilterSheet({ filters, categories, onChange, onC
             </div>
           </div>
         ))}
+
+        {/* ── Cuisson ──
+            Déduite du libellé de l'aliment, pas d'une colonne : environ deux
+            tiers des aliments Ciqual ne précisent rien et restent affichés
+            tant qu'aucune pastille n'est cochée. */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
+            Cuisson
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {COOKING_OPTIONS.map(o => {
+              const active = filters.cooking.includes(o.key)
+              return (
+                <button
+                  key={o.key}
+                  className="chip"
+                  onClick={() => set({ cooking: toggleIn(filters.cooking, o.key) })}
+                  style={active
+                    ? { background: 'var(--green)', color: 'var(--white)' }
+                    : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                >
+                  {o.label}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6 }}>
+            Repéré dans le nom de l'aliment. Beaucoup n'en précisent rien.
+          </div>
+        </div>
 
         {/* ── Catégories ── */}
         {categories.length > 0 && (

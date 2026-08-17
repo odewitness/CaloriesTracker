@@ -191,7 +191,7 @@ export default function ExplorerPage() {
   const isDefaultSort = sort.field === DEFAULT_SORT.field && sort.dir === DEFAULT_SORT.dir
 
   const activeFilterCount =
-    filters.claims.length + filters.categories.length +
+    filters.claims.length + filters.categories.length + filters.cooking.length +
     (filters.favoritesOnly ? 1 : 0) + (filters.fitsRemainingKcal ? 1 : 0)
 
   return (
