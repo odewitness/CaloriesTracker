@@ -75,6 +75,16 @@ export const SORT_BASES = [
   { key: 'portion', label: 'Par portion',       short: '/portion' },
 ]
 
+// Budget calorique de reference du mode « A calories egales ».
+//
+// A savoir : changer cette valeur ne change PAS l'ordre du classement. Toutes
+// les valeurs sont multipliees par le meme facteur, donc le rang de chaque
+// aliment est identique a 50 comme a 500 kcal. Ce reglage sert a rendre les
+// chiffres interpretables — « 87 g de thon pour 200 kcal » parle davantage que
+// la meme information ramenee a 100 kcal.
+export const KCAL_REF_OPTIONS = [50, 100, 200, 500]
+export const DEFAULT_KCAL_REF = 100
+
 // Énergie minimale pour qu'une comparaison « à calories égales » ait un sens.
 //
 // Le calcul divise par l'énergie de l'aliment : en dessous de quelques kcal,
@@ -129,7 +139,7 @@ export function rawValue(food, field) {
   return sum
 }
 
-export function fieldValue(food, field, base) {
+export function fieldValue(food, field, base, kcalRef = DEFAULT_KCAL_REF) {
   if (field.virtual) return null // le nom n'a pas de valeur chiffrée à comparer
   const raw = rawValue(food, field)
   if (raw == null) return null
@@ -140,7 +150,7 @@ export function fieldValue(food, field, base) {
     // Voir MIN_KCAL_FOR_DENSITY : en dessous, le rapport n'est plus qu'une
     // division par presque zéro (eaux, sodas light, bouillons, infusions).
     if (!kcal || kcal < MIN_KCAL_FOR_DENSITY) return null
-    return (raw / kcal) * 100
+    return (raw / kcal) * kcalRef
   }
   if (base === 'portion') return (raw * getPortion(food).g) / 100
   return raw
@@ -152,13 +162,13 @@ export function fieldValue(food, field, base) {
 // qui permet de distinguer un aliment vraiment dense d'un aliment simplement
 // pauvre en calories. Null si l'aliment n'apporte pas d'énergie (eau, thé) :
 // aucune quantité n'atteint jamais 100 kcal.
-export function gramsFor100kcal(food) {
+export function gramsForKcal(food, kcalRef = DEFAULT_KCAL_REF) {
   const kcal = food.energie_kcal
   // Même seuil que le classement lui-même : afficher « 172 414 g pour
   // 100 kcal » ne renseigne sur rien, sinon que l'aliment n'a pas sa place
   // dans cette comparaison.
   if (!kcal || kcal < MIN_KCAL_FOR_DENSITY) return null
-  return (100 / kcal) * 100
+  return (kcalRef / kcal) * 100
 }
 
 // ── Allégations nutritionnelles (règlement UE n°1924/2006, annexe) ───────────
@@ -340,7 +350,19 @@ export const DEFAULT_FILTERS = {
 // que l'utilisatrice n'en a pas choisi un. Ni les filtres ni le tri ne sont
 // mémorisés d'une ouverture à l'autre — un réglage pris pour un besoin ponctuel
 // ne doit pas devenir l'état permanent de la page.
-export const DEFAULT_SORT = { field: 'nom', dir: 'asc', base: 'g100' }
+export const DEFAULT_SORT = { field: 'nom', dir: 'asc', base: 'g100', kcalRef: DEFAULT_KCAL_REF }
+
+// Libelle du mode de comparaison courant, reference calorique incluse — une
+// seule source pour le bouton « Trier » et le sous-titre des valeurs.
+export function describeBase(sort) {
+  if (sort.base === 'kcal100') return `Pour ${sort.kcalRef ?? DEFAULT_KCAL_REF} kcal`
+  return SORT_BASES.find(b => b.key === sort.base)?.label ?? ''
+}
+
+export function baseShortLabel(sort) {
+  if (sort.base === 'kcal100') return `/${sort.kcalRef ?? DEFAULT_KCAL_REF} kcal`
+  return SORT_BASES.find(b => b.key === sort.base)?.short ?? ''
+}
 
 export function filterFoods(foods, filters, { isFavorite, remainingKcal } = {}) {
   const q = normalize(filters.query).trim()
@@ -400,7 +422,7 @@ export function removeFilter(filters, item) {
 // sens du tri. (En SQL, `order by ... desc` remonte les NULL en premier : la
 // première page serait pleine d'aliments sans donnée. Même piège en JS si on
 // traite null comme 0.)
-export function sortFoods(foods, { field, dir, base }) {
+export function sortFoods(foods, { field, dir, base, kcalRef = DEFAULT_KCAL_REF }) {
   const f = findField(field)
   const mult = dir === 'asc' ? 1 : -1
 
@@ -409,7 +431,7 @@ export function sortFoods(foods, { field, dir, base }) {
   }
 
   return [...foods]
-    .map(food => ({ food, val: fieldValue(food, f, base) }))
+    .map(food => ({ food, val: fieldValue(food, f, base, kcalRef) }))
     .sort((a, b) => {
       if (a.val == null && b.val == null) return a.food.alim_nom.localeCompare(b.food.alim_nom, 'fr')
       if (a.val == null) return 1

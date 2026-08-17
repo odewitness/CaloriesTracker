@@ -7,10 +7,11 @@ import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { computeTotals } from '../lib/nutrients'
 import {
-  DEFAULT_FILTERS, DEFAULT_SORT, SORT_BASES,
+  DEFAULT_FILTERS, DEFAULT_SORT,
   filterFoods, sortFoods, findField, fieldValue, formatValue,
   listCategories, getRichClaims, getPortion, getNutrientGaps,
-  describeActiveFilters, removeFilter, gramsFor100kcal, hasDeclaredPortion,
+  describeActiveFilters, removeFilter, gramsForKcal, hasDeclaredPortion,
+  describeBase, baseShortLabel,
 } from '../lib/ciqualExplorer'
 import NutrientGapsBanner from '../components/NutrientGapsBanner'
 import ExplorerFilterSheet from '../components/ExplorerFilterSheet'
@@ -58,12 +59,12 @@ function ControlButton({ icon, caption, value, active, onClick }) {
 // Une ligne de résultat. La valeur mise en avant à droite est celle du tri
 // actif (et pas systématiquement les calories) : c'est ce qui explique d'un
 // coup d'œil pourquoi l'aliment est classé là.
-function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
-  const val = fieldValue(food, sortField, base)
+function ExplorerRow({ food, sortField, sort, isFav, onSelect, onToggleFav }) {
+  const { base, kcalRef } = sort
+  const val = fieldValue(food, sortField, base, kcalRef)
   const claims = getRichClaims(food, 2)
-  const baseShort = SORT_BASES.find(b => b.key === base)?.short
   const portion = getPortion(food)
-  const grams100 = gramsFor100kcal(food)
+  const gramsRef = gramsForKcal(food, kcalRef)
 
   return (
     <div
@@ -87,8 +88,8 @@ function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
               interprétable. En mode densité c'est ce qu'il faut manger pour
               100 kcal ; en mode portion, la portion elle-même et ce qu'elle
               coûte en calories. */}
-          {base === 'kcal100' && grams100 != null ? (
-            `${Math.round(grams100)} g pour 100 kcal`
+          {base === 'kcal100' && gramsRef != null ? (
+            `${Math.round(gramsRef)} g pour ${kcalRef} kcal`
           ) : base === 'portion' ? (
             <>
               <span style={{ fontWeight: 600, color: 'var(--text)' }}>{portion.label}</span>
@@ -119,7 +120,7 @@ function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
               « portion » : c'est la seule facon de savoir a quoi la valeur
               au-dessus correspond. */}
           <div style={{ fontSize: 10, color: 'var(--text-hint)' }}>
-            {base === 'portion' ? `pour ${portion.g} g` : baseShort}
+            {base === 'portion' ? `pour ${portion.g} g` : baseShortLabel(sort)}
           </div>
         </div>
       )}
@@ -225,7 +226,7 @@ export default function ExplorerPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <ControlButton
           icon={<ArrowUpDown size={14} />}
-          caption={sortField.virtual ? 'Trier' : `Trier · ${SORT_BASES.find(b => b.key === sort.base)?.label}`}
+          caption={sortField.virtual ? 'Trier' : `Trier · ${describeBase(sort)}`}
           value={sortField.virtual
             ? (sort.dir === 'asc' ? 'Nom A → Z' : 'Nom Z → A')
             : `${sortField.label} ${sort.dir === 'desc' ? '↓' : '↑'}`}
@@ -297,7 +298,7 @@ export default function ExplorerPage() {
               key={food.alim_code || food.id}
               food={food}
               sortField={sortField}
-              base={sort.base}
+              sort={sort}
               isFav={isFavorite(food)}
               onSelect={setSelected}
               onToggleFav={handleToggleFav}

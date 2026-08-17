@@ -1,6 +1,6 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { SORT_GROUPS, SORT_BASES, findField } from '../lib/ciqualExplorer'
+import { SORT_GROUPS, SORT_BASES, findField, KCAL_REF_OPTIONS, DEFAULT_KCAL_REF } from '../lib/ciqualExplorer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerSortSheet — construit le tri en trois temps, dans l'ordre où la
@@ -16,7 +16,7 @@ import { SORT_GROUPS, SORT_BASES, findField } from '../lib/ciqualExplorer'
 
 const BASE_HINTS = {
   g100:    "À poids égal : pour 100 g de chaque aliment. Fait remonter les produits très concentrés (poudres, graines) dont on ne mange que quelques grammes.",
-  kcal100: "« Pour le même nombre de calories, lequel m'apporte le plus ? ». Chaque ligne indique la quantité à manger pour atteindre ces 100 kcal. Les aliments trop peu caloriques (eaux, sodas light, bouillons) ne sont pas comparables ainsi et partent en fin de liste.",
+  kcal100: "« Pour le même budget de calories, lequel m'apporte le plus ? ». Chaque ligne indique la quantité à manger pour ce budget. Le classement reste le même quel que soit le nombre de kcal choisi — seuls les chiffres changent. Les aliments trop peu caloriques (eaux, sodas light, bouillons) ne sont pas comparables ainsi et partent en fin de liste.",
   portion: "Ce qu'apporte une portion usuelle de chaque aliment. Le plus proche de la réalité de l'assiette.",
 }
 
@@ -98,7 +98,22 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
               selected={sort.base}
               onPick={key => onChange({ ...sort, base: key })}
             />
-            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8, lineHeight: 1.45 }}>
+            {/* Budget calorique de reference : ne change pas l'ordre du
+                classement (tout est multiplie par le meme facteur), mais rend
+                les quantites parlantes — 200 kcal est plus proche d'une
+                collation reelle que 100 kcal. */}
+            {sort.base === 'kcal100' && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginBottom: 5 }}>Budget de calories</div>
+                <ChipRow
+                  grow
+                  options={KCAL_REF_OPTIONS.map(k => ({ key: k, label: `${k} kcal` }))}
+                  selected={sort.kcalRef ?? DEFAULT_KCAL_REF}
+                  onPick={key => onChange({ ...sort, kcalRef: key })}
+                />
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 10, lineHeight: 1.45 }}>
               {BASE_HINTS[sort.base]}
             </div>
           </div>
