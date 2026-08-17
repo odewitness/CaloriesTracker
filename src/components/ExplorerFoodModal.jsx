@@ -7,7 +7,7 @@ import { useBackButton } from '../hooks/useBackButton'
 import { useFavorites } from '../hooks/useFavorites'
 import { useJournal } from '../hooks/useJournal'
 import { scaleFood, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
-import { getPortion } from '../lib/ciqualExplorer'
+import { getPortion, getCategoryLabel } from '../lib/ciqualExplorer'
 import MacroPreview from './MacroPreview'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
@@ -121,7 +121,7 @@ export default function ExplorerFoodModal({ food, onClose }) {
               >
                 <Star size={18} fill={fav ? 'var(--amber)' : 'none'} />
               </button>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{food.categorie}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{getCategoryLabel(food.categorie)}</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>

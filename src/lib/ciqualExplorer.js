@@ -253,10 +253,76 @@ export function isSeasoningCategory(categorie) {
   return SEASONING_HINTS.some(h => c.includes(h))
 }
 
-// Liste des catégories réellement présentes en base — construite depuis le
-// catalogue chargé, jamais codée en dur (voir remarque ci-dessus).
+// ── Regroupement d'affichage des catégories ─────────────────────────────────
+// La table `ciqual` mélange deux imports : l'import ANSES complet (libellés
+// tout en minuscules, ~3 500 lignes) et une petite liste d'aliments courants
+// ajoutée par-dessus (libellés capitalisés, une cinquantaine de lignes), qui
+// découpe les mêmes familles plus finement. D'où des doublons apparents dans
+// le filtre : « produits laitiers » d'un côté, « Fromages » et « Lait et
+// produits laitiers » de l'autre.
+//
+// On les ramène à un jeu unique de libellés. C'est PUREMENT une couche
+// d'affichage : la colonne `categorie` n'est jamais modifiée en base, et le
+// schéma reste inchangé.
+//
+// La clé est la catégorie brute normalisée (minuscules sans accents) — une
+// simple différence de casse (« matières grasses » / « Matières grasses ») est
+// donc déjà fusionnée sans avoir à la lister deux fois.
+const VIANDES  = 'Viandes, œufs et poissons'
+const VEGETAUX = 'Fruits, légumes, légumineuses et oléagineux'
+const LAITIERS = 'Produits laitiers'
+const CEREALES = 'Produits céréaliers'
+const SUCRES   = 'Produits sucrés'
+const DIVERS   = 'Divers'
+
+const CATEGORY_ALIASES = {
+  'viandes, oeufs, poissons':               VIANDES,
+  'viandes et charcuteries':                VIANDES,
+  'poissons et produits de la mer':         VIANDES,
+
+  'fruits, legumes, legumineuses et oleagineux': VEGETAUX,
+  'legumes et produits derives':            VEGETAUX,
+  'fruits':                                 VEGETAUX,
+  'fruits a coque':                         VEGETAUX,
+  'legumineuses':                           VEGETAUX,
+
+  'produits laitiers':                      LAITIERS,
+  'fromages':                               LAITIERS,
+  'lait et produits laitiers':              LAITIERS,
+
+  'produits cerealiers':                    CEREALES,
+  'cereales et derives':                    CEREALES,
+
+  'produits sucres':                        SUCRES,
+  'sucres et confiseries':                  SUCRES,
+
+  'matieres grasses':                       'Matières grasses',
+  'aides culinaires et ingredients divers': 'Aides culinaires et ingrédients divers',
+  'entrees et plats composes':              'Entrées et plats composés',
+  'eaux et autres boissons':                'Eaux et autres boissons',
+  'aliments infantiles':                    'Aliments infantiles',
+  'glaces et sorbets':                      'Glaces et sorbets',
+
+  // Deux lignes isolées, sans famille évidente (« Dessert (aliment moyen) »,
+  // « Crème de coco »). Les ranger ailleurs serait les faire passer pour ce
+  // qu'elles ne sont pas.
+  'divers':                                 DIVERS,
+  'vegetalien':                             DIVERS,
+}
+
+export function getCategoryLabel(categorie) {
+  if (!categorie) return DIVERS
+  const known = CATEGORY_ALIASES[normalize(categorie)]
+  if (known) return known
+  // Catégorie non répertoriée (import futur) : au minimum une majuscule
+  // initiale, plutôt que de la masquer ou de l'afficher telle quelle.
+  return categorie.charAt(0).toUpperCase() + categorie.slice(1)
+}
+
+// Libellés regroupés réellement présents dans le catalogue chargé — jamais
+// codés en dur, pour rester juste si la base évolue.
 export function listCategories(foods) {
-  return Array.from(new Set(foods.map(f => f.categorie).filter(Boolean)))
+  return Array.from(new Set(foods.map(f => getCategoryLabel(f.categorie))))
     .sort((a, b) => a.localeCompare(b, 'fr'))
 }
 
@@ -281,9 +347,13 @@ export function filterFoods(foods, filters, { isFavorite, remainingKcal } = {}) 
   const claimFields = filters.claims.map(findField)
 
   return foods.filter(food => {
-    if (!filters.showSeasonings && isSeasoningCategory(food.categorie)) return false
+    // Le filtre porte sur le libellé REGROUPÉ, pas sur la catégorie brute :
+    // sans ça, cocher « Produits laitiers » laisserait de côté les lignes
+    // rangées sous « Fromages » par le second import.
+    const categorie = getCategoryLabel(food.categorie)
+    if (!filters.showSeasonings && isSeasoningCategory(categorie)) return false
     if (q && !normalize(food.alim_nom).includes(q)) return false
-    if (filters.categories.length && !filters.categories.includes(food.categorie)) return false
+    if (filters.categories.length && !filters.categories.includes(categorie)) return false
     // Plusieurs pastilles « riche en » = ET logique : on cherche l'aliment qui
     // coche tous les besoins à la fois, pas l'union des trois listes.
     if (claimFields.length && !claimFields.every(f => getClaimLevel(food, f) === 'riche')) return false
