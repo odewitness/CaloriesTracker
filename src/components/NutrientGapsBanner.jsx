@@ -1,4 +1,5 @@
 import React from 'react'
+import { MoreHorizontal } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NutrientGapsBanner — en-tête de l'explorateur : les nutriments les plus en
@@ -20,7 +21,12 @@ import React from 'react'
 // les critères actifs.
 //
 // Props :
-//   gaps              — sortie de getNutrientGaps() : [{ field, pct }]
+//   gaps              — sortie de getNutrientGaps() : [{ field, pct }], déjà
+//                        plafonnée aux quelques pires manques (voir ExplorerPage)
+//   hasMoreGaps        — true s'il existe d'autres manques au-delà de `gaps`
+//                        (la bande n'en montre qu'une poignée, cf. limite dans
+//                        getNutrientGaps) — affiche alors le bouton « … »
+//   onShowAllGaps()    — ouvre la liste complète des manques du jour
 //   hasEntries        — false si rien n'est encore noté aujourd'hui
 //   remainingKcal     — calories restantes sur l'objectif du jour (null si pas d'objectif)
 //   activeClaims      — clés de nutriments déjà filtrées (pour l'état actif des pastilles)
@@ -28,7 +34,7 @@ import React from 'react'
 //   fitsRemainingKcal / onToggleFits — filtre « tient dans mes calories restantes »
 // ─────────────────────────────────────────────────────────────────────────────
 export default function NutrientGapsBanner({
-  gaps, hasEntries, remainingKcal, activeClaims, onPickGap, fitsRemainingKcal, onToggleFits,
+  gaps, hasMoreGaps, onShowAllGaps, hasEntries, remainingKcal, activeClaims, onPickGap, fitsRemainingKcal, onToggleFits,
 }) {
   const showKcalToggle = remainingKcal != null && remainingKcal > 0
 
@@ -73,6 +79,21 @@ export default function NutrientGapsBanner({
               </button>
             )
           })}
+
+          {/* La bande n'affiche qu'une poignée de manques (voir la limite
+              passée à getNutrientGaps côté ExplorerPage) — sans ce bouton,
+              rien n'indique qu'il en existe d'autres, ni comment les
+              atteindre en dehors des deux feuilles de réglages générales. */}
+          {hasMoreGaps && (
+            <button
+              className="chip"
+              onClick={onShowAllGaps}
+              style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}
+              aria-label="Voir tous les manques du jour"
+            >
+              <MoreHorizontal size={14} />
+            </button>
+          )}
 
           {/* Rangé dans la même bande que les manques : c'est un critère de
               même nature (« ce qui me va aujourd'hui »), et il n'a pas besoin

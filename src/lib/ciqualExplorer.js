@@ -38,8 +38,14 @@ export const MACRO_FIELDS = [
 // à exclure de la projection SQL.
 export const NAME_FIELD = { key: 'nom', label: 'Nom', unit: null, virtual: true }
 
+// Pas plus une colonne `ciqual` que NAME_FIELD : la popularité vit dans
+// `favoris` (use_count/last_used_at), pas dans la base Ciqual. sortFoods()
+// a besoin d'un accesseur externe pour ce champ (voir son 3ᵉ paramètre) —
+// impossible à dériver de l'aliment seul comme les autres champs.
+export const POPULARITY_FIELD = { key: 'popularite', label: 'Les plus utilisés', unit: null, virtual: true }
+
 export const SORT_GROUPS = [
-  { label: 'Général',   fields: [NAME_FIELD] },
+  { label: 'Général',   fields: [NAME_FIELD, POPULARITY_FIELD] },
   { label: 'Macros',    fields: MACRO_FIELDS },
   { label: 'Vitamines', fields: VITAMIN_FIELDS },
   { label: 'Minéraux',  fields: MINERAL_FIELDS },
@@ -68,6 +74,9 @@ export function findField(key) {
 // nom à un nutriment héritait du A → Z et sortait les aliments les plus
 // pauvres). Même convention que le tri des favoris dans FoodPicker.
 export function naturalDir(fieldKey) {
+  // La popularité s'intéresse d'abord aux aliments les PLUS utilisés — même
+  // logique que les nutriments, à l'inverse du nom qui se lit de A à Z.
+  if (fieldKey === POPULARITY_FIELD.key) return 'desc'
   return findField(fieldKey).virtual ? 'asc' : 'desc'
 }
 
@@ -515,9 +524,24 @@ export function removeFilter(filters, item) {
 // sens du tri. (En SQL, `order by ... desc` remonte les NULL en premier : la
 // première page serait pleine d'aliments sans donnée. Même piège en JS si on
 // traite null comme 0.)
-export function sortFoods(foods, { field, dir, base, kcalRef = DEFAULT_KCAL_REF }) {
+// `getUsage(food)` : accesseur optionnel vers `{ count, lastUsed }` (voir
+// ExplorerPage, construit depuis `favoris.use_count`/`last_used_at`) — la
+// seule donnée que sortFoods() ne peut pas dériver de l'aliment lui-même,
+// puisqu'elle vit dans une autre table.
+export function sortFoods(foods, { field, dir, base, kcalRef = DEFAULT_KCAL_REF }, getUsage) {
   const f = findField(field)
   const mult = dir === 'asc' ? 1 : -1
+
+  if (field === POPULARITY_FIELD.key) {
+    return [...foods].sort((a, b) => {
+      const ua = getUsage?.(a), ub = getUsage?.(b)
+      const ca = ua?.count || 0, cb = ub?.count || 0
+      if (ca !== cb) return mult * (ca - cb)
+      const la = ua?.lastUsed || '', lb = ub?.lastUsed || ''
+      if (la !== lb) return mult * (la < lb ? -1 : 1)
+      return a.alim_nom.localeCompare(b.alim_nom, 'fr')
+    })
+  }
 
   if (f.virtual) {
     return [...foods].sort((a, b) => mult * a.alim_nom.localeCompare(b.alim_nom, 'fr'))
@@ -536,30 +560,266 @@ export function sortFoods(foods, { field, dir, base, kcalRef = DEFAULT_KCAL_REF 
 }
 
 // ── Manques du jour ─────────────────────────────────────────────────────────
+// Cible journalière d'un nutriment : la VNR/RNP fixe (field.ref) pour les
+// vitamines et minéraux, l'objectif personnel réglé dans Paramètres pour les
+// deux macros suivies (protéines, fibres — les seules à avoir un objectif
+// chiffré). Null si aucune cible n'existe encore pour ce champ.
+function dailyTarget(field, settings) {
+  if (field.key === 'proteines') return settings?.goal_proteines > 0 ? settings.goal_proteines : null
+  if (field.key === 'fibres')    return settings?.goal_fibres > 0 ? settings.goal_fibres : null
+  return field.ref || null
+}
+
+// Valeur déjà consommée aujourd'hui pour ce nutriment, dans les mêmes unités
+// que dailyTarget() — `totals` utilise les clés courtes prot/fib pour les
+// macros, la clé du nutriment lui-même pour les micros.
+function consumedToday(totals, field) {
+  if (field.key === 'proteines') return totals.prot || 0
+  if (field.key === 'fibres')    return totals.fib || 0
+  return (field.sumKeys || [field.key]).reduce((s, k) => s + (totals[k] || 0), 0)
+}
+
 // Classe les nutriments par écart à l'objectif, du plus déficitaire au moins.
 // `totals` = sortie de computeTotals() (clés prot/fib pour les macros, clé
 // nutriment pour les micros). Les nutriments `limite` (sel, sodium) sont
 // exclus : en manquer n'est pas un problème.
 export function getNutrientGaps(totals, settings, limit = 3) {
   if (!totals) return []
-  const items = []
-
-  if (settings?.goal_proteines > 0) {
-    items.push({ field: PROT_FIELD, pct: (totals.prot || 0) / settings.goal_proteines })
-  }
-  if (settings?.goal_fibres > 0) {
-    items.push({ field: FIBRES_FIELD, pct: (totals.fib || 0) / settings.goal_fibres })
-  }
-  for (const field of CLAIM_MICRO_FIELDS) {
-    const val = (field.sumKeys || [field.key]).reduce((s, k) => s + (totals[k] || 0), 0)
-    items.push({ field, pct: val / field.ref })
-  }
+  const items = [PROT_FIELD, FIBRES_FIELD, ...CLAIM_MICRO_FIELDS]
+    .map(field => {
+      const target = dailyTarget(field, settings)
+      return target != null ? { field, pct: consumedToday(totals, field) / target } : null
+    })
+    .filter(Boolean)
 
   return items
     .filter(i => i.pct < 1)
     .sort((a, b) => a.pct - b.pct)
     .slice(0, limit)
     .map(i => ({ field: i.field, pct: Math.round(i.pct * 100) }))
+}
+
+// Manque du jour en valeur absolue (pas en %) pour UN nutriment donné — sert
+// au calcul du grammage nécessaire (voir gapCoverage). Null si ce nutriment
+// n'a pas de cible journalière (macro sans objectif réglé, ou champ sans VNR
+// comme glucides/lipides).
+export function getGapAmount(totals, settings, field) {
+  if (!totals) return null
+  const target = dailyTarget(field, settings)
+  if (target == null) return null
+  return Math.max(0, target - consumedToday(totals, field))
+}
+
+// Grammage nécessaire pour combler le(s) manque(s) du jour sur `gaps`, sous
+// la contrainte des calories restantes — le calcul derrière une (ou
+// plusieurs) pastille(s) de manque combinée(s) à « tient dans mes calories
+// restantes » (voir NutrientGapsBanner / ExplorerPage).
+// `gaps` : [{ field, missing }], missing > 0 déjà filtré par l'appelant.
+//
+// Avec plusieurs manques sélectionnés, on prend le grammage le PLUS exigeant
+// des deux : comme chaque nutriment est proportionnel au poids, ce grammage
+// couvre forcément aussi les autres manques (au pire en les dépassant), donc
+// une seule quantité d'un seul aliment répond à la fois à tous les manques
+// cochés — c'est le geste attendu (« qu'est-ce qui comble les DEUX à la
+// fois »), pas une quantité par nutriment.
+//
+// Sans contrainte calorique atteignable, le grammage indiqué comble tout
+// (pct: 100). Quand tout combler dépasserait les calories restantes, on
+// redescend au grammage qui tient dans le budget et on indique la part du
+// manque le moins bien couvert (le nutriment le plus juste, donc le plus
+// honnête à afficher) — plutôt que de masquer l'aliment, qui reste un
+// progrès partiel utile.
+//
+// Retourne null si l'aliment n'apporte pas au moins un des nutriments visés,
+// ou s'il n'y a plus aucun manque à combler.
+export function gapCoverage(food, gaps, remainingKcal) {
+  if (!gaps?.length) return null
+  const per100 = gaps.map(g => rawValue(food, g.field))
+  if (per100.some(v => v == null || v <= 0)) return null
+
+  const gramsForFullGap = Math.max(...gaps.map((g, i) => (g.missing / per100[i]) * 100))
+  const kcalPer100 = food.energie_kcal || 0
+  const kcalForFullGap = (gramsForFullGap * kcalPer100) / 100
+
+  if (remainingKcal == null || kcalForFullGap <= remainingKcal) {
+    return { grams: gramsForFullGap, kcal: kcalForFullGap, pct: 100 }
+  }
+  // Kcal restantes insuffisantes pour tout combler, mais un aliment à 0
+  // kcal/100g ne peut jamais dépasser un budget positif : cette branche
+  // suppose donc kcalPer100 > 0.
+  const grams = (remainingKcal / kcalPer100) * 100
+  const pctPerGap = gaps.map((g, i) => ((grams * per100[i]) / 100 / g.missing) * 100)
+  return { grams, kcal: remainingKcal, pct: Math.round(Math.min(...pctPerGap)) }
+}
+
+// ── Suggestions ──────────────────────────────────────────────────────────────
+
+// Meilleure alternative dans la MÊME CATÉGORIE pour un nutriment en manque
+// aujourd'hui — sert à la fiche d'un aliment (ExplorerFoodModal) : « un
+// aliment similaire est nettement plus riche en fer ». Cherche dans l'ordre
+// des manques les plus urgents (`gaps`, sortie de getNutrientGaps) et
+// s'arrête au premier qui a une alternative valable, plutôt que d'en
+// proposer une par manque — une seule suggestion à la fois se lit, trois se
+// noient.
+//
+// Seuil de significativité : au moins 50 % de plus /100 g que l'aliment
+// courant (ou n'importe quelle valeur positive si l'aliment courant n'en
+// apporte pas du tout). En dessous, la différence est dans le bruit de
+// mesure Ciqual et la suggestion n'apprendrait rien.
+export function findBetterAlternative(food, foods, gaps) {
+  if (!food || !foods?.length || !gaps?.length) return null
+  const category = getCategoryLabel(food.categorie)
+
+  for (const { field } of gaps) {
+    const currentVal = rawValue(food, field) || 0
+    let best = null
+    let bestVal = 0
+    for (const candidate of foods) {
+      if (candidate.alim_code === food.alim_code) continue
+      if (getCategoryLabel(candidate.categorie) !== category) continue
+      const v = rawValue(candidate, field)
+      if (v == null || v <= bestVal) continue
+      best = candidate
+      bestVal = v
+    }
+    if (best && (currentVal === 0 ? bestVal > 0 : bestVal >= currentVal * 1.5)) {
+      return { field, food: best, currentVal, betterVal: bestVal }
+    }
+  }
+  return null
+}
+
+// Point de coût calorique MINIMAL, pour un couple d'aliments (A, B) donné,
+// qui comble à la fois toutes les contraintes `missing` (une par manque,
+// même ordre que `aVals`/`bVals`) — x = grammes de A, y = grammes de B.
+//
+// Géométrie : chaque contrainte k s'écrit x·aVals[k] + y·bVals[k] ≥
+// missing[k] (une demi-droite), x,y ≥ 0. La région faisable est un polygone
+// convexe, et minimiser une fonction linéaire (le kcal) dessus atteint
+// toujours son minimum en un SOMMET de ce polygone — jamais à l'intérieur.
+// Les sommets possibles sont : chaque aliment seul (l'autre à 0), et
+// l'intersection de chaque paire de contraintes prises à l'égalité. Avec au
+// plus une poignée de manques cochés à la fois dans l'app, il y a au plus
+// quelques sommets à tester — pas besoin d'un vrai solveur de programme
+// linéaire pour un polygone aussi simple.
+function minimalKcalVertex(aVals, kcalA, bVals, kcalB, missing) {
+  const K = missing.length
+  const candidates = []
+
+  let xOnly = 0
+  for (let k = 0; k < K; k++) {
+    if (aVals[k] <= 0) { xOnly = Infinity; break }
+    xOnly = Math.max(xOnly, (missing[k] * 100) / aVals[k])
+  }
+  if (isFinite(xOnly)) candidates.push([xOnly, 0])
+
+  let yOnly = 0
+  for (let k = 0; k < K; k++) {
+    if (bVals[k] <= 0) { yOnly = Infinity; break }
+    yOnly = Math.max(yOnly, (missing[k] * 100) / bVals[k])
+  }
+  if (isFinite(yOnly)) candidates.push([0, yOnly])
+
+  for (let i = 0; i < K; i++) {
+    for (let j = i + 1; j < K; j++) {
+      // Système 2×2 : x·aVals[i] + y·bVals[i] = missing[i]·100 (idem pour j).
+      const det = aVals[i] * bVals[j] - aVals[j] * bVals[i]
+      if (Math.abs(det) < 1e-9) continue // contraintes parallèles, pas de sommet
+      const mi = missing[i] * 100, mj = missing[j] * 100
+      const x = (mi * bVals[j] - mj * bVals[i]) / det
+      const y = (aVals[i] * mj - aVals[j] * mi) / det
+      if (x < -1e-6 || y < -1e-6) continue
+      candidates.push([Math.max(0, x), Math.max(0, y)])
+    }
+  }
+
+  let best = null
+  for (const [x, y] of candidates) {
+    let feasible = true
+    for (let k = 0; k < K; k++) {
+      if (x * aVals[k] + y * bVals[k] < missing[k] * 100 - 1e-6) { feasible = false; break }
+    }
+    if (!feasible) continue
+    const kcal = (x * kcalA + y * kcalB) / 100
+    if (!best || kcal < best.kcal) best = { gramsA: x, gramsB: y, kcal }
+  }
+  return best
+}
+
+function isBetterCombo(candidate, current) {
+  if (!current) return true
+  if (candidate.pct !== current.pct) return candidate.pct > current.pct
+  // À couverture égale (typiquement deux solutions à 100 %), la moins
+  // calorique gagne : inutile de suggérer d'en manger plus que nécessaire.
+  return candidate.kcal < current.kcal
+}
+
+// Suggestion à DEUX aliments quand aucun aliment seul ne comble bien les
+// manques `gaps` sous la contrainte `remainingKcal` (voir gapCoverage — même
+// idée, mais répartie sur deux aliments). Résultat :
+// { foods: [{ food, grams }, { food, grams }], kcal, pct }.
+//
+// Deux régimes selon le couple testé :
+//  - Si une combinaison à coût calorique minimal (minimalKcalVertex) comble
+//    tout DANS le budget, c'est elle qui est retenue — jamais plus que la
+//    quantité strictement nécessaire.
+//  - Sinon (le budget ne suffit pas à tout combler avec ce couple), on
+//    cherche le meilleur partage du budget ENTIER : la seule variable libre
+//    devient alors la part donnée à chaque aliment, balayée de 0 à 1 par pas
+//    de 5 % (21 points), en gardant le partage qui maximise la couverture la
+//    MOINS bonne des manques visés (le nutriment le plus juste). Dépenser
+//    tout le budget est alors correct : le budget est la contrainte qui
+//    limite la couverture, donc en dépenser moins ne peut que faire pire.
+//
+// `candidates` : sous-ensemble déjà restreint (les résultats affichés,
+// donc déjà cohérents avec les filtres actifs) — tester toutes les paires
+// parmi 3000+ aliments Ciqual n'aurait ni sens ni budget de calcul justifié
+// ici ; on se limite aux 40 premiers.
+export function suggestCombo(candidates, gaps, remainingKcal) {
+  if (!gaps?.length || !remainingKcal || remainingKcal <= 0) return null
+  const pool = candidates.filter(f => (f.energie_kcal || 0) > 0).slice(0, 40)
+  if (pool.length < 2) return null
+
+  const missing = gaps.map(g => g.missing)
+  let best = null
+
+  for (let i = 0; i < pool.length; i++) {
+    const a = pool[i]
+    const aVals = gaps.map(g => rawValue(a, g.field))
+    if (aVals.some(v => v == null)) continue
+    const kcalA = a.energie_kcal
+
+    for (let j = i + 1; j < pool.length; j++) {
+      const b = pool[j]
+      const bVals = gaps.map(g => rawValue(b, g.field))
+      if (bVals.some(v => v == null)) continue
+      const kcalB = b.energie_kcal
+
+      const minimal = minimalKcalVertex(aVals, kcalA, bVals, kcalB, missing)
+      if (minimal && minimal.kcal <= remainingKcal) {
+        const cand = { foods: [{ food: a, grams: minimal.gramsA }, { food: b, grams: minimal.gramsB }], kcal: minimal.kcal, pct: 100 }
+        if (isBetterCombo(cand, best)) best = cand
+        continue // ce couple comble déjà tout, pas besoin du repli budget
+      }
+
+      let pairBest = null
+      for (let step = 0; step <= 20; step++) {
+        const r = step / 20 // part du budget calorique donnée à `a`
+        const gramsA = (r * remainingKcal / kcalA) * 100
+        const gramsB = ((1 - r) * remainingKcal / kcalB) * 100
+
+        let minPct = Infinity
+        for (let k = 0; k < gaps.length; k++) {
+          const covered = (gramsA * aVals[k] + gramsB * bVals[k]) / 100
+          minPct = Math.min(minPct, (covered / missing[k]) * 100)
+        }
+        const cand = { foods: [{ food: a, grams: gramsA }, { food: b, grams: gramsB }], kcal: remainingKcal, pct: minPct }
+        if (isBetterCombo(cand, pairBest)) pairBest = cand
+      }
+      if (pairBest && isBetterCombo(pairBest, best)) best = pairBest
+    }
+  }
+  return best ? { ...best, pct: Math.round(best.pct) } : null
 }
 
 // ── Formatage ───────────────────────────────────────────────────────────────
