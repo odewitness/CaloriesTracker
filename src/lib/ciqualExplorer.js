@@ -61,6 +61,24 @@ export function findField(key) {
   return ALL_SORT_FIELDS.find(f => f.key === key) || NAME_FIELD
 }
 
+const VITAMIN_KEYS = new Set(VITAMIN_FIELDS.map(f => f.key))
+
+// Libellé court pour les grilles de pastilles (choix du tri, choix des
+// filtres). Les vitamines y sont réduites à leur lettre ou leur numéro
+// (« C », « B12 ») : répéter « Vitamine » douze fois n'apprend rien, le groupe
+// s'appelle déjà « Vitamines », et ça libère beaucoup de largeur.
+//
+// Les minéraux gardent leur nom complet : leurs abrégés existants (« Cal »,
+// « Man », « Pho », « Sél ») servent aux pastilles de compléments alimentaires
+// où la place manque vraiment, mais ne se lisent pas d'eux-mêmes ici.
+//
+// Partout ailleurs (bouton de tri, filtres actifs, manques du jour), c'est le
+// libellé complet qui est affiché : hors de la grille, « C » seul serait
+// ambigu.
+export function chipLabel(field) {
+  return VITAMIN_KEYS.has(field.key) && field.short ? field.short : field.label
+}
+
 // ── Bases de comparaison ────────────────────────────────────────────────────
 // C'est le cœur de l'outil. Un classement brut /100 g sur Ciqual remonte des
 // épices déshydratées et des ingrédients purs (100 g de thym, de sel, de
@@ -396,7 +414,14 @@ export function filterFoods(foods, filters, { isFavorite, remainingKcal } = {}) 
 export function describeActiveFilters(filters, remainingKcal) {
   const out = []
   for (const k of filters.claims) {
-    out.push({ id: `claim:${k}`, kind: 'claim', value: k, label: `Riche en ${findField(k).label.toLowerCase()}` })
+    // Seule l'initiale passe en minuscule : un toLowerCase() complet donnait
+    // « riche en vitamine c » ou « folates (b9) », où la lettre du nutriment
+    // est justement ce qui l'identifie.
+    const label = findField(k).label
+    out.push({
+      id: `claim:${k}`, kind: 'claim', value: k,
+      label: `Riche en ${label.charAt(0).toLowerCase()}${label.slice(1)}`,
+    })
   }
   for (const c of filters.categories) {
     out.push({ id: `cat:${c}`, kind: 'category', value: c, label: c })

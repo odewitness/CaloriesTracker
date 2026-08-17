@@ -1,6 +1,6 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { CLAIM_GROUPS, DEFAULT_FILTERS } from '../lib/ciqualExplorer'
+import { CLAIM_GROUPS, DEFAULT_FILTERS, chipLabel } from '../lib/ciqualExplorer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerFilterSheet — filtres de l'explorateur Ciqual.
@@ -86,7 +86,7 @@ export default function ExplorerFilterSheet({ filters, categories, onChange, onC
                       ? { background: 'var(--green)', color: 'var(--white)' }
                       : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
                   >
-                    {f.label}
+                    {chipLabel(f)}
                   </button>
                 )
               })}
