@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Star } from 'lucide-react'
+import { X, Star, Lightbulb } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useBackButton } from '../hooks/useBackButton'
 import { useFavorites } from '../hooks/useFavorites'
 import { useJournal } from '../hooks/useJournal'
 import { scaleFood, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
-import { getPortion, getCategoryLabel } from '../lib/ciqualExplorer'
+import { getPortion, getCategoryLabel, findBetterAlternative, formatValue } from '../lib/ciqualExplorer'
 import MacroPreview from './MacroPreview'
 import VitaminPanel from './VitaminPanel'
 import NutrientDetails from './NutrientDetails'
@@ -27,8 +27,13 @@ import Loader from './Loader'
 // que FoodPicker ne re-fetch jamais pour la source 'ciqual' (voir selectFood),
 // donc un favori créé depuis une ligne allégée resterait amputé de ses acides
 // gras et sucres détaillés à chaque réutilisation.
+//
+// Props `foods` (catalogue complet, pour chercher une alternative) et `gaps`
+// (manques RÉELS du jour, sortie de getNutrientGaps — indépendants des
+// filtres actifs sur la page) sont optionnels : sans eux, pas de section
+// alternative plutôt qu'une section cassée.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ExplorerFoodModal({ food, onClose }) {
+export default function ExplorerFoodModal({ food, onClose, foods, gaps, onPickFood }) {
   useBackButton(onClose)
   const toast = useToast()
   const { isFavorite, toggleFavorite } = useFavorites()
@@ -46,6 +51,12 @@ export default function ExplorerFoodModal({ food, onClose }) {
 
   useEffect(() => {
     let cancelled = false
+    // Remet loading à true à CHAQUE changement d'aliment, pas seulement au
+    // montage : la modale reste montée en basculant sur l'alternative
+    // suggérée (onPickFood change `food` sans démonter), donc sans ce reset
+    // le détail du PRÉCÉDENT aliment resterait affiché le temps du fetch.
+    setLoading(true)
+    setFull(null)
     ;(async () => {
       const { data, error } = await supabase
         .from('ciqual')
@@ -64,6 +75,21 @@ export default function ExplorerFoodModal({ food, onClose }) {
     })()
     return () => { cancelled = true }
   }, [food.alim_code])
+
+  // La modale reste montée quand on bascule sur l'alternative suggérée
+  // (onPickFood change juste `food` sans démonter/remonter) : sans cet
+  // effet, la quantité saisie pour l'aliment précédent resterait affichée
+  // telle quelle sur le nouveau, avec un libellé de portion qui ne
+  // correspondrait plus à rien.
+  useEffect(() => { setQty(String(portion.g)) }, [food.alim_code])
+
+  // Alternative dans la même catégorie, plus riche sur l'un des manques
+  // réels du jour (voir findBetterAlternative) — indépendante des filtres
+  // actifs sur la page, donc visible même en navigation libre.
+  const alternative = useMemo(
+    () => (foods?.length && gaps?.length ? findBetterAlternative(food, foods, gaps) : null),
+    [food, foods, gaps]
+  )
 
   // Toutes les valeurs recalculées au grammage saisi — exactement la forme
   // d'objet `totals` attendue par VitaminPanel / NutrientDetails.
@@ -123,6 +149,28 @@ export default function ExplorerFoodModal({ food, onClose }) {
               </button>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{getCategoryLabel(food.categorie)}</span>
             </div>
+
+            {/* Un seul lien texte plutôt qu'une carte imposante : c'est une
+                piste à explorer, pas une alerte. Cliquer bascule la fiche sur
+                l'alternative (onPickFood), sans fermer la modale. */}
+            {alternative && onPickFood && (
+              <button
+                onClick={() => onPickFood(alternative.food)}
+                className="btn-ghost"
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%', textAlign: 'left',
+                  background: 'var(--green-light)', borderRadius: 'var(--radius-sm)', padding: '9px 11px', marginBottom: 14,
+                }}
+              >
+                <Lightbulb size={15} style={{ color: 'var(--green-dark)', flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 12.5, color: 'var(--green-dark)', lineHeight: 1.4 }}>
+                  <strong>{alternative.food.alim_nom}</strong> (même catégorie) est bien plus riche en{' '}
+                  {alternative.field.label.charAt(0).toLowerCase()}{alternative.field.label.slice(1)} :{' '}
+                  {formatValue(alternative.betterVal, alternative.field.unit)} contre{' '}
+                  {formatValue(alternative.currentVal, alternative.field.unit)} ici, pour 100 g.
+                </span>
+              </button>
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <input

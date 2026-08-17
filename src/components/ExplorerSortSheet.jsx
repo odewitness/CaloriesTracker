@@ -1,6 +1,6 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { SORT_GROUPS, SORT_BASES, findField, chipLabel, naturalDir, KCAL_REF_OPTIONS, DEFAULT_KCAL_REF } from '../lib/ciqualExplorer'
+import { SORT_GROUPS, SORT_BASES, findField, chipLabel, naturalDir, KCAL_REF_OPTIONS, DEFAULT_KCAL_REF, POPULARITY_FIELD } from '../lib/ciqualExplorer'
 import ExplorerSheetSection from './ExplorerSheetSection'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,11 +67,18 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
 
   // Trier par nom ne compare aucune valeur : la base de comparaison n'a alors
   // rien à piloter, on masque l'étape plutôt que de laisser un réglage sans effet.
-  const isName = findField(sort.field).virtual
+  // La popularité est logée au même endroit (virtual: true, ce n'est pas une
+  // colonne ciqual) mais répond à une question différente du nom : elle a
+  // donc ses propres libellés de sens, et masque aussi l'étape « Comparer »
+  // (aucune base /100g, /kcal ou /portion n'a de sens sur un compteur d'usage).
+  const isName = findField(sort.field).virtual && sort.field !== POPULARITY_FIELD.key
+  const isPopularity = sort.field === POPULARITY_FIELD.key
 
   const dirOptions = isName
     ? [{ key: 'asc', label: 'A → Z' }, { key: 'desc', label: 'Z → A' }]
-    : [{ key: 'desc', label: `Les + élevés d'abord` }, { key: 'asc', label: `Les - élevés d'abord` }]
+    : isPopularity
+      ? [{ key: 'desc', label: `Les + utilisés d'abord` }, { key: 'asc', label: `Les - utilisés d'abord` }]
+      : [{ key: 'desc', label: `Les + élevés d'abord` }, { key: 'asc', label: `Les - élevés d'abord` }]
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -108,7 +115,7 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
         })}
 
         {/* ── 2. Comment comparer ── */}
-        {!isName && (
+        {!isName && !isPopularity && (
           <div style={{ marginTop: 16 }}>
             <StepTitle n="2">Comparer</StepTitle>
             <ChipRow
@@ -140,7 +147,7 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
 
         {/* ── 3. Sens ── */}
         <div style={{ marginTop: 16 }}>
-          <StepTitle n={isName ? '2' : '3'}>Sens</StepTitle>
+          <StepTitle n={isName || isPopularity ? '2' : '3'}>Sens</StepTitle>
           <ChipRow
             grow
             options={dirOptions}

@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-08-17',
+    title: 'Quatre nouveautés dans Explorer',
+    description: "Un bouton + est apparu sur chaque carte de l'explorateur : il ajoute direct l'aliment à ton journal, avec la quantité déjà calculée si tu combles un manque. Tu peux maintenant trier par « les plus utilisés » pour retrouver tes habitudes en un coup d'œil. Quand aucun aliment seul ne comble bien un manque dans tes calories restantes, l'explorateur te propose parfois deux aliments à combiner. Et sur la fiche d'un aliment, s'il existe une variante de la même famille nettement plus riche en ce qui te manque aujourd'hui, elle t'est suggérée — un appui dessus l'affiche à sa place.",
+  },
+  {
+    date: '2026-08-17',
+    title: 'Explorer te dit combien manger',
+    description: "Dans l'explorateur, quand tu tapes sur un (ou plusieurs) nutriment qui te manque aujourd'hui et que tu coches « tient dans mes calories restantes », chaque aliment de la liste affiche maintenant directement le grammage qu'il faudrait manger pour combler ce(s) manque(s) sans dépasser tes calories restantes — si tu en choisis deux à la fois, le grammage couvre les deux en même temps, pas l'un après l'autre. Si un aliment ne peut pas tout combler dans ce budget, tu vois la quantité maximale qui rentre quand même et le pourcentage du manque que ça couvre.",
+  },
+  {
+    date: '2026-08-17',
     title: 'La page Explorer est plus facile à lire',
     description: "Chaque aliment s'affiche maintenant sur sa propre carte, avec une pastille colorée qui rappelle sa famille (viandes, légumes, produits laitiers...) et un badge quand il est riche en protéines, en fibres ou en un nutriment intéressant. Ce qui te manque aujourd'hui tient sur une seule ligne qui défile sur le côté, et les boutons Trier et Filtrer ont été réduits à l'essentiel : tu vois les premiers aliments tout de suite, sans faire défiler. Dans les réglages, les longues listes de vitamines, de minéraux et de catégories sont repliées — tu les ouvres d'un appui quand tu en as besoin, et un petit chiffre te dit si tu y as laissé un filtre. Rien n'a disparu, tout est juste plus rapide à trouver.",
   },

@@ -11,10 +11,15 @@ import { MEALS_ORDER as MEALS } from '../lib/nutrients'
 //   nom               — nom affiché dans le titre ("Pour quel jour... « {nom} » ?")
 //   journalDate / onDateChange (yyyy-mm-dd)
 //   journalMeal / onMealChange
+//   qty / onQtyChange — OPTIONNEL : ajoute un champ grammage en tête de feuille.
+//                       Réservé à l'ajout rapide d'un seul aliment (voir
+//                       ExplorerPage.handleQuickAdd) ; les groupes d'aliments à
+//                       quantités déjà fixées (repas type, recette) ne le
+//                       passent pas et la section reste masquée.
 //   onConfirm()
 //   onClose()
 // ─────────────────────────────────────────────────────────────────────────────
-export default function AddToJournalSheet({ nom, journalDate, onDateChange, journalMeal, onMealChange, onConfirm, onClose }) {
+export default function AddToJournalSheet({ nom, journalDate, onDateChange, journalMeal, onMealChange, qty, onQtyChange, onConfirm, onClose }) {
   useBackButton(onClose)
   const todayStr = new Date().toISOString().slice(0, 10)
   const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
@@ -28,6 +33,23 @@ export default function AddToJournalSheet({ nom, journalDate, onDateChange, jour
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
           Pour quel jour et quel repas « {nom} » ?
         </div>
+
+        {onQtyChange && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Quantité</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <input
+                className="input"
+                type="number"
+                inputMode="decimal"
+                value={qty}
+                onChange={e => onQtyChange(e.target.value)}
+                style={{ width: 110 }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>g</span>
+            </div>
+          </>
+        )}
 
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Jour</div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
