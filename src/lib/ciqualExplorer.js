@@ -104,6 +104,15 @@ export function getPortion(food) {
   return { g: 100, label: '100 g par défaut', declared: false }
 }
 
+// Le repli sur 100 g reste utile là où il faut bien une quantité de référence
+// (filtre « tient dans mes calories restantes »), mais il n'a pas sa place
+// dans le classement par portion : comparer une portion réelle à un 100 g
+// arbitraire fait gagner l'aliment qui n'a simplement pas de portion en base.
+// Ces aliments sont donc écartés de ce mode.
+export function hasDeclaredPortion(food) {
+  return getPortion(food).declared
+}
+
 // Valeur brute /100 g, en préservant la distinction null / 0 : dans Ciqual,
 // une case vide veut dire « non mesuré », pas « absent ». Les afficher comme
 // des zéros ferait passer des aliments jamais analysés pour des aliments

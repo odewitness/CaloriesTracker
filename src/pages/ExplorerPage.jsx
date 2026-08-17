@@ -10,7 +10,7 @@ import {
   DEFAULT_FILTERS, DEFAULT_SORT, SORT_BASES,
   filterFoods, sortFoods, findField, fieldValue, formatValue,
   listCategories, getRichClaims, getPortion, getNutrientGaps,
-  describeActiveFilters, removeFilter, gramsFor100kcal,
+  describeActiveFilters, removeFilter, gramsFor100kcal, hasDeclaredPortion,
 } from '../lib/ciqualExplorer'
 import NutrientGapsBanner from '../components/NutrientGapsBanner'
 import ExplorerFilterSheet from '../components/ExplorerFilterSheet'
@@ -91,9 +91,7 @@ function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
             `${Math.round(grams100)} g pour 100 kcal`
           ) : base === 'portion' ? (
             <>
-              <span style={{ fontWeight: 600, color: portion.declared ? 'var(--text)' : 'var(--text-hint)' }}>
-                {portion.label}
-              </span>
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>{portion.label}</span>
               {` · ${Math.round((food.energie_kcal ?? 0) * portion.g / 100)} kcal`}
             </>
           ) : (
@@ -160,8 +158,11 @@ export default function ExplorerPage() {
   const sortField  = findField(sort.field)
 
   const results = useMemo(() => {
-    const filtered = filterFoods(foods, filters, { isFavorite, remainingKcal: remaining })
-    return sortFoods(filtered, sort)
+    let list = filterFoods(foods, filters, { isFavorite, remainingKcal: remaining })
+    // Classement par portion : seuls les aliments ayant une portion renseignée
+    // en base sont comparables entre eux (voir hasDeclaredPortion).
+    if (sort.base === 'portion') list = list.filter(hasDeclaredPortion)
+    return sortFoods(list, sort)
   }, [foods, filters, sort, isFavorite, remaining])
 
   // Un favori se pose depuis la ligne allégée, mais `favoris.food_data` est un
@@ -289,6 +290,7 @@ export default function ExplorerPage() {
         <>
           <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 2 }}>
             {results.length} aliment{results.length > 1 ? 's' : ''}
+            {sort.base === 'portion' && ' ayant une portion renseignée'}
           </div>
           {results.slice(0, visible).map(food => (
             <ExplorerRow
