@@ -1,6 +1,7 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
 import { CLAIM_GROUPS, DEFAULT_FILTERS, chipLabel, COOKING_OPTIONS } from '../lib/ciqualExplorer'
+import ExplorerSheetSection from './ExplorerSheetSection'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerFilterSheet — filtres de l'explorateur Ciqual.
@@ -13,29 +14,27 @@ import { CLAIM_GROUPS, DEFAULT_FILTERS, chipLabel, COOKING_OPTIONS } from '../li
 // RNP déjà définis dans nutrients.js (voir getClaimLevel).
 //
 // Plusieurs pastilles cochées = ET logique (l'aliment doit toutes les vérifier).
+//
+// Les groupes longs (vitamines, minéraux, catégories) sont repliés par défaut,
+// sauf s'ils contiennent déjà un filtre actif — voir ExplorerSheetSection.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ToggleRow({ label, hint, checked, onChange }) {
+function Chip({ label, active, onClick }) {
   return (
     <button
-      onClick={onChange}
-      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '10px 0', borderBottom: '0.5px solid var(--border)' }}
+      className="chip"
+      onClick={onClick}
+      style={active
+        ? { background: 'var(--green)', color: 'var(--white)' }
+        : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
     >
-      <span style={{
-        width: 18, height: 18, borderRadius: 5, flexShrink: 0,
-        border: `1.5px solid ${checked ? 'var(--green)' : 'var(--border-md)'}`,
-        background: checked ? 'var(--green)' : 'transparent',
-        color: 'var(--white)', fontSize: 12, fontWeight: 700,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {checked ? '✓' : ''}
-      </span>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{label}</span>
-        {hint && <span style={{ display: 'block', fontSize: 11, color: 'var(--text-hint)', marginTop: 1 }}>{hint}</span>}
-      </span>
+      {label}
     </button>
   )
+}
+
+function ChipGrid({ children }) {
+  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{children}</div>
 }
 
 export default function ExplorerFilterSheet({ filters, categories, onChange, onClose }) {
@@ -60,7 +59,7 @@ export default function ExplorerFilterSheet({ filters, categories, onChange, onC
           {activeCount > 0 && (
             <button
               className="btn-ghost"
-              style={{ fontSize: 12.5, color: 'var(--text-muted)' }}
+              style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '6px 0' }}
               onClick={() => onChange({ ...DEFAULT_FILTERS, query: filters.query })}
             >
               Tout effacer
@@ -69,104 +68,100 @@ export default function ExplorerFilterSheet({ filters, categories, onChange, onC
         </div>
 
         {/* ── Riche en… ── */}
-        {CLAIM_GROUPS.map(group => (
-          <div key={group.label} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
-              Riche en — {group.label}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {group.fields.map(f => {
-                const active = filters.claims.includes(f.key)
-                return (
-                  <button
+        {CLAIM_GROUPS.map(group => {
+          const keys = group.fields.map(f => f.key)
+          const count = filters.claims.filter(k => keys.includes(k)).length
+          return (
+            <ExplorerSheetSection
+              key={group.label}
+              title={`Riche en — ${group.label}`}
+              count={count}
+              // Les macros sont le point d'entrée le plus courant : elles
+              // restent dépliées. Les deux autres groupes ne s'ouvrent d'office
+              // que s'ils portent déjà un filtre.
+              collapsible={group.label !== 'Macros'}
+              defaultOpen={count > 0}
+            >
+              <ChipGrid>
+                {group.fields.map(f => (
+                  <Chip
                     key={f.key}
-                    className="chip"
+                    label={chipLabel(f)}
+                    active={filters.claims.includes(f.key)}
                     onClick={() => set({ claims: toggleIn(filters.claims, f.key) })}
-                    style={active
-                      ? { background: 'var(--green)', color: 'var(--white)' }
-                      : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-                  >
-                    {chipLabel(f)}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+                  />
+                ))}
+              </ChipGrid>
+            </ExplorerSheetSection>
+          )
+        })}
 
         {/* ── Cuisson ──
             Déduite du libellé de l'aliment, pas d'une colonne : environ deux
             tiers des aliments Ciqual ne précisent rien et restent affichés
             tant qu'aucune pastille n'est cochée. */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
-            Cuisson
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {COOKING_OPTIONS.map(o => {
-              const active = filters.cooking.includes(o.key)
-              return (
-                <button
-                  key={o.key}
-                  className="chip"
-                  onClick={() => set({ cooking: toggleIn(filters.cooking, o.key) })}
-                  style={active
-                    ? { background: 'var(--green)', color: 'var(--white)' }
-                    : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-                >
-                  {o.label}
-                </button>
-              )
-            })}
-          </div>
+        <ExplorerSheetSection title="Cuisson">
+          <ChipGrid>
+            {COOKING_OPTIONS.map(o => (
+              <Chip
+                key={o.key}
+                label={o.label}
+                active={filters.cooking.includes(o.key)}
+                onClick={() => set({ cooking: toggleIn(filters.cooking, o.key) })}
+              />
+            ))}
+          </ChipGrid>
           <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6 }}>
-            Repéré dans le nom de l'aliment. Beaucoup n'en précisent rien.
+            Repérée dans le nom de l'aliment. Beaucoup n'en précisent rien.
           </div>
-        </div>
+        </ExplorerSheetSection>
 
         {/* ── Catégories ── */}
         {categories.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
-              Catégories
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {categories.map(c => {
-                const active = filters.categories.includes(c)
-                return (
-                  <button
-                    key={c}
-                    className="chip"
-                    onClick={() => set({ categories: toggleIn(filters.categories, c) })}
-                    style={active
-                      ? { background: 'var(--green)', color: 'var(--white)' }
-                      : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-                  >
-                    {c}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <ExplorerSheetSection
+            title="Catégories"
+            count={filters.categories.length}
+            collapsible
+            defaultOpen={filters.categories.length > 0}
+          >
+            <ChipGrid>
+              {categories.map(c => (
+                <Chip
+                  key={c}
+                  label={c}
+                  active={filters.categories.includes(c)}
+                  onClick={() => set({ categories: toggleIn(filters.categories, c) })}
+                />
+              ))}
+            </ChipGrid>
+          </ExplorerSheetSection>
         )}
 
-        {/* ── Options ── */}
-        <div style={{ marginBottom: 16 }}>
-          <ToggleRow
-            label="Seulement mes favoris"
-            hint="Les aliments marqués d'une étoile"
-            checked={filters.favoritesOnly}
-            onChange={() => set({ favoritesOnly: !filters.favoritesOnly })}
-          />
-          <ToggleRow
-            label="Afficher épices et aides culinaires"
-            hint="Masquées par défaut : 100 g de thym séché fausse tous les classements"
-            checked={filters.showSeasonings}
-            onChange={() => set({ showSeasonings: !filters.showSeasonings })}
-          />
-        </div>
+        {/* ── Options ──
+            Deux pastilles plutôt que deux lignes à cocher pleine largeur : ce
+            sont des filtres comme les autres, ils n'ont pas à occuper quatre
+            fois plus de place. La note sur les épices reste, elle : sans elle,
+            leur absence de la liste passe pour un bug. */}
+        <ExplorerSheetSection title="Options">
+          <ChipGrid>
+            <Chip
+              label="★ Mes favoris"
+              active={filters.favoritesOnly}
+              onClick={() => set({ favoritesOnly: !filters.favoritesOnly })}
+            />
+            <Chip
+              label="🧂 Afficher les épices"
+              active={filters.showSeasonings}
+              onClick={() => set({ showSeasonings: !filters.showSeasonings })}
+            />
+          </ChipGrid>
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6 }}>
+            Épices et aides culinaires sont masquées par défaut : 100 g de thym
+            séché fausse tous les classements.
+          </div>
+        </ExplorerSheetSection>
 
-        <button className="btn-primary" style={{ width: '100%' }} onClick={onClose}>
+        <button className="btn-primary" style={{ width: '100%', marginTop: 4 }} onClick={onClose}>
           Voir les résultats
         </button>
       </div>

@@ -273,6 +273,20 @@ export function getRichClaims(food, max = 3) {
   return out
 }
 
+// Variante micro-nutriments seuls. Sur les cartes de résultat, les macros
+// sont déjà résumées par le badge de getNutriBadge() : n'y répéter que les
+// micros évite le doublon (« Riche en protéines » affiché deux fois sur la
+// même carte) tout en gardant visible un « Riche en fer », qui n'apparaîtrait
+// nulle part ailleurs tant qu'on ne trie pas sur ce nutriment.
+export function getRichMicroClaims(food, max = 1) {
+  const out = []
+  for (const field of CLAIM_MICRO_FIELDS) {
+    if (getClaimLevel(food, field) === 'riche') out.push(field)
+    if (out.length >= max) break
+  }
+  return out
+}
+
 // ── Catégories ──────────────────────────────────────────────────────────────
 const normalize = (s) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 

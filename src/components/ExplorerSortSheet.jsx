@@ -1,6 +1,7 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
 import { SORT_GROUPS, SORT_BASES, findField, chipLabel, naturalDir, KCAL_REF_OPTIONS, DEFAULT_KCAL_REF } from '../lib/ciqualExplorer'
+import ExplorerSheetSection from './ExplorerSheetSection'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerSortSheet — construit le tri en trois temps, dans l'ordre où la
@@ -11,7 +12,10 @@ import { SORT_GROUPS, SORT_BASES, findField, chipLabel, naturalDir, KCAL_REF_OPT
 //
 // Le nutriment est présenté en deux niveaux (groupe → nutriment) plutôt qu'en
 // une liste à plat de 33 pastilles, comme FoodSortModal pour les aliments
-// personnalisés.
+// personnalisés. Vitamines et minéraux sont repliés par défaut : ce sont 23
+// pastilles qui repoussaient autrement les étapes 2 et 3 hors de l'écran. Le
+// groupe du tri en cours, lui, s'ouvre toujours — sinon on ne verrait pas sur
+// quoi la liste est classée.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_HINTS = {
@@ -22,7 +26,7 @@ const BASE_HINTS = {
 
 function StepTitle({ n, children }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
       <span style={{
         width: 17, height: 17, borderRadius: '50%', flexShrink: 0,
         background: 'var(--green-light)', color: 'var(--green-dark)',
@@ -45,7 +49,7 @@ function ChipRow({ options, selected, onPick, grow }) {
           className="chip"
           onClick={() => onPick(o.key)}
           style={{
-            ...(grow ? { flex: 1, minWidth: 0 } : null),
+            ...(grow ? { flex: 1, minWidth: 0, padding: '6px 8px', textAlign: 'center' } : null),
             ...(selected === o.key
               ? { background: 'var(--green)', color: 'var(--white)' }
               : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }),
@@ -73,30 +77,39 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet">
         <div className="modal-handle" />
-        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 18 }}>Trier les aliments</h2>
+        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16 }}>Trier les aliments</h2>
 
         {/* ── 1. Quoi ── */}
         <StepTitle n="1">Trier par</StepTitle>
-        {SORT_GROUPS.map(group => (
-          <div key={group.label} style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginBottom: 5 }}>{group.label}</div>
-            <ChipRow
-              options={group.fields.map(f => ({ key: f.key, label: chipLabel(f) }))}
-              selected={sort.field}
-              // Changer de champ repart sur son sens naturel (voir naturalDir) ;
-              // retoucher le champ deja actif conserve le sens choisi.
-              onPick={key => onChange({
-                ...sort,
-                field: key,
-                dir: key === sort.field ? sort.dir : naturalDir(key),
-              })}
-            />
-          </div>
-        ))}
+        {SORT_GROUPS.map(group => {
+          const inGroup = group.fields.some(f => f.key === sort.field)
+          const long = group.label === 'Vitamines' || group.label === 'Minéraux'
+          return (
+            <ExplorerSheetSection
+              key={group.label}
+              title={group.label}
+              count={inGroup && long ? 1 : 0}
+              collapsible={long}
+              defaultOpen={inGroup}
+            >
+              <ChipRow
+                options={group.fields.map(f => ({ key: f.key, label: chipLabel(f) }))}
+                selected={sort.field}
+                // Changer de champ repart sur son sens naturel (voir naturalDir) ;
+                // retoucher le champ deja actif conserve le sens choisi.
+                onPick={key => onChange({
+                  ...sort,
+                  field: key,
+                  dir: key === sort.field ? sort.dir : naturalDir(key),
+                })}
+              />
+            </ExplorerSheetSection>
+          )
+        })}
 
         {/* ── 2. Comment comparer ── */}
         {!isName && (
-          <div style={{ marginTop: 18 }}>
+          <div style={{ marginTop: 16 }}>
             <StepTitle n="2">Comparer</StepTitle>
             <ChipRow
               grow
@@ -109,7 +122,7 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
                 les quantites parlantes — 200 kcal est plus proche d'une
                 collation reelle que 100 kcal. */}
             {sort.base === 'kcal100' && (
-              <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginBottom: 5 }}>Budget de calories</div>
                 <ChipRow
                   grow
@@ -119,14 +132,14 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
                 />
               </div>
             )}
-            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 10, lineHeight: 1.45 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8, lineHeight: 1.45 }}>
               {BASE_HINTS[sort.base]}
             </div>
           </div>
         )}
 
         {/* ── 3. Sens ── */}
-        <div style={{ marginTop: 18 }}>
+        <div style={{ marginTop: 16 }}>
           <StepTitle n={isName ? '2' : '3'}>Sens</StepTitle>
           <ChipRow
             grow
@@ -136,7 +149,7 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
           />
         </div>
 
-        <button className="btn-primary" style={{ width: '100%', marginTop: 22 }} onClick={onClose}>
+        <button className="btn-primary" style={{ width: '100%', marginTop: 20 }} onClick={onClose}>
           Voir les résultats
         </button>
       </div>

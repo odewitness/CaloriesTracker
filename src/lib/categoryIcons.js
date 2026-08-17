@@ -18,6 +18,11 @@ const FOOD_CATEGORY_ICONS = {
   'Produits laitiers': '🥛',
   'Produits sucrés': '🍬',
   'Viandes, oeufs, poissons': '🍗',
+  // Libellés regroupés produits par getCategoryLabel() (explorateur Ciqual) :
+  // il fusionne plusieurs catégories brutes sous un intitulé unique, qui n'est
+  // pas toujours celui de l'import ANSES.
+  'Viandes, œufs et poissons': '🍗',
+  'Divers': '🗂️',
 }
 
 const RECIPE_CATEGORY_ICONS = {
@@ -68,6 +73,8 @@ const FOOD_CATEGORY_COLOR_KEYS = {
   'Produits laitiers': 'blue',
   'Produits sucrés': 'coral',
   'Viandes, oeufs, poissons': 'coral',
+  'Viandes, œufs et poissons': 'coral',
+  'Divers': 'neutral',
 }
 
 const RECIPE_CATEGORY_COLOR_KEYS = {

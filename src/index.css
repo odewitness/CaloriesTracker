@@ -367,6 +367,19 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 
 .chip:active { background: #9FE1CB; }
 
+/* Bandeau de pastilles défilant horizontalement (manques du jour de
+   l'explorateur) : la barre de défilement native ne sert à rien au doigt et
+   mange plusieurs pixels de hauteur sur une bande déjà volontairement fine. */
+.chip-scroller {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.chip-scroller::-webkit-scrollbar { display: none; }
+.chip-scroller > * { flex-shrink: 0; }
+
 /* Macro colors */
 .c-prot { color: var(--green); }
 .c-gluc { color: var(--amber); }

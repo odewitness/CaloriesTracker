@@ -10,8 +10,14 @@ import React from 'react'
 // (déjà calculé pour la page Aujourd'hui) et des RNP de VITAMIN_FIELDS /
 // MINERAL_FIELDS — rien de nouveau à saisir.
 //
-// `.card` n'a pas de padding dans index.css (chaque usage pose le sien) :
-// il est donc défini ici, comme dans CalorieRing ou CalendarWeekStrip.
+// Présenté en BANDE FINE et non en carte : c'est un raccourci, pas le contenu
+// de la page. Sur mobile, l'ancienne carte (titre + paragraphe + grille de
+// pastilles + séparateur + seconde pastille) poussait les premiers résultats
+// hors de l'écran — soit exactement ce qu'on vient chercher ici. Les pastilles
+// et le filtre calorique tiennent donc sur une seule ligne qui défile
+// horizontalement, sans texte explicatif : le geste (appuyer sur un nutriment)
+// se comprend en l'essayant, et son effet reste lisible juste en dessous dans
+// les critères actifs.
 //
 // Props :
 //   gaps              — sortie de getNutrientGaps() : [{ field, pct }]
@@ -26,64 +32,64 @@ export default function NutrientGapsBanner({
 }) {
   const showKcalToggle = remainingKcal != null && remainingKcal > 0
 
+  // Rien à combler et pas d'objectif calorique : la bande n'aurait aucun
+  // contenu, on ne réserve pas d'espace pour un en-tête vide.
+  if (gaps.length === 0 && !showKcalToggle && hasEntries) return null
+
   return (
-    <div className="card" style={{ padding: '16px 16px 18px', marginBottom: 14 }}>
-      <div className="section-title" style={{ marginBottom: 12 }}>
-        Ce qui te manque aujourd'hui
+    <div style={{ marginBottom: 12 }}>
+      <div style={{
+        fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)',
+        textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6,
+      }}>
+        À combler aujourd'hui
       </div>
 
+      {/* Les deux états sans manque tiennent en une ligne : l'ancienne version
+          y consacrait un paragraphe de trois lignes. */}
       {!hasEntries ? (
-        <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
-          Tu n'as encore rien noté aujourd'hui. Explore librement — ou reviens ici
-          après ton premier repas pour voir ce qu'il te reste à combler.
+        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: showKcalToggle ? 8 : 0 }}>
+          Rien de noté aujourd'hui — explore librement.
         </div>
-      ) : gaps.length === 0 ? (
-        <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--green-dark)' }}>
-          Tous tes apports sont au niveau. Rien à combler pour l'instant 👏
+      ) : gaps.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--green-dark)', marginBottom: showKcalToggle ? 8 : 0 }}>
+          Tous tes apports sont au niveau 👏
         </div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {gaps.map(({ field, pct }) => {
-              const active = activeClaims.includes(field.key)
-              return (
-                <button
-                  key={field.key}
-                  className="chip"
-                  onClick={() => onPickGap(field.key)}
-                  style={{
-                    padding: '7px 13px',
-                    ...(active ? { background: 'var(--green)', color: 'var(--white)' } : null),
-                  }}
-                >
-                  {field.label}
-                  <span style={{ marginLeft: 5, opacity: 0.7, fontWeight: 500 }}>{pct} %</span>
-                </button>
-              )
-            })}
-          </div>
-          <div style={{ fontSize: 11.5, lineHeight: 1.5, color: 'var(--text-hint)', marginTop: 12 }}>
-            Touche un nutriment : la liste ne garde que les aliments qui en sont
-            riches, du plus riche au moins riche.
-          </div>
-        </>
       )}
 
-      {showKcalToggle && (
-        <>
-          <div style={{ height: 0.5, background: 'var(--border)', margin: '14px -16px 12px' }} />
-          <button
-            className="chip"
-            onClick={onToggleFits}
-            style={{
-              padding: '7px 13px',
-              background: fitsRemainingKcal ? 'var(--green)' : 'var(--gray-bg)',
-              color:      fitsRemainingKcal ? 'var(--white)' : 'var(--text-muted)',
-            }}
-          >
-            {fitsRemainingKcal ? '✓ ' : ''}Tient dans mes {Math.round(remainingKcal)} kcal restantes
-          </button>
-        </>
+      {(gaps.length > 0 || showKcalToggle) && (
+        <div className="chip-scroller">
+          {gaps.map(({ field, pct }) => {
+            const active = activeClaims.includes(field.key)
+            return (
+              <button
+                key={field.key}
+                className="chip"
+                onClick={() => onPickGap(field.key)}
+                style={active ? { background: 'var(--green)', color: 'var(--white)' } : null}
+              >
+                {field.label}
+                <span style={{ marginLeft: 5, opacity: 0.65, fontWeight: 500 }}>{pct} %</span>
+              </button>
+            )
+          })}
+
+          {/* Rangé dans la même bande que les manques : c'est un critère de
+              même nature (« ce qui me va aujourd'hui »), et il n'a pas besoin
+              d'un bloc séparé sous une ligne de séparation. */}
+          {showKcalToggle && (
+            <button
+              className="chip"
+              onClick={onToggleFits}
+              style={{
+                background: fitsRemainingKcal ? 'var(--green)' : 'var(--gray-bg)',
+                color:      fitsRemainingKcal ? 'var(--white)' : 'var(--text-muted)',
+              }}
+            >
+              {fitsRemainingKcal ? '✓ ' : ''}Tient dans mes {Math.round(remainingKcal)} kcal
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

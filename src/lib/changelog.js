@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-17',
+    title: 'La page Explorer est plus facile à lire',
+    description: "Chaque aliment s'affiche maintenant sur sa propre carte, avec une pastille colorée qui rappelle sa famille (viandes, légumes, produits laitiers...) et un badge quand il est riche en protéines, en fibres ou en un nutriment intéressant. Ce qui te manque aujourd'hui tient sur une seule ligne qui défile sur le côté, et les boutons Trier et Filtrer ont été réduits à l'essentiel : tu vois les premiers aliments tout de suite, sans faire défiler. Dans les réglages, les longues listes de vitamines, de minéraux et de catégories sont repliées — tu les ouvres d'un appui quand tu en as besoin, et un petit chiffre te dit si tu y as laissé un filtre. Rien n'a disparu, tout est juste plus rapide à trouver.",
+  },
+  {
+    date: '2026-08-17',
     title: 'Explore les aliments pour combler tes manques',
     description: "Une boussole est apparue en haut de l'écran : elle ouvre une nouvelle page pour fouiller dans la base des aliments et trouver quoi manger selon ce dont tu as besoin. Tout en haut, tu vois ce qui te manque aujourd'hui — fer, magnésium, protéines... — et il suffit de taper dessus pour ne garder que les aliments qui en sont riches. Tu peux classer la liste par n'importe quelle vitamine, minéral ou macro, dans les deux sens, et choisir comment comparer : pour 100 g, pour un budget de calories que tu fixes (50, 100, 200 ou 500), ou par portion. Ce choix compte : à calories égales, chaque aliment t'indique la quantité qu'il faudrait manger, ce qui évite de te faire miroiter des épices que tu ne mangeras jamais par 100 g. Côté filtres, tu peux demander « riche en » un nutriment précis, choisir une catégorie, ne voir que tes favoris, ou trier entre le cru, le cuit et ce qui est à cuire. Tes favoris gardent leur étoile, et tu peux ajouter un aliment à ton journal sans quitter la page.",
   },
