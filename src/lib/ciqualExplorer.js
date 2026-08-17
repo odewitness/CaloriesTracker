@@ -61,6 +61,16 @@ export function findField(key) {
   return ALL_SORT_FIELDS.find(f => f.key === key) || NAME_FIELD
 }
 
+// Sens « naturel » d'un champ. Un nom se lit de A à Z ; une valeur
+// nutritionnelle intéresse d'abord par le haut — on cherche les aliments les
+// PLUS riches en fer, pas les moins. Changer de champ repart donc sur ce sens
+// plutôt que de conserver celui du champ précédent (sinon, passer du tri par
+// nom à un nutriment héritait du A → Z et sortait les aliments les plus
+// pauvres). Même convention que le tri des favoris dans FoodPicker.
+export function naturalDir(fieldKey) {
+  return findField(fieldKey).virtual ? 'asc' : 'desc'
+}
+
 const VITAMIN_KEYS = new Set(VITAMIN_FIELDS.map(f => f.key))
 
 // Libellé court pour les grilles de pastilles (choix du tri, choix des

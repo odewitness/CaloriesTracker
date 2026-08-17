@@ -1,6 +1,6 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { SORT_GROUPS, SORT_BASES, findField, chipLabel, KCAL_REF_OPTIONS, DEFAULT_KCAL_REF } from '../lib/ciqualExplorer'
+import { SORT_GROUPS, SORT_BASES, findField, chipLabel, naturalDir, KCAL_REF_OPTIONS, DEFAULT_KCAL_REF } from '../lib/ciqualExplorer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerSortSheet — construit le tri en trois temps, dans l'ordre où la
@@ -83,7 +83,13 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
             <ChipRow
               options={group.fields.map(f => ({ key: f.key, label: chipLabel(f) }))}
               selected={sort.field}
-              onPick={key => onChange({ ...sort, field: key })}
+              // Changer de champ repart sur son sens naturel (voir naturalDir) ;
+              // retoucher le champ deja actif conserve le sens choisi.
+              onPick={key => onChange({
+                ...sort,
+                field: key,
+                dir: key === sort.field ? sort.dir : naturalDir(key),
+              })}
             />
           </div>
         ))}
