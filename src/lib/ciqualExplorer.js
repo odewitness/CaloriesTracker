@@ -115,6 +115,18 @@ export function fieldValue(food, field, base) {
   return raw
 }
 
+// Masse d'aliment nécessaire pour atteindre 100 kcal — le pendant concret du
+// tri par densité : « 2,7 mg de fer pour 100 kcal » ne veut rien dire tant
+// qu'on ne sait pas que ces 100 kcal représentent 435 g d'épinards. C'est ce
+// qui permet de distinguer un aliment vraiment dense d'un aliment simplement
+// pauvre en calories. Null si l'aliment n'apporte pas d'énergie (eau, thé) :
+// aucune quantité n'atteint jamais 100 kcal.
+export function gramsFor100kcal(food) {
+  const kcal = food.energie_kcal
+  if (!kcal || kcal <= 0) return null
+  return (100 / kcal) * 100
+}
+
 // ── Allégations nutritionnelles (règlement UE n°1924/2006, annexe) ───────────
 // Seuils officiels, pas des estimations maison :
 //   vitamines & minéraux — « source de » ≥ 15 % de la VNR pour 100 g,

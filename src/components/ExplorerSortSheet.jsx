@@ -14,7 +14,7 @@ import { SORT_GROUPS, SORT_BASES, findField } from '../lib/ciqualExplorer'
 
 const BASE_HINTS = {
   g100:    'Classement brut. Fait remonter les aliments très concentrés (épices, poudres) qu\'on ne mange pas en quantité.',
-  kcal100: 'Densité nutritionnelle : le plus de nutriment pour le moins de calories. Le mode le plus utile pour enrichir sans alourdir.',
+  kcal100: 'Densité nutritionnelle : le plus de nutriment pour le moins de calories. Chaque aliment indique aussi la quantité à manger pour atteindre ces 100 kcal.',
   portion: 'Ce qu\'une portion usuelle apporte vraiment. Remet les condiments à leur place.',
 }
 

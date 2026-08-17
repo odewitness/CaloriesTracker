@@ -10,7 +10,7 @@ import {
   DEFAULT_FILTERS, DEFAULT_SORT, SORT_BASES,
   filterFoods, sortFoods, findField, fieldValue, formatValue,
   listCategories, getRichClaims, getPortion, getNutrientGaps,
-  describeActiveFilters, removeFilter,
+  describeActiveFilters, removeFilter, gramsFor100kcal,
 } from '../lib/ciqualExplorer'
 import NutrientGapsBanner from '../components/NutrientGapsBanner'
 import ExplorerFilterSheet from '../components/ExplorerFilterSheet'
@@ -63,6 +63,7 @@ function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
   const claims = getRichClaims(food, 2)
   const baseShort = SORT_BASES.find(b => b.key === base)?.short
   const portion = getPortion(food)
+  const grams100 = gramsFor100kcal(food)
 
   return (
     <div
@@ -81,7 +82,12 @@ function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>{food.alim_nom}</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-          {Math.round(food.energie_kcal ?? 0)} kcal/100 g
+          {/* En mode densité, la quantité à manger pour atteindre ces 100 kcal
+              est l'information décisive : elle sépare un aliment réellement
+              dense d'un aliment simplement peu calorique. */}
+          {base === 'kcal100' && grams100 != null
+            ? `${Math.round(grams100)} g pour 100 kcal`
+            : `${Math.round(food.energie_kcal ?? 0)} kcal/100 g`}
           {base === 'portion' && portion.declared && ` · ${portion.label}`}
         </div>
         {claims.length > 0 && (
