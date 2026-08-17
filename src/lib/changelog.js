@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-17',
+    title: 'Explore les aliments pour combler tes manques',
+    description: "Une boussole est apparue en haut de l'écran : elle ouvre une nouvelle page pour fouiller librement dans la base des aliments. En haut, tu vois ce qui te manque aujourd'hui (fer, magnésium, protéines...) — tape dessus et la liste ne garde que les aliments qui en sont riches. Tu peux aussi trier par n'importe quelle vitamine ou minéral dans les deux sens, filtrer par catégorie, et surtout comparer pour 100 g, pour 100 calories, ou par portion : c'est ce dernier réglage qui évite de te proposer des épices que tu ne mangeras jamais par 100 g. Tes favoris gardent leur étoile, et tu peux ajouter un aliment à ton journal sans quitter la page.",
+  },
+  {
     date: '2026-08-15',
     title: 'Fini les chiffres soulignés en bleu sur iPhone',
     description: "Sur iPhone, Safari transformait parfois des nombres (calories, dates...) en liens bleus soulignés comme s'il s'agissait d'un numéro de téléphone. C'est corrigé, le texte garde sa couleur normale partout dans l'app.",
