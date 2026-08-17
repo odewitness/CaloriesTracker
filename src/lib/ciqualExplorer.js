@@ -70,10 +70,23 @@ export function findField(key) {
 //   portion — valeur réellement apportée par une portion usuelle (colonne
 //             `portions` de ciqual), qui remet les épices à leur vraie place.
 export const SORT_BASES = [
-  { key: 'g100',    label: 'pour 100 g',    short: '/100 g' },
-  { key: 'kcal100', label: 'pour 100 kcal', short: '/100 kcal' },
-  { key: 'portion', label: 'par portion',   short: '/portion' },
+  { key: 'g100',    label: 'Pour 100 g',        short: '/100 g' },
+  { key: 'kcal100', label: 'À calories égales', short: '/100 kcal' },
+  { key: 'portion', label: 'Par portion',       short: '/portion' },
 ]
+
+// Énergie minimale pour qu'une comparaison « à calories égales » ait un sens.
+//
+// Le calcul divise par l'énergie de l'aliment : en dessous de quelques kcal,
+// on divise par presque zéro et le classement se remplit d'artefacts. Un soda
+// à 0,06 kcal/100 g « apporte » 172 g de protéines pour 100 kcal — vrai au
+// sens strict, mais il faudrait en boire 172 kg. Ces aliments ne sont pas
+// comparables à calories égales : leur valeur est nulle dans ce mode, donc ils
+// partent en fin de liste (règle « valeurs manquantes en dernier »).
+//
+// 20 kcal/100 g = il faut déjà 500 g pour atteindre 100 kcal ; en dessous, le
+// rapport ne décrit plus un aliment mais une division par presque rien.
+export const MIN_KCAL_FOR_DENSITY = 20
 
 // Portion usuelle déclarée sur l'aliment. Tous les aliments Ciqual n'en ont
 // pas : on retombe alors sur 100 g, en le disant explicitement dans le libellé
@@ -108,7 +121,9 @@ export function fieldValue(food, field, base) {
   // brute plutôt que d'afficher 100 partout.
   if (base === 'kcal100' && field.key !== 'energie_kcal') {
     const kcal = food.energie_kcal
-    if (!kcal || kcal <= 0) return null // aliment sans énergie (eau, thé) : densité indéfinie
+    // Voir MIN_KCAL_FOR_DENSITY : en dessous, le rapport n'est plus qu'une
+    // division par presque zéro (eaux, sodas light, bouillons, infusions).
+    if (!kcal || kcal < MIN_KCAL_FOR_DENSITY) return null
     return (raw / kcal) * 100
   }
   if (base === 'portion') return (raw * getPortion(food).g) / 100
@@ -123,7 +138,10 @@ export function fieldValue(food, field, base) {
 // aucune quantité n'atteint jamais 100 kcal.
 export function gramsFor100kcal(food) {
   const kcal = food.energie_kcal
-  if (!kcal || kcal <= 0) return null
+  // Même seuil que le classement lui-même : afficher « 172 414 g pour
+  // 100 kcal » ne renseigne sur rien, sinon que l'aliment n'a pas sa place
+  // dans cette comparaison.
+  if (!kcal || kcal < MIN_KCAL_FOR_DENSITY) return null
   return (100 / kcal) * 100
 }
 
