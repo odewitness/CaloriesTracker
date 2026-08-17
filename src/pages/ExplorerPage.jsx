@@ -82,13 +82,23 @@ function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>{food.alim_nom}</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-          {/* En mode densité, la quantité à manger pour atteindre ces 100 kcal
-              est l'information décisive : elle sépare un aliment réellement
-              dense d'un aliment simplement peu calorique. */}
-          {base === 'kcal100' && grams100 != null
-            ? `${Math.round(grams100)} g pour 100 kcal`
-            : `${Math.round(food.energie_kcal ?? 0)} kcal/100 g`}
-          {base === 'portion' && portion.declared && ` · ${portion.label}`}
+          {/* Chaque mode annonce la quantité sur laquelle la ligne est
+              calculée — sans elle, la valeur de droite n'est pas
+              interprétable. En mode densité c'est ce qu'il faut manger pour
+              100 kcal ; en mode portion, la portion elle-même et ce qu'elle
+              coûte en calories. */}
+          {base === 'kcal100' && grams100 != null ? (
+            `${Math.round(grams100)} g pour 100 kcal`
+          ) : base === 'portion' ? (
+            <>
+              <span style={{ fontWeight: 600, color: portion.declared ? 'var(--text)' : 'var(--text-hint)' }}>
+                {portion.label}
+              </span>
+              {` · ${Math.round((food.energie_kcal ?? 0) * portion.g / 100)} kcal`}
+            </>
+          ) : (
+            `${Math.round(food.energie_kcal ?? 0)} kcal/100 g`
+          )}
         </div>
         {claims.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
@@ -107,7 +117,12 @@ function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
           <div style={{ fontSize: 13, fontWeight: 700, color: val == null ? 'var(--text-hint)' : 'var(--green-dark)' }}>
             {formatValue(val, sortField.unit)}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-hint)' }}>{baseShort}</div>
+          {/* En mode portion, le grammage exact vaut mieux que le mot
+              « portion » : c'est la seule facon de savoir a quoi la valeur
+              au-dessus correspond. */}
+          <div style={{ fontSize: 10, color: 'var(--text-hint)' }}>
+            {base === 'portion' ? `pour ${portion.g} g` : baseShort}
+          </div>
         </div>
       )}
     </div>

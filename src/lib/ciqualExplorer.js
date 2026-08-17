@@ -91,10 +91,17 @@ export const MIN_KCAL_FOR_DENSITY = 20
 // Portion usuelle déclarée sur l'aliment. Tous les aliments Ciqual n'en ont
 // pas : on retombe alors sur 100 g, en le disant explicitement dans le libellé
 // (mieux qu'exclure l'aliment du classement sans prévenir).
+// Le libellé porte TOUJOURS le grammage : « 1 cuillère à soupe » ne dit pas
+// sur quelle quantité la ligne est calculée, alors que c'est précisément ce
+// que le mode « par portion » compare. Et quand l'aliment n'a pas de portion
+// déclarée en base, le repli sur 100 g doit être annoncé — sinon le classement
+// mélange sans prévenir des portions réelles et des 100 g par défaut.
 export function getPortion(food) {
   const p = food.portions?.[0]
-  if (p?.g > 0) return { g: p.g, label: p.label || `${p.g} g`, declared: true }
-  return { g: 100, label: '100 g', declared: false }
+  if (p?.g > 0) {
+    return { g: p.g, label: p.label ? `${p.label} (${p.g} g)` : `${p.g} g`, declared: true }
+  }
+  return { g: 100, label: '100 g par défaut', declared: false }
 }
 
 // Valeur brute /100 g, en préservant la distinction null / 0 : dans Ciqual,
