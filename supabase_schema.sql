@@ -708,7 +708,24 @@ alter table repas_types disable row level security;
 alter table settings disable row level security;
 alter table aliments_custom disable row level security;
 alter table marques disable row level security;
-alter table mensurations disable row level security;
+
+-- RLS activé sur mensurations le 2026-08-17 (données sensibles - poids et
+-- mesures corporelles - accessibles sans authentification via la Data API
+-- tant que le RLS était désactivé). Policies exécutées manuellement dans le
+-- SQL editor Supabase (pas d'accès direct à la base depuis cette session).
+alter table mensurations enable row level security;
+
+create policy "mensurations_select_own" on mensurations
+  for select using (auth.uid() = user_id);
+
+create policy "mensurations_insert_own" on mensurations
+  for insert with check (auth.uid() = user_id);
+
+create policy "mensurations_update_own" on mensurations
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "mensurations_delete_own" on mensurations
+  for delete using (auth.uid() = user_id);
 
 -- Statut RLS non vérifié pour les 7 tables ajoutées à cette reconstruction
 -- (profiles, recettes, recette_ingredients, favoris, listes_courses,
