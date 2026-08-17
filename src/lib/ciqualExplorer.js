@@ -31,7 +31,15 @@ export const MACRO_FIELDS = [
 // Groupes proposés dans le sélecteur de tri (deux niveaux : groupe → nutriment,
 // même principe que FoodSortModal — une liste à plat de 32 nutriments serait
 // illisible sur mobile).
+// Tri neutre, et état par défaut de la page : classer par nom n'applique
+// AUCUN point de vue nutritionnel sur la liste. Sans cette option, tout tri
+// est forcément « par un nutriment » et il devient impossible de revenir à une
+// liste non orientée. `virtual` = ce n'est pas une colonne de `ciqual`, donc
+// à exclure de la projection SQL.
+export const NAME_FIELD = { key: 'nom', label: 'Nom', unit: null, virtual: true }
+
 export const SORT_GROUPS = [
+  { label: 'Général',   fields: [NAME_FIELD] },
   { label: 'Macros',    fields: MACRO_FIELDS },
   { label: 'Vitamines', fields: VITAMIN_FIELDS },
   { label: 'Minéraux',  fields: MINERAL_FIELDS },
@@ -46,11 +54,11 @@ export const ALL_SORT_FIELDS = SORT_GROUPS.flatMap(g => g.fields)
 // Dérivée des listes de champs, jamais recopiée à la main.
 export const EXPLORER_SELECT = Array.from(new Set([
   'id', 'alim_code', 'alim_nom', 'categorie', 'portions',
-  ...ALL_SORT_FIELDS.flatMap(f => f.sumKeys || [f.key]),
+  ...ALL_SORT_FIELDS.filter(f => !f.virtual).flatMap(f => f.sumKeys || [f.key]),
 ])).join(',')
 
 export function findField(key) {
-  return ALL_SORT_FIELDS.find(f => f.key === key) || MACRO_FIELDS[0]
+  return ALL_SORT_FIELDS.find(f => f.key === key) || NAME_FIELD
 }
 
 // ── Bases de comparaison ────────────────────────────────────────────────────
@@ -93,6 +101,7 @@ export function rawValue(food, field) {
 }
 
 export function fieldValue(food, field, base) {
+  if (field.virtual) return null // le nom n'a pas de valeur chiffrée à comparer
   const raw = rawValue(food, field)
   if (raw == null) return null
   // « Calories pour 100 kcal » ne veut rien dire : on retombe sur la valeur
@@ -215,7 +224,11 @@ export const DEFAULT_FILTERS = {
   showSeasonings: false,
 }
 
-export const DEFAULT_SORT = { field: 'proteines', dir: 'desc', base: 'g100' }
+// La page s'ouvre sur un tri par nom : aucun nutriment n'est privilégié tant
+// que l'utilisatrice n'en a pas choisi un. Ni les filtres ni le tri ne sont
+// mémorisés d'une ouverture à l'autre — un réglage pris pour un besoin ponctuel
+// ne doit pas devenir l'état permanent de la page.
+export const DEFAULT_SORT = { field: 'nom', dir: 'asc', base: 'g100' }
 
 export function filterFoods(foods, filters, { isFavorite, remainingKcal } = {}) {
   const q = normalize(filters.query).trim()
@@ -274,6 +287,11 @@ export function removeFilter(filters, item) {
 export function sortFoods(foods, { field, dir, base }) {
   const f = findField(field)
   const mult = dir === 'asc' ? 1 : -1
+
+  if (f.virtual) {
+    return [...foods].sort((a, b) => mult * a.alim_nom.localeCompare(b.alim_nom, 'fr'))
+  }
+
   return [...foods]
     .map(food => ({ food, val: fieldValue(food, f, base) }))
     .sort((a, b) => {

@@ -30,18 +30,7 @@ import EmptyState from '../components/EmptyState'
 // simple navigateur de base de données.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FILTERS_KEY = 'explorer_filters'
-const SORT_KEY    = 'explorer_sort'
-const PAGE_STEP   = 50
-
-function loadStored(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    // Fusion avec les valeurs par défaut : un réglage enregistré par une
-    // version antérieure n'a pas forcément toutes les clés attendues.
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback
-  } catch { return fallback }
-}
+const PAGE_STEP = 50
 
 // Bouton de contrôle "Trier" / "Filtrer" : même gabarit pour les deux, avec
 // l'intitulé du réglage au-dessus et sa valeur courante en dessous.
@@ -106,12 +95,15 @@ function ExplorerRow({ food, sortField, base, isFav, onSelect, onToggleFav }) {
         )}
       </div>
 
-      <div style={{ flexShrink: 0, textAlign: 'right' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: val == null ? 'var(--text-hint)' : 'var(--green-dark)' }}>
-          {formatValue(val, sortField.unit)}
+      {/* Tri par nom : aucune valeur a mettre en avant, la ligne reste sobre. */}
+      {!sortField.virtual && (
+        <div style={{ flexShrink: 0, textAlign: 'right' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: val == null ? 'var(--text-hint)' : 'var(--green-dark)' }}>
+            {formatValue(val, sortField.unit)}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-hint)' }}>{baseShort}</div>
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-hint)' }}>{baseShort}</div>
-      </div>
+      )}
     </div>
   )
 }
@@ -124,15 +116,16 @@ export default function ExplorerPage() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const { entries } = useJournal(today)
 
-  const [filters, setFilters] = useState(() => loadStored(FILTERS_KEY, DEFAULT_FILTERS))
-  const [sort, setSort]       = useState(() => loadStored(SORT_KEY, DEFAULT_SORT))
+  // Volontairement NON persistes : la page repart d'un etat neutre a chaque
+  // ouverture (tri par nom, aucun filtre). Un reglage pris pour un besoin
+  // ponctuel - typiquement une pastille de manque du jour - ne doit pas
+  // devenir l'etat permanent de l'onglet.
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [sort, setSort]       = useState(DEFAULT_SORT)
   const [filterOpen, setFilterOpen] = useState(false)
   const [sortOpen, setSortOpen]     = useState(false)
   const [selected, setSelected]     = useState(null)
   const [visible, setVisible]       = useState(PAGE_STEP)
-
-  useEffect(() => { try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)) } catch { /* ignore */ } }, [filters])
-  useEffect(() => { try { localStorage.setItem(SORT_KEY, JSON.stringify(sort)) } catch { /* ignore */ } }, [sort])
 
   // Revenir en haut de liste dès qu'on change les critères : garder 300 lignes
   // dépliées après un changement de filtre n'a aucun sens.
@@ -172,6 +165,7 @@ export default function ExplorerPage() {
   }
 
   const activeFilters = useMemo(() => describeActiveFilters(filters, remaining), [filters, remaining])
+  const isDefaultSort = sort.field === DEFAULT_SORT.field && sort.dir === DEFAULT_SORT.dir
 
   const activeFilterCount =
     filters.claims.length + filters.categories.length +
@@ -209,8 +203,10 @@ export default function ExplorerPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <ControlButton
           icon={<ArrowUpDown size={14} />}
-          caption={`Trier · ${SORT_BASES.find(b => b.key === sort.base)?.label}`}
-          value={`${sortField.label} ${sort.dir === 'desc' ? '↓' : '↑'}`}
+          caption={sortField.virtual ? 'Trier' : `Trier · ${SORT_BASES.find(b => b.key === sort.base)?.label}`}
+          value={sortField.virtual
+            ? (sort.dir === 'asc' ? 'Nom A → Z' : 'Nom Z → A')
+            : `${sortField.label} ${sort.dir === 'desc' ? '↓' : '↑'}`}
           onClick={() => setSortOpen(true)}
         />
         <ControlButton
@@ -232,7 +228,9 @@ export default function ExplorerPage() {
           onClick={() => setSort(s => ({ ...s, dir: s.dir === 'desc' ? 'asc' : 'desc' }))}
           style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
         >
-          {sort.dir === 'desc' ? '↓ Les + élevés' : '↑ Les - élevés'}
+          {sortField.virtual
+            ? (sort.dir === 'asc' ? 'A → Z' : 'Z → A')
+            : (sort.dir === 'desc' ? '↓ Les + élevés' : '↑ Les - élevés')}
         </button>
 
         {activeFilters.map(item => (
@@ -246,10 +244,14 @@ export default function ExplorerPage() {
           </button>
         ))}
 
-        {activeFilters.length > 1 && (
+        {/* Remet la page dans son état d'ouverture : filtres vidés ET tri
+            ramené au nom. Sans la remise à zéro du tri, retirer la dernière
+            pastille laisserait la liste classée sur un nutriment sans qu'aucun
+            critère ne soit plus visible. */}
+        {(activeFilters.length > 0 || !isDefaultSort) && (
           <button
             className="chip"
-            onClick={() => setFilters(f => ({ ...DEFAULT_FILTERS, query: f.query }))}
+            onClick={() => { setFilters(f => ({ ...DEFAULT_FILTERS, query: f.query })); setSort(DEFAULT_SORT) }}
             style={{ background: 'transparent', color: 'var(--text-hint)' }}
           >
             Tout effacer

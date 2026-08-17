@@ -1,6 +1,6 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
-import { SORT_GROUPS, SORT_BASES } from '../lib/ciqualExplorer'
+import { SORT_GROUPS, SORT_BASES, findField } from '../lib/ciqualExplorer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerSortSheet — choix du nutriment de tri, du sens, et surtout de la
@@ -22,6 +22,10 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
   useBackButton(onClose)
 
   const pickField = (key) => onChange({ ...sort, field: key })
+  // Trier par nom ne compare aucune valeur : la base (/100 g, /100 kcal,
+  // /portion) n'a alors rien a piloter, on masque la section plutot que de
+  // laisser un reglage sans effet.
+  const isName = findField(sort.field).virtual
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -30,36 +34,40 @@ export default function ExplorerSortSheet({ sort, onChange, onClose }) {
         <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16 }}>Trier les aliments</h2>
 
         {/* ── Base de comparaison ── */}
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
-          Comparer
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-          {SORT_BASES.map(b => (
-            <button
-              key={b.key}
-              className="chip"
-              onClick={() => onChange({ ...sort, base: b.key })}
-              style={sort.base === b.key
-                ? { background: 'var(--green)', color: 'var(--white)', flex: 1 }
-                : { background: 'var(--gray-bg)', color: 'var(--text-muted)', flex: 1 }}
-            >
-              {b.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 18, lineHeight: 1.45 }}>
-          {BASE_HINTS[sort.base]}
-        </div>
+        {!isName && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
+              Comparer
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              {SORT_BASES.map(b => (
+                <button
+                  key={b.key}
+                  className="chip"
+                  onClick={() => onChange({ ...sort, base: b.key })}
+                  style={sort.base === b.key
+                    ? { background: 'var(--green)', color: 'var(--white)', flex: 1 }
+                    : { background: 'var(--gray-bg)', color: 'var(--text-muted)', flex: 1 }}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 18, lineHeight: 1.45 }}>
+              {BASE_HINTS[sort.base]}
+            </div>
+          </>
+        )}
 
         {/* ── Sens ── */}
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
           Sens
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
-          {[
-            { dir: 'desc', label: `Les + élevés d'abord` },
-            { dir: 'asc',  label: `Les - élevés d'abord` },
-          ].map(o => (
+          {(isName
+            ? [{ dir: 'asc', label: 'A → Z' }, { dir: 'desc', label: 'Z → A' }]
+            : [{ dir: 'desc', label: `Les + élevés d'abord` }, { dir: 'asc', label: `Les - élevés d'abord` }]
+          ).map(o => (
             <button
               key={o.dir}
               className="chip"
