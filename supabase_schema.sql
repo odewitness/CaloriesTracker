@@ -8,6 +8,12 @@
 -- profiles.pseudo, depuis un nouvel export information_schema.columns
 -- (pas de table_constraints cette fois — FK/CHECK sur ces tables
 -- déduits du code client, marqués "non confirmé" quand incertains).
+-- Complété le 2026-08-18 : table 24 (push_subscriptions) + colonnes
+-- notif_reminder_enabled/notif_social_enabled/last_reminder_sent_date sur
+-- settings, pour les notifications push (rappel quotidien + activité
+-- sociale) — voir supabase/sql/push_notifications_setup.sql pour le SQL
+-- complet (schéma + triggers + cron), exécuté manuellement, pas encore
+-- confirmé appliqué en base au moment de l'écriture de ce fichier.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -197,7 +203,12 @@ create table if not exists settings (
   updated_at timestamptz default now(),
   user_id uuid references auth.users(id),
   meal_overrides jsonb not null default '{}',
-  meal_enabled jsonb not null default '{"Dîner": true, "Collation": true, "Déjeuner": true, "Compléments": true, "Petit-déjeuner": true}'
+  meal_enabled jsonb not null default '{"Dîner": true, "Collation": true, "Déjeuner": true, "Compléments": true, "Petit-déjeuner": true}',
+  -- Ajoutées le 2026-08-18 pour les notifications push (voir
+  -- supabase/sql/push_notifications_setup.sql).
+  notif_reminder_enabled boolean not null default true,
+  notif_social_enabled boolean not null default true,
+  last_reminder_sent_date date
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
@@ -697,6 +708,19 @@ create table if not exists commentaires_journal (
   created_at timestamptz not null default now()
 );
 
+-- 24. TABLE PUSH_SUBSCRIPTIONS (abonnements push par appareil, voir
+-- usePushSubscription.js) — un utilisateur peut avoir plusieurs lignes (un
+-- téléphone + un ordinateur par ex.), une par endpoint PushManager.
+create table if not exists push_subscriptions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -741,6 +765,12 @@ create policy "mensurations_delete_own" on mensurations
 -- commentaires dans useFeed.js et usePartageDetail.js — "déjà filtré côté
 -- base par RLS"), la visibilité (auteure ou amie acceptée) est donc
 -- entièrement portée par des policies RLS non reproduites ici.
+
+-- RLS activé sur push_subscriptions dès sa création (2026-08-18), policies
+-- select/insert/delete "own" (voir supabase/sql/push_notifications_setup.sql)
+-- — pas de policy update, le client supprime + réinsère plutôt que de
+-- modifier une ligne existante.
+alter table push_subscriptions enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

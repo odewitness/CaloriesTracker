@@ -8,6 +8,8 @@ const DEFAULTS = {
   goal_kcal: 1800, goal_proteines: 100, goal_glucides: 180, goal_lipides: 60, goal_fibres: 30,
   meal_overrides: {},
   meal_enabled: { ...MEAL_ENABLED_DEFAULTS },
+  notif_reminder_enabled: true,
+  notif_social_enabled: true,
 }
 
 export function useSettings() {

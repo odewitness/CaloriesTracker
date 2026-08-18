@@ -3,9 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
 import { useMeasurements } from '../hooks/useMeasurements'
+import { usePushSubscription } from '../hooks/usePushSubscription'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill, ChevronRight } from 'lucide-react'
+import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill, ChevronRight, Bell, Users } from 'lucide-react'
 import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
 import Loader from '../components/Loader'
 
@@ -26,6 +27,25 @@ function Row({ icon, label, children }) {
       <div style={{ flex: 1, fontSize: 14 }}>{label}</div>
       {children}
     </div>
+  )
+}
+
+function ToggleSwitch({ checked, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: 36, height: 20, borderRadius: 10, position: 'relative', flexShrink: 0,
+        background: checked ? 'var(--green)' : 'var(--border-md)',
+        transition: 'background .2s',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 2, left: checked ? 18 : 2,
+        width: 16, height: 16, borderRadius: '50%', background: 'white',
+        transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+      }} />
+    </button>
   )
 }
 
@@ -143,6 +163,19 @@ export default function ProfilePage() {
   const { profile, loading: profileLoading, updateProfile } = useProfile()
   const { settings, loading: settingsLoading, update: updateSettings } = useSettings()
   const { entries: measurementEntries } = useMeasurements()
+  const { supported: pushSupported, permission: pushPermission, subscribed: pushSubscribed, loading: pushLoading, subscribe: subscribePush } = usePushSubscription()
+
+  // Les préférences de notification s'appliquent immédiatement (pas de bouton
+  // "Sauvegarder") — contrairement aux objectifs nutritionnels, ce ne sont
+  // pas des valeurs qu'on ajuste plusieurs fois avant de valider.
+  const [enablingPush, setEnablingPush] = useState(false)
+  const handleEnablePush = async () => {
+    setEnablingPush(true)
+    const { error } = await subscribePush()
+    setEnablingPush(false)
+    if (error) toast(pushPermission === 'denied' ? 'Permission refusée' : "Impossible d'activer les notifications")
+    else toast('✓ Notifications activées !')
+  }
 
   const openMeasurements = () => navigate('/mensurations', { state: { backgroundLocation: location.state?.backgroundLocation || location } })
   const latestWeight = measurementEntries.find(e => e.poids_kg != null)?.poids_kg
@@ -368,6 +401,48 @@ export default function ProfilePage() {
       {goalsDirty && (
         <button className="btn-primary" onClick={saveGoals} style={{ marginTop: 4, marginBottom: 20 }}>💾 Sauvegarder les objectifs</button>
       )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <Bell size={16} color="var(--green)" />
+        <div className="section-title" style={{ marginBottom: 0 }}>Notifications</div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
+        {!pushSupported ? (
+          <div style={{ padding: '13px 16px', fontSize: 12.5, color: 'var(--text-hint)' }}>
+            Non disponible sur ce navigateur.
+          </div>
+        ) : pushPermission !== 'granted' ? (
+          <div style={{ padding: '13px 16px' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+              Reçois un rappel si tu n'as rien noté, et sois prévenue de l'activité de tes amies. Fonctionne mieux si l'app est ajoutée à l'écran d'accueil.
+            </div>
+            <button className="btn-primary" onClick={handleEnablePush} disabled={enablingPush || pushLoading}>
+              {enablingPush ? '...' : 'Activer les notifications'}
+            </button>
+            {pushPermission === 'denied' && (
+              <div style={{ fontSize: 12, color: 'var(--coral)', marginTop: 8 }}>
+                Permission refusée — à réactiver dans les réglages du navigateur pour ce site.
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <Row icon={<Bell size={18} />} label="Rappel si rien noté">
+              <ToggleSwitch
+                checked={settings.notif_reminder_enabled !== false}
+                onClick={() => updateSettings({ notif_reminder_enabled: !(settings.notif_reminder_enabled !== false) })}
+              />
+            </Row>
+            <Row icon={<Users size={18} />} label="Activité sociale">
+              <ToggleSwitch
+                checked={settings.notif_social_enabled !== false}
+                onClick={() => updateSettings({ notif_social_enabled: !(settings.notif_social_enabled !== false) })}
+              />
+            </Row>
+          </>
+        )}
+      </div>
 
       <button
         onClick={handleSignOut}
