@@ -5,6 +5,7 @@ import MacroBar from '../components/MacroBar'
 import VitaminPanel from '../components/VitaminPanel'
 import NutrientDetails from '../components/NutrientDetails'
 import MealSection from '../components/MealSection'
+import QuickAddSuggestions from '../components/QuickAddSuggestions'
 import AddFoodModal from '../components/AddFoodModal'
 import FoodDetailModal from '../components/FoodDetailModal'
 import EditSupplementModal from '../components/EditSupplementModal'
@@ -19,7 +20,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
 import { ALL_NUTRIENT_KEYS, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
-import { fmt } from '../lib/dates'
+import { fmt, getMealForTime } from '../lib/dates'
 
 function dateOffset(base, days) {
   const d = new Date(base)
@@ -91,6 +92,11 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   }, [entries])
 
   const mealTargets = useMemo(() => computeMealTargets(settings), [settings])
+  const isToday = dateStr === fmt(new Date())
+  const currentMeal = useMemo(
+    () => isToday ? getMealForTime(new Date(), settings.meal_enabled) : null,
+    [isToday, settings.meal_enabled]
+  )
 
   const handleAdd = async (entry) => {
     const { error } = await addEntry(entry)
@@ -151,6 +157,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
         <VitaminPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
         <NutrientDetails totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
+        {currentMeal && <QuickAddSuggestions meal={currentMeal} onAdd={handleAdd} />}
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="section-title" style={{ marginBottom: 0 }}>Repas du jour</div>
