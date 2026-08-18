@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-08-18',
+    title: 'Des notifications pour ne rien manquer',
+    description: "Tu peux maintenant activer les notifications depuis Profil > Notifications. Elles te préviennent si tu n'as encore rien noté en fin d'après-midi (ou si un repas planifié attend d'être marqué mangé), et quand une amie partage quelque chose, réagit ou commente un de tes partages. Ça marche mieux si tu ajoutes l'app à ton écran d'accueil.",
+  },
+  {
+    date: '2026-08-18',
+    title: "Des suggestions dans l'écran d'ajout",
+    description: "Quand tu appuies sur le + d'un repas pour ajouter un aliment, une section « Suggestions » te propose maintenant ceux que tu manges le plus souvent à ce repas-là, juste après tes favoris — pratique pour retrouver vite tes habitudes du quotidien.",
+  },
+  {
+    date: '2026-08-18',
     title: 'Ajoute tes propres portions sur un aliment Ciqual',
     description: "Beaucoup d'aliments de la base Ciqual n'ont pas de portion usuelle renseignée. Tu peux maintenant appuyer sur « Modifier » à côté de « Portions courantes » pour en ajouter toi-même (ex : « 1 tranche · 30 g ») — aussi bien depuis la fiche d'un aliment dans Explorer qu'au moment de l'ajouter à ton suivi du jour. Elles servent ensuite de quantité par défaut partout où cet aliment est utilisé.",
   },
