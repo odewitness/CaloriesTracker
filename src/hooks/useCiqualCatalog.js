@@ -56,3 +56,14 @@ export function useCiqualCatalog() {
 
   return { foods, loading, error }
 }
+
+// Met à jour les portions d'un aliment dans le cache module, après une
+// sauvegarde réussie depuis ExplorerFoodModal ou FoodPicker (édition des
+// "portions courantes" d'un aliment ciqual). Le cache vit en dehors du cycle
+// de vie des composants : sans ce patch, la modification resterait invisible
+// dans l'explorateur tant que la session (ou la page) n'est pas rechargée.
+export function patchCachedPortions(alimCode, portions) {
+  if (!cachedFoods) return
+  const idx = cachedFoods.findIndex(f => f.alim_code === alimCode)
+  if (idx !== -1) cachedFoods[idx] = { ...cachedFoods[idx], portions }
+}

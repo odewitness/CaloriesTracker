@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-18',
+    title: 'Ajoute tes propres portions sur un aliment Ciqual',
+    description: "Beaucoup d'aliments de la base Ciqual n'ont pas de portion usuelle renseignée. Tu peux maintenant appuyer sur « Modifier » à côté de « Portions courantes » pour en ajouter toi-même (ex : « 1 tranche · 30 g ») — aussi bien depuis la fiche d'un aliment dans Explorer qu'au moment de l'ajouter à ton suivi du jour. Elles servent ensuite de quantité par défaut partout où cet aliment est utilisé.",
+  },
+  {
+    date: '2026-08-18',
     title: 'Scan de code-barres plus fiable',
     description: "Le scanner de code-barres attend maintenant de lire deux fois le même code avant de le valider, pour éviter qu'une mauvaise lecture affiche un produit qui ne correspond pas du tout à ce que tu as scanné.",
   },

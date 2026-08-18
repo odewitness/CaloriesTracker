@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { X, Search, ScanLine, Camera, ArrowLeft, Star, Pencil } from 'lucide-react'
+import { X, Search, ScanLine, Camera, ArrowLeft, Star, Pencil, PlusCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { useFavorites, foodIdentity } from '../hooks/useFavorites'
 import { useRecentFoods } from '../hooks/useRecentFoods'
+import { patchCachedPortions } from '../hooks/useCiqualCatalog'
 import BarcodeScanner from './BarcodeScanner'
 import { useBackButton } from '../hooks/useBackButton'
 import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
@@ -92,6 +93,12 @@ export default function FoodPicker({
   const [favoritesVisible, setFavoritesVisible] = useState(FAVORITES_STEP)
   const [favSort, setFavSort] = useState('most') // 'recent' | 'alpha' | 'most'
   const [favSortDir, setFavSortDir] = useState('desc') // 'asc' | 'desc'
+  // Édition des portions courantes d'un aliment ciqual — même geste que sur
+  // la fiche de l'Explorer (ExplorerFoodModal), mais accessible directement
+  // au moment d'ajouter l'aliment au suivi, sans repasser par Explorer.
+  const [editingPortions, setEditingPortions] = useState(false)
+  const [portionsDraft, setPortionsDraft] = useState([{ label: '', g: '' }])
+  const [savingPortions, setSavingPortions] = useState(false)
   const searchRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -388,6 +395,7 @@ const selectFood = async (food) => {
   setSubtractMode(false)
   setGrossWeight("")
   setWasteWeight("")
+  setEditingPortions(false)
   setStep('configure')
 }
 
@@ -395,6 +403,40 @@ const isComplementFood = selected?.categorie === COMPLEMENT_CATEGORY
 // Poids d'une dose = 1ère "portion" de l'aliment (voir CustomFoodsSection —
 // portions[0] est toujours la dose de base pour un complément).
 const doseUnitG = isComplementFood ? (selected.portions?.[0]?.g || 1) : null
+
+// Portions éditables uniquement pour un aliment ciqual : `_source` est vide
+// sur les lignes venues de search_ciqual (voir doSearch) et vaut 'ciqual' par
+// défaut ailleurs dans l'app (cf. useFavorites) — les aliments personnalisés
+// se modifient déjà depuis l'onglet Aliments, les recettes et les produits
+// Open Food Facts n'ont pas de portions librement éditables ici.
+const isCiqualFood = !isComplementFood && (selected?._source || 'ciqual') === 'ciqual' && !!selected?.alim_code
+
+const startEditPortions = () => {
+  const current = selected?.portions
+  setPortionsDraft(
+    Array.isArray(current) && current.length
+      ? current.map(p => ({ label: p.label || '', g: p.g != null ? String(p.g) : '' }))
+      : [{ label: '', g: '' }]
+  )
+  setEditingPortions(true)
+}
+const addPortionDraft    = () => setPortionsDraft(p => [...p, { label: '', g: '' }])
+const removePortionDraft = (i) => setPortionsDraft(p => p.filter((_, idx) => idx !== i))
+const updatePortionDraft = (i, k, v) => setPortionsDraft(p => p.map((x, idx) => idx === i ? { ...x, [k]: v } : x))
+
+const savePortions = async () => {
+  const clean = portionsDraft
+    .filter(p => p.label.trim() && parseFloat(p.g) > 0)
+    .map(p => ({ label: p.label.trim(), g: parseFloat(p.g) }))
+  setSavingPortions(true)
+  const { error } = await supabase.from('ciqual').update({ portions: clean }).eq('alim_code', selected.alim_code)
+  setSavingPortions(false)
+  if (error) { toast('Erreur lors de la sauvegarde des portions'); return }
+  setSelected(s => ({ ...s, portions: clean }))
+  patchCachedPortions(selected.alim_code, clean)
+  setEditingPortions(false)
+  toast('Portions mises à jour')
+}
 
 // Change le nombre de doses (bouton −/+ ou saisie directe) : recalcule `qty`
 // (grammes, source de vérité pour scaleFood) à partir du nombre de doses.
@@ -735,18 +777,78 @@ const setDoseCount = (text) => {
               </>
             ) : (
               <>
-                {/* Portions chips */}
-                {selected.portions?.length > 0 && (
+                {/* Portions chips — éditables pour un aliment ciqual (voir isCiqualFood) */}
+                {(selected.portions?.length > 0 || isCiqualFood) && (
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 6 }}>Portions courantes</div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {selected.portions.map((p, i) => (
-                        <button key={i} className="chip" onClick={() => setQty(String(p.g))}>
-                          {p.label} · {p.g}g
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>Portions courantes</div>
+                      {isCiqualFood && !editingPortions && (
+                        <button
+                          onClick={startEditPortions}
+                          style={{ color: 'var(--green)', fontSize: 11.5, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Pencil size={12} /> Modifier
                         </button>
-                      ))}
-                      <button className="chip" onClick={() => setQty('100')}>100g</button>
+                      )}
                     </div>
+
+                    {!editingPortions ? (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {selected.portions.map((p, i) => (
+                          <button key={i} className="chip" onClick={() => setQty(String(p.g))}>
+                            {p.label} · {p.g}g
+                          </button>
+                        ))}
+                        <button className="chip" onClick={() => setQty('100')}>100g</button>
+                      </div>
+                    ) : (
+                      <>
+                        {portionsDraft.map((p, i) => (
+                          <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                            <input
+                              className="input"
+                              placeholder="Ex: 1 tranche"
+                              value={p.label}
+                              onChange={e => updatePortionDraft(i, 'label', e.target.value)}
+                              style={{ flex: 1 }}
+                            />
+                            <input
+                              className="input"
+                              type="number"
+                              placeholder="g"
+                              value={p.g}
+                              onChange={e => updatePortionDraft(i, 'g', e.target.value)}
+                              style={{ width: 70 }}
+                            />
+                            <span style={{ fontSize: 11, color: 'var(--text-hint)', flexShrink: 0 }}>g</span>
+                            {portionsDraft.length > 1 && (
+                              <button onClick={() => removePortionDraft(i)} style={{ color: 'var(--coral)', flexShrink: 0, fontSize: 18, lineHeight: 1 }}>×</button>
+                            )}
+                          </div>
+                        ))}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                          <button
+                            onClick={addPortionDraft}
+                            style={{ color: 'var(--green)', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            <PlusCircle size={14} /> Ajouter
+                          </button>
+                          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                            <button onClick={() => setEditingPortions(false)} style={{ color: 'var(--text-muted)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)' }}>
+                              Annuler
+                            </button>
+                            <button
+                              className="btn-primary"
+                              onClick={savePortions}
+                              disabled={savingPortions}
+                              style={{ padding: '7px 16px', fontSize: 12.5, opacity: savingPortions ? 0.7 : 1 }}
+                            >
+                              {savingPortions ? '...' : 'Enregistrer'}
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
