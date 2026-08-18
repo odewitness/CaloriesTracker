@@ -29,6 +29,10 @@ export default defineConfig({
         // quasi instantané et un minimum de résilience hors-ligne. Les appels
         // Supabase / Open Food Facts restent réseau (pas de cache API ici).
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // Injecte les écouteurs push/notificationclick (public/push-sw.js)
+        // dans le service worker généré, sans passer en stratégie
+        // injectManifest juste pour ces deux écouteurs.
+        importScripts: ['push-sw.js'],
       },
     }),
   ],
