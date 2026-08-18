@@ -16,6 +16,7 @@ import MeasurementsPage from './pages/MeasurementsPage'
 import SocialPage from './pages/SocialPage'
 import ExplorerPage from './pages/ExplorerPage'
 import Loader from './components/Loader'
+import ErrorBoundary from './components/ErrorBoundary'
 import { getLatestChangelogKey } from './lib/changelog'
 import { useFriends } from './hooks/useFriends'
 import { useSocialNotifications } from './hooks/useSocialNotifications'
@@ -385,13 +386,15 @@ function Gate() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <Routes>
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="*" element={<Gate />} />
-        </Routes>
-      </ToastProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ToastProvider>
+          <Routes>
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="*" element={<Gate />} />
+          </Routes>
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
