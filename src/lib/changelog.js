@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-18',
+    title: 'Scan de code-barres plus fiable',
+    description: "Le scanner de code-barres attend maintenant de lire deux fois le même code avant de le valider, pour éviter qu'une mauvaise lecture affiche un produit qui ne correspond pas du tout à ce que tu as scanné.",
+  },
+  {
+    date: '2026-08-18',
     title: 'Recherche Open Food Facts plus fiable, avec filtres',
     description: "Le « erreur réseau » qui apparaissait souvent en cherchant un produit emballé devrait être bien plus rare : l'app réessaie maintenant automatiquement avant d'abandonner. Et quand une recherche ramène plusieurs résultats, deux listes déroulantes apparaissent pour filtrer par marque ou par catégorie et retrouver plus vite ce que tu cherches.",
   },

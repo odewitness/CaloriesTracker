@@ -3,15 +3,40 @@ import { X, CameraOff } from 'lucide-react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { DecodeHintType, BarcodeFormat, NotFoundException } from '@zxing/library'
 
+// Valide le checksum EAN-13/EAN-8/UPC-A pour rejeter les mauvaises lectures
+function isValidChecksum(code) {
+  if (!/^\d+$/.test(code)) return false
+  const digits = code.split('').map(Number)
+  const checkDigit = digits.pop()
+  let sum = 0
+  for (let i = 0; i < digits.length; i++) {
+    const weight = (digits.length - i) % 2 === 0 ? 1 : 3
+    sum += digits[i] * weight
+  }
+  const expected = (10 - (sum % 10)) % 10
+  return expected === checkDigit
+}
+
+// Le checksum filtre déjà la grande majorité des mauvais scans, mais pas
+// tous : un code mal lu a statistiquement ~1 chance sur 10 de retomber quand
+// même sur un checksum valide. Exiger 2 lectures identiques d'affilée (quelques
+// dizaines de ms à pleine fréquence) rend un faux positif quasiment impossible,
+// sans ralentissement perceptible côté utilisatrice.
+const REQUIRED_MATCHES = 2
+
 export default function BarcodeScanner({ onDetected, onClose }) {
   const videoRef = useRef(null)
   const readerRef = useRef(null)
   const detectedRef = useRef(false)
+  const candidatesRef = useRef({}) // code -> nombre de lectures consécutives
+  const lastCodeRef = useRef(null)
   const [error, setError] = useState(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     detectedRef.current = false
+    candidatesRef.current = {}
+    lastCodeRef.current = null
 
     const hints = new Map()
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -41,9 +66,28 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           (result, err) => {
             if (detectedRef.current) return
             if (result) {
-              detectedRef.current = true
-              if (navigator.vibrate) navigator.vibrate(60)
-              onDetected(result.getText())
+              const code = result.getText()
+
+              // Rejette les codes dont le checksum est invalide (mauvaises lectures)
+              if (!isValidChecksum(code)) {
+                candidatesRef.current = {}
+                lastCodeRef.current = null
+                return
+              }
+
+              // Exige la même lecture valide plusieurs fois de suite
+              if (code === lastCodeRef.current) {
+                candidatesRef.current[code] = (candidatesRef.current[code] || 1) + 1
+              } else {
+                candidatesRef.current = { [code]: 1 }
+                lastCodeRef.current = code
+              }
+
+              if (candidatesRef.current[code] >= REQUIRED_MATCHES) {
+                detectedRef.current = true
+                if (navigator.vibrate) navigator.vibrate(60)
+                onDetected(code)
+              }
               return
             }
             if (err && !(err instanceof NotFoundException)) {
