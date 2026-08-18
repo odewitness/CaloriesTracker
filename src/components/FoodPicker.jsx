@@ -98,6 +98,7 @@ export default function FoodPicker({
   const [offCategoryFilter, setOffCategoryFilter] = useState('')
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false)
   const [favoritesVisible, setFavoritesVisible] = useState(FAVORITES_STEP)
+  const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(false)
   const [favSort, setFavSort] = useState('most') // 'recent' | 'alpha' | 'most'
   const [favSortDir, setFavSortDir] = useState('desc') // 'asc' | 'desc'
   // Édition des portions courantes d'un aliment ciqual — même geste que sur
@@ -651,21 +652,6 @@ const setDoseCount = (text) => {
 
               {!searching && query.length < 2 && (
                 <>
-                  {searchSource === 'ciqual' && meal && mealSuggestions.length > 0 && (
-                    <>
-                      <div className="section-title" style={{ marginTop: 4 }}>Suggestions pour {meal}</div>
-                      {mealSuggestions.map((food, i) => (
-                        <FoodRow
-                          key={i}
-                          food={food}
-                          isFav={isFavorite(food)}
-                          onSelect={selectFood}
-                          onToggleFav={toggleFavorite}
-                        />
-                      ))}
-                    </>
-                  )}
-
                   {searchSource === 'ciqual' && favorites.length > 0 && (
                     <>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 8 }}>
@@ -706,9 +692,35 @@ const setDoseCount = (text) => {
                     </>
                   )}
 
+                  {searchSource === 'ciqual' && meal && mealSuggestions.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => setSuggestionsCollapsed(c => !c)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginTop: favorites.length > 0 ? 16 : 4 }}
+                      >
+                        <span className="section-title" style={{ margin: 0 }}>Suggestions pour {meal}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-hint)', fontWeight: 600 }}>
+                          {mealSuggestions.length}
+                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
+                          {suggestionsCollapsed ? '▸' : '▾'}
+                        </span>
+                      </button>
+                      {!suggestionsCollapsed && mealSuggestions.map((food, i) => (
+                        <FoodRow
+                          key={i}
+                          food={food}
+                          isFav={isFavorite(food)}
+                          onSelect={selectFood}
+                          onToggleFav={toggleFavorite}
+                        />
+                      ))}
+                    </>
+                  )}
+
                   {searchSource === 'ciqual' && recentsMerged.length > 0 && (
                     <>
-                      <div className="section-title" style={{ marginTop: favorites.length > 0 ? 16 : 4 }}>Récents (100 dernières entrées)</div>
+                      <div className="section-title" style={{ marginTop: (favorites.length > 0 || (meal && mealSuggestions.length > 0)) ? 16 : 4 }}>Récents (100 dernières entrées)</div>
                       {recentsMerged.map((food, i) => (
                         <FoodRow
                           key={i}
