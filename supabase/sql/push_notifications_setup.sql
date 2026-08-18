@@ -175,10 +175,14 @@ drop trigger if exists trg_push_on_new_comment on commentaires_journal;
 create trigger trg_push_on_new_comment after insert on commentaires_journal for each row execute function push_on_new_comment();
 
 -- 8. CRON — rappel quotidien ---------------------------------------------------
--- Nécessite l'extension pg_cron (activable depuis Database > Extensions dans
--- le dashboard Supabase, ou `create extension if not exists pg_cron;` si les
--- droits le permettent). Tourne toutes les heures ; daily-reminder se gate
--- elle-même sur l'heure locale Europe/Paris (voir son code).
+-- Nécessite l'extension pg_cron : la ligne ci-dessous suffit en général,
+-- sinon l'activer depuis Database > Extensions dans le dashboard Supabase
+-- (toggle "pg_cron") avant de relancer ce bloc.
+create extension if not exists pg_cron;
+
+-- Tourne toutes les heures ; daily-reminder se gate elle-même sur l'heure
+-- locale Europe/Paris (voir son code) pour éviter de gérer le changement
+-- d'heure dans l'expression cron.
 select cron.schedule(
   'daily-reminder-hourly',
   '0 * * * *',
