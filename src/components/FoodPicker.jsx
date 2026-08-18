@@ -40,6 +40,20 @@ import EmptyState from './EmptyState'
 
 const FAVORITES_STEP = 20
 
+// Réessaie jusqu'à 3 fois (avec un court délai) en cas de réponse HTTP non-2xx
+// avant d'abandonner — cf. commentaire dans doSearch sur la fiabilité de
+// l'API Open Food Facts.
+async function fetchOFFWithRetry(url, attempts = 3) {
+  let lastStatus
+  for (let i = 0; i < attempts; i++) {
+    const res = await fetch(url)
+    if (res.ok) return res.json()
+    lastStatus = res.status
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, 500))
+  }
+  throw new Error(`Open Food Facts indisponible (${lastStatus})`)
+}
+
 export default function FoodPicker({
   title = 'Ajouter un aliment',
   confirmLabel = 'Ajouter',
@@ -72,6 +86,8 @@ export default function FoodPicker({
   const [scannerOpen, setScannerOpen] = useState(false)
   const [adjustingRecipeQty, setAdjustingRecipeQty] = useState(false)
   const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
+  const [offBrandFilter, setOffBrandFilter] = useState('')
+  const [offCategoryFilter, setOffCategoryFilter] = useState('')
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(false)
   const [favoritesVisible, setFavoritesVisible] = useState(FAVORITES_STEP)
   const [favSort, setFavSort] = useState('most') // 'recent' | 'alpha' | 'most'
@@ -160,16 +176,24 @@ export default function FoodPicker({
 
     if (searchSource === 'off') {
       try {
-        const res = await fetch(
+        // Le moteur de recherche d'Open Food Facts (world.openfoodfacts.org)
+        // répond régulièrement en 503 par intermittence (vérifié manuellement :
+        // environ un essai sur deux échoue, y compris sur son API v2 — pas un
+        // souci réseau côté client). Un simple retry avec petit délai suffit
+        // dans la grande majorité des cas. Le moteur plus récent
+        // (search.openfoodfacts.org) est plus fiable mais ne renvoie pas
+        // d'en-tête CORS pour notre origine : inutilisable depuis le navigateur.
+        const data = await fetchOFFWithRetry(
           `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=product_name,product_name_fr,categories,brands,nutriments,serving_size`
         )
-        const data = await res.json()
         const products = (data.products || [])
           .filter(p => p.product_name || p.product_name_fr)
           .map(mapOFFProduct)
         setResults(products)
+        setOffBrandFilter('')
+        setOffCategoryFilter('')
       } catch {
-        toast('Erreur réseau Open Food Facts')
+        toast('Open Food Facts est temporairement indisponible, réessaie dans un instant')
         setResults([])
       }
       setSearching(false)
@@ -231,8 +255,43 @@ export default function FoodPicker({
   // Effacer les résultats et relancer la recherche quand on change de source
   useEffect(() => {
     setResults([])
+    setOffBrandFilter('')
+    setOffCategoryFilter('')
     if (query.length >= 2) doSearch(query)
   }, [searchSource])
+
+  // Marques/catégories disponibles pour filtrer les résultats OFF affichés —
+  // calculées côté client à partir du lot déjà récupéré (25 résultats max).
+  // Pas d'appel réseau supplémentaire : l'API de facettes la plus fiable
+  // d'Open Food Facts (search.openfoodfacts.org) ne renvoie pas d'en-tête
+  // CORS pour notre origine (vérifié manuellement), donc inutilisable ici.
+  const offBrandOptions = useMemo(() => {
+    if (searchSource !== 'off') return []
+    const counts = new Map()
+    for (const f of results) {
+      if (!f.marque) continue
+      counts.set(f.marque, (counts.get(f.marque) || 0) + 1)
+    }
+    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr'))
+  }, [results, searchSource])
+
+  const offCategoryOptions = useMemo(() => {
+    if (searchSource !== 'off') return []
+    const counts = new Map()
+    for (const f of results) {
+      if (!f.categorie) continue
+      counts.set(f.categorie, (counts.get(f.categorie) || 0) + 1)
+    }
+    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr'))
+  }, [results, searchSource])
+
+  const offFilteredResults = useMemo(() => {
+    if (searchSource !== 'off') return results
+    return results.filter(f =>
+      (!offBrandFilter || f.marque === offBrandFilter) &&
+      (!offCategoryFilter || f.categorie === offCategoryFilter)
+    )
+  }, [results, searchSource, offBrandFilter, offCategoryFilter])
 
   // Entrée = lance la recherche immédiatement et ferme le clavier
   const handleSearchKeyDown = (e) => {
@@ -248,15 +307,14 @@ export default function FoodPicker({
     if (!code) return
     setBarcodeLoading(true)
     try {
-      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
-      const data = await res.json()
+      const data = await fetchOFFWithRetry(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
       if (data.status === 1 && data.product) {
         selectFood(mapOFFProduct(data.product))
       } else {
         toast('Produit non trouvé dans Open Food Facts')
       }
     } catch {
-      toast('Erreur réseau')
+      toast('Open Food Facts est temporairement indisponible, réessaie dans un instant')
     }
     setBarcodeLoading(false)
   }
@@ -489,6 +547,37 @@ const setDoseCount = (text) => {
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               {searching && <Loader label="Recherche..." />}
 
+              {!searching && searchSource === 'off' && results.length > 0 && (offBrandOptions.length > 1 || offCategoryOptions.length > 1) && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+                  {offBrandOptions.length > 1 && (
+                    <select
+                      className="input"
+                      style={{ flex: 1, fontSize: 12.5, padding: '8px 10px' }}
+                      value={offBrandFilter}
+                      onChange={e => setOffBrandFilter(e.target.value)}
+                    >
+                      <option value="">Toutes les marques</option>
+                      {offBrandOptions.map(([brand, count]) => (
+                        <option key={brand} value={brand}>{brand} ({count})</option>
+                      ))}
+                    </select>
+                  )}
+                  {offCategoryOptions.length > 1 && (
+                    <select
+                      className="input"
+                      style={{ flex: 1, fontSize: 12.5, padding: '8px 10px' }}
+                      value={offCategoryFilter}
+                      onChange={e => setOffCategoryFilter(e.target.value)}
+                    >
+                      <option value="">Toutes les catégories</option>
+                      {offCategoryOptions.map(([cat, count]) => (
+                        <option key={cat} value={cat}>{cat} ({count})</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
               {!searching && query.length >= 2 && results.length === 0 && (
                 <EmptyState>
                   {searchSource === 'off'
@@ -497,7 +586,11 @@ const setDoseCount = (text) => {
                 </EmptyState>
               )}
 
-              {!searching && query.length >= 2 && results.map((food, i) => (
+              {!searching && query.length >= 2 && results.length > 0 && offFilteredResults.length === 0 && (
+                <EmptyState>Aucun résultat avec ces filtres</EmptyState>
+              )}
+
+              {!searching && query.length >= 2 && offFilteredResults.map((food, i) => (
                 <FoodRow
                   key={food.id || food.alim_code || i}
                   food={food}

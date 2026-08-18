@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-18',
+    title: 'Recherche Open Food Facts plus fiable, avec filtres',
+    description: "Le « erreur réseau » qui apparaissait souvent en cherchant un produit emballé devrait être bien plus rare : l'app réessaie maintenant automatiquement avant d'abandonner. Et quand une recherche ramène plusieurs résultats, deux listes déroulantes apparaissent pour filtrer par marque ou par catégorie et retrouver plus vite ce que tu cherches.",
+  },
+  {
     date: '2026-08-17',
     title: 'Favoris plus faciles à parcourir',
     description: "Quand tu ajoutes un aliment à ton journal, la liste de tes favoris ne s'affiche plus qu'en partie (les 20 premiers) avec un bouton pour voir les suivants — plus pratique maintenant que tu en as beaucoup. Le nombre total de favoris est aussi indiqué à côté du titre. Et le bouton + de la page Explorer a maintenant le même style que celui d'Aujourd'hui.",
