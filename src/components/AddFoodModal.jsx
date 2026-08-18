@@ -23,6 +23,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       confirmLabel="Ajouter au journal"
       contextLabel={<>Ajout à : <strong style={{ color: 'var(--text)' }}>{meal}</strong></>}
       includeRecipes={true}
+      meal={meal}
       onConfirm={handleConfirm}
       onClose={onClose}
     />

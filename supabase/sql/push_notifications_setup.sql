@@ -13,8 +13,10 @@
 --      Postgres, pas par le navigateur, donc pas de JWT Supabase à
 --      présenter — la protection vient du header x-push-secret vérifié dans
 --      le code de chaque fonction.
---   2. Leurs secrets définis : VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
---      PUSH_TRIGGER_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+--   2. Leurs secrets définis (dashboard → Edge Functions → Secrets) :
+--      VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, PUSH_TRIGGER_SECRET.
+--      SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont déjà injectées
+--      automatiquement par Supabase, pas besoin de les définir.
 --   3. PUSH_TRIGGER_SECRET doit être IDENTIQUE à la valeur codée en dur
 --      ci-dessous — même convention que les identifiants Supabase déjà en
 --      dur dans src/lib/supabase.js (app perso, pas de .env, pas de

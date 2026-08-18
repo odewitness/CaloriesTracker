@@ -5,6 +5,7 @@ import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { useFavorites, foodIdentity } from '../hooks/useFavorites'
 import { useRecentFoods } from '../hooks/useRecentFoods'
+import { useMealSuggestions } from '../hooks/useMealSuggestions'
 import { patchCachedPortions } from '../hooks/useCiqualCatalog'
 import BarcodeScanner from './BarcodeScanner'
 import { useBackButton } from '../hooks/useBackButton'
@@ -32,6 +33,10 @@ import EmptyState from './EmptyState'
 //   contextLabel   — ligne optionnelle affichée sous la config (ex: "Ajout à : Déjeuner")
 //   includeRecipes — si false, les recettes n'apparaissent pas dans les résultats
 //                    (évite d'imbriquer une recette dans une autre recette)
+//   meal           — OPTIONNEL : si fourni, affiche une section "Suggestions"
+//                    (aliments les plus fréquents pour CE repas, voir
+//                    useMealSuggestions) au-dessus des Favoris. Absent pour
+//                    RecipeFormModal (pas de notion de repas côté recette).
 //   onConfirm(food, qty) — appelé à la validation ; le CALLER se charge de
 //                          transformer (food, qty) en objet persistable via
 //                          scaleFood() de lib/nutrients.js, avec ses propres
@@ -60,6 +65,7 @@ export default function FoodPicker({
   confirmLabel = 'Ajouter',
   contextLabel,
   includeRecipes = true,
+  meal,
   onConfirm,
   onClose,
 }) {
@@ -68,6 +74,7 @@ export default function FoodPicker({
   const { user } = useAuth()
   const { favorites, isFavorite, toggleFavorite } = useFavorites()
   const { recents } = useRecentFoods()
+  const { suggestions: mealSuggestions } = useMealSuggestions(meal)
   const [step, setStep] = useState('search') // search | configure
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -644,6 +651,21 @@ const setDoseCount = (text) => {
 
               {!searching && query.length < 2 && (
                 <>
+                  {searchSource === 'ciqual' && meal && mealSuggestions.length > 0 && (
+                    <>
+                      <div className="section-title" style={{ marginTop: 4 }}>Suggestions pour {meal}</div>
+                      {mealSuggestions.map((food, i) => (
+                        <FoodRow
+                          key={i}
+                          food={food}
+                          isFav={isFavorite(food)}
+                          onSelect={selectFood}
+                          onToggleFav={toggleFavorite}
+                        />
+                      ))}
+                    </>
+                  )}
+
                   {searchSource === 'ciqual' && favorites.length > 0 && (
                     <>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 8 }}>
@@ -699,7 +721,7 @@ const setDoseCount = (text) => {
                     </>
                   )}
 
-                  {(searchSource === 'off' || (favorites.length === 0 && recentsMerged.length === 0)) && (
+                  {(searchSource === 'off' || (favorites.length === 0 && recentsMerged.length === 0 && mealSuggestions.length === 0)) && (
                     <EmptyState>
                       {searchSource === 'off'
                         ? 'Tape le nom d\'un produit emballé (marque, référence…)'

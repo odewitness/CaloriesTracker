@@ -3,10 +3,24 @@
 // gate elle-même sur l'heure locale Europe/Paris plutôt que de dépendre
 // d'une expression cron en UTC — évite d'avoir à ajuster l'heure du cron au
 // changement heure d'été/hiver.
-import { sendToUsers, supabaseAdmin } from '../_shared/webpush.ts'
+//
+// Fichier volontairement autonome (pas d'import partagé avec
+// send-push/index.ts) pour permettre un déploiement par copier/coller dans
+// l'éditeur du dashboard Supabase, sans avoir besoin de la CLI.
+import webpush from 'npm:web-push@3.6.7'
+import { createClient } from 'npm:@supabase/supabase-js@2'
+
+const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY')!
+const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')!
+const PUSH_TRIGGER_SECRET = Deno.env.get('PUSH_TRIGGER_SECRET')!
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+webpush.setVapidDetails('mailto:remplace-moi@example.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 const TARGET_HOUR = 17 // heure locale Europe/Paris à laquelle envoyer le rappel
-const PUSH_TRIGGER_SECRET = Deno.env.get('PUSH_TRIGGER_SECRET')!
 
 function parisHour(): number {
   return parseInt(
@@ -18,6 +32,25 @@ function parisHour(): number {
 function parisDateStr(): string {
   // Format 'YYYY-MM-DD', comparable directement aux colonnes `date` Postgres.
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+}
+
+async function sendToUser(userId: string, payload: { title: string; body: string; url: string }) {
+  const { data: subs } = await supabaseAdmin.from('push_subscriptions').select('*').eq('user_id', userId)
+  for (const sub of subs || []) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        JSON.stringify(payload)
+      )
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number })?.statusCode
+      if (statusCode === 404 || statusCode === 410) {
+        await supabaseAdmin.from('push_subscriptions').delete().eq('id', sub.id)
+      } else {
+        console.error('push send error', sub.id, err)
+      }
+    }
+  }
 }
 
 Deno.serve(async (req) => {
@@ -70,7 +103,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (title) await sendToUsers([row.user_id], { title, body, url: '/today' })
+    if (title) await sendToUser(row.user_id, { title, body, url: '/today' })
 
     await supabaseAdmin.from('settings').update({ last_reminder_sent_date: today }).eq('user_id', row.user_id)
   }
