@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-18',
+    title: 'Un calculateur pour trouver tes calories',
+    description: "Dans Profil, un nouveau calculateur estime tes besoins caloriques à partir de ton sexe, ton âge, ta taille, ton poids et ton niveau d'activité (à renseigner une fois dans tes informations personnelles). Choisis perte de poids, maintien ou prise de muscle, et applique le résultat directement à tes objectifs en un clic. Les anciens boutons de préréglages ont disparu au profit de ce calcul personnalisé.",
+  },
+  {
+    date: '2026-08-18',
     title: 'Des notifications pour ne rien manquer',
     description: "Tu peux maintenant activer les notifications depuis Profil > Notifications. Elles te préviennent si tu n'as encore rien noté en fin d'après-midi (ou si un repas planifié attend d'être marqué mangé), et quand une amie partage quelque chose, réagit ou commente un de tes partages. Ça marche mieux si tu ajoutes l'app à ton écran d'accueil.",
   },

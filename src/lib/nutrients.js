@@ -309,6 +309,85 @@ export function computeMealTargets(settings) {
   return targets
 }
 
+// ── computeCalorieNeeds ──────────────────────────────────────────────────────
+// Estimation des besoins caloriques (BMR + TDEE) via la formule de
+// Mifflin-St Jeor, la plus fiable en usage général (référence utilisée par
+// ProfilePage.jsx pour le calculateur "besoins caloriques").
+//
+//   BMR (homme)  = 10×poids(kg) + 6,25×taille(cm) − 5×âge + 5
+//   BMR (femme)  = 10×poids(kg) + 6,25×taille(cm) − 5×âge − 161
+//   TDEE = BMR × multiplicateur d'activité
+//
+// Pour perte/prise, l'ajustement kcal n'est pas un forfait fixe : il est
+// dérivé du poids objectif et de la durée choisis par l'utilisatrice, via
+// l'équivalence ≈ 7700 kcal par kg de masse grasse (référence usuelle) :
+//   ajustement/jour = (poids_objectif − poids_actuel) × 7700 / (durée_semaines × 7)
+
+export const ACTIVITY_LEVELS = [
+  { key: 'sedentaire', mult: 1.2,   label: 'Sédentaire',           desc: 'Peu ou pas d’exercice, travail assis' },
+  { key: 'leger',      mult: 1.375, label: 'Légèrement actif',     desc: 'Sport léger 1 à 3 j/semaine' },
+  { key: 'modere',     mult: 1.55,  label: 'Modérément actif',     desc: 'Sport modéré 3 à 5 j/semaine' },
+  { key: 'actif',      mult: 1.725, label: 'Très actif',           desc: 'Sport intense 6 à 7 j/semaine' },
+  { key: 'tres_actif', mult: 1.9,   label: 'Extrêmement actif',    desc: 'Sport quotidien + travail physique' },
+]
+
+const KCAL_PER_KG = 7700 // équivalence énergétique usuelle d'1 kg de masse grasse
+
+// `maxSafePaceKg` : rythme hebdomadaire au-delà duquel on avertit (perte trop
+// rapide = risque de fonte musculaire, prise trop rapide = surtout du gras).
+export const CALORIE_OBJECTIVES = [
+  { key: 'perte',    label: 'Perte de poids',   protPerKg: 2.0, fatShare: 0.25, maxSafePaceKg: 1 },
+  { key: 'maintien', label: 'Maintien',         protPerKg: 1.6, fatShare: 0.30, maxSafePaceKg: null },
+  { key: 'prise',    label: 'Prise de muscle',  protPerKg: 1.8, fatShare: 0.25, maxSafePaceKg: 0.5 },
+]
+
+// `sexe` : 'H' ou 'F'. Retourne null si sexe/âge/taille/poids manquent.
+// Pour perte/prise, sans `objectiveWeightKg`+`objectiveWeeks` renseignés,
+// retourne quand même bmr/tdee mais targetKcal/macros/paceKgPerWeek à null
+// (rien à appliquer tant que l'objectif de poids n'est pas précisé).
+export function computeCalorieNeeds({ sexe, age, tailleCm, poidsKg, activityKey, objectiveKey, objectiveWeightKg, objectiveWeeks }) {
+  if (!sexe || !age || !tailleCm || !poidsKg) return null
+  const activity  = ACTIVITY_LEVELS.find(a => a.key === activityKey) || ACTIVITY_LEVELS[1]
+  const objective = CALORIE_OBJECTIVES.find(o => o.key === objectiveKey) || CALORIE_OBJECTIVES[1]
+
+  const bmr = 10 * poidsKg + 6.25 * tailleCm - 5 * age + (sexe === 'H' ? 5 : -161)
+  const tdee = bmr * activity.mult
+
+  let delta = 0
+  let paceKgPerWeek = null
+  let unsafePace = false
+  if (objective.key !== 'maintien') {
+    if (!objectiveWeightKg || !objectiveWeeks) {
+      return { bmr: Math.round(bmr), tdee: Math.round(tdee), targetKcal: null, paceKgPerWeek: null, unsafePace: false, macros: null }
+    }
+    const diffKg = objectiveWeightKg - poidsKg
+    paceKgPerWeek = diffKg / objectiveWeeks
+    delta = (diffKg * KCAL_PER_KG) / (objectiveWeeks * 7)
+    unsafePace = objective.maxSafePaceKg != null && Math.abs(paceKgPerWeek) > objective.maxSafePaceKg
+  }
+
+  const targetKcal = Math.max(1200, tdee + delta)
+  const prot = objective.protPerKg * poidsKg
+  const lip  = (targetKcal * objective.fatShare) / 9
+  const gluc = Math.max(0, (targetKcal - prot * 4 - lip * 9) / 4)
+  const fib  = Math.max(25, Math.round((targetKcal / 1000) * 14))
+
+  return {
+    bmr: Math.round(bmr),
+    tdee: Math.round(tdee),
+    targetKcal: Math.round(targetKcal),
+    paceKgPerWeek,
+    unsafePace,
+    macros: {
+      goal_kcal: Math.round(targetKcal),
+      goal_proteines: Math.round(prot),
+      goal_glucides: Math.round(gluc),
+      goal_lipides: Math.round(lip),
+      goal_fibres: fib,
+    },
+  }
+}
+
 // ── computeTotals ────────────────────────────────────────────────────────
 // Somme les entrées `journal` (ou tout tableau d'objets shape scaleFood())
 // en un objet de totaux { kcal, prot, gluc, lip, fib, ...ALL_NUTRIENT_KEYS }.

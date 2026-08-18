@@ -6,19 +6,11 @@ import { useMeasurements } from '../hooks/useMeasurements'
 import { usePushSubscription } from '../hooks/usePushSubscription'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { User, Calendar, Scale, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill, ChevronRight, Bell, Users } from 'lucide-react'
-import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
+import { User, Calendar, Scale, Ruler, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill, ChevronRight, Bell, Users, Calculator } from 'lucide-react'
+import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS, computeCalorieNeeds, ACTIVITY_LEVELS, CALORIE_OBJECTIVES } from '../lib/nutrients'
 import Loader from '../components/Loader'
 
 const MEAL_ICONS = { 'Petit-déjeuner': Coffee, 'Déjeuner': Sun, 'Dîner': Moon, 'Collation': Cookie }
-
-const PRESETS = [
-  { label: 'Perte de poids (femme)', kcal: 1400, prot: 100, gluc: 130, lip: 50, fib: 30 },
-  { label: 'Perte de poids (homme)', kcal: 1700, prot: 130, gluc: 160, lip: 60, fib: 35 },
-  { label: 'Maintien (femme)',        kcal: 1900, prot: 90,  gluc: 210, lip: 70, fib: 30 },
-  { label: 'Maintien (homme)',        kcal: 2400, prot: 110, gluc: 270, lip: 85, fib: 35 },
-  { label: 'Prise de muscle (homme)', kcal: 2800, prot: 170, gluc: 320, lip: 90, fib: 35 },
-]
 
 function Row({ icon, label, children }) {
   return (
@@ -50,6 +42,24 @@ function ToggleSwitch({ checked, onClick }) {
 }
 
 function GoalField({ icon, label, value, unit, color, onChange }) {
+  // Buffer texte local : évite qu'effacer le champ pour taper une nouvelle
+  // valeur ne le fasse passer furtivement par 0 (voir CLAUDE.md / historique).
+  const [text, setText] = useState(String(value))
+  useEffect(() => { setText(String(value)) }, [value])
+
+  const handleChange = (e) => {
+    const v = e.target.value
+    setText(v)
+    if (v === '') return // en cours d'effacement, ne pas forcer 0 tant que rien n'est retapé
+    const num = parseInt(v, 10)
+    if (!isNaN(num)) onChange(num)
+  }
+
+  const handleBlur = () => {
+    // Champ laissé vide ou invalide au blur : revient à la dernière valeur valide
+    if (text === '' || isNaN(parseInt(text, 10))) setText(String(value))
+  }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderBottom: '0.5px solid var(--border)', gap: 12 }}>
       <div style={{ color, flexShrink: 0 }}>{icon}</div>
@@ -60,12 +70,160 @@ function GoalField({ icon, label, value, unit, color, onChange }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <input
           type="number"
-          value={value}
-          onChange={e => onChange(parseInt(e.target.value) || 0)}
+          value={text}
+          onChange={handleChange}
+          onBlur={handleBlur}
           style={{ width: 72, textAlign: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 6px', fontSize: 15, fontWeight: 700, fontFamily: 'var(--font)', color, background: 'var(--gray-bg)', outline: 'none' }}
         />
         <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 24 }}>{unit}</span>
       </div>
+    </div>
+  )
+}
+
+function CalorieCalculatorCard({ sexe, tailleCm, niveauActivite, onActivite, objective, onObjective, targetWeight, onTargetWeight, weeks, onWeeks, poidsKg, age, onOpenMeasurements, onApply }) {
+  const missing = []
+  if (!sexe) missing.push('sexe')
+  if (!age) missing.push('âge')
+  if (!tailleCm) missing.push('taille')
+  if (!poidsKg) missing.push('poids')
+  const missingLabel = missing.length > 1
+    ? missing.slice(0, -1).join(', ') + ' et ' + missing[missing.length - 1]
+    : missing[0]
+
+  const needsWeightGoal = objective !== 'maintien'
+  const objectiveWeightKg = targetWeight ? parseFloat(targetWeight) : null
+  const objectiveWeeks = weeks ? parseFloat(weeks) : null
+
+  // Pour la perte, le poids objectif doit être inférieur au poids actuel (et
+  // inversement pour la prise) — sinon le calcul donnerait un ajustement dans
+  // le mauvais sens (ex. un surplus alors qu'on a choisi « Perte de poids »).
+  const wrongDirection = needsWeightGoal && poidsKg != null && objectiveWeightKg != null && (
+    (objective === 'perte' && objectiveWeightKg >= poidsKg) ||
+    (objective === 'prise' && objectiveWeightKg <= poidsKg)
+  )
+
+  const needs = wrongDirection ? null : computeCalorieNeeds({
+    sexe,
+    age: age ? parseInt(age, 10) : null,
+    tailleCm: tailleCm ? parseFloat(tailleCm) : null,
+    poidsKg,
+    activityKey: niveauActivite,
+    objectiveKey: objective,
+    objectiveWeightKg: needsWeightGoal ? objectiveWeightKg : null,
+    objectiveWeeks: needsWeightGoal ? objectiveWeeks : null,
+  })
+
+  return (
+    <div className="card" style={{ padding: '14px 16px', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+        <Calculator size={16} color="var(--green)" />
+        <div style={{ fontWeight: 700, fontSize: 14 }}>Calculateur de besoins caloriques</div>
+      </div>
+
+      {missing.length > 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 12, lineHeight: 1.5 }}>
+          Il manque : {missingLabel}, pour voir l'estimation (sexe, âge et taille se règlent dans tes informations personnelles ci-dessus).
+        </div>
+      )}
+
+      <div onClick={onOpenMeasurements} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, cursor: 'pointer' }}>
+        <div style={{ flex: 1, fontSize: 13 }}>Poids</div>
+        <span style={{ fontSize: 13, color: poidsKg != null ? 'var(--text)' : 'var(--coral)', fontWeight: 600 }}>
+          {poidsKg != null ? `${poidsKg} kg` : 'à renseigner'}
+        </span>
+        <ChevronRight size={14} color="var(--text-hint)" />
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 6 }}>Niveau d'activité</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {ACTIVITY_LEVELS.map(a => (
+            <button key={a.key} onClick={() => onActivite(a.key)} style={{
+              textAlign: 'left', padding: '8px 10px', borderRadius: 8, fontFamily: 'var(--font)',
+              border: `1.5px solid ${niveauActivite === a.key ? 'var(--green)' : 'var(--border)'}`,
+              background: niveauActivite === a.key ? 'var(--green-light)' : 'var(--white)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: niveauActivite === a.key ? 'var(--green-dark)' : 'var(--text)' }}>{a.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>{a.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: needsWeightGoal ? 10 : 14 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 6 }}>Objectif</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {CALORIE_OBJECTIVES.map(o => (
+            <button key={o.key} onClick={() => onObjective(o.key)} style={{
+              flex: 1, padding: '8px 4px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)',
+              background: objective === o.key ? 'var(--green)' : 'var(--green-light)',
+              color: objective === o.key ? 'white' : 'var(--green-dark)',
+            }}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {needsWeightGoal && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Poids objectif</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="number" value={targetWeight} onChange={e => onTargetWeight(e.target.value)} placeholder="—"
+                style={{ width: '100%', textAlign: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 6px', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font)', color: 'var(--text)', background: 'var(--gray-bg)', outline: 'none' }}
+              />
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>kg</span>
+            </div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>En combien de temps</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="number" value={weeks} onChange={e => onWeeks(e.target.value)} placeholder="—"
+                style={{ width: '100%', textAlign: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 6px', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font)', color: 'var(--text)', background: 'var(--gray-bg)', outline: 'none' }}
+              />
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>sem.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {wrongDirection && (
+        <div style={{ fontSize: 12, color: 'var(--coral)', marginBottom: 12, lineHeight: 1.5 }}>
+          {objective === 'perte'
+            ? 'Ton poids objectif doit être inférieur à ton poids actuel pour une perte de poids.'
+            : 'Ton poids objectif doit être supérieur à ton poids actuel pour une prise de muscle.'}
+        </div>
+      )}
+
+      {needs && needs.macros ? (
+        <div style={{ background: 'var(--gray-bg)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-hint)' }}>Métabolisme de base : <strong style={{ color: 'var(--text)' }}>{needs.bmr} kcal</strong></div>
+          <div style={{ fontSize: 12, color: 'var(--text-hint)' }}>Dépense totale (maintien) : <strong style={{ color: 'var(--text)' }}>{needs.tdee} kcal</strong></div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--coral)', marginTop: 6 }}>
+            Objectif estimé : {needs.targetKcal} kcal/jour
+          </div>
+          {needs.paceKgPerWeek != null && (
+            <div style={{ fontSize: 11, color: needs.unsafePace ? 'var(--coral)' : 'var(--text-hint)', marginTop: 2 }}>
+              Rythme : ≈ {needs.paceKgPerWeek > 0 ? '+' : ''}{needs.paceKgPerWeek.toFixed(2)} kg/semaine
+              {needs.unsafePace && (objective === 'perte'
+                ? ' — plus rapide que recommandé (max ~1 kg/semaine), risque de fonte musculaire et de reprise'
+                : ' — plus rapide que recommandé (max ~0,5 kg/semaine), au-delà c\'est surtout du gras')}
+            </div>
+          )}
+        </div>
+      ) : (missing.length === 0 && needsWeightGoal && !wrongDirection && (!targetWeight || !weeks)) ? (
+        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 12, lineHeight: 1.5 }}>
+          Renseigne ton poids objectif et la durée pour voir l'estimation.
+        </div>
+      ) : null}
+
+      <button className="btn-primary" disabled={!needs || !needs.macros} onClick={() => onApply(needs)} style={{ opacity: (needs && needs.macros) ? 1 : 0.5 }}>
+        Appliquer ces valeurs aux objectifs
+      </button>
     </div>
   )
 }
@@ -184,6 +342,12 @@ export default function ProfilePage() {
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [age, setAge] = useState('')
+  const [sexe, setSexe] = useState('')
+  const [tailleCm, setTailleCm] = useState('')
+  const [niveauActivite, setNiveauActivite] = useState('')
+  const [calcObjective, setCalcObjective] = useState('maintien')
+  const [calcTargetWeight, setCalcTargetWeight] = useState('')
+  const [calcWeeks, setCalcWeeks] = useState('')
   const [profileDirty, setProfileDirty] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
 
@@ -192,6 +356,9 @@ export default function ProfilePage() {
       setPrenom(profile.prenom || '')
       setNom(profile.nom || '')
       setAge(profile.age ?? '')
+      setSexe(profile.sexe || '')
+      setTailleCm(profile.taille_cm ?? '')
+      setNiveauActivite(profile.niveau_activite || '')
     }
   }, [profile])
 
@@ -203,6 +370,9 @@ export default function ProfilePage() {
       prenom: prenom.trim() || null,
       nom: nom.trim() || null,
       age: age !== '' ? parseInt(age) : null,
+      sexe: sexe || null,
+      taille_cm: tailleCm !== '' ? parseFloat(tailleCm) : null,
+      niveau_activite: niveauActivite || null,
     })
     setSavingProfile(false)
     if (!error) { toast('✓ Profil mis à jour !'); setProfileDirty(false) }
@@ -219,15 +389,25 @@ export default function ProfilePage() {
 
   const setGoal = (k, v) => { setGoals(g => ({ ...g, [k]: v })); setGoalsDirty(true) }
 
+  // Champs réellement gérés par cette section. `goals` est une copie figée de
+  // `settings` prise au chargement de la page : si on renvoyait l'objet entier
+  // à la sauvegarde, on écraserait en base tout changement fait entre-temps
+  // ailleurs sur la page (ex. toggle notification), avec sa valeur périmée.
+  const GOAL_FIELDS = ['goal_kcal', 'goal_proteines', 'goal_glucides', 'goal_lipides', 'goal_fibres', 'meal_overrides', 'meal_enabled']
+
   const saveGoals = async () => {
-    await updateSettings(goals)
+    const patch = {}
+    for (const k of GOAL_FIELDS) patch[k] = goals[k]
+    await updateSettings(patch)
     setGoalsDirty(false)
     toast('✓ Objectifs sauvegardés !')
   }
 
-  const applyPreset = (p) => {
-    setGoals(g => ({ ...g, goal_kcal: p.kcal, goal_proteines: p.prot, goal_glucides: p.gluc, goal_lipides: p.lip, goal_fibres: p.fib }))
+  const applyCalorieNeeds = (needs) => {
+    if (!needs) return
+    setGoals(g => ({ ...g, ...needs.macros }))
     setGoalsDirty(true)
+    toast('✓ Objectifs mis à jour, pense à les sauvegarder ci-dessous')
   }
 
   // ── Répartition par repas (auto basé sur la science, surchargeable) ────
@@ -300,6 +480,24 @@ export default function ProfilePage() {
         <Row icon={<Calendar size={18} />} label="Âge">
           <input className="input-sm" type="number" value={age} onChange={e => markProfileDirty(setAge)(e.target.value)} placeholder="—" />
         </Row>
+        <Row icon={<User size={18} />} label="Sexe">
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[['F', 'Femme'], ['H', 'Homme']].map(([key, label]) => (
+              <button key={key} onClick={() => markProfileDirty(setSexe)(key)} style={{
+                padding: '6px 10px', borderRadius: 7, fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)',
+                background: sexe === key ? 'var(--green)' : 'var(--gray-bg)',
+                color: sexe === key ? 'white' : 'var(--text-muted)',
+                border: '1px solid var(--border)',
+              }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <Row icon={<Ruler size={18} />} label="Taille">
+          <input className="input-sm" type="number" style={{ width: 64 }} value={tailleCm} onChange={e => markProfileDirty(setTailleCm)(e.target.value)} placeholder="—" />
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>cm</span>
+        </Row>
         <div
           onClick={openMeasurements}
           style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderBottom: '0.5px solid var(--border)', gap: 12, cursor: 'pointer' }}
@@ -325,15 +523,22 @@ export default function ProfilePage() {
         <div className="section-title" style={{ marginBottom: 0 }}>Objectifs nutritionnels</div>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {PRESETS.map(p => (
-            <button key={p.label} className="chip" onClick={() => applyPreset(p)} style={{ fontSize: 11 }}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <CalorieCalculatorCard
+        sexe={sexe}
+        tailleCm={tailleCm}
+        niveauActivite={niveauActivite}
+        onActivite={markProfileDirty(setNiveauActivite)}
+        objective={calcObjective}
+        onObjective={setCalcObjective}
+        targetWeight={calcTargetWeight}
+        onTargetWeight={setCalcTargetWeight}
+        weeks={calcWeeks}
+        onWeeks={setCalcWeeks}
+        poidsKg={latestWeight}
+        age={age}
+        onOpenMeasurements={openMeasurements}
+        onApply={applyCalorieNeeds}
+      />
 
       <div className="card" style={{ marginBottom: goalsDirty ? 12 : 20, overflow: 'hidden' }}>
         <GoalField icon={<Flame size={18} />}    label="Calories"   value={goals.goal_kcal}      unit="kcal" color="var(--coral)"  onChange={v => setGoal('goal_kcal', v)} />

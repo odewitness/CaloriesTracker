@@ -304,7 +304,15 @@ create table if not exists profiles (
   updated_at timestamptz default now(),
   -- Ajoutée après coup pour le fil social (recherche d'amies, affichage des
   -- auteures) ; unicité non confirmée côté base.
-  pseudo text
+  pseudo text,
+  -- Ajoutées le 2026-08-18 pour le calculateur de besoins caloriques
+  -- (BMR/TDEE, voir supabase/sql/calorie_needs_profile_setup.sql). 'H'/'F'.
+  sexe text,
+  -- Taille corporelle (hauteur) en cm — à ne pas confondre avec
+  -- mensurations.taille_cm qui est le tour de taille.
+  taille_cm numeric,
+  -- 'sedentaire' | 'leger' | 'modere' | 'actif' | 'tres_actif'
+  niveau_activite text
 );
 
 -- 7. TABLE RECETTES (plats maison, valeurs nutritionnelles pour 100g)
