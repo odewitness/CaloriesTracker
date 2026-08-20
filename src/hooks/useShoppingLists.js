@@ -210,6 +210,24 @@ export function useShoppingListItems(listeId) {
     return addItems(toAdd)
   }
 
+  // ── Ajoute un aliment suggéré (voir useGroceriesSuggestions), en résolvant
+  // sa catégorie au préalable — même logique que pour les ingrédients de
+  // recette/repas type. suggestion : { food_source, food_ref_id, food_name }.
+  const addSuggestedItem = async (suggestion) => {
+    const [withCategory] = await resolveCategories([{
+      food_source: suggestion.food_source,
+      food_ref_id: suggestion.food_ref_id,
+      food_name: suggestion.food_name,
+    }])
+    return addItems([{
+      nom: suggestion.food_name,
+      categorie: withCategory.categorie,
+      qty_g: null,
+      food_source: suggestion.food_source,
+      food_ref_id: suggestion.food_ref_id,
+    }])
+  }
+
   const toggleChecked = async (id, checked) => {
     setItems(it => it.map(x => x.id === id ? { ...x, checked } : x)) // optimiste
     const { error } = await supabase
@@ -243,5 +261,5 @@ export function useShoppingListItems(listeId) {
     return { error }
   }
 
-  return { items, loading, addItems, addRecetteIngredients, addRepasItems, toggleChecked, deleteItem, clearChecked, refetch: load }
+  return { items, loading, addItems, addRecetteIngredients, addRepasItems, addSuggestedItem, toggleChecked, deleteItem, clearChecked, refetch: load }
 }

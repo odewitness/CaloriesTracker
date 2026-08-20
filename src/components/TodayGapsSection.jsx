@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Lightbulb, Plus, ChevronDown } from 'lucide-react'
 import { useFavorites, foodIdentity } from '../hooks/useFavorites'
 import { useRecentFoods } from '../hooks/useRecentFoods'
 import { portionGapCoverage, formatValue } from '../lib/ciqualExplorer'
 import { scaleFood } from '../lib/nutrients'
+import { logSuggestions } from '../lib/suggestionsLog'
 import NutrientGapsBanner from './NutrientGapsBanner'
 import AllGapsSheet from './AllGapsSheet'
 import AddToJournalSheet from './AddToJournalSheet'
@@ -98,6 +99,12 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
     }
     return out
   }, [top10Gaps, favorites, recents])
+
+  // Trace ce qui a réellement été montré : c'est la matière première de la
+  // section "Suggestions" de la liste de courses (voir
+  // useGroceriesSuggestions.js), qui fait remonter les aliments les plus
+  // fréquents parmi ceux suggérés ici au fil du temps.
+  useEffect(() => { logSuggestions(suggestions) }, [suggestions])
 
   const handleQuickAdd = (suggestion) => {
     setQuickAdd({

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-20',
+    title: 'Des suggestions dans ta liste de courses',
+    description: "Ta liste de courses affiche maintenant une section \"Suggestions\" : les aliments qui reviennent le plus souvent dans les conseils \"À combler aujourd'hui\" de ta page du jour (par exemple des sardines si tu manques souvent de vitamine D). Un tap sur le \"+\" les ajoute directement à ta liste.",
+  },
+  {
+    date: '2026-08-20',
     title: "Le grammage qui comble ton manque, même sans limite de calories",
     description: "Dans l'Explorer, quand tu sélectionnes un manque, chaque aliment t'indique maintenant directement le nombre de grammes qui le comble, à la place du taux pour 100 g — plus besoin de cocher \"tient dans mes calories restantes\" pour l'avoir.",
   },

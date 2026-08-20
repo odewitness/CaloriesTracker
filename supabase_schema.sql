@@ -734,6 +734,25 @@ create table if not exists push_subscriptions (
   created_at timestamptz not null default now()
 );
 
+-- 25. TABLE SUGGESTIONS_MANQUES (historique des aliments suggérés pour
+-- combler un manque nutritionnel, voir supabase/sql/suggestions_manques_setup.sql
+-- pour le SQL complet — écrit le 2026-08-20. Alimentée depuis
+-- TodayGapsSection.jsx (voir src/lib/suggestionsLog.js), lue/agrégée par
+-- useGroceriesSuggestions.js pour faire remonter les aliments les plus
+-- souvent suggérés dans la section "Suggestions" de la liste de courses.
+create table if not exists suggestions_manques (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  food_source text not null default 'ciqual', -- 'ciqual' | 'custom' | 'off' (rare)
+  food_ref_id text,
+  food_name text not null,
+  nutrient_key text not null, -- ex. 'vit_d', 'fer' — voir VITAMIN_FIELDS/MINERAL_FIELDS/MACRO_FIELDS dans src/lib/nutrients.js
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_suggestions_manques_user_date
+  on suggestions_manques (user_id, created_at desc);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -784,6 +803,11 @@ create policy "mensurations_delete_own" on mensurations
 -- — pas de policy update, le client supprime + réinsère plutôt que de
 -- modifier une ligne existante.
 alter table push_subscriptions enable row level security;
+
+-- RLS activé sur suggestions_manques dès sa création (2026-08-20), policies
+-- select/insert "own" (voir supabase/sql/suggestions_manques_setup.sql) — pas
+-- de policy update/delete, historique en écriture seule côté client.
+alter table suggestions_manques enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

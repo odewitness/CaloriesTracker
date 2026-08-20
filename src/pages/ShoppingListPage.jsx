@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react'
-import { Plus, ChevronLeft, Trash2, X, Check, ShoppingCart, Pencil } from 'lucide-react'
+import { Plus, ChevronLeft, Trash2, X, Check, ShoppingCart, Pencil, Lightbulb } from 'lucide-react'
 import { useToast } from '../lib/toast'
-import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
+import { useShoppingLists, useShoppingListItems, itemIdentity } from '../hooks/useShoppingLists'
+import { useGroceriesSuggestions } from '../hooks/useGroceriesSuggestions'
+import { findField } from '../lib/ciqualExplorer'
 import AddFromRecipeModal from '../components/AddFromRecipeModal'
 import AddFromMealModal from '../components/AddFromMealModal'
 import FoodPicker from '../components/FoodPicker'
@@ -175,11 +177,59 @@ function ItemRow({ item, onToggle, onDelete }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SuggestionsSection — aliments qui reviennent le plus souvent dans les
+// suggestions "À combler aujourd'hui" de la page du jour (voir
+// useGroceriesSuggestions), qu'elle n'a pas encore ajoutés à cette liste.
+// Un appui sur "+" les ajoute directement, sans quantité (comme un article
+// libre) : ce sont des idées à cocher/adapter, pas un grammage calculé pour
+// cette liste précise.
+// ─────────────────────────────────────────────────────────────────────────────
+function SuggestionsSection({ existingKeys, onAdd }) {
+  const { suggestions, loading } = useGroceriesSuggestions()
+
+  const toAdd = useMemo(
+    () => suggestions.filter(s => !existingKeys.has(itemIdentity({ food_source: s.food_source, food_ref_id: s.food_ref_id, nom: s.food_name }))),
+    [suggestions, existingKeys]
+  )
+
+  if (loading || toAdd.length === 0) return null
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>
+        Suggestions
+      </div>
+      {toAdd.map(s => {
+        const labels = s.nutrientKeys.map(k => findField(k).label)
+        return (
+          <div key={`${s.food_source}:${s.food_ref_id ?? s.food_name}`} className="card" style={{ marginBottom: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Lightbulb size={16} style={{ color: 'var(--green-dark)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{s.food_name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2 }}>
+                Souvent suggéré pour {labels.join(', ')}
+              </div>
+            </div>
+            <button
+              onClick={() => onAdd(s)}
+              style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--green-light)', color: 'var(--green-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              aria-label={`Ajouter ${s.food_name} à la liste`}
+            >
+              <Plus size={15} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ListeDetail
 // ─────────────────────────────────────────────────────────────────────────────
 function ListeDetail({ liste, onBack }) {
   const toast = useToast()
-  const { items, loading, addItems, addRecetteIngredients, addRepasItems, toggleChecked, deleteItem, clearChecked } = useShoppingListItems(liste.id)
+  const { items, loading, addItems, addRecetteIngredients, addRepasItems, addSuggestedItem, toggleChecked, deleteItem, clearChecked } = useShoppingListItems(liste.id)
   const [menuOpen, setMenuOpen] = useState(false)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [foodPickerOpen, setFoodPickerOpen] = useState(false)
@@ -203,6 +253,12 @@ function ListeDetail({ liste, onBack }) {
   }, [items])
 
   const checkedCount = items.filter(i => i.checked).length
+  const existingKeys = useMemo(() => new Set(items.map(itemIdentity)), [items])
+
+  const handleAddSuggestion = async (suggestion) => {
+    await addSuggestedItem(suggestion)
+    toast('✓ Ajouté')
+  }
 
   const handleFoodPickerConfirm = async (food, qty) => {
     const source = food._source === 'custom' ? 'custom' : food._source === 'off' ? 'off' : 'ciqual'
@@ -243,6 +299,8 @@ function ListeDetail({ liste, onBack }) {
         {!loading && items.length === 0 && (
           <EmptyState icon={<ShoppingCart size={40} />} title="Liste vide" description='Ajoute des articles avec le bouton "+"' />
         )}
+
+        {!loading && <SuggestionsSection existingKeys={existingKeys} onAdd={handleAddSuggestion} />}
 
         {grouped.map(([cat, catItems]) => (
           <div key={cat} style={{ marginBottom: 18 }}>
