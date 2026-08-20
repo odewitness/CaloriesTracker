@@ -20,6 +20,8 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { getLatestChangelogKey } from './lib/changelog'
 import { useFriends } from './hooks/useFriends'
 import { useSocialNotifications } from './hooks/useSocialNotifications'
+import { TodayHeaderProvider, useTodayHeaderInfo } from './lib/TodayHeaderContext'
+import { fmt, dateLabel } from './lib/dates'
 
 const WHATSNEW_SEEN_KEY = 'whatsnew_last_seen'
 
@@ -131,6 +133,30 @@ function SocialButtonIcon() {
   )
 }
 
+// Date du jour affichée dans l'espace à gauche du bandeau, uniquement quand
+// TodayPage est la page active (voir TodayHeaderContext) — reflète la date
+// en cours de prévisualisation pendant un swipe. Cliquable pour revenir à
+// aujourd'hui quand on n'y est pas déjà.
+function HeaderDateBlock() {
+  const { active, date, onNavigate } = useTodayHeaderInfo()
+  if (!active || !date) return <div />
+
+  const isToday = fmt(date) === fmt(new Date())
+  return (
+    <button
+      onClick={() => !isToday && onNavigate(0)}  // 0 = retour aujourd'hui
+      style={{ textAlign: 'left', minWidth: 0, overflow: 'hidden' }}
+    >
+      <div style={{ fontWeight: 700, fontSize: 15, color: isToday ? 'var(--text)' : 'var(--green)', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {dateLabel(date)}{!isToday && ' ↩'}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-hint)', whiteSpace: 'nowrap' }}>
+        {date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+      </div>
+    </button>
+  )
+}
+
 // Bouton rond en haut à droite : ouvre ProfilePage en plein écran par-dessus
 // l'app, sans occuper d'onglet dans la bottom nav.
 // hidden=true → le bandeau se rétracte (scroll vers le bas), voir handleScroll.
@@ -142,23 +168,26 @@ function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClic
 
   return (
     <div className={`top-bar${hidden ? ' top-bar-hidden' : ''}`}>
-      <button className="profile-avatar-btn" onClick={onExplorerClick} aria-label="Explorer les aliments">
-        <ExplorerButtonIcon />
-      </button>
-      <button className="profile-avatar-btn" onClick={onCalendarClick} aria-label="Calendrier">
-        <CalendarButtonIcon />
-      </button>
-      <button className="profile-avatar-btn" onClick={onSocialClick} aria-label="Amies" style={{ position: 'relative' }}>
-        <SocialButtonIcon />
-        {hasFriendRequests && <span className="notif-dot" />}
-      </button>
-      <button className="profile-avatar-btn" onClick={onWhatsNewClick} aria-label="Nouveautés" style={{ position: 'relative' }}>
-        <BellIcon />
-        {hasUnreadNews && <span className="notif-dot" />}
-      </button>
-      <button className="profile-avatar-btn" onClick={onClick} aria-label="Profil">
-        {initials ? initials : <ProfileIcon />}
-      </button>
+      <HeaderDateBlock />
+      <div className="top-bar-icons">
+        <button className="profile-avatar-btn" onClick={onExplorerClick} aria-label="Explorer les aliments">
+          <ExplorerButtonIcon />
+        </button>
+        <button className="profile-avatar-btn" onClick={onCalendarClick} aria-label="Calendrier">
+          <CalendarButtonIcon />
+        </button>
+        <button className="profile-avatar-btn" onClick={onSocialClick} aria-label="Amies" style={{ position: 'relative' }}>
+          <SocialButtonIcon />
+          {hasFriendRequests && <span className="notif-dot" />}
+        </button>
+        <button className="profile-avatar-btn" onClick={onWhatsNewClick} aria-label="Nouveautés" style={{ position: 'relative' }}>
+          <BellIcon />
+          {hasUnreadNews && <span className="notif-dot" />}
+        </button>
+        <button className="profile-avatar-btn" onClick={onClick} aria-label="Profil">
+          {initials ? initials : <ProfileIcon />}
+        </button>
+      </div>
     </div>
   )
 }
@@ -243,6 +272,7 @@ function AppShell() {
   }, [location.pathname])
 
   return (
+    <TodayHeaderProvider>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <ProfileButton
         onClick={() => openOverlay('/profile')}
@@ -367,6 +397,7 @@ function AppShell() {
         </Routes>
       )}
     </div>
+    </TodayHeaderProvider>
   )
 }
 

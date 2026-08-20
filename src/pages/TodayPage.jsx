@@ -1,9 +1,7 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react'
-import CalorieRing from '../components/CalorieRing'
-import MacroBar from '../components/MacroBar'
-import VitaminPanel from '../components/VitaminPanel'
-import NutrientDetails from '../components/NutrientDetails'
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { Share2 } from 'lucide-react'
+import TodayOverviewCard from '../components/TodayOverviewCard'
+import NutrientPanel from '../components/NutrientPanel'
 import MealSection from '../components/MealSection'
 import AddFoodModal from '../components/AddFoodModal'
 import AddFromMealModal from '../components/AddFromMealModal'
@@ -22,48 +20,13 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
 import { ALL_NUTRIENT_KEYS, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
-import { fmt } from '../lib/dates'
+import { fmt, dateLabel } from '../lib/dates'
+import { useSetTodayHeaderInfo } from '../lib/TodayHeaderContext'
 
 function dateOffset(base, days) {
   const d = new Date(base)
   d.setDate(d.getDate() + days)
   return d
-}
-
-function dateLabel(date) {
-  const today = new Date(); today.setHours(0,0,0,0)
-  const d = new Date(date); d.setHours(0,0,0,0)
-  const diff = (d - today) / 86400000
-  if (diff === 0) return "Aujourd'hui"
-  if (diff === -1) return 'Hier'
-  if (diff === 1) return 'Demain'
-  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-}
-
-// ── Header navigation date ─────────────────────────────────────────────────
-function DateHeader({ date, onNavigate }) {
-  const isToday = fmt(date) === fmt(new Date())
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-      <button className="btn-icon" onClick={() => onNavigate(-1)}>
-        <ChevronLeft size={20} color="var(--text-muted)" />
-      </button>
-      <div style={{ textAlign: 'center' }}>
-        <button
-          onClick={() => !isToday && onNavigate(0)}  // 0 = retour aujourd'hui
-          style={{ fontWeight: 700, fontSize: 16, color: isToday ? 'var(--text)' : 'var(--green)' }}
-        >
-          {dateLabel(date)}{!isToday && ' ↩'}
-        </button>
-        <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>
-          {date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-        </div>
-      </div>
-      <button className="btn-icon" onClick={() => onNavigate(1)}>
-        <ChevronRight size={20} color="var(--text-muted)" />
-      </button>
-    </div>
-  )
 }
 
 // ── Contenu d'un slot jour ─────────────────────────────────────────────────
@@ -181,12 +144,18 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   overflowY: 'auto',                    // ← scroll indépendant par slot
   WebkitOverflowScrolling: 'touch',     // ← momentum scroll iOS
 }}>
-      <DateHeader date={date} onNavigate={onNavigate} />
       <>
-        <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
-        <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
-        <VitaminPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
-        <NutrientDetails totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
+        <TodayOverviewCard
+          consumed={totals.kcal}
+          goal={settings.goal_kcal}
+          prot={totals.prot}
+          gluc={totals.gluc}
+          lip={totals.lip}
+          fib={totals.fib}
+          goals={settings}
+          onNavigate={onNavigate}
+        />
+        <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="section-title" style={{ marginBottom: 0 }}>Repas du jour</div>
@@ -363,6 +332,26 @@ export default function TodayPage() {
 
   const datePrev = dateOffset(date, -1)
   const dateNext = dateOffset(date, +1)
+
+  // Date à afficher dans l'en-tête global : pendant un swipe, dès qu'on a
+  // dépassé le seuil de bascule, on prévisualise déjà le jour voisin (seuil
+  // identique à celui qui déclenchera réellement la navigation au relâchement).
+  const previewDate = (() => {
+    const threshold = window.innerWidth * SWIPE_THRESHOLD
+    if (dragPx < -threshold) return dateNext
+    if (dragPx > threshold) return datePrev
+    return date
+  })()
+
+  const setHeaderInfo = useSetTodayHeaderInfo()
+  useEffect(() => {
+    setHeaderInfo({ active: true, date: previewDate, onNavigate: navigate })
+  }, [previewDate, navigate, setHeaderInfo])
+  // Ne retire l'info qu'au démontage réel (changement d'onglet) — pas à
+  // chaque mise à jour de previewDate, sinon l'en-tête clignote à vide.
+  useEffect(() => {
+    return () => setHeaderInfo({ active: false, date: null, onNavigate: null })
+  }, [setHeaderInfo])
 
   return (
     <>

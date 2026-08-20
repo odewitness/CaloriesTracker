@@ -7,7 +7,7 @@
 // - MealsPage.jsx     → idem pour les repas types
 // - AddFoodModal.jsx  → savoir quels champs récupérer sur l'aliment sélectionné
 // - ManualPage.jsx    → générer le formulaire de saisie d'un aliment personnalisé
-// - VitaminPanel.jsx  → afficher les jauges vitamines/minéraux
+// - NutrientPanel.jsx → afficher les jauges vitamines/minéraux/sucres/gras
 
 // ── Sucres détaillés (g / 100g) ──────────────────────────────────────────────
 export const SUGAR_FIELDS = [

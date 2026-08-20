@@ -7,7 +7,7 @@ import { getNutrientStatus } from './nutrientStatus'
 // calcule à la place les vitamines/minéraux réellement renseignés sur le
 // produit (valeurs stockées /100g comme le reste du schéma), à l'échelle
 // `scale` (ex: qty_g / 100), avec leur %AJR et statut (mêmes références que
-// VitaminPanel). Utilisé par la carte Aliments (CustomFoodsSection) et le
+// NutrientPanel). Utilisé par la carte Aliments (CustomFoodsSection) et le
 // sélecteur d'ajout au journal (FoodPicker) — une seule source de vérité.
 // ─────────────────────────────────────────────────────────────────────────────
 export function getComplementNutrients(food, scale) {

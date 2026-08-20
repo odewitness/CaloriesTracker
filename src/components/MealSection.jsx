@@ -59,7 +59,7 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
 
   // ── Repas actif ───────────────────────────────────────────────────────
   return (
-    <div className="card" style={{ marginBottom: 10, overflow: 'hidden' }}>
+    <div className="card" style={{ marginBottom: 10, overflow: menuOpen ? 'visible' : 'hidden' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px' }}>
         <button

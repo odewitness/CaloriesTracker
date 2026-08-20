@@ -9,3 +9,14 @@ export function fmt(date) {
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
+
+// "Aujourd'hui" / "Hier" / "Demain" / sinon "lundi 3 mars" (fr-FR).
+export function dateLabel(date) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const d = new Date(date); d.setHours(0, 0, 0, 0)
+  const diff = (d - today) / 86400000
+  if (diff === 0) return "Aujourd'hui"
+  if (diff === -1) return 'Hier'
+  if (diff === 1) return 'Demain'
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+}

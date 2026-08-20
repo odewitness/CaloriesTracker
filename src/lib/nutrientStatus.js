@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // getNutrientStatus — statut d'une valeur de vitamine/minéral par rapport à sa
 // référence (RNP = besoin, ou objectif max pour les nutriments "limite" comme
-// le sel). Extrait de VitaminPanel pour être réutilisé ailleurs (ex. carte
+// le sel). Extrait de NutrientPanel pour être réutilisé ailleurs (ex. carte
 // aliment complément alimentaire).
 //
 // Nutriments normaux (limite = false) : plus on s'approche de la ref, mieux
