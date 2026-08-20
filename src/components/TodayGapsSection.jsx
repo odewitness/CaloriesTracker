@@ -44,37 +44,59 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
   const [gapsSheetOpen, setGapsSheetOpen] = useState(false)
   const [quickAdd, setQuickAdd] = useState(null) // { food, qty, date, meal, saving } | null
 
-  // Pour chaque aliment qu'elle mange déjà (favoris + récents, dédupliqués),
-  // on cherche PARMI les 10 manques les plus urgents celui que SA PORTION
-  // HABITUELLE (voir portionGapCoverage) couvre le mieux — pas forcément le
-  // manque n°1 (un aliment peut être médiocre sur le plus urgent mais
-  // excellent sur le 4e). Le grammage n'est jamais inventé/plafonné : c'est
-  // la portion réelle de l'aliment (déclarée, ou 100 g par défaut), donc il
-  // varie naturellement d'un aliment à l'autre au lieu de converger vers un
-  // même chiffre.
+  // On parcourt les manques dans leur ordre d'urgence (top10Gaps est déjà
+  // trié du plus urgent au moins urgent, voir getNutrientGaps) et, pour
+  // CHAQUE manque, on cherche l'aliment qu'elle mange déjà dont SA PORTION
+  // HABITUELLE (voir portionGapCoverage) le couvre le mieux — un aliment
+  // déjà retenu pour un manque n'est pas réutilisé pour un autre, pour avoir
+  // des suggestions variées plutôt que 3 fois le même aliment/nutriment.
   //
-  // On garde ensuite les MAX_SUGGESTIONS meilleures paires aliment/nutriment,
-  // un aliment n'apparaissant qu'une fois (sur son meilleur match).
+  // Choisir systématiquement le meilleur aliment TOUS MANQUES CONFONDUS (au
+  // lieu, comme ici, du meilleur PAR manque pris dans l'ordre d'urgence)
+  // faisait converger toutes les suggestions vers le même nutriment : un
+  // manque presque comblé (donc trivialement couvert à 100 % par n'importe
+  // quel aliment qui en contient un peu) gagnait systématiquement face aux
+  // manques réellement importants.
+  //
+  // Le grammage n'est jamais inventé/plafonné : c'est la portion réelle de
+  // l'aliment (déclarée, ou 100 g par défaut), donc il varie naturellement
+  // d'un aliment à l'autre au lieu de converger vers un même chiffre.
+  //
+  // Pour ne pas montrer toujours le même aliment pour un manque donné, on
+  // pioche au hasard parmi les meilleurs candidats plutôt que de toujours
+  // prendre le premier — recalculé à chaque montage de la section (ouverture
+  // de l'app, changement de jour), donc ça varie d'une fois à l'autre.
   const suggestions = useMemo(() => {
     if (!top10Gaps.length) return []
     const candidates = [...favorites.map(f => f.food_data), ...recents]
     const seen = new Set()
-    const out = []
+    const uniqueCandidates = []
     for (const food of candidates) {
       const key = foodIdentity(food).key
       if (seen.has(key)) continue
       seen.add(key)
-
-      let best = null
-      for (const gap of top10Gaps) {
-        const c = portionGapCoverage(food, gap)
-        if (!c) continue
-        if (!best || c.pct > best.coverage.pct) best = { gap, coverage: c }
-      }
-      if (best) out.push({ food, gap: best.gap, coverage: best.coverage })
+      uniqueCandidates.push(food)
     }
-    out.sort((a, b) => b.coverage.pct - a.coverage.pct)
-    return out.slice(0, MAX_SUGGESTIONS)
+
+    const used = new Set()
+    const out = []
+    for (const gap of top10Gaps) {
+      if (out.length >= MAX_SUGGESTIONS) break
+      const matches = []
+      for (const food of uniqueCandidates) {
+        const key = foodIdentity(food).key
+        if (used.has(key)) continue
+        const c = portionGapCoverage(food, gap)
+        if (c && c.pct > 0) matches.push({ food, coverage: c })
+      }
+      if (!matches.length) continue
+      matches.sort((a, b) => b.coverage.pct - a.coverage.pct)
+      const pool = matches.slice(0, Math.min(3, matches.length))
+      const pick = pool[Math.floor(Math.random() * pool.length)]
+      used.add(foodIdentity(pick.food).key)
+      out.push({ food: pick.food, gap, coverage: pick.coverage })
+    }
+    return out
   }, [top10Gaps, favorites, recents])
 
   const handleQuickAdd = (suggestion) => {
@@ -142,10 +164,10 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
                   >
                     <Lightbulb size={15} style={{ color: 'var(--green-dark)', flexShrink: 0, marginTop: 2 }} />
                     <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--green-dark)', lineHeight: 1.4 }}>
-                      <strong>{formatValue(s.coverage.grams, 'g')}</strong> de {s.food.alim_nom}
+                      <strong>{formatValue(s.coverage.grams, 'g')}</strong> de <em>{s.food.alim_nom}</em>
                       {s.coverage.pct >= 100
-                        ? ` comble ton manque en ${lowerFirst(s.gap.field.label)}`
-                        : ` couvre ${s.coverage.pct}% de ton manque en ${lowerFirst(s.gap.field.label)}`}
+                        ? ` comblent ton manque en ${lowerFirst(s.gap.field.label)}`
+                        : ` couvrent ${s.coverage.pct}% de ton manque en ${lowerFirst(s.gap.field.label)}`}
                     </div>
                     <button
                       onClick={() => handleQuickAdd(s)}

@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-08-20',
+    title: "Le grammage qui comble ton manque, même sans limite de calories",
+    description: "Dans l'Explorer, quand tu sélectionnes un manque, chaque aliment t'indique maintenant directement le nombre de grammes qui le comble, à la place du taux pour 100 g — plus besoin de cocher \"tient dans mes calories restantes\" pour l'avoir.",
+  },
+  {
+    date: '2026-08-20',
+    title: 'Des suggestions plus variées dans "À combler aujourd\'hui"',
+    description: "Les suggestions d'aliments proposaient souvent la même vitamine à chaque fois, toujours pour la même quantité. Elles portent maintenant sur plusieurs manques différents, et changent un peu à chaque fois que tu ouvres l'app. La fenêtre qui s'ouvre quand tu appuies sur le \"+\" est aussi corrigée : elle ne dépassait plus de l'écran sur certains téléphones.",
+  },
+  {
+    date: '2026-08-20',
     title: "Des conseils nutritionnels directement sur ta page du jour",
     description: "Sur ta page du jour, un nouveau bandeau te montre ce qu'il te manque aujourd'hui (fer, vitamine C, fibres...), avec une suggestion parmi ce que tu manges déjà pour le combler en un tap. Et quand tu ajoutes un aliment, tu vois maintenant s'il est riche en un nutriment, et éventuellement la quantité qui comble ton manque du jour — comme dans l'Explorer.",
   },

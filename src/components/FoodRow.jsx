@@ -66,8 +66,8 @@ export default function FoodRow({ food, isFav, onSelect, onToggleFav, top10Gaps 
             {coverage && (
               <span style={{ background: 'var(--blue-light)', color: 'var(--blue)', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 600 }}>
                 {coverage.pct >= 100
-                  ? `${formatValue(coverage.grams, 'g')} comble ton manque en ${lowerFirst(bestGapMatch.gap.field.label)}`
-                  : `${formatValue(coverage.grams, 'g')} comble ${coverage.pct}% de ton manque en ${lowerFirst(bestGapMatch.gap.field.label)}`}
+                  ? `${formatValue(coverage.grams, 'g')} comblent ton manque en ${lowerFirst(bestGapMatch.gap.field.label)}`
+                  : `${formatValue(coverage.grams, 'g')} comblent ${coverage.pct}% de ton manque en ${lowerFirst(bestGapMatch.gap.field.label)}`}
               </span>
             )}
           </div>

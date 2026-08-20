@@ -96,12 +96,13 @@ function ExplorerRow({ food, sortField, sort, isFav, onSelect, onToggleFav, gapF
   const gramsRef = gramsForKcal(food, kcalRef)
 
   // Grammage nécessaire pour combler, à la fois, tous les manques du jour
-  // cochés en pastille tout en tenant dans les calories restantes — actif
-  // seulement quand les deux critères sont réunis (voir ExplorerPage).
-  // Indépendant du tri affiché : remplace la valeur de tri habituelle, qui
-  // répondrait à une question différente (« combien pour 100 g ») et pas à
-  // celle posée ici (« combien manger de cet aliment précis, là,
-  // maintenant, pour combler ce que je vise »).
+  // cochés en pastille — actif dès qu'au moins un manque est coché, avec ou
+  // sans « tient dans mes calories restantes » (remainingKcal vaut alors
+  // null, donc seul le plafond de portion réaliste limite le grammage — voir
+  // gapCoverage). Indépendant du tri affiché : remplace la valeur de tri
+  // habituelle, qui répondrait à une question différente (« combien pour
+  // 100 g ») et pas à celle posée ici (« combien manger de cet aliment
+  // précis, là, maintenant, pour combler ce que je vise »).
   const coverage = gapFields.length ? gapCoverage(food, gapFields, remainingKcal) : null
   const isPopularitySort = sort.field === POPULARITY_FIELD.key
 
@@ -320,20 +321,21 @@ export default function ExplorerPage() {
   }, [favorites])
   const getUsage = (food) => usageMap.get(foodIdentity(food).key) || null
 
-  // Le grammage « comble le(s) manque(s) » ne s'active que si « tient dans mes
-  // calories restantes » est coché, et porte sur TOUS les nutriments
-  // actuellement filtrés en « riche en » qui sont encore un manque réel
-  // aujourd'hui (getGapAmount > 0). Indépendant du tri : sélectionner deux
-  // manques doit combiner les deux dans le grammage affiché, que la liste
-  // soit triée sur l'un, l'autre, ou par nom (voir gapCoverage).
+  // Le grammage « comble le(s) manque(s) » s'active dès qu'un manque est
+  // coché en pastille « riche en » (via handlePickGap ou le filtre), qu'il
+  // reste ou non un manque réel aujourd'hui (getGapAmount > 0) — indépendant
+  // du tri : sélectionner deux manques doit combiner les deux dans le
+  // grammage affiché, que la liste soit triée sur l'un, l'autre, ou par nom
+  // (voir gapCoverage). « Tient dans mes calories restantes » n'entre plus
+  // en jeu ici : il ne fait qu'ajouter une contrainte de calories au calcul
+  // (voir remainingKcal plus bas), pas une condition pour l'afficher du tout.
   const gapFields = useMemo(() => {
-    if (!filters.fitsRemainingKcal) return []
     return filters.claims
       .map(findField)
       .filter(f => !f.virtual)
       .map(field => ({ field, missing: getGapAmount(totals, settings, field) }))
       .filter(g => g.missing > 0)
-  }, [filters.fitsRemainingKcal, filters.claims, totals, settings])
+  }, [filters.claims, totals, settings])
 
   const results = useMemo(() => {
     let list = filterFoods(foods, filters, { isFavorite, remainingKcal: remaining })
@@ -349,14 +351,18 @@ export default function ExplorerPage() {
     return sortFoods(list, sort, getUsage)
   }, [foods, filters, sort, isFavorite, remaining, usageMap, sortField])
 
-  // Suggestion à deux aliments (voir suggestCombo) : ne s'affiche que si AUCUN
-  // aliment des résultats actuels ne comble déjà bien les manques cochés tout
-  // seul — sinon elle ferait doublon avec le grammage déjà visible sur les
-  // cartes (coverage). Cherche d'abord la meilleure couverture atteignable en
-  // un seul aliment ; ne calcule la combinaison à deux (plus coûteux) que si
-  // elle a une chance d'apporter un vrai progrès.
+  // Suggestion à deux aliments (voir suggestCombo) : reste réservée à « tient
+  // dans mes calories restantes » coché, c'est le seul cas où combiner deux
+  // aliments sous un budget précis a un sens — sans ce budget, gapCoverage
+  // n'a de toute façon pas de contrainte à répartir entre les deux. Ne
+  // s'affiche que si AUCUN aliment des résultats actuels ne comble déjà bien
+  // les manques cochés tout seul — sinon elle ferait doublon avec le
+  // grammage déjà visible sur les cartes (coverage). Cherche d'abord la
+  // meilleure couverture atteignable en un seul aliment ; ne calcule la
+  // combinaison à deux (plus coûteux) que si elle a une chance d'apporter un
+  // vrai progrès.
   const comboSuggestion = useMemo(() => {
-    if (!gapFields.length || remaining == null || remaining <= 0) return null
+    if (!gapFields.length || !filters.fitsRemainingKcal || remaining == null || remaining <= 0) return null
     let bestSinglePct = 0
     for (const food of results) {
       const c = gapCoverage(food, gapFields, remaining)
@@ -370,7 +376,7 @@ export default function ExplorerPage() {
     // part, qui a un coût de lecture (deux aliments à peser plutôt qu'un).
     if (!combo || combo.pct <= bestSinglePct + 5) return null
     return combo
-  }, [gapFields, remaining, results])
+  }, [gapFields, filters.fitsRemainingKcal, remaining, results])
 
   // Un favori se pose depuis la ligne allégée, mais `favoris.food_data` est un
   // snapshot jamais rafraîchi côté FoodPicker : on recharge la ligne complète
@@ -579,7 +585,7 @@ export default function ExplorerPage() {
               onSelect={setSelected}
               onToggleFav={handleToggleFav}
               gapFields={gapFields}
-              remainingKcal={remaining}
+              remainingKcal={filters.fitsRemainingKcal ? remaining : null}
               usage={getUsage(food)}
               onQuickAdd={handleQuickAdd}
             />
