@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-08-20',
+    title: 'Vitamines, minéraux, sucres et graisses réunis dans un seul encart',
+    description: "Les sections \"Vitamines & Minéraux\" et \"Détail sucres & acides gras\" ne font plus qu'un, sous le titre \"Détail nutritionnel\". Quatre boutons en haut (Vitamines, Minéraux, Sucres, Acides gras) te permettent de basculer entre les catégories, comme avant.",
+  },
+  {
+    date: '2026-08-20',
+    title: "L'écran d'accueil réorganisé pour gagner de la place",
+    description: "La date du jour s'affiche maintenant en haut à gauche de l'écran, et suit le jour affiché quand tu swipes pour changer de jour (tape dessus pour revenir à aujourd'hui). Le cercle des calories et tes macros (protéines, glucides, lipides, fibres) sont regroupés dans un seul encart, avec les flèches pour changer de jour de chaque côté — le swipe reste bien sûr disponible. Et le bouton \"Ajouter un repas type\" dans le menu \"...\" d'un repas ne se coupe plus quand la section est repliée.",
+  },
+  {
+    date: '2026-08-20',
     title: 'Tes repas types enfin accessibles depuis le jour',
     description: "Appuie sur le bouton \"...\" à côté du + d'un repas, sur l'écran principal : tu peux maintenant ajouter directement un de tes repas types à ce repas, ou créer un nouveau repas type à partir de ce que tu as déjà noté ce jour-là. Plus besoin de passer par \"Mes aliments\" pour t'en servir.",
   },

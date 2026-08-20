@@ -10,8 +10,7 @@ import { scaleFood, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { getPortion, getCategoryLabel, findBetterAlternative, formatValue } from '../lib/ciqualExplorer'
 import { patchCachedPortions } from '../hooks/useCiqualCatalog'
 import MacroPreview from './MacroPreview'
-import VitaminPanel from './VitaminPanel'
-import NutrientDetails from './NutrientDetails'
+import NutrientPanel from './NutrientPanel'
 import AddToJournalSheet from './AddToJournalSheet'
 import Loader from './Loader'
 
@@ -140,7 +139,7 @@ export default function ExplorerFoodModal({ food, onClose, foods, gaps, onPickFo
   )
 
   // Toutes les valeurs recalculées au grammage saisi — exactement la forme
-  // d'objet `totals` attendue par VitaminPanel / NutrientDetails.
+  // d'objet `totals` attendue par NutrientPanel.
   const live = useMemo(() => {
     if (!full) return null
     const f = (parseFloat(qty) || 0) / 100
@@ -319,8 +318,7 @@ export default function ExplorerFoodModal({ food, onClose, foods, gaps, onPickFo
 
             <MacroPreview food={full} qty={qty} />
 
-            <VitaminPanel totals={live} hasEntries={true} defaultOpen={true} />
-            <NutrientDetails totals={live} hasEntries={true} defaultOpen={true} />
+            <NutrientPanel totals={live} hasEntries={true} defaultOpen={true} />
 
             <button
               className="btn-primary"

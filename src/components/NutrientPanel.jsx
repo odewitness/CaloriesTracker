@@ -1,13 +1,93 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { SUGAR_FIELDS, FAT_FIELDS, SUCRES_ANSES_REF, KCAL_PER_G_LIPIDES, LIPIDES_AE_TARGET, AGS_AE_MAX } from '../lib/nutrients'
+import { VITAMIN_FIELDS, MINERAL_FIELDS, SUGAR_FIELDS, FAT_FIELDS, SUCRES_ANSES_REF, KCAL_PER_G_LIPIDES, LIPIDES_AE_TARGET, AGS_AE_MAX } from '../lib/nutrients'
+import { getNutrientStatus as getStatus, NUTRIENT_STATUS_COLOR as STATUS_COLOR } from '../lib/nutrientStatus'
 import NutrientBreakdownModal from './NutrientBreakdownModal'
+
+const TABS = [
+  { key: 'vitamines', label: 'Vitamines' },
+  { key: 'mineraux',  label: 'Minéraux' },
+  { key: 'sucres',    label: 'Sucres' },
+  { key: 'gras',      label: 'Acides gras' },
+]
 
 function fmtVal(val, unit) {
   if (val == null) return '—'
   return `${val < 1 && val > 0 ? val.toFixed(2) : Math.round(val * 10) / 10} ${unit}`
 }
 
+// ── Ligne "jauge" vitamines/minéraux — % du RNP, marqueur LSS/seuil ────────
+function GaugeRow({ v, totals, hasEntries, onClick }) {
+  const val = (v.sumKeys || [v.key]).reduce((s, k) => s + (totals[k] ?? 0), 0)
+  const hasData = hasEntries // N/D uniquement si aucune entrée loggée — 0 sur un aliment loggé est une vraie donnée
+
+  const pct = Math.round((val / v.ref) * 100)
+  const barPct = Math.min(100, pct)
+
+  const lssMarkerPct = v.lss !== null
+    ? Math.min(100, (v.lss / v.ref) * 100)
+    : null
+
+  const status = hasData ? getStatus(val, v.ref, v.lss, v.limite) : 'low'
+  const badgeColor = STATUS_COLOR[status]
+
+  const refLabel = v.limite ? 'Objectif max' : 'RNP'
+  const lssLabel = v.limite ? 'Seuil' : 'LSS'
+  const tooltip = hasData
+    ? `${val.toFixed(val < 1 ? 3 : 1)} ${v.unit} / ${refLabel} ${v.ref} ${v.unit}${v.lss ? ` / ${lssLabel} ${v.lss} ${v.unit}` : ''}`
+    : 'Données non disponibles'
+
+  const Wrapper = onClick ? 'button' : 'div'
+
+  return (
+    <Wrapper
+      onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, width: '100%', textAlign: 'left', cursor: onClick ? 'pointer' : 'default' }}
+      title={tooltip}
+    >
+      <span style={{ fontSize: 12, color: 'var(--text)', width: 90, flexShrink: 0 }}>{v.label}</span>
+
+      <div style={{ flex: 1, position: 'relative', height: 6 }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{
+            width: hasData ? `${barPct}%` : '0%',
+            height: '100%',
+            background: STATUS_COLOR[status],
+            borderRadius: 3,
+            transition: 'width .4s',
+          }} />
+        </div>
+
+        {lssMarkerPct !== null && lssMarkerPct < 100 && (
+          <div style={{
+            position: 'absolute',
+            top: -1,
+            bottom: -1,
+            left: `${lssMarkerPct}%`,
+            width: 2,
+            background: 'var(--coral)',
+            borderRadius: 1,
+            opacity: 0.55,
+            transform: 'translateX(-50%)',
+          }} />
+        )}
+      </div>
+
+      <span style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color: hasData ? badgeColor : 'var(--text-hint)',
+        width: 38,
+        textAlign: 'right',
+        flexShrink: 0,
+      }}>
+        {hasData ? `${status === 'excess' ? '⚠︎ ' : ''}${pct}%` : 'N/D'}
+      </span>
+    </Wrapper>
+  )
+}
+
+// ── Liste simple valeur/objectif — sucres & acides gras détaillés ─────────
 function NutrientList({ fields, totals, hasEntries, entries, onSelectField }) {
   const canBreakdown = entries && entries.length > 0
   return (
@@ -30,10 +110,7 @@ function NutrientList({ fields, totals, hasEntries, entries, onSelectField }) {
   )
 }
 
-// Exported: reused as-is by HistoryPage.jsx so the period dashboard shows the
-// exact same Anses gauge as TodayPage, just fed with period-averaged totals
-// instead of today's totals.
-export function SucresAnsesGauge({ totals, hasEntries }) {
+function SucresAnsesGauge({ totals, hasEntries }) {
   const sucresTotal = totals.sucres ?? 0
   const lactose = totals.lactose ?? 0
   const galactose = totals.galactose ?? 0
@@ -78,7 +155,7 @@ function GaugeBar({ barPct, color, bandMarkers }) {
 // Lipides totaux : l'Anses recommande une zone cible de 35-40% de l'apport
 // énergétique (AE) du jour, pas un simple plafond — en dessous = sous-couverture
 // des besoins, au-dessus = excès. On affiche donc une bande cible plutôt qu'un seuil.
-export function LipidesTotauxGauge({ totals, hasEntries }) {
+function LipidesTotauxGauge({ totals, hasEntries }) {
   const hasKcal = hasEntries && totals.kcal > 0
   const aePct = hasKcal ? (totals.lip * KCAL_PER_G_LIPIDES / totals.kcal) * 100 : 0
   const { min, max } = LIPIDES_AE_TARGET
@@ -107,7 +184,7 @@ export function LipidesTotauxGauge({ totals, hasEntries }) {
 }
 
 // AG saturés totaux : seuil maximal (≤12% AE), pas une zone cible.
-export function AGSGauge({ totals, hasEntries }) {
+function AGSGauge({ totals, hasEntries }) {
   const hasKcal = hasEntries && totals.kcal > 0
   const ags = totals.acides_gras_satures ?? 0
   const aePct = hasKcal ? (ags * KCAL_PER_G_LIPIDES / totals.kcal) * 100 : 0
@@ -132,10 +209,22 @@ export function AGSGauge({ totals, hasEntries }) {
   )
 }
 
-export default function NutrientDetails({ totals, hasEntries, defaultOpen = false, entries, onUpdate }) {
+// ─────────────────────────────────────────────────────────────────────────
+// NutrientPanel — fusion de l'ancien "Vitamines & Minéraux" et "Détail
+// sucres & acides gras" en une seule carte à 4 pills, pour économiser une
+// carte entière sur la page du jour (et partout où les deux s'affichaient
+// déjà côte à côte : historique, fiches aliment/recette).
+// ─────────────────────────────────────────────────────────────────────────
+export default function NutrientPanel({ totals, hasEntries, defaultOpen = false, entries, onUpdate }) {
   const [open, setOpen] = useState(defaultOpen)
-  const [tab, setTab] = useState('sucres') // sucres | gras
+  const [tab, setTab] = useState('vitamines')
   const [selectedField, setSelectedField] = useState(null)
+
+  // La liste détaillée par aliment n'a de sens que si on dispose des entrées
+  // individuelles (ex: page d'accueil) — pas dans les contextes où le panneau
+  // affiche déjà un seul aliment (FoodDetailModal) ou un /100g de recette.
+  const canBreakdown = entries && entries.length > 0
+  const isGauge = tab === 'vitamines' || tab === 'mineraux'
 
   return (
     <div className="card" style={{ marginBottom: 12, overflow: 'hidden', flexShrink: 0 }}>
@@ -143,44 +232,60 @@ export default function NutrientDetails({ totals, hasEntries, defaultOpen = fals
         onClick={() => setOpen(o => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}
       >
-        <span style={{ fontWeight: 600, fontSize: 14 }}>Détail sucres & acides gras</span>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>Détail nutritionnel</span>
         <ChevronDown size={18} color="var(--text-muted)" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
       </button>
 
       {open && (
         <div style={{ padding: '0 16px 14px' }}>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            <button
-              onClick={() => setTab('sucres')}
-              className="chip"
-              style={{ background: tab === 'sucres' ? 'var(--green)' : 'var(--green-light)', color: tab === 'sucres' ? 'white' : 'var(--green-dark)' }}
-            >
-              Sucres
-            </button>
-            <button
-              onClick={() => setTab('gras')}
-              className="chip"
-              style={{ background: tab === 'gras' ? 'var(--green)' : 'var(--green-light)', color: tab === 'gras' ? 'white' : 'var(--green-dark)' }}
-            >
-              Acides gras
-            </button>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="chip"
+                style={{ background: tab === t.key ? 'var(--green)' : 'var(--green-light)', color: tab === t.key ? 'white' : 'var(--green-dark)' }}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          {tab === 'sucres'
-            ? (
-              <>
-                <SucresAnsesGauge totals={totals} hasEntries={hasEntries} />
-                <NutrientList fields={SUGAR_FIELDS} totals={totals} hasEntries={hasEntries} entries={entries} onSelectField={setSelectedField} />
-              </>
-            )
-            : (
-              <>
-                <LipidesTotauxGauge totals={totals} hasEntries={hasEntries} />
-                <AGSGauge totals={totals} hasEntries={hasEntries} />
-                <NutrientList fields={FAT_FIELDS} totals={totals} hasEntries={hasEntries} entries={entries} onSelectField={setSelectedField} />
-              </>
-            )}
+          {tab === 'vitamines' && VITAMIN_FIELDS.map(v => (
+            <GaugeRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
+          ))}
+          {tab === 'mineraux' && MINERAL_FIELDS.map(v => (
+            <GaugeRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
+          ))}
 
+          {tab === 'sucres' && (
+            <>
+              <SucresAnsesGauge totals={totals} hasEntries={hasEntries} />
+              <NutrientList fields={SUGAR_FIELDS} totals={totals} hasEntries={hasEntries} entries={entries} onSelectField={setSelectedField} />
+            </>
+          )}
+
+          {tab === 'gras' && (
+            <>
+              <LipidesTotauxGauge totals={totals} hasEntries={hasEntries} />
+              <AGSGauge totals={totals} hasEntries={hasEntries} />
+              <NutrientList fields={FAT_FIELDS} totals={totals} hasEntries={hasEntries} entries={entries} onSelectField={setSelectedField} />
+            </>
+          )}
+
+          {isGauge && (
+            <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: 2, height: 10, background: 'var(--coral)', borderRadius: 1, opacity: 0.55 }} />
+                <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>LSS / Seuil</span>
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>
+                <span style={{ color: '#1D9E75', fontWeight: 600 }}>vert</span> = bien &nbsp;·&nbsp;
+                <span style={{ color: 'var(--amber)', fontWeight: 600 }}>orange</span> = à surveiller &nbsp;·&nbsp;
+                <span style={{ color: 'var(--coral)', fontWeight: 600 }}>rouge</span> = trop bas ou trop haut
+              </span>
+            </div>
+          )}
         </div>
       )}
 

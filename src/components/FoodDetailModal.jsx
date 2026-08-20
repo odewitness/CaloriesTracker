@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { X, ChevronLeft } from 'lucide-react'
-import VitaminPanel from './VitaminPanel'
-import NutrientDetails from './NutrientDetails'
+import NutrientPanel from './NutrientPanel'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
 
@@ -42,8 +41,8 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack }) {
 
   // "live" = toutes les valeurs nutritionnelles de l'aliment recalculées au
   // prorata du grammage en cours d'édition — sert à la fois à l'aperçu macro
-  // et, en l'état exact d'un objet "totals", à VitaminPanel/NutrientDetails
-  // (ces deux composants sont déjà génériques sur un totals + hasEntries).
+  // et, en l'état exact d'un objet "totals", à NutrientPanel (déjà générique
+  // sur un totals + hasEntries).
   const live = useMemo(() => {
     const t = {
       kcal: (entry.energie_kcal || 0) * f,
@@ -121,8 +120,7 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack }) {
             </button>
           )}
 
-          <VitaminPanel totals={live} hasEntries={true} defaultOpen={true} />
-          <NutrientDetails totals={live} hasEntries={true} defaultOpen={true} />
+          <NutrientPanel totals={live} hasEntries={true} defaultOpen={true} />
         </div>
       </div>
     </div>

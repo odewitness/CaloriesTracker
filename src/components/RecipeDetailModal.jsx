@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Share2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen, ChefHat } from 'lucide-react'
-import VitaminPanel from './VitaminPanel'
-import NutrientDetails from './NutrientDetails'
+import NutrientPanel from './NutrientPanel'
 import FoodDetailModal from './FoodDetailModal'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
@@ -563,8 +562,7 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
             </div>
           ) : per100 ? (
             <>
-              <VitaminPanel totals={displayTotals} hasEntries={true} defaultOpen />
-              <NutrientDetails totals={displayTotals} hasEntries={true} defaultOpen />
+              <NutrientPanel totals={displayTotals} hasEntries={true} defaultOpen />
             </>
           ) : (
             <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Aucun ingrédient renseigné.</div>

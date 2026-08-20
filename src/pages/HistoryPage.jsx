@@ -5,8 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { TrendingDown, Flame, Target, ChevronLeft, ChevronRight } from 'lucide-react'
 import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
-import VitaminPanel from '../components/VitaminPanel'
-import NutrientDetails from '../components/NutrientDetails'
+import NutrientPanel from '../components/NutrientPanel'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
@@ -230,7 +229,7 @@ export default function HistoryPage() {
   // Même construction que le `totals` de TodayPage : une somme brute par clé,
   // sans pré-fusionner les colonnes dédoublées (vit_e_totale/vit_e,
   // folates/folates_intrinseques...). Cette fusion (sumKeys) est laissée aux
-  // composants d'affichage (VitaminPanel, NutrientDetails) qui la font déjà —
+  // composant d'affichage (NutrientPanel) qui la fait déjà —
   // une seule source de vérité pour cette logique, au lieu de la dupliquer ici.
   const avg = useMemo(() => {
     const n = daysWithData || 1
@@ -361,13 +360,7 @@ export default function HistoryPage() {
           {/* Clic sur un nutriment → liste des aliments qui y contribuent sur
               la période affichée, triés du plus au moins riche (même modal
               que sur TodayPage : NutrientBreakdownModal trie déjà tout seul). */}
-          <VitaminPanel
-            totals={avg}
-            hasEntries={hasEntries}
-            entries={entries}
-            onUpdate={handleUpdate}
-          />
-          <NutrientDetails
+          <NutrientPanel
             totals={avg}
             hasEntries={hasEntries}
             entries={entries}

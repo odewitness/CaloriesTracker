@@ -2,8 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Share2 } from 'lucide-react'
 import CalorieRing from './CalorieRing'
 import MacroBar from './MacroBar'
-import VitaminPanel from './VitaminPanel'
-import NutrientDetails from './NutrientDetails'
+import NutrientPanel from './NutrientPanel'
 import MealSection from './MealSection'
 import AddFoodModal from './AddFoodModal'
 import FoodDetailModal from './FoodDetailModal'
@@ -34,8 +33,10 @@ function dateLabel(date) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DayRecapPanel — récap complet d'UNE date choisie dans le calendrier.
-// Réutilise EXACTEMENT la même mise en page que TodayPage : CalorieRing,
-// MacroBar, VitaminPanel, NutrientDetails, puis "Repas du jour" avec un
+// Réutilise la même logique que TodayPage : CalorieRing, MacroBar (affichage
+// séparé ici, contrairement à TodayOverviewCard sur la page du jour qui les
+// fusionne avec les flèches de navigation — pas de swipe ici), NutrientPanel,
+// puis "Repas du jour" avec un
 // MealSection par repas (toggle, ajout, suppression) + SupplementSection —
 // donc les repas réellement mangés ce jour-là (planifiés ou non) s'affichent
 // tous. Les repas/compléments encore planifiés mais pas mangés s'affichent
@@ -121,8 +122,7 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
 
       <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
       <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
-      <VitaminPanel totals={totals} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
-      <NutrientDetails totals={totals} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
+      <NutrientPanel totals={totals} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
 
       <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
