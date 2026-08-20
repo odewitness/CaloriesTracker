@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Share2 } from 'lucide-react'
 import TodayOverviewCard from '../components/TodayOverviewCard'
 import NutrientPanel from '../components/NutrientPanel'
@@ -12,6 +13,7 @@ import SupplementSection, { SUPPLEMENT_MEAL } from '../components/SupplementSect
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import ShareJournalModal from '../components/ShareJournalModal'
+import TodayGapsSection from '../components/TodayGapsSection'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useFeed } from '../hooks/useFeed'
@@ -19,7 +21,8 @@ import { saveMealTemplate } from '../hooks/useMealTemplates'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
-import { ALL_NUTRIENT_KEYS, computeMealTargets, MEALS_ORDER as MEALS } from '../lib/nutrients'
+import { computeMealTargets, computeTotals, MEALS_ORDER as MEALS } from '../lib/nutrients'
+import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { fmt, dateLabel } from '../lib/dates'
 import { useSetTodayHeaderInfo } from '../lib/TodayHeaderContext'
 
@@ -33,7 +36,10 @@ function dateOffset(base, days) {
 function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) {
   const toast = useToast()
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const dateStr = fmt(date)
+  const isToday = dateStr === fmt(new Date())
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings } = useSettings()
@@ -44,21 +50,33 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
 
   const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
 
-  const totals = useMemo(() => {
-    const t = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 }
-    for (const key of ALL_NUTRIENT_KEYS) t[key] = 0
-    for (const e of entries) {
-      t.kcal += e.energie_kcal || 0
-      t.prot += e.proteines || 0
-      t.gluc += e.glucides || 0
-      t.lip  += e.lipides || 0
-      t.fib  += e.fibres || 0
-      for (const key of ALL_NUTRIENT_KEYS) t[key] += e[key] || 0
-    }
-    return t
-  }, [entries])
-
+  const totals = useMemo(() => computeTotals(entries), [entries])
   const mealTargets = useMemo(() => computeMealTargets(settings), [settings])
+
+  // Manques nutritionnels du jour (voir ciqualExplorer.js, même logique que
+  // la bande "À combler aujourd'hui" de l'Explorer) — calculés pour tout
+  // slot (pas seulement "aujourd'hui") car ils servent aussi au grammage
+  // "comble le manque" du FoodPicker quand on ajoute un aliment à CE jour,
+  // qu'il s'agisse d'hier, demain ou aujourd'hui.
+  const allGaps = useMemo(() => getNutrientGaps(totals, settings, Infinity), [totals, settings])
+  const gaps    = useMemo(() => allGaps.slice(0, 3), [allGaps])
+
+  // Version avec grammage absolu (voir getGapAmount) des 10 manques les plus
+  // urgents — sert au moteur de suggestion de TodayGapsSection ET au Food
+  // Picker (voir FoodRow), qui cherchent tous deux pour chaque aliment CELUI
+  // de ces 10 manques qu'il comble le plus efficacement (pas forcément le
+  // n°1 : un aliment peut être médiocre sur le manque le plus urgent mais
+  // excellent sur le 4e).
+  const top10Gaps = useMemo(() => (
+    allGaps.slice(0, 10).map(g => ({ field: g.field, missing: getGapAmount(totals, settings, g.field) }))
+  ), [allGaps, totals, settings])
+
+  // Ouvre l'Explorer préfiltré sur ce nutriment — même geste qu'une pastille
+  // de manque dans l'Explorer lui-même (voir ExplorerPage.handlePickGap),
+  // amorcé ici via le state de navigation (lu par ExplorerPage au montage).
+  const goToExplorerGap = (gapKey) => {
+    navigate('/explorer', { state: { backgroundLocation: location.state?.backgroundLocation || location, gapKey } })
+  }
 
   const handleAdd = async (entry) => {
     const { error } = await addEntry(entry)
@@ -156,6 +174,26 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onNavigate={onNavigate}
         />
         <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
+
+        {/* Uniquement sur le jour réellement affiché (le texte de la bande et
+            les favoris/récents qu'elle charge n'ont de sens que pour
+            "aujourd'hui" au sens propre, pas un slot voisin visité en
+            swipant), et seulement si l'utilisatrice ne l'a pas masquée depuis
+            Profil > Page du jour. */}
+        {isToday && settings.afficher_manques_jour !== false && (
+          <div style={{ marginTop: 16 }}>
+            <TodayGapsSection
+              dateStr={dateStr}
+              gaps={gaps}
+              allGaps={allGaps}
+              top10Gaps={top10Gaps}
+              entries={entries}
+              onAddEntry={handleAdd}
+              onNavigateExplorer={goToExplorerGap}
+            />
+          </div>
+        )}
+
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="section-title" style={{ marginBottom: 0 }}>Repas du jour</div>
@@ -175,7 +213,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
               entries={entries.filter(e => e.meal === m)}
               target={mealTargets[m]}
               plannedItems={nonMangesPlanifies.filter(r => r.meal === m)}
-              onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd })}
+              onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd, top10Gaps })}
               onDelete={handleDelete}
               onUpdate={handleUpdate}
               onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
@@ -382,6 +420,7 @@ export default function TodayPage() {
       {modal && (
         <AddFoodModal
           initialMeal={modal.meal}
+          top10Gaps={modal.top10Gaps}
           onAdd={modal.addEntry}
           onClose={() => setModal(null)}
         />

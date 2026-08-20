@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-20',
+    title: "Des conseils nutritionnels directement sur ta page du jour",
+    description: "Sur ta page du jour, un nouveau bandeau te montre ce qu'il te manque aujourd'hui (fer, vitamine C, fibres...), avec une suggestion parmi ce que tu manges déjà pour le combler en un tap. Et quand tu ajoutes un aliment, tu vois maintenant s'il est riche en un nutriment, et éventuellement la quantité qui comble ton manque du jour — comme dans l'Explorer.",
+  },
+  {
+    date: '2026-08-20',
     title: 'Vitamines, minéraux, sucres et graisses réunis dans un seul encart',
     description: "Les sections \"Vitamines & Minéraux\" et \"Détail sucres & acides gras\" ne font plus qu'un, sous le titre \"Détail nutritionnel\". Quatre boutons en haut (Vitamines, Minéraux, Sucres, Acides gras) te permettent de basculer entre les catégories, comme avant.",
   },

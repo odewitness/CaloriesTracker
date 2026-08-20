@@ -6,7 +6,7 @@ import { useMeasurements } from '../hooks/useMeasurements'
 import { usePushSubscription } from '../hooks/usePushSubscription'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { User, Calendar, Scale, Ruler, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill, ChevronRight, Bell, Users, Calculator } from 'lucide-react'
+import { User, Calendar, Scale, Ruler, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill, ChevronRight, Bell, Users, Calculator, Lightbulb } from 'lucide-react'
 import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS, computeCalorieNeeds, ACTIVITY_LEVELS, CALORIE_OBJECTIVES } from '../lib/nutrients'
 import Loader from '../components/Loader'
 
@@ -606,6 +606,20 @@ export default function ProfilePage() {
       {goalsDirty && (
         <button className="btn-primary" onClick={saveGoals} style={{ marginTop: 4, marginBottom: 20 }}>💾 Sauvegarder les objectifs</button>
       )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <Lightbulb size={16} color="var(--green)" />
+        <div className="section-title" style={{ marginBottom: 0 }}>Page du jour</div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
+        <Row icon={<Lightbulb size={18} />} label="Manques du jour et suggestions">
+          <ToggleSwitch
+            checked={settings.afficher_manques_jour !== false}
+            onClick={() => updateSettings({ afficher_manques_jour: !(settings.afficher_manques_jour !== false) })}
+          />
+        </Row>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <Bell size={16} color="var(--green)" />

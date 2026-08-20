@@ -37,6 +37,14 @@ import EmptyState from './EmptyState'
 //                    (aliments les plus fréquents pour CE repas, voir
 //                    useMealSuggestions) au-dessus des Favoris. Absent pour
 //                    RecipeFormModal (pas de notion de repas côté recette).
+//   top10Gaps      — OPTIONNEL : les 10 manques nutritionnels les plus urgents
+//                    du jour ciblé, avec leur grammage absolu (voir
+//                    getNutrientGaps/getGapAmount dans ciqualExplorer.js),
+//                    transmis par AddFoodModal. Simplement passé à chaque
+//                    FoodRow, qui cherche parmi ces 10 manques celui que la
+//                    portion habituelle de CET aliment couvre le mieux (voir
+//                    portionGapCoverage). Absent pour RecipeFormModal (pas de
+//                    notion de jour/manque).
 //   onConfirm(food, qty) — appelé à la validation ; le CALLER se charge de
 //                          transformer (food, qty) en objet persistable via
 //                          scaleFood() de lib/nutrients.js, avec ses propres
@@ -66,6 +74,7 @@ export default function FoodPicker({
   contextLabel,
   includeRecipes = true,
   meal,
+  top10Gaps,
   onConfirm,
   onClose,
 }) {
@@ -300,13 +309,17 @@ export default function FoodPicker({
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr'))
   }, [results, searchSource])
 
-  const offFilteredResults = useMemo(() => {
-    if (searchSource !== 'off') return results
-    return results.filter(f =>
+  // Résultats affichés : filtrés par marque/catégorie côté OFF (pas d'effet
+  // côté Ciqual), puis favoris remontés en tête — sans perdre l'ordre de
+  // pertinence déjà posé par search_ciqual / OFF à l'intérieur de chaque
+  // groupe (favoris / non-favoris), le tri étant stable.
+  const searchResults = useMemo(() => {
+    const filtered = searchSource !== 'off' ? results : results.filter(f =>
       (!offBrandFilter || f.marque === offBrandFilter) &&
       (!offCategoryFilter || f.categorie === offCategoryFilter)
     )
-  }, [results, searchSource, offBrandFilter, offCategoryFilter])
+    return [...filtered].sort((a, b) => (isFavorite(a) ? 0 : 1) - (isFavorite(b) ? 0 : 1))
+  }, [results, searchSource, offBrandFilter, offCategoryFilter, isFavorite])
 
   // Entrée = lance la recherche immédiatement et ferme le clavier
   const handleSearchKeyDown = (e) => {
@@ -636,17 +649,18 @@ const setDoseCount = (text) => {
                 </EmptyState>
               )}
 
-              {!searching && query.length >= 2 && results.length > 0 && offFilteredResults.length === 0 && (
+              {!searching && query.length >= 2 && results.length > 0 && searchResults.length === 0 && (
                 <EmptyState>Aucun résultat avec ces filtres</EmptyState>
               )}
 
-              {!searching && query.length >= 2 && offFilteredResults.map((food, i) => (
+              {!searching && query.length >= 2 && searchResults.map((food, i) => (
                 <FoodRow
                   key={food.id || food.alim_code || i}
                   food={food}
                   isFav={isFavorite(food)}
                   onSelect={selectFood}
                   onToggleFav={toggleFavorite}
+                  top10Gaps={top10Gaps}
                 />
               ))}
 
@@ -678,6 +692,7 @@ const setDoseCount = (text) => {
                           isFav={true}
                           onSelect={selectFood}
                           onToggleFav={() => toggleFavorite(f.food_data)}
+                          top10Gaps={top10Gaps}
                         />
                       ))}
                       {!favoritesCollapsed && favoritesVisible < sortedFavorites.length && (
@@ -713,6 +728,7 @@ const setDoseCount = (text) => {
                           isFav={isFavorite(food)}
                           onSelect={selectFood}
                           onToggleFav={toggleFavorite}
+                          top10Gaps={top10Gaps}
                         />
                       ))}
                     </>
@@ -728,6 +744,7 @@ const setDoseCount = (text) => {
                           isFav={isFavorite(food)}
                           onSelect={selectFood}
                           onToggleFav={toggleFavorite}
+                          top10Gaps={top10Gaps}
                         />
                       ))}
                     </>

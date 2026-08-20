@@ -623,13 +623,16 @@ export function getGapAmount(totals, settings, field) {
 // cochés — c'est le geste attendu (« qu'est-ce qui comble les DEUX à la
 // fois »), pas une quantité par nutriment.
 //
-// Sans contrainte calorique atteignable, le grammage indiqué comble tout
-// (pct: 100). Quand tout combler dépasserait les calories restantes, on
-// redescend au grammage qui tient dans le budget et on indique la part du
-// manque le moins bien couvert (le nutriment le plus juste, donc le plus
-// honnête à afficher) — plutôt que de masquer l'aliment, qui reste un
-// progrès partiel utile.
-//
+// Trois contraintes peuvent limiter le grammage réellement proposé : le
+// besoin lui-même (gramsForFullGap), les calories restantes, et un plafond de
+// portion réaliste (MAX_REALISTIC_COVERAGE_G — personne ne mange 350 g de
+// persil pour son fer). On prend la PLUS PETITE des trois plutôt que de
+// masquer l'aliment dès qu'une seule est dépassée : combler une partie du
+// manque avec une portion raisonnable reste un progrès utile à montrer, et
+// c'est justement le rôle de `pct` (100 seulement si rien ne limite en deçà
+// du besoin réel) de dire jusqu'où on va.
+export const MAX_REALISTIC_COVERAGE_G = 200
+
 // Retourne null si l'aliment n'apporte pas au moins un des nutriments visés,
 // ou s'il n'y a plus aucun manque à combler.
 export function gapCoverage(food, gaps, remainingKcal) {
@@ -639,20 +642,42 @@ export function gapCoverage(food, gaps, remainingKcal) {
 
   const gramsForFullGap = Math.max(...gaps.map((g, i) => (g.missing / per100[i]) * 100))
   const kcalPer100 = food.energie_kcal || 0
-  const kcalForFullGap = (gramsForFullGap * kcalPer100) / 100
 
-  if (remainingKcal == null || kcalForFullGap <= remainingKcal) {
-    return { grams: gramsForFullGap, kcal: kcalForFullGap, pct: 100 }
+  let grams = Math.min(gramsForFullGap, MAX_REALISTIC_COVERAGE_G)
+  if (remainingKcal != null && kcalPer100 > 0) {
+    grams = Math.min(grams, (remainingKcal / kcalPer100) * 100)
   }
-  // Kcal restantes insuffisantes pour tout combler, mais un aliment à 0
-  // kcal/100g ne peut jamais dépasser un budget positif : cette branche
-  // suppose donc kcalPer100 > 0.
-  const grams = (remainingKcal / kcalPer100) * 100
+  if (grams <= 0) return null
+
+  const kcal = (grams * kcalPer100) / 100
+  if (grams >= gramsForFullGap) return { grams, kcal, pct: 100 }
   const pctPerGap = gaps.map((g, i) => ((grams * per100[i]) / 100 / g.missing) * 100)
-  return { grams, kcal: remainingKcal, pct: Math.round(Math.min(...pctPerGap)) }
+  return { grams, kcal, pct: Math.round(Math.min(...pctPerGap)) }
 }
 
 // ── Suggestions ──────────────────────────────────────────────────────────────
+
+// Combien du manque `gap` une PORTION RÉALISTE de cet aliment (déclarée en
+// base, ou 100 g par défaut — voir getPortion) couvre-t-elle ? Contraire de
+// gapCoverage, qui résout "combien de grammes pour combler X %", quitte à
+// buter sur MAX_REALISTIC_COVERAGE_G — et donc à afficher ce même plafond
+// pour tout aliment qui en a besoin de plus, ce qui rend toutes les
+// suggestions identiques (« 200 g ») dès qu'aucun aliment du lot n'est très
+// dense sur ces nutriments. Ici on part de ce qu'on mange VRAIMENT (sa
+// portion habituelle) et on regarde jusqu'où ça mène : le grammage affiché
+// varie donc d'un aliment à l'autre (30 g de noix, 125 g de yaourt...) au
+// lieu de converger vers un chiffre inventé.
+//
+// Retourne null si l'aliment n'apporte pas ce nutriment, ou s'il n'y a plus
+// de manque à combler.
+export function portionGapCoverage(food, gap) {
+  if (!gap?.missing) return null
+  const per100 = rawValue(food, gap.field)
+  if (per100 == null || per100 <= 0) return null
+  const portion = getPortion(food)
+  const amount = (per100 * portion.g) / 100
+  return { grams: portion.g, pct: Math.round(Math.min(100, (amount / gap.missing) * 100)) }
+}
 
 // Meilleure alternative dans la MÊME CATÉGORIE pour un nutriment en manque
 // aujourd'hui — sert à la fiche d'un aliment (ExplorerFoodModal) : « un

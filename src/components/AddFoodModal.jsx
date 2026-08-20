@@ -9,7 +9,7 @@ import { scaleFood } from '../lib/nutrients'
 // définir le contexte propre au journal : le repas ciblé et le format d'entrée
 // attendu par useJournal.addEntry.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
+export default function AddFoodModal({ initialMeal, top10Gaps, onAdd, onClose }) {
   const meal = initialMeal || 'Déjeuner' // fixé par le "+" sur lequel on a cliqué
 
   const handleConfirm = async (food, qty) => {
@@ -24,6 +24,7 @@ export default function AddFoodModal({ initialMeal, onAdd, onClose }) {
       contextLabel={<>Ajout à : <strong style={{ color: 'var(--text)' }}>{meal}</strong></>}
       includeRecipes={true}
       meal={meal}
+      top10Gaps={top10Gaps}
       onConfirm={handleConfirm}
       onClose={onClose}
     />
