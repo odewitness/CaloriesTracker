@@ -32,9 +32,12 @@ import { MoreHorizontal } from 'lucide-react'
 //   activeClaims      — clés de nutriments déjà filtrées (pour l'état actif des pastilles)
 //   onPickGap(key)    — bascule le filtre « riche en <nutriment> » + le tri dessus
 //   fitsRemainingKcal / onToggleFits — filtre « tient dans mes calories restantes »
+//   hideTitle         — OPTIONNEL : masque le titre "À combler aujourd'hui"
+//                        quand un en-tête englobant le porte déjà (voir
+//                        TodayGapsSection)
 // ─────────────────────────────────────────────────────────────────────────────
 export default function NutrientGapsBanner({
-  gaps, hasMoreGaps, onShowAllGaps, hasEntries, remainingKcal, activeClaims, onPickGap, fitsRemainingKcal, onToggleFits,
+  gaps, hasMoreGaps, onShowAllGaps, hasEntries, remainingKcal, activeClaims, onPickGap, fitsRemainingKcal, onToggleFits, hideTitle,
 }) {
   const showKcalToggle = remainingKcal != null && remainingKcal > 0
 
@@ -44,12 +47,17 @@ export default function NutrientGapsBanner({
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{
-        fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)',
-        textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6,
-      }}>
-        À combler aujourd'hui
-      </div>
+      {/* hideTitle : quand un en-tête englobant porte déjà ce titre (voir
+          TodayGapsSection, qui l'utilise comme intitulé de sa section
+          repliable) — éviter la répétition. */}
+      {!hideTitle && (
+        <div style={{
+          fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)',
+          textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6,
+        }}>
+          À combler aujourd'hui
+        </div>
+      )}
 
       {/* Les deux états sans manque tiennent en une ligne : l'ancienne version
           y consacrait un paragraphe de trois lignes. */}

@@ -238,13 +238,23 @@ export default function NutrientPanel({ totals, hasEntries, defaultOpen = false,
 
       {open && (
         <div style={{ padding: '0 16px 14px' }}>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
             {TABS.map(t => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className="chip"
-                style={{ background: tab === t.key ? 'var(--green)' : 'var(--green-light)', color: tab === t.key ? 'white' : 'var(--green-dark)' }}
+                style={{
+                  background: tab === t.key ? 'var(--green)' : 'var(--green-light)',
+                  color: tab === t.key ? 'white' : 'var(--green-dark)',
+                  // Réduits par rapport au chip par défaut : à 4 dans la
+                  // largeur d'une carte, "Acides gras" fait déborder sur deux
+                  // lignes sur un écran de téléphone étroit sinon.
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  flex: '1 1 0',
+                  textAlign: 'center',
+                }}
               >
                 {t.label}
               </button>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Search, SlidersHorizontal, ArrowUpDown, Star, Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
@@ -249,6 +250,7 @@ function ExplorerRow({ food, sortField, sort, isFav, onSelect, onToggleFav, gapF
 }
 
 export default function ExplorerPage() {
+  const location = useLocation()
   const { foods, loading, error } = useCiqualCatalog()
   const { favorites, isFavorite, toggleFavorite } = useFavorites()
   const { settings } = useSettings()
@@ -257,12 +259,23 @@ export default function ExplorerPage() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const { entries } = useJournal(today)
 
+  // Ouverture depuis une pastille de manque de la page du jour (voir
+  // TodayGapsSection / TodayPage.goToExplorerGap) : amorce exactement le même
+  // état que si on avait tapé la pastille équivalente ici (voir
+  // handlePickGap plus bas). Lu une seule fois au montage — n'affecte pas la
+  // règle juste en dessous, qui ne vaut que pour les ouvertures normales.
+  const initialGapKey = location.state?.gapKey
+
   // Volontairement NON persistes : la page repart d'un etat neutre a chaque
-  // ouverture (tri par nom, aucun filtre). Un reglage pris pour un besoin
-  // ponctuel - typiquement une pastille de manque du jour - ne doit pas
-  // devenir l'etat permanent de l'onglet.
-  const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [sort, setSort]       = useState(DEFAULT_SORT)
+  // ouverture (tri par nom, aucun filtre) SAUF amorçage ci-dessus. Un reglage
+  // pris pour un besoin ponctuel - typiquement une pastille de manque du jour
+  // - ne doit pas devenir l'etat permanent de l'onglet.
+  const [filters, setFilters] = useState(() =>
+    initialGapKey ? { ...DEFAULT_FILTERS, claims: [initialGapKey] } : DEFAULT_FILTERS
+  )
+  const [sort, setSort] = useState(() =>
+    initialGapKey ? { ...DEFAULT_SORT, field: initialGapKey, dir: 'desc' } : DEFAULT_SORT
+  )
   const [filterOpen, setFilterOpen] = useState(false)
   const [sortOpen, setSortOpen]     = useState(false)
   const [selected, setSelected]     = useState(null)

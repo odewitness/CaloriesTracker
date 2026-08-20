@@ -209,7 +209,11 @@ create table if not exists settings (
   -- supabase/sql/push_notifications_setup.sql).
   notif_reminder_enabled boolean not null default true,
   notif_social_enabled boolean not null default true,
-  last_reminder_sent_date date
+  last_reminder_sent_date date,
+  -- Ajoutée le 2026-08-20 : affiche/masque la section "À combler aujourd'hui"
+  -- (manques nutritionnels + suggestion) sur la page du jour (voir Profil >
+  -- Page du jour, et TodayGapsSection côté client).
+  afficher_manques_jour boolean not null default true
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
