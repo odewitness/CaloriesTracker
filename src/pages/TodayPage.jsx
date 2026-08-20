@@ -71,6 +71,11 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     allGaps.slice(0, 10).map(g => ({ field: g.field, missing: getGapAmount(totals, settings, g.field) }))
   ), [allGaps, totals, settings])
 
+  // Calories restantes du jour — sert à TodayGapsSection pour privilégier des
+  // suggestions qui tiennent dans le budget plutôt que n'importe quel aliment
+  // qui comble le manque au prix d'un dépassement.
+  const remainingKcal = settings.goal_kcal != null ? settings.goal_kcal - totals.kcal : null
+
   // Ouvre l'Explorer préfiltré sur ce nutriment — même geste qu'une pastille
   // de manque dans l'Explorer lui-même (voir ExplorerPage.handlePickGap),
   // amorcé ici via le state de navigation (lu par ExplorerPage au montage).
@@ -188,6 +193,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
               allGaps={allGaps}
               top10Gaps={top10Gaps}
               entries={entries}
+              remainingKcal={remainingKcal}
               onAddEntry={handleAdd}
               onNavigateExplorer={goToExplorerGap}
             />

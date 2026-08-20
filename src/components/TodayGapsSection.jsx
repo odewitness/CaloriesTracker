@@ -36,10 +36,13 @@ function lowerFirst(s) {
 //                (voir getGapAmount), sert de vivier au moteur de suggestion
 //                ci-dessous (voir `suggestions`).
 //   entries    — du jour, sert juste à savoir si "rien de noté aujourd'hui"
+//   remainingKcal — calories restantes du jour (objectif - consommé), sert à
+//                privilégier parmi les candidats ceux qui tiennent dedans
+//                (voir `suggestions`) ; null si pas d'objectif calorique réglé
 //   onAddEntry(entry) — même handler que le "+" des repas (useJournal.addEntry)
 //   onNavigateExplorer(gapKey) — ouvre l'Explorer préfiltré sur ce nutriment
 // ─────────────────────────────────────────────────────────────────────────────
-export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, entries, onAddEntry, onNavigateExplorer }) {
+export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, entries, remainingKcal, onAddEntry, onNavigateExplorer }) {
   const { favorites } = useFavorites()
   const { recents } = useRecentFoods()
   const { user } = useAuth()
@@ -69,6 +72,14 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
   // pioche au hasard parmi les meilleurs candidats plutôt que de toujours
   // prendre le premier — recalculé à chaque montage de la section (ouverture
   // de l'app, changement de jour), donc ça varie d'une fois à l'autre.
+  //
+  // Parmi ces meilleurs candidats, on priorise ceux dont la portion tient
+  // dans les calories qu'il reste à la journée (remainingKcal) — inutile de
+  // suggérer 40 g d'amandes pour le magnésium si ça fait dépasser l'objectif
+  // du jour. Si AUCUN candidat ne tient dedans, on retombe sur les meilleurs
+  // quand même plutôt que de ne rien suggérer : combler un manque reste
+  // pertinent même en dépassement, et un léger dépassement calorique est un
+  // moindre mal face à l'absence totale de suggestion.
   const suggestions = useMemo(() => {
     if (!top10Gaps.length) return []
     const candidates = [...favorites.map(f => f.food_data), ...recents]
@@ -93,14 +104,18 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
         if (c && c.pct > 0) matches.push({ food, coverage: c })
       }
       if (!matches.length) continue
-      matches.sort((a, b) => b.coverage.pct - a.coverage.pct)
-      const pool = matches.slice(0, Math.min(3, matches.length))
+      const fitting = remainingKcal != null
+        ? matches.filter(m => m.coverage.kcal <= remainingKcal)
+        : matches
+      const ranked = fitting.length ? fitting : matches
+      ranked.sort((a, b) => b.coverage.pct - a.coverage.pct)
+      const pool = ranked.slice(0, Math.min(3, ranked.length))
       const pick = pool[Math.floor(Math.random() * pool.length)]
       used.add(foodIdentity(pick.food).key)
       out.push({ food: pick.food, gap, coverage: pick.coverage })
     }
     return out
-  }, [top10Gaps, favorites, recents])
+  }, [top10Gaps, favorites, recents, remainingKcal])
 
   // Trace ce qui a réellement été montré : c'est la matière première de la
   // section "Suggestions" de la liste de courses (voir

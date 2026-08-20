@@ -669,14 +669,17 @@ export function gapCoverage(food, gaps, remainingKcal) {
 // lieu de converger vers un chiffre inventé.
 //
 // Retourne null si l'aliment n'apporte pas ce nutriment, ou s'il n'y a plus
-// de manque à combler.
+// de manque à combler. `kcal` (coût calorique de cette portion) est exposé
+// pour que l'appelant puisse arbitrer entre plusieurs candidats à couverture
+// égale selon les calories qu'il reste à la journée (voir TodayGapsSection).
 export function portionGapCoverage(food, gap) {
   if (!gap?.missing) return null
   const per100 = rawValue(food, gap.field)
   if (per100 == null || per100 <= 0) return null
   const portion = getPortion(food)
   const amount = (per100 * portion.g) / 100
-  return { grams: portion.g, pct: Math.round(Math.min(100, (amount / gap.missing) * 100)) }
+  const kcal = ((food.energie_kcal || 0) * portion.g) / 100
+  return { grams: portion.g, pct: Math.round(Math.min(100, (amount / gap.missing) * 100)), kcal }
 }
 
 // Meilleure alternative dans la MÊME CATÉGORIE pour un nutriment en manque

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-20',
+    title: 'Les suggestions "À combler aujourd\'hui" tiennent compte de tes calories restantes',
+    description: "Sur ta page du jour, les suggestions pour combler tes manques nutritionnels évitent maintenant de te proposer un aliment qui te ferait dépasser ton objectif de calories, quand une autre option tout aussi efficace existe.",
+  },
+  {
+    date: '2026-08-20',
     title: 'Des suggestions dans ta liste de courses',
     description: "Ta liste de courses affiche maintenant une section \"Suggestions\" : les aliments qui reviennent le plus souvent dans les conseils \"À combler aujourd'hui\" de ta page du jour (par exemple des sardines si tu manques souvent de vitamine D). Un tap sur le \"+\" les ajoute directement à ta liste.",
   },
