@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-20',
+    title: 'Tes repas types enfin accessibles depuis le jour',
+    description: "Appuie sur le bouton \"...\" à côté du + d'un repas, sur l'écran principal : tu peux maintenant ajouter directement un de tes repas types à ce repas, ou créer un nouveau repas type à partir de ce que tu as déjà noté ce jour-là. Plus besoin de passer par \"Mes aliments\" pour t'en servir.",
+  },
+  {
     date: '2026-08-18',
     title: 'Un calculateur pour trouver tes calories',
     description: "Dans Profil, un nouveau calculateur estime tes besoins caloriques à partir de ton sexe, ton âge, ta taille, ton poids et ton niveau d'activité (à renseigner une fois dans tes informations personnelles). Choisis perte de poids, maintien ou prise de muscle, et applique le résultat directement à tes objectifs en un clic. Les anciens boutons de préréglages ont disparu au profit de ce calcul personnalisé.",

@@ -5,6 +5,8 @@ import { ALL_NUTRIENT_KEYS, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import AddFoodModal from './AddFoodModal'
 import { useJournal } from '../hooks/useJournal'
 import { useBackButton } from '../hooks/useBackButton'
+import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
+import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
 
@@ -180,7 +182,7 @@ function ImportFromDayModal({ onImport, onClose }) {
 // ─── Édition d'un repas type — plein écran (même pattern que AddFoodModal) ──
 // Props :
 //   repas   — repas type existant (avec .id) en édition, ou null pour un nouveau
-//   onSave({ nom, description, items, nb_portions })
+//   onSave({ nom, description, items, nb_portions, categories })
 //   onClose()
 export default function EditMealTemplatePage({ repas, onSave, onClose }) {
   useBackButton(onClose)
@@ -189,9 +191,13 @@ export default function EditMealTemplatePage({ repas, onSave, onClose }) {
   const [desc, setDesc] = useState(repas?.description || '')
   const [portions, setPortions] = useState(repas?.nb_portions || 1)
   const [items, setItems] = useState(repas?.items || [])
+  const [categories, setCategories] = useState(repas?.categories || [])
   const [showAddFood, setShowAddFood] = useState(false)
   const [showImportMeal, setShowImportMeal] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const toggleCategory = (cat) =>
+    setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
 
   const handleAddFood = (entry) => {
     setItems(prev => [...prev, { ...entry, meal: undefined }])
@@ -231,7 +237,7 @@ export default function EditMealTemplatePage({ repas, onSave, onClose }) {
     if (!nom.trim()) { toast('Donne un nom au repas'); return }
     if (items.length === 0) { toast('Ajoute au moins un aliment'); return }
     setSaving(true)
-    await onSave({ nom: nom.trim(), description: desc.trim(), items, nb_portions: portions })
+    await onSave({ nom: nom.trim(), description: desc.trim(), items, nb_portions: portions, categories })
     setSaving(false)
   }
 
@@ -260,7 +266,7 @@ export default function EditMealTemplatePage({ repas, onSave, onClose }) {
         <button className="btn-icon" onClick={onClose} style={{ color: 'var(--text-muted)' }}>
           <ArrowLeft size={20} />
         </button>
-        <h2>{repas ? 'Modifier le repas' : 'Nouveau repas type'}</h2>
+        <h2>{repas?.id ? 'Modifier le repas' : 'Nouveau repas type'}</h2>
         <div style={{ width: 32, flexShrink: 0 }} />
       </div>
 
@@ -277,6 +283,22 @@ export default function EditMealTemplatePage({ repas, onSave, onClose }) {
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Nombre de portions</div>
             <input className="input" type="number" min={1} value={portions} onChange={e => setPortions(parseInt(e.target.value) || 1)} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Catégories</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {RECIPE_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => toggleCategory(cat)}
+                  className="chip"
+                  style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                >
+                  {getRecipeCategoryIcon(cat)} {cat}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

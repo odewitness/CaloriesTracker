@@ -31,11 +31,11 @@ export function useMealTemplateDetail(id) {
 // MealTemplatesSection.handleSave pour être réutilisable ailleurs (une seule
 // source de vérité pour la logique d'enregistrement).
 // ─────────────────────────────────────────────────────────────────────────────
-export async function saveMealTemplate({ userId, repasTypeId, nom, description, items, nbPortions }) {
+export async function saveMealTemplate({ userId, repasTypeId, nom, description, items, nbPortions, categories = [] }) {
   if (repasTypeId) {
     const { data, error } = await supabase
       .from('repas_types')
-      .update({ nom, description, items, nb_portions: nbPortions, updated_at: new Date().toISOString() })
+      .update({ nom, description, items, nb_portions: nbPortions, categories, updated_at: new Date().toISOString() })
       .eq('id', repasTypeId)
       .eq('user_id', userId)
       .select()
@@ -44,7 +44,7 @@ export async function saveMealTemplate({ userId, repasTypeId, nom, description, 
   }
   const { data, error } = await supabase
     .from('repas_types')
-    .insert([{ nom, description, items, nb_portions: nbPortions, user_id: userId }])
+    .insert([{ nom, description, items, nb_portions: nbPortions, categories, user_id: userId }])
     .select()
     .single()
   return { data, error }

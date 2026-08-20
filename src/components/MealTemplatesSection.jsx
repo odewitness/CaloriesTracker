@@ -1,5 +1,5 @@
-import React, { forwardRef, useImperativeHandle, useState, useEffect } from 'react'
-import { Trash2, ChevronDown, Check, Pencil, UtensilsCrossed, CalendarPlus, MoreVertical } from 'lucide-react'
+import React, { forwardRef, useImperativeHandle, useState, useEffect, useMemo } from 'react'
+import { Trash2, ChevronDown, Check, Pencil, UtensilsCrossed, CalendarPlus, MoreVertical, Search, X, ArrowUpDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
@@ -7,8 +7,15 @@ import AddFoodModal from './AddFoodModal'
 import PlanMealModal from './PlanMealModal'
 import EditMealTemplatePage from './EditMealTemplatePage'
 import AddToJournalSheet from './AddToJournalSheet'
+import MealTemplateSortModal from './MealTemplateSortModal'
 import { saveMealTemplate, deleteMealTemplate } from '../hooks/useMealTemplates'
 import { getNutriBadge } from '../lib/nutriBadge'
+import { getRecipeCategoryIcon, getRecipeCategoryColor } from '../lib/categoryIcons'
+import { RECIPE_CATEGORIES, UNCATEGORIZED_LABEL } from '../lib/recipeCategories'
+import {
+  DEFAULT_SORT, sortMealTemplates, describeSortField, isCustomSort,
+  filterByCategories, isCustomFilter, describeActiveFilters,
+} from '../lib/mealTemplateSort'
 import MacroPillsRow from './MacroPillsRow'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
@@ -170,8 +177,54 @@ const MealTemplatesSection = forwardRef(function MealTemplatesSection({ active }
   const [planTarget, setPlanTarget] = useState(null) // repas type en cours de planification
   const [journalDate, setJournalDate] = useState(new Date().toISOString().slice(0, 10))
   const [journalMeal, setJournalMeal] = useState('Déjeuner')
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState(DEFAULT_SORT)
+  const [sortModalOpen, setSortModalOpen] = useState(false)
+  const [collapsedCategories, setCollapsedCategories] = useState(() => new Set())
 
   useEffect(() => { load() }, [user])
+
+  // Normalise pour une recherche insensible à la casse et aux accents
+  const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+
+  const filteredRepasList = useMemo(() => {
+    const q = normalize(search.trim())
+    if (!q) return repasList
+    return repasList.filter(r => {
+      if (normalize(r.nom).includes(q)) return true
+      return (r.items || []).some(i => normalize(i.food_name).includes(q))
+    })
+  }, [repasList, search])
+
+  const sortActive   = isCustomSort(sort)
+  const filterActive = isCustomFilter(sort)
+
+  // Regroupés par catégorie (un repas type avec plusieurs catégories apparaît
+  // dans chaque groupe correspondant) — même logique que RecipesSection.
+  const groupedRepas = useMemo(() => {
+    const catFiltered = filterByCategories(filteredRepasList, sort.categories)
+    const sorted = sortMealTemplates(catFiltered, sort)
+    const groups = []
+    for (const cat of RECIPE_CATEGORIES) {
+      if (sort.categories.length > 0 && !sort.categories.includes(cat)) continue
+      const items = sorted.filter(r => (r.categories || []).includes(cat))
+      if (items.length > 0) groups.push({ key: cat, items })
+    }
+    if (sort.categories.length === 0) {
+      const items = sorted.filter(r => !(r.categories || []).length)
+      if (items.length > 0) groups.push({ key: UNCATEGORIZED_LABEL, items })
+    }
+    return groups
+  }, [filteredRepasList, sort])
+
+  const totalRepasCount = groupedRepas.reduce((s, g) => s + g.items.length, 0)
+
+  const toggleCategoryCollapsed = (key) =>
+    setCollapsedCategories(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
 
   const load = async () => {
     if (!user) { setRepasList([]); setLoading(false); return }
@@ -181,8 +234,8 @@ const MealTemplatesSection = forwardRef(function MealTemplatesSection({ active }
     setLoading(false)
   }
 
-  const handleSave = async ({ nom, description, items, nb_portions }) => {
-    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: editTarget?.id, nom, description, items, nbPortions: nb_portions })
+  const handleSave = async ({ nom, description, items, nb_portions, categories }) => {
+    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: editTarget?.id, nom, description, items, nbPortions: nb_portions, categories })
     if (!error) { toast(editTarget?.id ? '✓ Repas modifié !' : '✓ Repas créé !'); load() }
     else toast('Erreur')
     setEditTarget(null)
@@ -214,22 +267,99 @@ const MealTemplatesSection = forwardRef(function MealTemplatesSection({ active }
     <>
       {active && (
         <>
-          {loading && <Loader />}
+          {/* ── Barre de recherche + tri ── */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                className="input"
+                placeholder="Rechercher un repas type ou un aliment..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: 36, paddingRight: search ? 36 : 12 }}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
 
-          {!loading && repasList.length === 0 && (
-            <EmptyState icon={<UtensilsCrossed size={40} />} title="Aucun repas type" description="Crée des groupes d'aliments pour les réutiliser facilement" />
+            <button
+              onClick={() => setSortModalOpen(true)}
+              style={{
+                width: 44, height: 44, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                background: (sortActive || filterActive) ? 'var(--green-light)' : 'var(--gray-bg)',
+                color: (sortActive || filterActive) ? 'var(--green-dark)' : 'var(--text-muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <ArrowUpDown size={17} />
+            </button>
+          </div>
+
+          {(sortActive || filterActive) && (
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 10 }}>
+              {filterActive && `Filtré par ${describeActiveFilters(sort).join(', ')}`}
+              {filterActive && sortActive && ' · '}
+              {sortActive && `Trié par ${describeSortField(sort.primary, sort.basis)}${sort.secondary ? `, puis ${describeSortField(sort.secondary, sort.basis)}` : ''}`}
+            </div>
           )}
 
-          {repasList.map(r => (
-            <MealTemplateCard
-              key={r.id}
-              repas={r}
-              onDelete={handleDelete}
-              onEdit={setEditTarget}
-              onAddToJournal={handleAddToJournal}
-              onPlan={setPlanTarget}
+          {loading && <Loader />}
+
+          {!loading && totalRepasCount === 0 && (
+            <EmptyState
+              icon={<UtensilsCrossed size={40} />}
+              title={search || filterActive ? 'Aucun résultat' : 'Aucun repas type'}
+              description={search || filterActive
+                ? 'Aucun repas type ne correspond à ta recherche/filtre'
+                : "Crée des groupes d'aliments pour les réutiliser facilement"}
             />
-          ))}
+          )}
+
+          {groupedRepas.map(({ key, items }) => {
+            const collapsed = collapsedCategories.has(key)
+            const { accent, bg } = getRecipeCategoryColor(key)
+            return (
+              <div key={key} style={{ marginBottom: 18 }}>
+                <button
+                  onClick={() => toggleCategoryCollapsed(key)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: collapsed ? 0 : 6 }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ background: bg, color: accent, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+                      {getRecipeCategoryIcon(key)} {key}
+                    </span>
+                    <span style={{ color: 'var(--text-hint)', fontSize: 12, fontWeight: 600 }}>({items.length})</span>
+                  </span>
+                  <ChevronDown size={16} color="var(--text-hint)" style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
+                </button>
+                {!collapsed && items.map(r => (
+                  <MealTemplateCard
+                    key={r.id}
+                    repas={r}
+                    onDelete={handleDelete}
+                    onEdit={setEditTarget}
+                    onAddToJournal={handleAddToJournal}
+                    onPlan={setPlanTarget}
+                  />
+                ))}
+              </div>
+            )
+          })}
+
+          {sortModalOpen && (
+            <MealTemplateSortModal
+              value={sort}
+              onChange={setSort}
+              onClose={() => setSortModalOpen(false)}
+            />
+          )}
         </>
       )}
 

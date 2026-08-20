@@ -189,7 +189,8 @@ create table if not exists repas_types (
   nb_portions integer default 1,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
-  user_id uuid references auth.users(id)
+  user_id uuid references auth.users(id),
+  categories text[] not null default '{}' -- mêmes valeurs que recettes.categories (voir RECIPE_CATEGORIES dans src/lib/recipeCategories.js) : 'Petit-déjeuner' | 'Collation' | 'Plat' | 'Accompagnement' | 'Boisson' | 'Dessert' | 'Pain / pâtes' (multi)
 );
 
 -- 4. TABLE SETTINGS

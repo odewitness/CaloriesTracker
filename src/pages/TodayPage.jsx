@@ -6,6 +6,8 @@ import VitaminPanel from '../components/VitaminPanel'
 import NutrientDetails from '../components/NutrientDetails'
 import MealSection from '../components/MealSection'
 import AddFoodModal from '../components/AddFoodModal'
+import AddFromMealModal from '../components/AddFromMealModal'
+import EditMealTemplatePage from '../components/EditMealTemplatePage'
 import FoodDetailModal from '../components/FoodDetailModal'
 import EditSupplementModal from '../components/EditSupplementModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from '../components/SupplementSection'
@@ -15,6 +17,7 @@ import ShareJournalModal from '../components/ShareJournalModal'
 import { useJournal } from '../hooks/useJournal'
 import { useSettings } from '../hooks/useSettings'
 import { useFeed } from '../hooks/useFeed'
+import { saveMealTemplate } from '../hooks/useMealTemplates'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
@@ -73,6 +76,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const { settings } = useSettings()
   const { shareJournal } = useFeed()
   const [shareTarget, setShareTarget] = useState(null) // { meal: string|null, entries: [...] } | null
+  const [templateAddMeal, setTemplateAddMeal] = useState(null)    // nom du repas | null — ajout d'un repas type à ce repas
+  const [templateCreateMeal, setTemplateCreateMeal] = useState(null) // nom du repas | null — création d'un repas type depuis ce repas
 
   const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
 
@@ -108,6 +113,37 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     if (!error) toast('✓ Modifié !')
     else toast('Erreur')
     return { error }
+  }
+
+  // Ajoute les aliments d'un repas type sélectionné (déjà mis à l'échelle par
+  // AddFromMealModal) directement au journal de CE jour, pour le repas depuis
+  // lequel le menu a été ouvert — pas de re-choix date/repas nécessaire.
+  const handleAddFromTemplate = async (meal, items) => {
+    let ok = 0
+    for (const it of items) {
+      const { _idx, ...rest } = it
+      const { error } = await addEntry({ meal, ...rest })
+      if (!error) ok++
+    }
+    if (ok > 0) toast(`✓ ${ok} aliment${ok > 1 ? 's' : ''} ajouté${ok > 1 ? 's' : ''} !`)
+    else toast("Erreur lors de l'ajout")
+  }
+
+  // Crée un nouveau repas type à partir des aliments déjà enregistrés dans un
+  // repas de ce jour — même logique de "nettoyage" des champs que
+  // ImportFromDayModal (retire id/date/meal/user_id/created_at).
+  const templateSeedItems = useMemo(() => {
+    if (!templateCreateMeal) return []
+    return entries
+      .filter(e => e.meal === templateCreateMeal)
+      .map(({ id, date: _d, meal: _m, user_id, created_at, ...rest }) => rest)
+  }, [templateCreateMeal, entries])
+
+  const handleSaveTemplateFromMeal = async ({ nom, description, items, nb_portions, categories }) => {
+    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: null, nom, description, items, nbPortions: nb_portions, categories })
+    if (!error) toast(`✓ Repas type « ${nom} » créé !`)
+    else toast('Erreur')
+    setTemplateCreateMeal(null)
   }
 
   const handleMarkPlannedEaten = async (repas) => {
@@ -179,6 +215,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
               onDeleteSeries={handleDeleteSeries}
               onOpenPlannedSource={onOpenSource}
               onShare={(meal) => setShareTarget({ meal, entries: entries.filter(e => e.meal === meal) })}
+              onAddFromTemplate={setTemplateAddMeal}
+              onCreateTemplate={setTemplateCreateMeal}
             />
           ))}
         </div>
@@ -201,6 +239,21 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           subtitle={shareTarget.meal ? shareTarget.meal : dateLabel(date)}
           onConfirm={confirmShareJournal}
           onClose={() => setShareTarget(null)}
+        />
+      )}
+
+      {templateAddMeal && (
+        <AddFromMealModal
+          onAdd={(repas, items) => handleAddFromTemplate(templateAddMeal, items)}
+          onClose={() => setTemplateAddMeal(null)}
+        />
+      )}
+
+      {templateCreateMeal && (
+        <EditMealTemplatePage
+          repas={{ items: templateSeedItems, nb_portions: 1 }}
+          onSave={handleSaveTemplateFromMeal}
+          onClose={() => setTemplateCreateMeal(null)}
         />
       )}
     </div>

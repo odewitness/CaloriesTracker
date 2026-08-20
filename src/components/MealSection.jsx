@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, ChevronDown, Share2 } from 'lucide-react'
+import { Plus, ChevronDown, Share2, MoreVertical, BookOpen, BookmarkPlus } from 'lucide-react'
 import EditableFoodRow from './EditableFoodRow'
 import PlannedMealCard from './PlannedMealCard'
 
@@ -8,13 +8,19 @@ import PlannedMealCard from './PlannedMealCard'
 // dans le calendrier : marquer mangé, supprimer, supprimer la série).
 // onShare(name) — optionnel ; si absent, pas de bouton "Partager" (masqué
 // aussi si le repas est vide, rien à partager).
-export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare }) {
+// onAddFromTemplate(name) — optionnel ; ouvre le choix d'un repas type à
+// ajouter directement à ce repas (voir TodayPage).
+// onCreateTemplate(name) — optionnel ; crée un nouveau repas type à partir
+// des aliments déjà enregistrés dans ce repas (masqué si le repas est vide).
+export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare, onAddFromTemplate, onCreateTemplate }) {
   const enabled = target?.enabled !== false
   const storageKey = `meal-collapsed:${name}`
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem(storageKey)) ?? false }
     catch { return false }
   })
+  const [menuOpen, setMenuOpen] = useState(false)
+  const showTemplateMenu = !!(onAddFromTemplate || onCreateTemplate)
 
   const toggleCollapsed = () => {
     setCollapsed(c => {
@@ -104,6 +110,41 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
           >
             <Share2 size={15} />
           </button>
+        )}
+        {showTemplateMenu && (
+          <div style={{ position: 'relative', flexShrink: 0, marginRight: 6 }}>
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--gray-bg)', color: 'var(--text-hint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              aria-label={`Repas types pour ${name}`}
+              title="Repas types"
+            >
+              <MoreVertical size={16} />
+            </button>
+            {menuOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setMenuOpen(false)} />
+                <div className="card" style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, padding: 4, minWidth: 230 }}>
+                  {onAddFromTemplate && (
+                    <button
+                      onClick={() => { setMenuOpen(false); onAddFromTemplate(name) }}
+                      style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      <BookOpen size={14} /> Ajouter un repas type
+                    </button>
+                  )}
+                  {onCreateTemplate && entries.length > 0 && (
+                    <button
+                      onClick={() => { setMenuOpen(false); onCreateTemplate(name) }}
+                      style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      <BookmarkPlus size={14} /> Créer un repas type
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         )}
         <button
           onClick={() => onAdd(name)}
