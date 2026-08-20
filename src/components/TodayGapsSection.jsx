@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { Lightbulb, Plus, ChevronDown } from 'lucide-react'
 import { useFavorites, foodIdentity } from '../hooks/useFavorites'
 import { useRecentFoods } from '../hooks/useRecentFoods'
+import { useAuth } from '../lib/AuthContext'
 import { portionGapCoverage, formatValue } from '../lib/ciqualExplorer'
 import { scaleFood } from '../lib/nutrients'
 import { logSuggestions } from '../lib/suggestionsLog'
@@ -41,6 +42,7 @@ function lowerFirst(s) {
 export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, entries, onAddEntry, onNavigateExplorer }) {
   const { favorites } = useFavorites()
   const { recents } = useRecentFoods()
+  const { user } = useAuth()
   const [open, setOpen] = useState(true)
   const [gapsSheetOpen, setGapsSheetOpen] = useState(false)
   const [quickAdd, setQuickAdd] = useState(null) // { food, qty, date, meal, saving } | null
@@ -104,7 +106,7 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
   // section "Suggestions" de la liste de courses (voir
   // useGroceriesSuggestions.js), qui fait remonter les aliments les plus
   // fréquents parmi ceux suggérés ici au fil du temps.
-  useEffect(() => { logSuggestions(suggestions) }, [suggestions])
+  useEffect(() => { logSuggestions(suggestions, user?.id) }, [suggestions, user?.id])
 
   const handleQuickAdd = (suggestion) => {
     setQuickAdd({
