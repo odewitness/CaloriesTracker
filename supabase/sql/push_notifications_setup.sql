@@ -57,8 +57,14 @@ create extension if not exists pg_net;
 -- 4. HELPERS -------------------------------------------------------------------
 
 -- Amies acceptées d'un utilisateur (les deux sens de la relation amities).
+-- SECURITY DEFINER : appelée depuis les triggers push_on_new_* qui tournent
+-- avec les droits de la personne qui déclenche l'action (ex. l'amie qui
+-- réagit), pas avec ceux du propriétaire des données à notifier — sans
+-- SECURITY DEFINER, le RLS de la table `amities` bloquerait silencieusement
+-- la lecture (aucune erreur, juste 0 lignes → aucune notif envoyée, bug
+-- constaté le 2026-08-22).
 create or replace function push_friend_ids(p_user_id uuid)
-returns table(friend_id uuid) language sql stable as $$
+returns table(friend_id uuid) language sql stable security definer set search_path = public as $$
   select destinataire_id from amities where demandeur_id = p_user_id and statut = 'acceptee'
   union
   select demandeur_id from amities where destinataire_id = p_user_id and statut = 'acceptee'
@@ -68,8 +74,11 @@ $$;
 -- notif_social_enabled de chacun. Fire-and-forget (pg_net est asynchrone) :
 -- un échec d'envoi ne doit jamais faire échouer l'insertion qui a déclenché
 -- le trigger (partage, réaction, commentaire...).
+-- SECURITY DEFINER pour la même raison que push_friend_ids ci-dessus : lit
+-- `settings` (RLS "own row only") pour un user_id qui n'est pas forcément
+-- l'appelant.
 create or replace function push_notify(p_user_ids uuid[], p_title text, p_body text, p_url text)
-returns void language plpgsql as $$
+returns void language plpgsql security definer set search_path = public, net as $$
 declare
   v_ids uuid[];
 begin
@@ -93,8 +102,10 @@ end;
 $$;
 
 -- 5. NOUVEAU PARTAGE → notifie les amies acceptées de l'auteure --------------
+-- SECURITY DEFINER : lit `amities`/`settings` (RLS restreint) et doit
+-- fonctionner quel que soit le rôle qui a déclenché l'insertion.
 create or replace function push_on_new_partage()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare
   v_friends uuid[];
 begin
@@ -116,8 +127,13 @@ drop trigger if exists trg_push_on_new_partage on partages_journal;
 create trigger trg_push_on_new_partage after insert on partages_journal for each row execute function push_on_new_partage();
 
 -- 6. NOUVELLE RÉACTION → notifie l'auteure du partage -------------------------
+-- SECURITY DEFINER : sans ça, le `select ... from partages_recettes/journal`
+-- tourne avec les droits de l'amie qui réagit (pas l'auteure) ; si le RLS de
+-- ces tables ne lui donne pas accès à la ligne, v_author reste NULL et la
+-- fonction rend la main sans erreur ni notif — c'était la cause du bug du
+-- 2026-08-22 (notifs "mises en place" mais jamais reçues).
 create or replace function push_on_new_reaction()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare
   v_author uuid;
 begin
@@ -139,8 +155,9 @@ drop trigger if exists trg_push_on_new_reaction on reactions_journal;
 create trigger trg_push_on_new_reaction after insert on reactions_journal for each row execute function push_on_new_reaction();
 
 -- 7. NOUVEAU COMMENTAIRE / RÉPONSE → notifie l'auteure ciblée -----------------
+-- SECURITY DEFINER pour la même raison que push_on_new_reaction ci-dessus.
 create or replace function push_on_new_comment()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare
   v_target uuid;
 begin

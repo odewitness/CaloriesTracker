@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-22',
+    title: 'Corrige les notifications qui ne partaient jamais',
+    description: "Les notifications d'activité (réactions, commentaires sur tes partages) ne t'arrivaient jamais à cause d'un bug côté serveur. C'est corrigé : tu devrais maintenant bien les recevoir sur ton téléphone.",
+  },
+  {
+    date: '2026-08-22',
     title: 'La section "À combler aujourd\'hui" se souvient si tu l\'as repliée',
     description: "Si tu replies la section \"À combler aujourd'hui\" sur ta page du jour, elle reste repliée la prochaine fois que tu ouvres l'app (et inversement si tu la laisses ouverte).",
   },
