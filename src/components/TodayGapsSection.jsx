@@ -46,7 +46,10 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
   const { favorites } = useFavorites()
   const { recents } = useRecentFoods()
   const { user } = useAuth()
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('today-gaps-collapsed')) ?? true }
+    catch { return true }
+  })
   const [gapsSheetOpen, setGapsSheetOpen] = useState(false)
   const [quickAdd, setQuickAdd] = useState(null) // { food, qty, date, meal, saving } | null
 
@@ -150,7 +153,11 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
           sections de la page se comportent pareil. */}
       <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
         <button
-          onClick={() => setOpen(o => !o)}
+          onClick={() => setOpen(o => {
+            const next = !o
+            try { localStorage.setItem('today-gaps-collapsed', JSON.stringify(next)) } catch {}
+            return next
+          })}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}
         >
           <span style={{ fontWeight: 600, fontSize: 14 }}>À combler aujourd'hui</span>

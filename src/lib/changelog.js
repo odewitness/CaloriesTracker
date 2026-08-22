@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-22',
+    title: 'La section "À combler aujourd\'hui" se souvient si tu l\'as repliée',
+    description: "Si tu replies la section \"À combler aujourd'hui\" sur ta page du jour, elle reste repliée la prochaine fois que tu ouvres l'app (et inversement si tu la laisses ouverte).",
+  },
+  {
     date: '2026-08-20',
     title: 'Les suggestions "À combler aujourd\'hui" tiennent compte de tes calories restantes',
     description: "Sur ta page du jour, les suggestions pour combler tes manques nutritionnels évitent maintenant de te proposer un aliment qui te ferait dépasser ton objectif de calories, quand une autre option tout aussi efficace existe.",
