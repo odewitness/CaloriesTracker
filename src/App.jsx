@@ -225,7 +225,12 @@ function AppShell() {
   }, [activePath])
 
   const handleScroll = (e) => {
-    const top = e.target.scrollTop
+    // scrollTop est bridé à [0, scrollHeight - clientHeight] : le rebond
+    // élastique en fin de scroll (trackpad/iOS) le fait sinon osciller
+    // au-delà de ces bornes, ce qui inverse le signe du delta en rafale
+    // et fait trembler le header (il se cache/réapparaît en boucle).
+    const maxScroll = Math.max(0, e.target.scrollHeight - e.target.clientHeight)
+    const top = Math.min(Math.max(e.target.scrollTop, 0), maxScroll)
     const delta = top - lastScrollTop.current
     if (top <= 4) setHeaderHidden(false)        // tout en haut → toujours visible
     else if (delta > 6) setHeaderHidden(true)    // scroll vers le bas → se cache
@@ -286,7 +291,7 @@ function AppShell() {
       />
 
       {/* overflow visible ici — c'est page-content qui scroll en interne */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }} onScrollCapture={handleScroll}>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto', overscrollBehavior: 'contain' }} onScrollCapture={handleScroll}>
         <Routes location={backgroundLocation || location}>
           <Route path="/today" element={<TodayPage key={journalVersion} />} />
           <Route path="/manual" element={<ManualPage />} />

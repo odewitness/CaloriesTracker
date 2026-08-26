@@ -168,6 +168,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   padding: '16px 16px 90px',
   height: '100%',                       // ← chaque slot = hauteur du viewport
   overflowY: 'auto',                    // ← scroll indépendant par slot
+  overscrollBehavior: 'contain',        // ← empêche le rebond/chaînage de scroll en bas de page
   WebkitOverflowScrolling: 'touch',     // ← momentum scroll iOS
 }}>
       <>
