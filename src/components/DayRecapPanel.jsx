@@ -11,7 +11,9 @@ import SupplementSection, { SUPPLEMENT_MEAL } from './SupplementSection'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 import ShareJournalModal from './ShareJournalModal'
+import ExcludeDayBanner from './ExcludeDayBanner'
 import { useJournal } from '../hooks/useJournal'
+import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
 import { useFeed } from '../hooks/useFeed'
 import { useAuth } from '../lib/AuthContext'
@@ -48,11 +50,12 @@ function dateLabel(date) {
 //   onPlannedChange() — notifie le parent (calendrier) qu'un repas planifié a
 //                        changé, pour rafraîchir les points violets/verts
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DayRecapPanel({ date, onPlannedChange }) {
+export default function DayRecapPanel({ date, onPlannedChange, onExcludedChange }) {
   const dateStr = fmt(date)
   const { user } = useAuth()
   const toast = useToast()
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
+  const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
   const { settings } = useSettings()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { shareJournal } = useFeed()
@@ -119,6 +122,8 @@ export default function DayRecapPanel({ date, onPlannedChange }) {
       <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, textTransform: 'capitalize' }}>
         {dateLabel(date)}
       </div>
+
+      <ExcludeDayBanner excluded={excluded} onToggle={async () => { await toggleExcluded(); onExcludedChange?.() }} />
 
       <CalorieRing consumed={totals.kcal} goal={settings.goal_kcal} />
       <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />

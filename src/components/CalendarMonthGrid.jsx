@@ -59,7 +59,7 @@ function buildMonthCells(monthDate) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CalendarMonthGrid({
   monthDate, onChangeMonth, selectedDate, onSelectDate,
-  dayStatusByDate = {}, hasPlannedByDate = {},
+  dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
   selectedDates, onToggleDate, minDate,
 }) {
   const cells = useMemo(() => buildMonthCells(monthDate), [monthDate.getFullYear(), monthDate.getMonth()])
@@ -99,6 +99,7 @@ export default function CalendarMonthGrid({
           const hasPlanned = !!plannedStatus
           const isMissed = plannedStatus === 'missed'
           const disabled = minDate ? dStr < minDate : false
+          const isExcluded = !!excludedDates?.has(dStr)
 
           return (
             <button
@@ -118,11 +119,12 @@ export default function CalendarMonthGrid({
             >
               <span style={{
                 fontSize: 13, fontWeight: isToday || isSelected ? 700 : 500,
-                color: isSelected ? 'white' : 'var(--text)',
+                color: isSelected ? 'white' : isExcluded ? 'var(--text-hint)' : 'var(--text)',
+                textDecoration: isExcluded ? 'line-through' : 'none',
               }}>
                 {date.getDate()}
               </span>
-              {status !== 'none' && !isSelected && (
+              {status !== 'none' && !isSelected && !isExcluded && (
                 <span style={{
                   width: 4, height: 4, borderRadius: '50%',
                   background: STATUS_COLOR[status], marginTop: 2,
@@ -144,6 +146,7 @@ export default function CalendarMonthGrid({
         <Legend color="var(--green)" label="Objectifs atteints" />
         <Legend color="var(--coral)" label="Trop / pas assez" />
         <Legend color="var(--purple)" label="Repas planifié" dot />
+        <Legend color="var(--text-hint)" label="Jour exclu des stats" />
       </div>
     </div>
   )

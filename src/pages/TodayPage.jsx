@@ -14,7 +14,9 @@ import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import ShareJournalModal from '../components/ShareJournalModal'
 import TodayGapsSection from '../components/TodayGapsSection'
+import ExcludeDayBanner from '../components/ExcludeDayBanner'
 import { useJournal } from '../hooks/useJournal'
+import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
 import { useFeed } from '../hooks/useFeed'
 import { saveMealTemplate } from '../hooks/useMealTemplates'
@@ -41,6 +43,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const dateStr = fmt(date)
   const isToday = dateStr === fmt(new Date())
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
+  const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings } = useSettings()
   const { shareJournal } = useFeed()
@@ -168,6 +171,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   WebkitOverflowScrolling: 'touch',     // ← momentum scroll iOS
 }}>
       <>
+        <ExcludeDayBanner excluded={excluded} onToggle={toggleExcluded} />
         <TodayOverviewCard
           consumed={totals.kcal}
           goal={settings.goal_kcal}

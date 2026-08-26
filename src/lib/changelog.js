@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-26',
+    title: 'Exclue un jour de tes stats sans perdre ce que tu as loggé',
+    description: "Sur la page du jour ou dans le calendrier, tu peux maintenant marquer un jour comme \"exclu\" (par exemple une journée où tu n'as loggé qu'à moitié) : il n'entrera plus dans tes moyennes, ta série ou tes jours objectif, mais tu peux toujours voir et ajouter des aliments dessus. Le jour apparaît barré dans le calendrier, avec une pastille \"Exclu\" dans l'historique — un bouton \"Réinclure\" permet de revenir en arrière à tout moment.",
+  },
+  {
     date: '2026-08-22',
     title: 'Corrige les notifications qui ne partaient jamais',
     description: "Les notifications d'activité (réactions, commentaires sur tes partages) ne t'arrivaient jamais à cause d'un bug côté serveur. C'est corrigé : tu devrais maintenant bien les recevoir sur ton téléphone.",

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
-import { TrendingDown, Flame, Target, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useExcludedDaysRange } from '../hooks/useExcludedDays'
+import { TrendingDown, Flame, Target, ChevronLeft, ChevronRight, EyeOff } from 'lucide-react'
 import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
 import NutrientPanel from '../components/NutrientPanel'
@@ -18,6 +19,7 @@ const TABS = [
 ]
 
 const MEAL_ORDER = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
+const EMPTY_SET = new Set()
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -62,7 +64,7 @@ function shiftAnchor(tab, anchor, dir) {
   return d.toISOString().slice(0, 10)
 }
 
-function DayCard({ dateStr, entries, goalKcal }) {
+function DayCard({ dateStr, entries, goalKcal, excluded }) {
   const kcal = entries.reduce((s, e) => s + (e.energie_kcal || 0), 0)
   const prot = entries.reduce((s, e) => s + (e.proteines || 0), 0)
   const gluc = entries.reduce((s, e) => s + (e.glucides || 0), 0)
@@ -75,10 +77,17 @@ function DayCard({ dateStr, entries, goalKcal }) {
   const label = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })
 
   return (
-    <div className="card" style={{ padding: '13px 16px', marginBottom: 8 }}>
+    <div className="card" style={{ padding: '13px 16px', marginBottom: 8, opacity: excluded ? 0.55 : 1 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
         <div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{label}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{label}</div>
+            {excluded && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', background: 'var(--gray-bg)', borderRadius: 6, padding: '2px 6px' }}>
+                <EyeOff size={9} /> Exclu
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: 20, fontWeight: 700, marginTop: 1 }}>{Math.round(kcal)} kcal</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             <span className="c-prot">P {Math.round(prot)}g</span>&nbsp;
@@ -147,6 +156,11 @@ export default function HistoryPage() {
   const today = todayStr()
   const isCurrentPeriod = bounds.start <= today && today <= bounds.end
 
+  // Jours exclus des stats sur la période affichée (voir ExcludeDayBanner /
+  // useExcludedDay) — le journal de ces jours reste chargé et affichable
+  // (détail par jour), seuls les agrégats ci-dessous les ignorent.
+  const { excludedDates } = useExcludedDaysRange(bounds.start, bounds.end)
+
   // Charge les entrées du journal sur la période sélectionnée
   useEffect(() => {
     let cancelled = false
@@ -184,23 +198,27 @@ export default function HistoryPage() {
 
   // Série en cours : indépendante de la période affichée, toujours calculée
   // depuis aujourd'hui en remontant (comme avant).
+  const streakFrom = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 60); return d.toISOString().slice(0, 10) }, [])
+  const { excludedDates: streakExcludedDates } = useExcludedDaysRange(streakFrom, today)
+
   useEffect(() => {
     let cancelled = false
     const computeStreak = async () => {
       if (!user) { setStreak(0); return }
-      const from = new Date(); from.setDate(from.getDate() - 60)
       const { data } = await supabase
         .from('journal')
         .select('date, energie_kcal')
         .eq('user_id', user.id)
-        .gte('date', from.toISOString().slice(0, 10))
+        .gte('date', streakFrom)
       if (cancelled) return
       const byDate = {}
       for (const e of (data || [])) byDate[e.date] = (byDate[e.date] || 0) + (e.energie_kcal || 0)
       let s = 0
       for (let i = 0; i < 60; i++) {
         const d = new Date(); d.setDate(d.getDate() - i)
-        const kcal = byDate[d.toISOString().slice(0, 10)]
+        const dStr = d.toISOString().slice(0, 10)
+        if (streakExcludedDates.has(dStr)) continue // jour exclu → ignoré, ni compté ni interrompu
+        const kcal = byDate[dStr]
         if (!kcal) break
         if (kcal <= settings.goal_kcal) s++
         else break
@@ -209,7 +227,7 @@ export default function HistoryPage() {
     }
     computeStreak()
     return () => { cancelled = true }
-  }, [user, settings.goal_kcal])
+  }, [user, settings.goal_kcal, streakFrom, streakExcludedDates])
 
   const days = useMemo(() => {
     const g = {}
@@ -223,19 +241,31 @@ export default function HistoryPage() {
   const daysWithData = dateKeys.length
   const hasEntries = daysWithData > 0
 
+  // Jours loggés qui comptent réellement dans les agrégats ci-dessous
+  // (moyennes, jours objectif) — les jours exclus restent dans `dateKeys`
+  // pour être affichés (DayCard grisée « Exclu »), juste pas dans les calculs.
+  // Sur l'onglet Jour, pas d'agrégation multi-jours : on affiche toujours le
+  // vrai total du jour consulté, exclu ou non (l'exclusion ne joue que sur
+  // les moyennes semaine/mois/année).
+  const excludedForStats = tab === 'jour' ? EMPTY_SET : excludedDates
+  const statDateKeys = useMemo(() => dateKeys.filter(d => !excludedForStats.has(d)), [dateKeys, excludedForStats])
+  const daysCounted = statDateKeys.length
+
   // Moyenne / jour sur la période, calculée sur les jours réellement loggés
-  // (pas sur le nombre de jours calendaires) pour ne pas fausser la comparaison
-  // aux repères Anses si la semaine/le mois n'est pas terminé(e) ou partiellement loggé(e).
+  // ET non exclus (pas sur le nombre de jours calendaires) pour ne pas fausser
+  // la comparaison aux repères Anses si la semaine/le mois n'est pas
+  // terminé(e), partiellement loggé(e), ou contient des jours exclus.
   // Même construction que le `totals` de TodayPage : une somme brute par clé,
   // sans pré-fusionner les colonnes dédoublées (vit_e_totale/vit_e,
   // folates/folates_intrinseques...). Cette fusion (sumKeys) est laissée aux
   // composant d'affichage (NutrientPanel) qui la fait déjà —
   // une seule source de vérité pour cette logique, au lieu de la dupliquer ici.
   const avg = useMemo(() => {
-    const n = daysWithData || 1
+    const n = daysCounted || 1
     const obj = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 }
     for (const key of ALL_NUTRIENT_KEYS) obj[key] = 0
     for (const e of entries) {
+      if (excludedForStats.has(e.date)) continue
       obj.kcal += e.energie_kcal || 0
       obj.prot += e.proteines || 0
       obj.gluc += e.glucides || 0
@@ -245,19 +275,21 @@ export default function HistoryPage() {
     }
     for (const key in obj) obj[key] /= n
     return obj
-  }, [entries, daysWithData])
+  }, [entries, daysCounted, excludedForStats])
 
-  const daysObjectif = dateKeys.filter(d => days[d].reduce((s, e) => s + (e.energie_kcal || 0), 0) <= settings.goal_kcal).length
+  const daysObjectif = statDateKeys.filter(d => days[d].reduce((s, e) => s + (e.energie_kcal || 0), 0) <= settings.goal_kcal).length
 
   const goPrev = () => setAnchor(a => shiftAnchor(tab, a, -1))
   const goNext = () => setAnchor(a => shiftAnchor(tab, a, 1))
   const changeTab = (t) => { setTab(t); setAnchor(todayStr()) }
 
-  // Résumés mensuels pour le drill-down de l'onglet Année
+  // Résumés mensuels pour le drill-down de l'onglet Année — les jours exclus
+  // n'entrent ni dans le kcal cumulé ni dans le compte de jours loggés.
   const monthSummaries = useMemo(() => {
     if (tab !== 'annee') return []
     const byMonth = {}
     for (const e of entries) {
+      if (excludedDates.has(e.date)) continue
       const m = e.date.slice(0, 7)
       if (!byMonth[m]) byMonth[m] = { kcal: 0, dates: new Set() }
       byMonth[m].kcal += (e.energie_kcal || 0)
@@ -269,7 +301,7 @@ export default function HistoryPage() {
       avgKcal: byMonth[m].kcal / byMonth[m].dates.size,
       daysLogged: byMonth[m].dates.size,
     }))
-  }, [tab, entries])
+  }, [tab, entries, excludedDates])
 
   // Repas du jour sélectionné, groupés par repas (pour l'onglet Jour)
   const mealGroups = useMemo(() => {
@@ -341,7 +373,7 @@ export default function HistoryPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 6 }}>
             {[
               { icon: <Flame size={18} />, val: Math.round(avg.kcal), label: 'Moy. kcal/j', color: 'var(--amber)' },
-              { icon: <Target size={18} />, val: `${daysObjectif}/${daysWithData}j`, label: 'Jours objectif', color: 'var(--green)' },
+              { icon: <Target size={18} />, val: `${daysObjectif}/${daysCounted}j`, label: 'Jours objectif', color: 'var(--green)' },
               { icon: <TrendingDown size={18} />, val: `${streak}j`, label: 'Série en cours', color: 'var(--blue)' },
             ].map(({ icon, val, label, color }) => (
               <div key={label} className="card" style={{ padding: '12px 10px', textAlign: 'center' }}>
@@ -352,7 +384,7 @@ export default function HistoryPage() {
             ))}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '6px 2px 16px' }}>
-            Moyennes calculées sur les {daysWithData} jour{daysWithData > 1 ? 's' : ''} loggé{daysWithData > 1 ? 's' : ''} de la période — comparées aux repères Anses pour un adulte.
+            Moyennes calculées sur les {daysCounted} jour{daysCounted > 1 ? 's' : ''} loggé{daysCounted > 1 ? 's' : ''} de la période{daysWithData > daysCounted ? ` (${daysWithData - daysCounted} jour${daysWithData - daysCounted > 1 ? 's' : ''} exclu${daysWithData - daysCounted > 1 ? 's' : ''})` : ''} — comparées aux repères Anses pour un adulte.
           </div>
 
           <CalorieRing consumed={avg.kcal} goal={settings.goal_kcal} />
@@ -379,7 +411,7 @@ export default function HistoryPage() {
           )}
 
           {(tab === 'semaine' || tab === 'mois') && dateKeys.map(d => (
-            <DayCard key={d} dateStr={d} entries={days[d]} goalKcal={settings.goal_kcal} />
+            <DayCard key={d} dateStr={d} entries={days[d]} goalKcal={settings.goal_kcal} excluded={excludedDates.has(d)} />
           ))}
 
           {tab === 'annee' && monthSummaries.map(m => (

@@ -14,6 +14,9 @@
 -- sociale) — voir supabase/sql/push_notifications_setup.sql pour le SQL
 -- complet (schéma + triggers + cron), exécuté manuellement, pas encore
 -- confirmé appliqué en base au moment de l'écriture de ce fichier.
+-- Complété le 2026-08-26 : table 26 (jours_exclus), pas encore confirmée
+-- appliquée en base au moment de l'écriture de ce fichier — voir
+-- supabase/sql/jours_exclus_setup.sql pour le SQL complet.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -753,6 +756,22 @@ create table if not exists suggestions_manques (
 create index if not exists idx_suggestions_manques_user_date
   on suggestions_manques (user_id, created_at desc);
 
+-- 26. TABLE JOURS_EXCLUS (jours marqués "exclus des stats globales", voir
+-- supabase/sql/jours_exclus_setup.sql pour le SQL complet — écrit le
+-- 2026-08-26. Une ligne = un jour exclu ; absence de ligne = jour compté
+-- normalement. N'affecte que les agrégats de HistoryPage.jsx (moyennes,
+-- série, jours objectif) — le journal du jour reste inchangé, consultable et
+-- modifiable normalement (voir src/hooks/useExcludedDays.js).
+create table if not exists jours_exclus (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date date not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, date)
+);
+
+create index if not exists idx_jours_exclus_user_date on jours_exclus (user_id, date);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -808,6 +827,12 @@ alter table push_subscriptions enable row level security;
 -- select/insert "own" (voir supabase/sql/suggestions_manques_setup.sql) — pas
 -- de policy update/delete, historique en écriture seule côté client.
 alter table suggestions_manques enable row level security;
+
+-- RLS activé sur jours_exclus dès sa création (2026-08-26), policies
+-- select/insert/delete "own" (voir supabase/sql/jours_exclus_setup.sql) —
+-- pas de policy update, le toggle exclu/inclus est un insert/delete côté
+-- client, jamais une modification de ligne existante.
+alter table jours_exclus enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

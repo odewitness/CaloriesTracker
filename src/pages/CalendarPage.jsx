@@ -7,6 +7,7 @@ import PlanMealModal from '../components/PlanMealModal'
 import PlannedSeriesModal from '../components/PlannedSeriesModal'
 import { useJournalRange } from '../hooks/useJournalRange'
 import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
+import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
 import { fmt } from '../lib/dates'
@@ -53,6 +54,7 @@ export default function CalendarPage() {
 
   const { byDate: journalByDate, refetch: refetchJournal } = useJournalRange(rangeStart, rangeEnd)
   const { byDate: planifiesByDate, refetch: refetchPlanifies } = usePlannedMealsRange(rangeStart, rangeEnd)
+  const { excludedDates, refetch: refetchExcluded } = useExcludedDaysRange(rangeStart, rangeEnd)
 
   const dayStatusByDate = useMemo(() => {
     const result = {}
@@ -75,7 +77,7 @@ export default function CalendarPage() {
     return result
   }, [planifiesByDate])
 
-  const refetchAll = useCallback(() => { refetchJournal(); refetchPlanifies() }, [refetchJournal, refetchPlanifies])
+  const refetchAll = useCallback(() => { refetchJournal(); refetchPlanifies(); refetchExcluded() }, [refetchJournal, refetchPlanifies, refetchExcluded])
 
   const changeMonth = (dir) => {
     setAnchorDate(d => new Date(d.getFullYear(), d.getMonth() + dir, 1))
@@ -159,6 +161,7 @@ export default function CalendarPage() {
           onSelectDate={setSelectedDate}
           dayStatusByDate={dayStatusByDate}
           hasPlannedByDate={hasPlannedByDate}
+          excludedDates={excludedDates}
         />
       ) : (
         <CalendarWeekStrip
@@ -168,10 +171,11 @@ export default function CalendarPage() {
           onSelectDate={setSelectedDate}
           dayStatusByDate={dayStatusByDate}
           hasPlannedByDate={hasPlannedByDate}
+          excludedDates={excludedDates}
         />
       )}
 
-      <DayRecapPanel date={selectedDate} onPlannedChange={refetchAll} />
+      <DayRecapPanel date={selectedDate} onPlannedChange={refetchAll} onExcludedChange={refetchExcluded} />
 
       {planModal && (
         <PlanMealModal

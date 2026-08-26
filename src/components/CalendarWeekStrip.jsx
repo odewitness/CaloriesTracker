@@ -28,7 +28,7 @@ function startOfWeek(date) {
 // Props : mêmes conventions que CalendarMonthGrid, mais `weekDate` = une
 // date quelconque de la semaine affichée, onChangeWeek(dir) = -1 | 1.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate, onSelectDate, dayStatusByDate, hasPlannedByDate }) {
+export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate, onSelectDate, dayStatusByDate, hasPlannedByDate, excludedDates }) {
   const days = useMemo(() => {
     const start = startOfWeek(weekDate)
     return Array.from({ length: 7 }, (_, i) => {
@@ -69,6 +69,7 @@ export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate
           const plannedStatus = hasPlannedByDate[dStr]
           const hasPlanned = !!plannedStatus
           const isMissed = plannedStatus === 'missed'
+          const isExcluded = !!excludedDates?.has(dStr)
 
           return (
             <button
@@ -85,10 +86,14 @@ export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate
               <span style={{ fontSize: 9, fontWeight: 700, color: isSelected ? 'rgba(255,255,255,.8)' : 'var(--text-hint)' }}>
                 {WEEKDAY_SHORT[i]}
               </span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: isSelected ? 'white' : 'var(--text)' }}>
+              <span style={{
+                fontSize: 15, fontWeight: 700,
+                color: isSelected ? 'white' : isExcluded ? 'var(--text-hint)' : 'var(--text)',
+                textDecoration: isExcluded ? 'line-through' : 'none',
+              }}>
                 {date.getDate()}
               </span>
-              {status !== 'none' && !isSelected && (
+              {status !== 'none' && !isSelected && !isExcluded && (
                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: STATUS_COLOR[status] }} />
               )}
               {hasPlanned && (
