@@ -7,6 +7,26 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-29',
+    title: 'Plus de compléments dans les suggestions "À combler aujourd\'hui"',
+    description: "Les compléments alimentaires n'apparaissent plus dans les suggestions de la section \"À combler aujourd'hui\" : elles s'affichaient avec une quantité en grammes (\"100 g\") qui n'avait aucun sens pour des gélules ou des comprimés. Tes compléments restent gérés comme avant dans leur propre section, avec le compteur de doses.",
+  },
+  {
+    date: '2026-08-29',
+    title: 'Touche une pastille de nutriment pour filtrer les suggestions',
+    description: "Dans \"À combler aujourd'hui\", toucher une pastille de nutriment (vitamine D, fer...) ne t'envoie plus vers une autre page : ça affiche directement, juste en dessous, tes favoris riches en ce nutriment. Tu peux en toucher plusieurs à la fois : l'app cherche alors en priorité les aliments qui les couvrent tous. La pastille \"…\" ouvre la liste complète des vitamines et minéraux qui te manquent pour en choisir un autre. Touche à nouveau une pastille pour l'enlever.",
+  },
+  {
+    date: '2026-08-29',
+    title: 'Choisis quels aliments te propose "À combler aujourd\'hui"',
+    description: "Deux icônes sont apparues à côté du titre de la section \"À combler aujourd'hui\". Celle en forme de réglages te laisse choisir dans quels favoris elle pioche ses suggestions : ceux que tu as mangés récemment, ceux que tu manges le plus souvent, ou au contraire ceux que tu n'as jamais notés — ton choix est gardé en mémoire et retrouvé au prochain lancement. Celle en forme de flèches croisées te propose 3 autres aliments au hasard, toujours selon ce réglage.",
+  },
+  {
+    date: '2026-08-29',
+    title: 'Les pastilles de nutriments défilent sans changer de jour',
+    description: "Quand tu faisais glisser la rangée de pastilles de nutriments de \"À combler aujourd'hui\" pour voir les suivantes, l'app changeait de jour. Maintenant tu peux la faire défiler tranquillement sans quitter la journée.",
+  },
+  {
     date: '2026-08-26',
     title: 'Exclue un jour de tes stats sans perdre ce que tu as loggé',
     description: "Sur la page du jour ou dans le calendrier, tu peux maintenant marquer un jour comme \"exclu\" (par exemple une journée où tu n'as loggé qu'à moitié) : il n'entrera plus dans tes moyennes, ta série ou tes jours objectif, mais tu peux toujours voir et ajouter des aliments dessus. Le jour apparaît barré dans le calendrier, avec une pastille \"Exclu\" dans l'historique — un bouton \"Réinclure\" permet de revenir en arrière à tout moment.",

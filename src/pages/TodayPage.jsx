@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
 import { Share2 } from 'lucide-react'
 import TodayOverviewCard from '../components/TodayOverviewCard'
 import NutrientPanel from '../components/NutrientPanel'
@@ -38,8 +37,6 @@ function dateOffset(base, days) {
 function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) {
   const toast = useToast()
   const { user } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
   const dateStr = fmt(date)
   const isToday = dateStr === fmt(new Date())
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
@@ -61,30 +58,29 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   // slot (pas seulement "aujourd'hui") car ils servent aussi au grammage
   // "comble le manque" du FoodPicker quand on ajoute un aliment à CE jour,
   // qu'il s'agisse d'hier, demain ou aujourd'hui.
-  const allGaps = useMemo(() => getNutrientGaps(totals, settings, Infinity), [totals, settings])
+  // Chaque manque porte son grammage absolu (voir getGapAmount) : la section
+  // "À combler aujourd'hui" s'en sert pour afficher le % de manque couvert
+  // par une suggestion, y compris quand la pastille choisie n'est pas dans
+  // les 10 premières (feuille "…").
+  const allGaps = useMemo(() => (
+    getNutrientGaps(totals, settings, Infinity)
+      .map(g => ({ ...g, missing: getGapAmount(totals, settings, g.field) }))
+  ), [totals, settings])
   const gaps    = useMemo(() => allGaps.slice(0, 3), [allGaps])
 
-  // Version avec grammage absolu (voir getGapAmount) des 10 manques les plus
-  // urgents — sert au moteur de suggestion de TodayGapsSection ET au Food
-  // Picker (voir FoodRow), qui cherchent tous deux pour chaque aliment CELUI
-  // de ces 10 manques qu'il comble le plus efficacement (pas forcément le
-  // n°1 : un aliment peut être médiocre sur le manque le plus urgent mais
-  // excellent sur le 4e).
+  // Les 10 manques les plus urgents — sert au moteur de suggestion de
+  // TodayGapsSection ET au Food Picker (voir FoodRow), qui cherchent tous
+  // deux pour chaque aliment CELUI de ces 10 manques qu'il comble le plus
+  // efficacement (pas forcément le n°1 : un aliment peut être médiocre sur le
+  // manque le plus urgent mais excellent sur le 4e).
   const top10Gaps = useMemo(() => (
-    allGaps.slice(0, 10).map(g => ({ field: g.field, missing: getGapAmount(totals, settings, g.field) }))
-  ), [allGaps, totals, settings])
+    allGaps.slice(0, 10).map(g => ({ field: g.field, missing: g.missing }))
+  ), [allGaps])
 
   // Calories restantes du jour — sert à TodayGapsSection pour privilégier des
   // suggestions qui tiennent dans le budget plutôt que n'importe quel aliment
   // qui comble le manque au prix d'un dépassement.
   const remainingKcal = settings.goal_kcal != null ? settings.goal_kcal - totals.kcal : null
-
-  // Ouvre l'Explorer préfiltré sur ce nutriment — même geste qu'une pastille
-  // de manque dans l'Explorer lui-même (voir ExplorerPage.handlePickGap),
-  // amorcé ici via le state de navigation (lu par ExplorerPage au montage).
-  const goToExplorerGap = (gapKey) => {
-    navigate('/explorer', { state: { backgroundLocation: location.state?.backgroundLocation || location, gapKey } })
-  }
 
   const handleAdd = async (entry) => {
     const { error } = await addEntry(entry)
@@ -200,7 +196,6 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
               entries={entries}
               remainingKcal={remainingKcal}
               onAddEntry={handleAdd}
-              onNavigateExplorer={goToExplorerGap}
             />
           </div>
         )}
@@ -299,6 +294,16 @@ export default function TodayPage() {
   const wrapperRef = useRef(null)
 
   const onTouchStart = useCallback((e) => {
+    // Si le geste démarre dans une bande qui défile horizontalement (ex. les
+    // pastilles de nutriments de "À combler aujourd'hui"), on laisse ce
+    // défilement natif se faire : sinon le swipe de jour le capte et on
+    // change de jour au lieu de faire défiler les pastilles.
+    const scroller = e.target?.closest?.('.chip-scroller')
+    if (scroller && scroller.scrollWidth > scroller.clientWidth + 1) {
+      touchStartX.current = null
+      isHorizontal.current = false
+      return
+    }
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
     isHorizontal.current = false
