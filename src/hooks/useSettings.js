@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 
 import { MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
+import { WATER_DEFAULTS, mergeWaterSettings } from '../lib/water'
 
 const DEFAULTS = {
   goal_kcal: 1800, goal_proteines: 100, goal_glucides: 180, goal_lipides: 60, goal_fibres: 30,
@@ -11,6 +12,14 @@ const DEFAULTS = {
   notif_reminder_enabled: true,
   notif_social_enabled: true,
   afficher_manques_jour: true,
+  water: { ...WATER_DEFAULTS },
+}
+
+// Applique le même traitement que meal_enabled/meal_overrides au bloc `water`
+// (fusion avec les valeurs par défaut), pour rester robuste si la colonne
+// `settings.water` est absente (base pas encore migrée) ou partielle.
+function withWater(row) {
+  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, water: mergeWaterSettings(row?.water) }
 }
 
 export function useSettings() {
@@ -23,14 +32,14 @@ export function useSettings() {
     setLoading(true)
     const { data } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle()
     if (data) {
-      setSettings({ ...DEFAULTS, ...data, meal_overrides: data.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(data.meal_enabled || {}) } })
+      setSettings(withWater(data))
     } else {
       const { data: created } = await supabase
         .from('settings')
         .insert([{ ...DEFAULTS, user_id: user.id }])
         .select()
         .single()
-      setSettings({ ...DEFAULTS, ...(created || {}), meal_overrides: created?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(created?.meal_enabled || {}) } })
+      setSettings(withWater(created || {}))
     }
     setLoading(false)
   }, [user])

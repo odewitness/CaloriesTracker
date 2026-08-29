@@ -10,6 +10,7 @@
   --coral-light: #FAECE7;
   --blue: #185FA5;
   --blue-light: #E6F1FB;
+  --blue-dark: #10416F;
   --purple: #534AB7;
   --purple-light: #EEEDFE;
   --gray-bg: #F7F6F4;
@@ -430,3 +431,70 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 
 /* Divider */
 .divider { height: 0.5px; background: var(--border); }
+
+/* ── Suivi d'eau (WaterSection) ─────────────────────────────────────────────
+   Jauge "réservoir" qui se remplit du bas, avec vague de surface, bulles qui
+   remontent et petite étiquette "+250 ml" qui monte à chaque ajout. */
+.water-tank {
+  position: relative;
+  border-radius: 14px;
+  background: var(--blue-light);
+  border: 1px solid rgba(24, 95, 165, 0.14);
+  overflow: hidden;
+}
+.water-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, #4C93D0 0%, var(--blue) 100%);
+  transition: height .8s cubic-bezier(.22, 1, .36, 1);
+}
+.water-wave {
+  position: absolute;
+  top: -9px;
+  left: 0;
+  width: 200%;
+  height: 14px;
+  animation: waterWave 5s linear infinite;
+}
+.water-bubble {
+  position: absolute;
+  bottom: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  animation: waterRise 1.05s ease-out forwards;
+}
+.water-float {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+}
+.water-float span {
+  display: inline-block;
+  background: var(--blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  animation: waterFloatUp 1.4s ease-out forwards;
+}
+@keyframes waterWave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes waterRise {
+  0%   { transform: translateY(0) scale(1); opacity: .55; }
+  100% { transform: translateY(-70px) scale(.4); opacity: 0; }
+}
+@keyframes waterFloatUp {
+  0%   { transform: translateY(8px); opacity: 0; }
+  20%  { transform: translateY(0); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateY(-32px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .water-wave, .water-bubble, .water-float span { animation: none; }
+  .water-fill { transition: none; }
+}

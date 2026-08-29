@@ -9,6 +9,8 @@ import EditMealTemplatePage from '../components/EditMealTemplatePage'
 import FoodDetailModal from '../components/FoodDetailModal'
 import EditSupplementModal from '../components/EditSupplementModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from '../components/SupplementSection'
+import WaterSection from '../components/WaterSection'
+import AddWaterSheet from '../components/AddWaterSheet'
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import ShareJournalModal from '../components/ShareJournalModal'
@@ -17,6 +19,8 @@ import ExcludeDayBanner from '../components/ExcludeDayBanner'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
+import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
+import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
 import { useFeed } from '../hooks/useFeed'
 import { saveMealTemplate } from '../hooks/useMealTemplates'
 import { useAuth } from '../lib/AuthContext'
@@ -42,11 +46,31 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
-  const { settings } = useSettings()
+  const { settings, update: updateSettings } = useSettings()
+  const { foods: ciqualFoods } = useCiqualCatalog()
   const { shareJournal } = useFeed()
   const [shareTarget, setShareTarget] = useState(null) // { meal: string|null, entries: [...] } | null
   const [templateAddMeal, setTemplateAddMeal] = useState(null)    // nom du repas | null — ajout d'un repas type à ce repas
   const [templateCreateMeal, setTemplateCreateMeal] = useState(null) // nom du repas | null — création d'un repas type depuis ce repas
+  const [waterSheetOpen, setWaterSheetOpen] = useState(false)
+
+  const waterEntries = useMemo(() => entries.filter(isWaterEntry), [entries])
+  const waterCfg = settings.water
+  const defaultBeverage = useMemo(
+    () => pickDefaultBeverage(ciqualFoods, waterCfg?.default_food_ref_id),
+    [ciqualFoods, waterCfg?.default_food_ref_id]
+  )
+
+  const handleWaterQuickAdd = async (ml) => {
+    if (!defaultBeverage) { toast('Boissons en cours de chargement…'); return }
+    const { error } = await addEntry(buildWaterEntry(defaultBeverage, ml))
+    if (error) toast("Erreur lors de l'ajout")
+  }
+  const handleWaterUndo = async () => {
+    const last = waterEntries[waterEntries.length - 1]
+    if (last) await deleteEntry(last.id)
+  }
+  const handleUpdateWater = (patch) => updateSettings({ water: { ...waterCfg, ...patch } })
 
   const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
 
@@ -181,6 +205,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         />
         <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
 
+        {settings.water?.card_visible !== false && (
+          <WaterSection
+            entries={waterEntries}
+            water={waterCfg}
+            beverageName={defaultBeverage?.alim_nom}
+            onQuickAdd={handleWaterQuickAdd}
+            onUndo={handleWaterUndo}
+            onOpenSheet={() => setWaterSheetOpen(true)}
+          />
+        )}
+
         {/* Uniquement sur le jour réellement affiché (le texte de la bande et
             les favoris/récents qu'elle charge n'ont de sens que pour
             "aujourd'hui" au sens propre, pas un slot voisin visité en
@@ -245,6 +280,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onOpenPlannedSource={onOpenSource}
         />
       </>
+
+      {waterSheetOpen && (
+        <AddWaterSheet
+          entries={waterEntries}
+          water={waterCfg}
+          onUpdateWater={handleUpdateWater}
+          onAdd={handleAdd}
+          onDelete={handleDelete}
+          onClose={() => setWaterSheetOpen(false)}
+        />
+      )}
 
       {shareTarget && (
         <ShareJournalModal

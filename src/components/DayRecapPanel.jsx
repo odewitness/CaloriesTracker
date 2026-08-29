@@ -8,6 +8,8 @@ import AddFoodModal from './AddFoodModal'
 import FoodDetailModal from './FoodDetailModal'
 import EditSupplementModal from './EditSupplementModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from './SupplementSection'
+import WaterSection from './WaterSection'
+import AddWaterSheet from './AddWaterSheet'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 import ShareJournalModal from './ShareJournalModal'
@@ -15,7 +17,9 @@ import ExcludeDayBanner from './ExcludeDayBanner'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
+import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
 import { useFeed } from '../hooks/useFeed'
+import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
@@ -56,7 +60,8 @@ export default function DayRecapPanel({ date, onPlannedChange, onExcludedChange 
   const toast = useToast()
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
-  const { settings } = useSettings()
+  const { settings, update: updateSettings } = useSettings()
+  const { foods: ciqualFoods } = useCiqualCatalog()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { shareJournal } = useFeed()
 
@@ -64,6 +69,24 @@ export default function DayRecapPanel({ date, onPlannedChange, onExcludedChange 
   const [detailEntry, setDetailEntry] = useState(null)
   const [sourceDetail, setSourceDetail] = useState(null) // repas_planifies en cours de "voir sa page dédiée"
   const [shareTarget, setShareTarget] = useState(null) // { meal: string|null, entries: [...] } | null
+  const [waterSheetOpen, setWaterSheetOpen] = useState(false)
+
+  const waterEntries = useMemo(() => entries.filter(isWaterEntry), [entries])
+  const waterCfg = settings.water
+  const defaultBeverage = useMemo(
+    () => pickDefaultBeverage(ciqualFoods, waterCfg?.default_food_ref_id),
+    [ciqualFoods, waterCfg?.default_food_ref_id]
+  )
+  const handleWaterQuickAdd = async (ml) => {
+    if (!defaultBeverage) { toast('Boissons en cours de chargement…'); return }
+    const { error } = await addEntry(buildWaterEntry(defaultBeverage, ml))
+    if (error) toast("Erreur lors de l'ajout")
+  }
+  const handleWaterUndo = async () => {
+    const last = waterEntries[waterEntries.length - 1]
+    if (last) await deleteEntry(last.id)
+  }
+  const handleUpdateWater = (patch) => updateSettings({ water: { ...waterCfg, ...patch } })
 
   const totals = useMemo(() => computeTotals(entries), [entries])
   const hasEntries = entries.length > 0
@@ -129,6 +152,17 @@ export default function DayRecapPanel({ date, onPlannedChange, onExcludedChange 
       <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
       <NutrientPanel totals={totals} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
 
+      {settings.water?.card_visible !== false && (
+        <WaterSection
+          entries={waterEntries}
+          water={waterCfg}
+          beverageName={defaultBeverage?.alim_nom}
+          onQuickAdd={handleWaterQuickAdd}
+          onUndo={handleWaterUndo}
+          onOpenSheet={() => setWaterSheetOpen(true)}
+        />
+      )}
+
       <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="section-title" style={{ marginBottom: 0 }}>Repas</div>
@@ -179,6 +213,17 @@ export default function DayRecapPanel({ date, onPlannedChange, onExcludedChange 
           initialMeal={modal.meal}
           onAdd={modal.addEntry}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {waterSheetOpen && (
+        <AddWaterSheet
+          entries={waterEntries}
+          water={waterCfg}
+          onUpdateWater={handleUpdateWater}
+          onAdd={handleAdd}
+          onDelete={handleDelete}
+          onClose={() => setWaterSheetOpen(false)}
         />
       )}
 
