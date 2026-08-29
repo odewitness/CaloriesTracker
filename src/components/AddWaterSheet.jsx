@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Droplet, Plus, Minus, Star, Search, X, Trash2, Pencil, Check } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
@@ -93,7 +94,12 @@ export default function AddWaterSheet({ entries = [], water, onUpdateWater, onAd
   const removeDraft = (id) => setDraft((d) => d.filter((p) => p.id !== id))
   const addDraft = () => setDraft((d) => [...d, { id: newPortionId(), label: '', ml: 250 }])
 
-  return (
+  // Rendu via portal sur document.body : sur la page du jour, la feuille est
+  // montée à l'intérieur du slider (transform: translateX) — sans portal, le
+  // `position: fixed` se cale sur ce conteneur transformé (mauvaises
+  // dimensions) et les gestes tactiles sont captés par le swipe de jour
+  // (impossible à refermer).
+  return createPortal(
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet">
         <div className="modal-handle" />
@@ -297,6 +303,7 @@ export default function AddWaterSheet({ entries = [], water, onUpdateWater, onAd
 
         <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 10 }} onClick={onClose}>Fermer</button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
