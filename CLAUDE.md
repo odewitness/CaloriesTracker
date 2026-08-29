@@ -41,4 +41,5 @@ App personnelle de suivi calorique. React 18 + Vite, backend Supabase, déployé
 ## Notes utiles
 
 - Le hook `useBackButton.js` gère le bouton retour Android/navigateur via `history.pushState`/`popstate` — indépendant du routing React Router (`react-router-dom`), ne change jamais le pathname de l'URL.
+- **Modales/feuilles montées dans `TodayPage` : toujours les rendre via `createPortal(..., document.body)`.** Les slots de jour (`DaySlot`) vivent dans un slider avec `transform: translateX(...)` pour l'animation de swipe. Un enfant en `position: fixed` s'y cale sur ce conteneur transformé (dimensions x3, décalage) au lieu du viewport, et ses gestes tactiles sont captés par le swipe de jour (feuille impossible à refermer). Soit passer par un portal (pattern de `ExplorerFoodModal`, `NutrientBreakdownModal`, `AddWaterSheet`), soit remonter l'état au composant `TodayPage` hors du slider (pattern de `AddFoodModal` via `onOpenModal`).
 - Pas d'`ErrorBoundary` dans l'app : une erreur non catchée dans un composant produit un écran blanc silencieux (piste d'amélioration identifiée, pas encore traitée).
