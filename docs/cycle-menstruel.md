@@ -230,8 +230,8 @@ même table (Palier 5).
 | Écran de réglages « Cycle » dans le Profil (liste + écran dédié, pattern actuel) | `src/pages/ProfilePage.jsx` + `src/components/profile/CycleSection.jsx` | 1 ✅ |
 | Delta énergie lutéal appliqué aux cibles | ✅ `TodayPage.jsx` DaySlot via `cycleAdjustedSettings` → `TodayOverviewCard`, `computeMealTargets`, gaps. **Volontairement pas** dans `HistoryPage`/calendrier (objectif à plat sur les agrégats) ni `ExplorerPage` | 3 ✅ |
 | Nudge macros lutéal | **Indicatif seulement** (page d'info + tagline de phase). Pas de recalcul numérique des macros en Palier 3 | 3 ✅ |
-| Suggestions « aliments à privilégier » par phase, tirées de Ciqual | proche de `TodayGapsSection.jsx` / `useGroceriesSuggestions.js` | 4 |
-| Suivi fer / calcium / magnésium mis en avant selon la phase | `NutrientPanel.jsx` / `ComplementNutrientPills.jsx` | 4 |
+| Suggestions « aliments à privilégier » par phase, tirées de Ciqual | ✅ `src/components/CycleNutrientTips.jsx` (page du jour), données de `useCiqualCatalog` | 4 ✅ |
+| Suivi fer / calcium / magnésium mis en avant selon la phase | ✅ `NutrientPanel.jsx` prop `highlightKeys` (point violet), alimenté par `TodayPage.jsx` | 4 ✅ |
 
 ---
 
@@ -293,13 +293,19 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
       page d'info) ; `HistoryPage` et le calendrier gardent l'objectif à plat
       (pas d'ajustement rétro-actif jour par jour sur les agrégats).
 
-### Palier 4 — Focus micronutriments  ▸ statut : à faire
-- [ ] Suggestions « aliments à privilégier » par phase, tirées de la base Ciqual
-      (fer + vitamine C autour des règles ; calcium / magnésium en lutéale)
-- [ ] Mise en avant du suivi fer / calcium / magnésium selon la phase sur les
-      écrans de nutriments
-- [ ] Formulations douces, jamais de dosage de compléments prescrit
-- [ ] Entrée changelog
+### Palier 4 — Focus micronutriments  ▸ statut : codé (branche `cycle-micronutriments`)
+- [x] `cycle.js` : `PHASE_MICRO_FOCUS` (règles → fer + vit C ; lutéale → calcium
+      + magnésium) et `microFocusForPhase(phase, cfg)` (respecte
+      `afficher_conseils_micro`)
+- [x] `CycleNutrientTips` : carte « Bon moment pour… » sur la page du jour
+      (aujourd'hui uniquement), top aliments par nutriment tirés du catalogue
+      Ciqual déjà chargé (`useCiqualCatalog`), catégories parasites exclues
+- [x] `NutrientPanel` : prop `highlightKeys` → point violet + libellé gras sur
+      les jauges vitamines/minéraux concernées (rétro-compatible, sans effet
+      ailleurs). Alimenté depuis `TodayPage`.
+- [x] Toggle « Conseils d'aliments selon la phase » dans `CycleSection`
+- [x] Formulations orientées aliments, mention explicite « aucune dose sans bilan »
+- [x] Entrée changelog
 
 ### Palier 5 — Apprentissage & corrélations (plus tard)  ▸ statut : idée
 - [ ] Longueur de cycle apprise + lissée, intervalle de confiance sur les prédictions
@@ -355,6 +361,13 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
 
 ## 9. Journal des décisions
 
+- **2026-08-29** — Palier 3 mergé sur `main` + poussé. Palier 4 codé sur la
+  branche `cycle-micronutriments` : carte « Bon moment pour… » (`CycleNutrientTips`)
+  sur la page du jour + point violet sur les jauges concernées de `NutrientPanel`
+  (fer/vit C pendant les règles, calcium/magnésium en lutéale), aliments tirés du
+  catalogue Ciqual. Toggle `afficher_conseils_micro`. Informatif seulement, pas
+  tappable (ajout au journal), pas de dose de complément. `npm run build` OK. En
+  attente : test manuel + merge après confirmation.
 - **2026-08-29** — Paliers 1 + 2 mergés sur `main` et poussés (déploiement
   Netlify). Palier 3 démarré sur la branche `cycle-delta-energie`.
 - **2026-08-29** — Palier 3 codé : option « adapter mes calories à ma phase

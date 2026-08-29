@@ -212,6 +212,12 @@ export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
                 onClick={() => onPatch({ afficher_sur_calendrier: !(cfg.afficher_sur_calendrier !== false) })}
               />
             </Row>
+            <Row label="Conseils d'aliments selon la phase">
+              <ToggleSwitch
+                checked={cfg.afficher_conseils_micro !== false}
+                onClick={() => onPatch({ afficher_conseils_micro: !(cfg.afficher_conseils_micro !== false) })}
+              />
+            </Row>
           </div>
 
           <div style={{ display: 'flex', gap: 8, fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.55, marginBottom: 24 }}>

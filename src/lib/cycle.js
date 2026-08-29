@@ -302,6 +302,25 @@ export function phasesForRange(startStr, endStr, days, cfg) {
   return out
 }
 
+// ── Palier 4 : nutriments à mettre en avant selon la phase ─────────────────
+// Formulations douces, orientées aliments — jamais de dose de complément.
+export const PHASE_MICRO_FOCUS = {
+  menstruelle: [
+    { key: 'fer',   label: 'Fer',         hint: 'Les règles en font perdre. À associer à une source de vitamine C.' },
+    { key: 'vit_c', label: 'Vitamine C',  hint: "Aide à absorber le fer d'origine végétale." },
+  ],
+  luteale: [
+    { key: 'calcium',   label: 'Calcium',   hint: "C'est le mieux étayé pour l'inconfort d'avant-règles." },
+    { key: 'magnesium', label: 'Magnésium', hint: 'Peut aider sur la tension nerveuse et la rétention d\'eau.' },
+  ],
+}
+
+export function microFocusForPhase(phase, cfg) {
+  const s = mergeCycleSettings(cfg)
+  if (!s.enabled || s.afficher_conseils_micro === false) return []
+  return PHASE_MICRO_FOCUS[phase] || []
+}
+
 // ── Palier 3 : ajustement énergétique lutéal (opt-in) ──────────────────────
 // Delta (kcal) à ajouter à l'objectif du jour pour une phase donnée, selon les
 // réglages. 0 si non applicable. Données modestes : ~+150 kcal en phase lutéale

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Des aliments à privilégier selon ta phase',
+    description: "Quand le suivi du cycle est activé, la page du jour affiche, pendant tes règles et pendant la phase lutéale, une petite carte « Bon moment pour… » : pendant les règles, du fer (et de la vitamine C pour mieux l'absorber) ; en phase lutéale, du calcium et du magnésium. À chaque fois, quelques aliments courants qui en contiennent le plus. Dans « Détail nutritionnel », ces nutriments sont aussi repérés d'un point violet. Ce sont des aliments à privilégier, jamais des compléments : aucune dose ne se décide sans prise de sang. Tu peux masquer ces conseils dans Profil › Cycle & alimentation.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Option : un peu plus de calories en phase lutéale',
     description: "Dans Profil › Cycle & alimentation, tu peux maintenant activer « Adapter mes calories à ma phase lutéale ». Quand c'est activé, uniquement pendant les jours qui précèdent tes règles, ton objectif de calories du jour est relevé (de +120 kcal par défaut, réglable). Tes objectifs de protéines, glucides et lipides ne bougent pas. Une petite étiquette « +120 kcal » apparaît sur la pastille de cycle de la page du jour ces jours-là. C'est désactivé par défaut et la base scientifique reste modeste (environ +150 kcal/j en moyenne dans les études) : à essayer seulement si ça te parle.",
   },

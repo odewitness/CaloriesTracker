@@ -17,6 +17,7 @@ import ShareJournalModal from '../components/ShareJournalModal'
 import TodayGapsSection from '../components/TodayGapsSection'
 import DayShortcutsBar from '../components/DayShortcutsBar'
 import CyclePhaseBadge from '../components/CyclePhaseBadge'
+import CycleNutrientTips from '../components/CycleNutrientTips'
 import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
@@ -31,7 +32,7 @@ import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
 import { computeMealTargets, computeTotals, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
-import { cycleAdjustedSettings } from '../lib/cycle'
+import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
 import { fmt, dateLabel } from '../lib/dates'
 import { useSetTodayHeaderInfo, useTodayShortcuts } from '../lib/TodayHeaderContext'
 
@@ -92,6 +93,14 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     [settings, cycleDays, dateStr],
   )
   const cycleKcalDelta = daySettings._cycleKcalDelta || 0
+
+  const cyclePhase = useMemo(() => (
+    settings.cycle?.enabled && cycleDays.length ? phaseForDate(dateStr, cycleDays, settings.cycle) : null
+  ), [settings.cycle, cycleDays, dateStr])
+  const microFocusKeys = useMemo(
+    () => microFocusForPhase(cyclePhase, settings.cycle).map(f => f.key),
+    [cyclePhase, settings.cycle],
+  )
 
   const mealTargets = useMemo(() => computeMealTargets(daySettings), [daySettings])
 
@@ -230,7 +239,11 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           goals={daySettings}
           onNavigate={onNavigate}
         />
-        <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
+        <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} highlightKeys={microFocusKeys} />
+
+        {isToday && (
+          <CycleNutrientTips phase={cyclePhase} ciqualFoods={ciqualFoods} cycleSettings={settings.cycle} />
+        )}
 
         {/* Uniquement sur le jour réellement affiché (le texte de la bande et
             les favoris/récents qu'elle charge n'ont de sens que pour

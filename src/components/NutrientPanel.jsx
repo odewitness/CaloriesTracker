@@ -17,7 +17,7 @@ function fmtVal(val, unit) {
 }
 
 // ── Ligne "jauge" vitamines/minéraux — % du RNP, marqueur LSS/seuil ────────
-function GaugeRow({ v, totals, hasEntries, onClick }) {
+function GaugeRow({ v, totals, hasEntries, onClick, highlight }) {
   const val = (v.sumKeys || [v.key]).reduce((s, k) => s + (totals[k] ?? 0), 0)
   const hasData = hasEntries // N/D uniquement si aucune entrée loggée — 0 sur un aliment loggé est une vraie donnée
 
@@ -45,7 +45,10 @@ function GaugeRow({ v, totals, hasEntries, onClick }) {
       style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, width: '100%', textAlign: 'left', cursor: onClick ? 'pointer' : 'default' }}
       title={tooltip}
     >
-      <span style={{ fontSize: 12, color: 'var(--text)', width: 90, flexShrink: 0 }}>{v.label}</span>
+      <span style={{ fontSize: 12, color: 'var(--text)', width: 90, flexShrink: 0, fontWeight: highlight ? 700 : 400, display: 'flex', alignItems: 'center', gap: 4 }}>
+        {highlight && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--purple)', flexShrink: 0 }} title="Intéressant dans ta phase actuelle" />}
+        {v.label}
+      </span>
 
       <div style={{ flex: 1, position: 'relative', height: 6 }}>
         <div style={{ position: 'absolute', inset: 0, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
@@ -215,10 +218,12 @@ function AGSGauge({ totals, hasEntries }) {
 // carte entière sur la page du jour (et partout où les deux s'affichaient
 // déjà côte à côte : historique, fiches aliment/recette).
 // ─────────────────────────────────────────────────────────────────────────
-export default function NutrientPanel({ totals, hasEntries, defaultOpen = false, entries, onUpdate }) {
+export default function NutrientPanel({ totals, hasEntries, defaultOpen = false, entries, onUpdate, highlightKeys = [] }) {
   const [open, setOpen] = useState(defaultOpen)
   const [tab, setTab] = useState('vitamines')
   const [selectedField, setSelectedField] = useState(null)
+  const hl = new Set(highlightKeys)
+  const isHl = (v) => hl.has(v.key) || (v.sumKeys || []).some(k => hl.has(k))
 
   // La liste détaillée par aliment n'a de sens que si on dispose des entrées
   // individuelles (ex: page d'accueil) — pas dans les contextes où le panneau
@@ -262,10 +267,10 @@ export default function NutrientPanel({ totals, hasEntries, defaultOpen = false,
           </div>
 
           {tab === 'vitamines' && VITAMIN_FIELDS.map(v => (
-            <GaugeRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
+            <GaugeRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} highlight={isHl(v)} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
           ))}
           {tab === 'mineraux' && MINERAL_FIELDS.map(v => (
-            <GaugeRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
+            <GaugeRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} highlight={isHl(v)} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
           ))}
 
           {tab === 'sucres' && (
