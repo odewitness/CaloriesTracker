@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { cycleInfo, cycleNutrientRows, PHASES, formatPredictionWindow } from '../lib/cycle'
+import { cycleInfo, cycleNutrientRows, amenorrheaNotice, PHASES, formatPredictionWindow } from '../lib/cycle'
 import CycleNutrientTips from './CycleNutrientTips'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ export default function CyclePhaseBadge({ dateStr, days, cycleSettings, kcalDelt
 
   const tipRows = cycleNutrientRows(info.phase, favorites, cfg)
   const expandable = tipRows.length > 0
+  const notice = amenorrheaNotice(dateStr, days, cfg)
 
   let sub = null
   if (info.phase === 'inconnue') {
@@ -78,6 +79,16 @@ export default function CyclePhaseBadge({ dateStr, days, cycleSettings, kcalDelt
           />
         )}
       </div>
+
+      {notice && (
+        <div style={{
+          marginTop: 8, paddingTop: 8, borderTop: '0.5px solid var(--border)',
+          fontSize: 11, lineHeight: 1.45, color: 'var(--coral)',
+        }}>
+          Pas de règles notées depuis {notice.days} j — si ce n'est pas un oubli de saisie,
+          ça peut valoir le coup d'en parler à un·e professionnel·le de santé.
+        </div>
+      )}
 
       {expandable && open && <CycleNutrientTips rows={tipRows} />}
     </div>

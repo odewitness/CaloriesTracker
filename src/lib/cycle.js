@@ -115,6 +115,44 @@ export function cycleLengthStdDev(days, window = 6) {
   return Math.sqrt(variance)
 }
 
+// ── Palier 5 : régularité observée + alerte aménorrhée ─────────────────────
+// Résumé de la régularité des cycles pour l'affichage (moyenne, amplitude,
+// écart-type, "réguliers" si SD ≤ 4 j).
+export function cycleRegularity(days, window = 6) {
+  const lens = cycleLengths(days).filter(n => n >= 15 && n <= 60)
+  if (!lens.length) return null
+  const recent = lens.slice(-window)
+  const sd = cycleLengthStdDev(days, window)
+  return {
+    count: lens.length,
+    avg: observedCycleLength(days, window),
+    min: Math.min(...recent),
+    max: Math.max(...recent),
+    sd,
+    regular: sd != null ? sd <= 4 : null,
+  }
+}
+
+// Garde-fou aménorrhée / déficit énergétique (voir docs §8 pt 7). Renvoie un
+// objet { days, level, message } si aucune règle n'a été notée depuis ≥ 45 j
+// à la date donnée (hors contraception), sinon null. Ne remplace pas un avis
+// médical — invite juste à en parler.
+export function amenorrheaNotice(dateStr, days, cfg) {
+  const s = mergeCycleSettings(cfg)
+  if (!s.enabled || s.sous_contraception) return null
+  const starts = periodStarts(days)
+  if (!starts.length) return null
+  const last = starts[starts.length - 1]
+  if (last > dateStr) return null
+  const gap = daysBetween(last, dateStr)
+  if (gap < 45) return null
+  return {
+    days: gap,
+    level: gap >= 90 ? 'fort' : 'doux',
+    message: `Aucune règle notée depuis ${gap} jours. Si ce n'est pas un simple oubli de saisie, ça peut valoir le coup d'en parler à un·e professionnel·le de santé : une absence prolongée de règles est parfois liée à un apport en énergie trop bas.`,
+  }
+}
+
 // Durée médiane des règles observée (nb de jours par bloc), ou null.
 export function observedPeriodLength(days) {
   const b = periodBlocks(days)

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Ton cycle apprend de ton historique',
+    description: "Au fil des cycles que tu notes, l'app affiche maintenant ta longueur de cycle moyenne, son amplitude (de tant à tant de jours) et si tes cycles sont plutôt réguliers ou pas — dans Profil › Cycle & alimentation. La fourchette des prochaines règles s'ajuste à cette régularité. Dans l'Historique, un encart « Ton cycle sur cette période » compare tes calories (et ton poids, si tu le notes) en phase lutéale et sur le reste du cycle. Et si aucune règle n'est notée depuis plus de 45 jours, un message bienveillant t'invite à en parler à un·e professionnel·le si ce n'est pas un simple oubli de saisie.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Des aliments à privilégier selon ta phase',
     description: "Pendant tes règles et pendant la phase lutéale, la pastille de cycle sur la page du jour devient dépliable : touche-la pour voir, parmi tes favoris, ceux à privilégier selon le moment — du fer (et de la vitamine C) pendant les règles, du calcium et du magnésium en phase lutéale. Dans « Détail nutritionnel », ces nutriments sont aussi repérés d'un point violet. Tu peux masquer tout ça dans Profil › Cycle & alimentation.",
   },

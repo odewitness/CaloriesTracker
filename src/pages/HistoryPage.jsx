@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useMeasurements } from '../hooks/useMeasurements'
 import { useCycle } from '../hooks/useCycle'
+import { phaseForDate } from '../lib/cycle'
 import { TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
@@ -175,6 +176,35 @@ export default function HistoryPage() {
     return obj
   }, [entries, daysCounted, excludedDates])
 
+  // Corrélation phase ↔ calories / poids sur la période affichée (Palier 5) —
+  // hors vue Année (barres mensuelles). Split des jours loggés en "phase
+  // lutéale" vs "reste du cycle".
+  const cyclePhaseStats = useMemo(() => {
+    const cfg = settings.cycle
+    if (tab === 'annee' || !cfg?.enabled || cfg.sous_contraception || !cycleDays.length) return null
+    const lut = { k: [], w: [] }, rest = { k: [], w: [] }
+    for (const d of statDateKeys) {
+      const kcal = sumKcal(days[d])
+      if (kcal <= 0) continue
+      ;(phaseForDate(d, cycleDays, cfg) === 'luteale' ? lut : rest).k.push(kcal)
+    }
+    for (const m of measurementEntries) {
+      if (m.poids_kg == null || m.date < bounds.start || m.date > bounds.end) continue
+      ;(phaseForDate(m.date, cycleDays, cfg) === 'luteale' ? lut : rest).w.push(m.poids_kg)
+    }
+    if (lut.k.length < 2 || rest.k.length < 2) return null
+    const mean = a => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null)
+    const kLut = mean(lut.k), kRest = mean(rest.k)
+    const wLut = mean(lut.w), wRest = mean(rest.w)
+    return {
+      kLut: Math.round(kLut), kRest: Math.round(kRest), kDelta: Math.round(kLut - kRest),
+      nLut: lut.k.length, nRest: rest.k.length,
+      wLut: wLut != null ? Math.round(wLut * 10) / 10 : null,
+      wRest: wRest != null ? Math.round(wRest * 10) / 10 : null,
+      wDelta: (wLut != null && wRest != null) ? Math.round((wLut - wRest) * 10) / 10 : null,
+    }
+  }, [tab, settings.cycle, cycleDays, statDateKeys, days, measurementEntries, bounds.start, bounds.end])
+
   const daysObjectif = statDateKeys.filter(d => sumKcal(days[d]) <= settings.goal_kcal).length
   const energyBalance = statDateKeys.reduce((s, d) => s + (sumKcal(days[d]) - settings.goal_kcal), 0)
 
@@ -303,6 +333,26 @@ export default function HistoryPage() {
             cycleDays={cycleDays}
             cycleSettings={settings.cycle}
           />
+
+          {cyclePhaseStats && (
+            <div className="card" style={{ padding: '12px 14px', marginBottom: 12, borderLeft: '3px solid var(--purple)' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>Ton cycle sur cette période</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                Calories moy. : <strong>{cyclePhaseStats.kLut}</strong> en phase lutéale vs{' '}
+                <strong>{cyclePhaseStats.kRest}</strong> le reste du cycle{' '}
+                (<span style={{ color: cyclePhaseStats.kDelta >= 0 ? 'var(--coral)' : 'var(--green)', fontWeight: 700 }}>
+                  {cyclePhaseStats.kDelta >= 0 ? '+' : ''}{cyclePhaseStats.kDelta}
+                </span>).
+                {cyclePhaseStats.wDelta != null && (
+                  <> Poids moy. : <strong>{cyclePhaseStats.wLut}</strong> vs <strong>{cyclePhaseStats.wRest}</strong> kg{' '}
+                  ({cyclePhaseStats.wDelta >= 0 ? '+' : ''}{cyclePhaseStats.wDelta}).</>
+                )}
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.4 }}>
+                Un petit écart est attendu ; côté poids c'est surtout de l'eau. Sur {cyclePhaseStats.nLut} + {cyclePhaseStats.nRest} jours notés.
+              </div>
+            </div>
+          )}
 
           {/* Détail nutritionnel (vitamines, minéraux, sucres, acides gras) */}
           <div className="section-title">Détail nutritionnel</div>

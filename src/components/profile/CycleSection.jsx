@@ -6,7 +6,7 @@ import { useCycle } from '../../hooks/useCycle'
 import { fmt, todayStr } from '../../lib/dates'
 import {
   cycleInfo, phasesForRange, PHASES, formatPredictionWindow, formatDateRange,
-  addDays, daysBetween,
+  cycleRegularity, amenorrheaNotice, addDays, daysBetween,
 } from '../../lib/cycle'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,6 +23,8 @@ export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
 
   const today = todayStr()
   const info = useMemo(() => cycleInfo(today, days, cfg), [today, days, cfg])
+  const regularity = useMemo(() => cycleRegularity(days), [days])
+  const notice = useMemo(() => amenorrheaNotice(today, days, cfg), [today, days, cfg])
 
   const cycleByDate = useMemo(() => {
     if (cfg.afficher_sur_calendrier === false) return undefined
@@ -96,7 +98,18 @@ export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
           </div>
 
           {/* Phase courante */}
-          <PhaseSummary info={info} sousContraception={!!cfg.sous_contraception} />
+          <PhaseSummary info={info} sousContraception={!!cfg.sous_contraception} regularity={regularity} />
+
+          {notice && (
+            <div className="card" style={{ padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--coral)' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--coral)', marginBottom: 3 }}>
+                Pas de règles depuis {notice.days} jours
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>
+                {notice.message}
+              </div>
+            </div>
+          )}
 
           {/* Saisie / historique */}
           <div className="section-title" style={{ marginTop: 8 }}>Tes règles</div>
@@ -236,7 +249,7 @@ export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
   )
 }
 
-function PhaseSummary({ info, sousContraception }) {
+function PhaseSummary({ info, sousContraception, regularity }) {
   const phase = PHASES[info.phase] || PHASES.inconnue
   let line2 = null
   if (info.phase === 'inconnue') {
@@ -265,14 +278,21 @@ function PhaseSummary({ info, sousContraception }) {
       {phase.tagline && info.phase !== 'inconnue' && (
         <div style={{ fontSize: 11.5, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.5 }}>{phase.tagline}</div>
       )}
-      {(info.observedCycleLen != null || info.observedPeriodLen != null) && (
-        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6 }}>
-          {info.observedCycleLen != null && `Cycle observé : ${info.observedCycleLen} j`}
-          {info.observedCycleLen != null && info.observedPeriodLen != null && ' · '}
-          {info.observedPeriodLen != null && `règles : ${info.observedPeriodLen} j`}
-          {info.nCycles > 0 && ` (sur ${info.nCycles} cycle${info.nCycles > 1 ? 's' : ''})`}
-        </div>
-      )}
+      {regularity
+        ? (
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.5 }}>
+            Cycles : {regularity.avg} j en moyenne
+            {regularity.min !== regularity.max && `, de ${regularity.min} à ${regularity.max} j`}
+            {' '}sur {regularity.count} cycle{regularity.count > 1 ? 's' : ''}
+            {regularity.regular != null && (regularity.regular ? ' · plutôt réguliers' : ' · assez irréguliers')}
+            {info.observedPeriodLen != null && ` · règles ${info.observedPeriodLen} j`}
+          </div>
+        )
+        : info.observedPeriodLen != null && (
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6 }}>
+            Durée des règles observée : {info.observedPeriodLen} j
+          </div>
+        )}
     </div>
   )
 }

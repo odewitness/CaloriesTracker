@@ -309,17 +309,30 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
       (`afficher_conseils_micro`)
 - [x] Entrée changelog
 
-### Palier 5 — Apprentissage & corrélations (plus tard)  ▸ statut : idée
-- [ ] Longueur de cycle apprise + lissée, intervalle de confiance sur les prédictions
-- [ ] Détection de cycle en retard / absent → message bienveillant (cf. §8 pt 7)
-- [ ] Corrélation phase ↔ poids / calories / symptômes si l'utilisatrice les logge
-- [ ] (Éventuel) suivi de flux via `regles.date_fin` + intensité
+### Palier 5 — Apprentissage & corrélations  ▸ statut : codé (branche `cycle-apprentissage`)
+- [x] Longueur de cycle apprise + amplitude + régularité : `cycleRegularity(days)`
+      dans `cycle.js`, affiché dans `CycleSection` (`PhaseSummary`). La fourchette
+      des prédictions utilise déjà `margin = ceil(sd)` (Palier 1).
+- [x] Détection retard / absence de règles : `amenorrheaNotice(dateStr, days,
+      cfg)` (≥ 45 j) → message bienveillant dans `CyclePhaseBadge` (court) et
+      `CycleSection` (complet). Respecte le garde-fou §8 pt 7.
+- [x] Corrélation phase ↔ calories / poids : encart « Ton cycle sur cette
+      période » dans `HistoryPage` (moyenne lutéale vs reste du cycle, hors vue
+      Année, min. 2 + 2 jours notés).
+- [x] Entrée changelog
+- [ ] **Suivi de flux** (intensité des règles par jour) — reporté : nécessite une
+      colonne sur `regles` + UI de saisie. Voir Palier 7.
 
 ### Palier 6 — Entrées externes (si un jour pertinent)  ▸ statut : idée
 - [ ] Import CSV ponctuel de dates de règles (si « Mon Calendrier » ou une autre
       app finit par exporter quelque chose)
 - [ ] Wrapper natif (Capacitor) → lecture Health Connect / Apple Santé alimentant
       la table `regles`. Gros changement de nature du projet, hors périmètre actuel.
+
+### Palier 7 — Suivi de flux (idée)  ▸ statut : idée
+- [ ] Colonne `intensite` (ex. `léger` / `moyen` / `abondant`) sur `regles`,
+      saisie optionnelle par jour de règles.
+- [ ] Estimation des pertes en fer selon le flux ; nuance du conseil « fer ».
 
 ---
 
@@ -363,6 +376,13 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
 
 ## 9. Journal des décisions
 
+- **2026-08-29** — Palier 4 mergé sur `main` + poussé. Palier 5 codé sur la
+  branche `cycle-apprentissage` : `cycleRegularity` (moyenne + amplitude +
+  régularité, affiché dans `CycleSection`), `amenorrheaNotice` (≥ 45 j sans
+  règles → message dans `CyclePhaseBadge` + `CycleSection`), encart « Ton cycle
+  sur cette période » dans `HistoryPage` (calories/poids lutéale vs reste). Le
+  suivi de flux est repoussé au Palier 7 (nécessite une migration). `npm run
+  build` OK. En attente : test manuel + merge.
 - **2026-08-29** — Palier 3 mergé sur `main` + poussé. Palier 4 codé sur la
   branche `cycle-micronutriments`, puis retravaillé suite au retour utilisatrice :
   la liste des aliments n'est plus une carte à part mais **repliée dans la
