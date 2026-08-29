@@ -336,7 +336,7 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
   (décision utilisatrice, 2026-08-29) : changerait la nature du projet
   (build natif, stores). L'import/export texte couvre le besoin.
 
-### Palier 7 — Suivi de flux  ▸ statut : codé (branche `cycle-flux`)
+### Palier 7 — Suivi de flux  ▸ statut : ✅ mergé sur `main`
 - [x] Colonne `intensite` (`leger` / `moyen` / `abondant`) sur `regles` +
       policy `update` — `supabase/sql/regles_intensite_setup.sql`, à appliquer
       manuellement ; `supabase_schema.sql` mis à jour.
@@ -354,8 +354,8 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
 
 ## 7. Reste à faire (vue rapide)
 
-Paliers 1 → 6 **livrés et mergés** sur `main`. Palier 7 (intensité du flux)
-codé sur `cycle-flux`, en attente de la migration SQL + du merge.
+**Chantier terminé.** Paliers 1 → 7 tous livrés et mergés sur `main`, migrations
+`regles_setup.sql` et `regles_intensite_setup.sql` appliquées.
 
 Rien de prévu au-delà. Le wrapper natif (Health Connect / Apple Santé) est
 abandonné. Toute nouvelle idée s'ajoute ici.
@@ -392,10 +392,11 @@ abandonné. Toute nouvelle idée s'ajoute ici.
 
 - **2026-08-29** — Palier 6 mergé sur `main` + poussé ; wrapper natif abandonné
   (décision utilisatrice). Palier 7 codé sur la branche `cycle-flux` : colonne
-  `regles.intensite` + policy `update` (migration `regles_intensite_setup.sql` à
-  appliquer), saisie par bloc dans `CycleSection`, estimation des pertes de fer
-  (`estimatedIronLoss`), conseil « fer » nuancé. `npm run build` OK. En attente :
-  application SQL + test manuel + merge.
+  `regles.intensite` + policy `update` (migration `regles_intensite_setup.sql`),
+  saisie par bloc dans `CycleSection`, estimation des pertes de fer
+  (`estimatedIronLoss`), conseil « fer » nuancé.
+- **2026-08-29** — Migration `regles_intensite_setup.sql` appliquée (confirmée).
+  Palier 7 mergé sur `main` + poussé. **Chantier terminé** (Paliers 1 → 7).
 - **2026-08-29** — Palier 5 mergé sur `main` + poussé. Palier 6 : le wrapper
   natif (Health Connect / Apple Santé) reste hors périmètre ; à la place, **import
   par collage de texte** + export presse-papier dans `CycleSection`
