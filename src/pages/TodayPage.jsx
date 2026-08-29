@@ -17,13 +17,13 @@ import ShareJournalModal from '../components/ShareJournalModal'
 import TodayGapsSection from '../components/TodayGapsSection'
 import DayShortcutsBar from '../components/DayShortcutsBar'
 import CyclePhaseBadge from '../components/CyclePhaseBadge'
-import CycleNutrientTips from '../components/CycleNutrientTips'
 import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCycle } from '../hooks/useCycle'
 import { useSettings } from '../hooks/useSettings'
 import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
+import { useFavorites } from '../hooks/useFavorites'
 import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
 import { useFeed } from '../hooks/useFeed'
 import { saveMealTemplate } from '../hooks/useMealTemplates'
@@ -51,6 +51,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
   const { days: cycleDays } = useCycle()
+  const { favorites } = useFavorites()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings, update: updateSettings } = useSettings()
   const { foods: ciqualFoods } = useCiqualCatalog()
@@ -228,7 +229,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             canShare={entries.length > 0}
           />
         )}
-        <CyclePhaseBadge dateStr={dateStr} days={cycleDays} cycleSettings={settings.cycle} kcalDelta={cycleKcalDelta} />
+        <CyclePhaseBadge dateStr={dateStr} days={cycleDays} cycleSettings={settings.cycle} kcalDelta={cycleKcalDelta} favorites={favorites} />
         <TodayOverviewCard
           consumed={totals.kcal}
           goal={daySettings.goal_kcal}
@@ -240,10 +241,6 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onNavigate={onNavigate}
         />
         <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} highlightKeys={microFocusKeys} />
-
-        {isToday && (
-          <CycleNutrientTips phase={cyclePhase} ciqualFoods={ciqualFoods} cycleSettings={settings.cycle} />
-        )}
 
         {/* Uniquement sur le jour réellement affiché (le texte de la bande et
             les favoris/récents qu'elle charge n'ont de sens que pour

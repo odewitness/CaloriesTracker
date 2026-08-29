@@ -321,6 +321,30 @@ export function microFocusForPhase(phase, cfg) {
   return PHASE_MICRO_FOCUS[phase] || []
 }
 
+// Pour la phase courante : les nutriments à privilégier, chacun avec les
+// aliments des FAVORIS de l'utilisatrice qui en contiennent le plus (pour 100 g).
+// `favorites` = lignes de la table `favoris` (voir useFavorites). Renvoie []
+// si rien à montrer — l'appelant s'en sert aussi pour décider s'il y a du
+// contenu à déplier.
+export function cycleNutrientRows(phase, favorites, cfg, perNutrient = 6) {
+  const focus = microFocusForPhase(phase, cfg)
+  if (!focus.length) return []
+  return focus
+    .map(f => ({
+      ...f,
+      foods: (favorites || [])
+        .map(fav => ({
+          id: fav.id,
+          name: fav.food_data?.alim_nom || fav.food_name || '',
+          val: Number(fav.food_data?.[f.key]) || 0,
+        }))
+        .filter(x => x.val > 0 && x.name)
+        .sort((a, b) => b.val - a.val)
+        .slice(0, perNutrient),
+    }))
+    .filter(r => r.foods.length > 0)
+}
+
 // ── Palier 3 : ajustement énergétique lutéal (opt-in) ──────────────────────
 // Delta (kcal) à ajouter à l'objectif du jour pour une phase donnée, selon les
 // réglages. 0 si non applicable. Données modestes : ~+150 kcal en phase lutéale

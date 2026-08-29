@@ -230,7 +230,7 @@ même table (Palier 5).
 | Écran de réglages « Cycle » dans le Profil (liste + écran dédié, pattern actuel) | `src/pages/ProfilePage.jsx` + `src/components/profile/CycleSection.jsx` | 1 ✅ |
 | Delta énergie lutéal appliqué aux cibles | ✅ `TodayPage.jsx` DaySlot via `cycleAdjustedSettings` → `TodayOverviewCard`, `computeMealTargets`, gaps. **Volontairement pas** dans `HistoryPage`/calendrier (objectif à plat sur les agrégats) ni `ExplorerPage` | 3 ✅ |
 | Nudge macros lutéal | **Indicatif seulement** (page d'info + tagline de phase). Pas de recalcul numérique des macros en Palier 3 | 3 ✅ |
-| Suggestions « aliments à privilégier » par phase, tirées de Ciqual | ✅ `src/components/CycleNutrientTips.jsx` (page du jour), données de `useCiqualCatalog` | 4 ✅ |
+| Suggestions « aliments à privilégier » par phase, **limitées aux favoris** | ✅ `CyclePhaseBadge` dépliable + `CycleNutrientTips`, données de `useFavorites` | 4 ✅ |
 | Suivi fer / calcium / magnésium mis en avant selon la phase | ✅ `NutrientPanel.jsx` prop `highlightKeys` (point violet), alimenté par `TodayPage.jsx` | 4 ✅ |
 
 ---
@@ -295,16 +295,18 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
 
 ### Palier 4 — Focus micronutriments  ▸ statut : codé (branche `cycle-micronutriments`)
 - [x] `cycle.js` : `PHASE_MICRO_FOCUS` (règles → fer + vit C ; lutéale → calcium
-      + magnésium) et `microFocusForPhase(phase, cfg)` (respecte
-      `afficher_conseils_micro`)
-- [x] `CycleNutrientTips` : carte « Bon moment pour… » sur la page du jour
-      (aujourd'hui uniquement), top aliments par nutriment tirés du catalogue
-      Ciqual déjà chargé (`useCiqualCatalog`), catégories parasites exclues
+      + magnésium), `microFocusForPhase(phase, cfg)` (respecte
+      `afficher_conseils_micro`) et `cycleNutrientRows(phase, favorites, cfg)`
+- [x] Liste « Parmi tes favoris, bon moment pour… » **repliée dans la pastille
+      de phase** (`CyclePhaseBadge` devient dépliable quand il y a des favoris
+      correspondants) — composant `CycleNutrientTips` réduit à un rendu de `rows`
+- [x] **Seuls les aliments en favoris** sont proposés (données de `useFavorites`,
+      champ `food_data`), triés par teneur pour 100 g
 - [x] `NutrientPanel` : prop `highlightKeys` → point violet + libellé gras sur
       les jauges vitamines/minéraux concernées (rétro-compatible, sans effet
       ailleurs). Alimenté depuis `TodayPage`.
 - [x] Toggle « Conseils d'aliments selon la phase » dans `CycleSection`
-- [x] Formulations orientées aliments, mention explicite « aucune dose sans bilan »
+      (`afficher_conseils_micro`)
 - [x] Entrée changelog
 
 ### Palier 5 — Apprentissage & corrélations (plus tard)  ▸ statut : idée
@@ -362,12 +364,13 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
 ## 9. Journal des décisions
 
 - **2026-08-29** — Palier 3 mergé sur `main` + poussé. Palier 4 codé sur la
-  branche `cycle-micronutriments` : carte « Bon moment pour… » (`CycleNutrientTips`)
-  sur la page du jour + point violet sur les jauges concernées de `NutrientPanel`
-  (fer/vit C pendant les règles, calcium/magnésium en lutéale), aliments tirés du
-  catalogue Ciqual. Toggle `afficher_conseils_micro`. Informatif seulement, pas
-  tappable (ajout au journal), pas de dose de complément. `npm run build` OK. En
-  attente : test manuel + merge après confirmation.
+  branche `cycle-micronutriments`, puis retravaillé suite au retour utilisatrice :
+  la liste des aliments n'est plus une carte à part mais **repliée dans la
+  pastille de phase** (`CyclePhaseBadge` dépliable), elle ne propose **que des
+  aliments en favoris** (`useFavorites`), et la mention « pas de compléments /
+  bilan sanguin » a été retirée du bloc (elle reste dans la page d'info). Point
+  violet sur `NutrientPanel` conservé. `npm run build` OK. En attente : test
+  manuel + merge après confirmation.
 - **2026-08-29** — Paliers 1 + 2 mergés sur `main` et poussés (déploiement
   Netlify). Palier 3 démarré sur la branche `cycle-delta-energie`.
 - **2026-08-29** — Palier 3 codé : option « adapter mes calories à ma phase

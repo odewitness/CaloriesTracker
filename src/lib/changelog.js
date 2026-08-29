@@ -9,7 +9,7 @@ export const CHANGELOG = [
   {
     date: '2026-08-29',
     title: 'Des aliments à privilégier selon ta phase',
-    description: "Quand le suivi du cycle est activé, la page du jour affiche, pendant tes règles et pendant la phase lutéale, une petite carte « Bon moment pour… » : pendant les règles, du fer (et de la vitamine C pour mieux l'absorber) ; en phase lutéale, du calcium et du magnésium. À chaque fois, quelques aliments courants qui en contiennent le plus. Dans « Détail nutritionnel », ces nutriments sont aussi repérés d'un point violet. Ce sont des aliments à privilégier, jamais des compléments : aucune dose ne se décide sans prise de sang. Tu peux masquer ces conseils dans Profil › Cycle & alimentation.",
+    description: "Pendant tes règles et pendant la phase lutéale, la pastille de cycle sur la page du jour devient dépliable : touche-la pour voir, parmi tes favoris, ceux à privilégier selon le moment — du fer (et de la vitamine C) pendant les règles, du calcium et du magnésium en phase lutéale. Dans « Détail nutritionnel », ces nutriments sont aussi repérés d'un point violet. Tu peux masquer tout ça dans Profil › Cycle & alimentation.",
   },
   {
     date: '2026-08-29',
