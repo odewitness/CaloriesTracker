@@ -300,6 +300,10 @@ export default function HistoryPage() {
             onJumpToDetail={handleJump}
           />
 
+          {/* Détail nutritionnel (vitamines, minéraux, sucres, acides gras) */}
+          <div className="section-title">Détail nutritionnel</div>
+          <NutrientPanel totals={avg} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
+
           {/* Stats clés */}
           <HistoryStatGrid
             avgKcal={avg.kcal}
@@ -335,7 +339,6 @@ export default function HistoryPage() {
           <div className="section-title">Moyennes de la période</div>
           <CalorieRing consumed={avg.kcal} goal={settings.goal_kcal} />
           <MacroBar prot={avg.prot} gluc={avg.gluc} lip={avg.lip} fib={avg.fib} goals={settings} />
-          <NutrientPanel totals={avg} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
 
           {/* Tops & profils */}
           <div className="section-title">Répartition par repas</div>
