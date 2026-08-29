@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Scale, Ruler, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { useMeasurements } from '../hooks/useMeasurements'
+import { useCycle } from '../hooks/useCycle'
+import { useSettings } from '../hooks/useSettings'
 import { useToast } from '../lib/toast'
 import { todayStr } from '../lib/dates'
 import Loader from '../components/Loader'
@@ -107,6 +109,8 @@ function HistoryCard({ entry, onEdit, onDelete }) {
 export default function MeasurementsPage() {
   const toast = useToast()
   const { entries, loading, save, deleteEntry } = useMeasurements()
+  const { days: cycleDays } = useCycle()
+  const { settings } = useSettings()
   const [form, setForm] = useState(() => emptyForm(todayStr()))
   const [saving, setSaving] = useState(false)
   const formTopRef = useRef(null)
@@ -236,7 +240,14 @@ export default function MeasurementsPage() {
           </div>
           {(() => {
             const m = METRICS.find(x => x.key === selectedMetric)
-            return <MetricChart entries={entries} fieldKey={m.key} label={m.label} unit={m.unit} color={m.color} />
+            return (
+              <MetricChart
+                entries={entries} fieldKey={m.key} label={m.label} unit={m.unit} color={m.color}
+                showCyclePhases={m.key === 'poids_kg'}
+                cycleDays={cycleDays}
+                cycleSettings={settings.cycle}
+              />
+            )
           })()}
         </>
       )}

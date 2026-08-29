@@ -4,6 +4,7 @@ import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
 import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useMeasurements } from '../hooks/useMeasurements'
+import { useCycle } from '../hooks/useCycle'
 import { TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
@@ -37,6 +38,7 @@ export default function HistoryPage() {
   const { settings } = useSettings()
   const { user } = useAuth()
   const { entries: measurementEntries } = useMeasurements()
+  const { days: cycleDays } = useCycle()
 
   const [tab, setTab] = useState('semaine')
   const [anchor, setAnchor] = useState(todayStr())
@@ -298,6 +300,8 @@ export default function HistoryPage() {
             showWeight={showWeight}
             onToggleWeight={() => setShowWeight(v => !v)}
             onJumpToDetail={handleJump}
+            cycleDays={cycleDays}
+            cycleSettings={settings.cycle}
           />
 
           {/* Détail nutritionnel (vitamines, minéraux, sucres, acides gras) */}

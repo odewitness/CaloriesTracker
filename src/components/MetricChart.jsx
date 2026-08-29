@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useId } from 'react'
+import { phaseForDate } from '../lib/cycle'
 
 const WIDTH = 320
 const HEIGHT = 170
@@ -52,7 +53,10 @@ function smoothPath(coords) {
 // Graphique d'une seule métrique (poids OU une mensuration — jamais mélangées),
 // avec sélecteur de période, courbe lissée + dégradé, point tapable pour
 // épingler une valeur, et écart vs le tout premier relevé de cette métrique.
-export default function MetricChart({ entries, fieldKey, label, unit, color = 'var(--green)' }) {
+export default function MetricChart({
+  entries, fieldKey, label, unit, color = 'var(--green)',
+  showCyclePhases = false, cycleDays, cycleSettings,
+}) {
   const gradId = useId()
   const [range, setRange] = useState('tout')
 
@@ -84,6 +88,10 @@ export default function MetricChart({ entries, fieldKey, label, unit, color = 'v
   let pathD = ''
   let areaD = ''
   let stats = null
+  let lutealBands = []
+
+  const showPhases = showCyclePhases && !!cycleSettings?.enabled && !cycleSettings?.sous_contraception
+    && Array.isArray(cycleDays) && cycleDays.length > 0
 
   if (points.length >= 2) {
     const values = points.map(p => p[fieldKey])
@@ -102,6 +110,23 @@ export default function MetricChart({ entries, fieldKey, label, unit, color = 'v
 
     const avg = values.reduce((s, v) => s + v, 0) / values.length
     stats = { min, max, avg }
+
+    // Bandes de phase lutéale en arrière-plan (rétention d'eau ≠ prise de gras).
+    // L'axe x est indexé sur les points, pas sur le temps : on étend chaque
+    // suite de points lutéaux jusqu'aux milieux vers les points voisins.
+    if (showPhases) {
+      const isLuteal = points.map(p => phaseForDate(p.date, cycleDays, cycleSettings) === 'luteale')
+      let i = 0
+      while (i < points.length) {
+        if (!isLuteal[i]) { i++; continue }
+        let j = i
+        while (j + 1 < points.length && isLuteal[j + 1]) j++
+        const left = i === 0 ? xFor(0) : (xFor(i - 1) + xFor(i)) / 2
+        const right = j === points.length - 1 ? xFor(j) : (xFor(j) + xFor(j + 1)) / 2
+        lutealBands.push({ x: left, w: Math.max(right - left, 2) })
+        i = j + 1
+      }
+    }
   }
 
   return (
@@ -133,6 +158,9 @@ export default function MetricChart({ entries, fieldKey, label, unit, color = 'v
               <stop offset="100%" stopColor={color} stopOpacity="0" />
             </linearGradient>
           </defs>
+          {lutealBands.map((b, i) => (
+            <rect key={`lb${i}`} x={b.x.toFixed(1)} y={PAD_TOP - 6} width={b.w.toFixed(1)} height={HEIGHT - PAD_BOTTOM - (PAD_TOP - 6)} fill="var(--purple)" opacity="0.10" />
+          ))}
           <path d={areaD} fill={`url(#${gradId})`} stroke="none" />
           <path d={pathD} fill="none" stroke={color} strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
           {points.map((p, i) => (
@@ -177,6 +205,13 @@ export default function MetricChart({ entries, fieldKey, label, unit, color = 'v
           </button>
         ))}
       </div>
+
+      {showPhases && lutealBands.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: 'var(--text-hint)', marginBottom: stats ? 12 : 0, lineHeight: 1.4 }}>
+          <span style={{ width: 18, height: 10, borderRadius: 2, background: 'var(--purple)', opacity: 0.18, flexShrink: 0 }} />
+          Phase lutéale — le poids peut monter de 0,5 à 2 kg d'eau, ce n'est pas de la graisse.
+        </div>
+      )}
 
       {/* Min / Moy / Max sur la période affichée */}
       {stats && (

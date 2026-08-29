@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useId } from 'react'
 import { Scale } from 'lucide-react'
 import { dayStatus, STATUS_COLOR, smoothPath, eachDay } from '../../lib/history'
 import { todayStr } from '../../lib/dates'
+import { phaseForDate } from '../../lib/cycle'
 
 const WIDTH = 328
 const HEIGHT = 182
@@ -29,6 +30,7 @@ export default function CalorieTrendChart({
   tab, bounds, days, goalKcal, excludedDates,
   monthSummaries = [], avgKcal,
   weightPoints = [], showWeight, onToggleWeight, onJumpToDetail,
+  cycleDays, cycleSettings,
 }) {
   const gradId = useId()
   const isYear = tab === 'annee'
@@ -126,6 +128,19 @@ export default function CalorieTrendChart({
   const untrackedCount = points.filter(p => p.untracked && !p.excluded).length
   const hasChart = withData.length >= 1
 
+  // Bandes de phase lutéale en arrière-plan, uniquement quand la courbe de
+  // poids est superposée (contexte : rétention d'eau ≠ prise de gras) et hors
+  // vue Année (barres mensuelles, la phase n'y a pas de sens).
+  const showLutealBands = showWeight && canWeight && !isYear
+    && !!cycleSettings?.enabled && !cycleSettings?.sous_contraception
+    && Array.isArray(cycleDays) && cycleDays.length > 0
+  const lutealBands = useMemo(() => {
+    if (!showLutealBands) return []
+    return points
+      .map((p, i) => (phaseForDate(p.key, cycleDays, cycleSettings) === 'luteale' ? i : -1))
+      .filter(i => i >= 0)
+  }, [showLutealBands, points, cycleDays, cycleSettings])
+
   // ── Ligne de lecture du point sélectionné ───────────────────────────────
   const selLabel = !sel ? '—'
     : isYear ? cap(sel.label)
@@ -194,6 +209,11 @@ export default function CalorieTrendChart({
               <stop offset="100%" stopColor="var(--green)" stopOpacity="0" />
             </linearGradient>
           </defs>
+
+          {/* Bandes phase lutéale (fond) */}
+          {lutealBands.map(i => (
+            <rect key={`lb${i}`} x={(xFor(i) - slotW / 2).toFixed(1)} y={PAD_TOP} width={slotW.toFixed(1)} height={PLOT_H} fill="var(--purple)" opacity="0.09" />
+          ))}
 
           {/* Ligne d'objectif */}
           <line x1={PAD_L} y1={goalY} x2={WIDTH - PAD_R} y2={goalY} stroke="var(--text-hint)" strokeWidth="1" strokeDasharray="3 3" />
@@ -268,6 +288,12 @@ export default function CalorieTrendChart({
             ? `${untrackedCount} mois sans aucun suivi`
             : `${untrackedCount} jour${untrackedCount > 1 ? 's' : ''} non tracké${untrackedCount > 1 ? 's' : ''} sur la période`}
           {showWeight ? ' — tes calories réelles étaient sûrement plus élevées.' : '.'}
+        </div>
+      )}
+      {showLutealBands && lutealBands.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginTop: 4, color: 'var(--text-hint)' }}>
+          <span style={{ width: 16, height: 9, borderRadius: 2, background: 'var(--purple)', opacity: 0.16, flexShrink: 0 }} />
+          Bandes = phase lutéale : le poids peut monter de 0,5 à 2 kg d'eau.
         </div>
       )}
     </div>

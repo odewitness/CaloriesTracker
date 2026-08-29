@@ -247,7 +247,7 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
 
 ## 6. Paliers
 
-### Palier 1 — Suivi + info (aucun changement de cibles)  ▸ statut : en cours (branche `cycle-menstruel`)
+### Palier 1 — Suivi + info (aucun changement de cibles)  ▸ statut : codé, en attente d'application SQL + test manuel + merge (branche `cycle-menstruel`)
 - [x] `supabase/sql/regles_setup.sql` (table `regles` + colonne `settings.cycle`) + MAJ `supabase_schema.sql` — **application manuelle dans Supabase encore à faire par l'utilisatrice**
 - [x] `src/lib/cycle.js` (calcul de phase, fonctions pures + contenu éditorial des phases)
 - [x] `src/hooks/useCycle.js`
@@ -262,9 +262,10 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
       jour (`CyclePhaseBadge`)
 - [x] Interrupteur maître `enabled` + interrupteur `sous_contraception` +
       réglages longueurs + toggles d'affichage (`CycleSection`)
-- [ ] **Annotation des phases sur les graphes de poids (Historique + Mensurations)**
-      — reporté en commit suivant sur la même branche (touche `MetricChart` /
-      `HistoryPage`), fait après validation du socle
+- [x] Annotation de la phase lutéale sur les graphes de poids : bandes violettes
+      en fond sur `MetricChart` (courbe Poids de la page Mensurations) et sur
+      `CalorieTrendChart` (page Historique, seulement quand la courbe de poids est
+      superposée, hors vue Année) + légende « rétention d'eau ≠ prise de gras »
 
 ### Palier 2 — Page d'info + réglages  ▸ statut : à faire
 - [ ] Page « Cycle & alimentation » : les 4 phases, ce que dit la science **et
@@ -354,6 +355,11 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
   `npm run build` OK. Restent : appliquer le SQL en base (utilisatrice),
   validation manuelle, puis annotation des phases sur les graphes de poids.
   Aucune entrée changelog pour l'instant (prévue au Palier 2 avec la page d'info).
+- **2026-08-29** — Annotation phase lutéale sur les graphes de poids
+  (`MetricChart` page Mensurations + `CalorieTrendChart` page Historique quand
+  la superposition poids est active). Palier 1 **complet côté code**, `npm run
+  build` OK. Reste : appliquer `regles_setup.sql` en base, test manuel, merge +
+  push après confirmation.
 - **2026-08-29** — Modèle de données revu **avant tout usage** à la demande de
   l'utilisatrice : `regles` passe de « 1 ligne = 1er jour (date_debut/date_fin) »
   à **« 1 ligne = 1 jour de règles »**. La durée des règles varie d'un cycle à
