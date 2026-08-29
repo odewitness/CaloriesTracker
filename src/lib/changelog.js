@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Option : un peu plus de calories en phase lutéale',
+    description: "Dans Profil › Cycle & alimentation, tu peux maintenant activer « Adapter mes calories à ma phase lutéale ». Quand c'est activé, uniquement pendant les jours qui précèdent tes règles, ton objectif de calories du jour est relevé (de +120 kcal par défaut, réglable). Tes objectifs de protéines, glucides et lipides ne bougent pas. Une petite étiquette « +120 kcal » apparaît sur la pastille de cycle de la page du jour ces jours-là. C'est désactivé par défaut et la base scientifique reste modeste (environ +150 kcal/j en moyenne dans les études) : à essayer seulement si ça te parle.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Suis ton cycle et adapte ton assiette',
     description: "Dans Profil, une nouvelle rubrique « Cycle & alimentation ». Tu y marques tes jours de règles toi-même (l'app ne se connecte à aucune autre appli), y compris plusieurs cycles passés pour bien caler les estimations. L'app t'indique alors où tu en es dans ton cycle — règles, phase folliculaire, ovulation, phase lutéale — avec une petite pastille sur la page du jour et des couleurs sur le calendrier. Sur tes courbes de poids, les jours d'avant-règles sont surlignés : c'est le moment où le poids peut monter de 1 kg d'eau sans que ce soit de la graisse. Une page d'explications te résume, sans jargon, ce qui change côté alimentation à chaque phase et ce que la science dit vraiment (les effets sont réels mais modestes). Pour l'instant tes objectifs de calories ne changent pas : c'est purement informatif.",
   },

@@ -31,6 +31,7 @@ import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
 import { computeMealTargets, computeTotals, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
+import { cycleAdjustedSettings } from '../lib/cycle'
 import { fmt, dateLabel } from '../lib/dates'
 import { useSetTodayHeaderInfo, useTodayShortcuts } from '../lib/TodayHeaderContext'
 
@@ -81,7 +82,18 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
 
   const totals = useMemo(() => computeTotals(entries), [entries])
-  const mealTargets = useMemo(() => computeMealTargets(settings), [settings])
+
+  // Objectifs du jour éventuellement ajustés selon la phase du cycle
+  // (Palier 3, opt-in) — n'ajoute que des kcal en phase lutéale, sinon
+  // renvoie `settings` inchangé. Utilisé pour tous les calculs d'objectif de
+  // CE jour ; `settings` brut reste la source pour water / réglages.
+  const daySettings = useMemo(
+    () => cycleAdjustedSettings(settings, cycleDays, dateStr),
+    [settings, cycleDays, dateStr],
+  )
+  const cycleKcalDelta = daySettings._cycleKcalDelta || 0
+
+  const mealTargets = useMemo(() => computeMealTargets(daySettings), [daySettings])
 
   // Manques nutritionnels du jour (voir ciqualExplorer.js, même logique que
   // la bande "À combler aujourd'hui" de l'Explorer) — calculés pour tout
@@ -93,9 +105,9 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   // par une suggestion, y compris quand la pastille choisie n'est pas dans
   // les 10 premières (feuille "…").
   const allGaps = useMemo(() => (
-    getNutrientGaps(totals, settings, Infinity)
-      .map(g => ({ ...g, missing: getGapAmount(totals, settings, g.field) }))
-  ), [totals, settings])
+    getNutrientGaps(totals, daySettings, Infinity)
+      .map(g => ({ ...g, missing: getGapAmount(totals, daySettings, g.field) }))
+  ), [totals, daySettings])
   const gaps    = useMemo(() => allGaps.slice(0, 3), [allGaps])
 
   // Les 10 manques les plus urgents — sert au moteur de suggestion de
@@ -110,7 +122,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   // Calories restantes du jour — sert à TodayGapsSection pour privilégier des
   // suggestions qui tiennent dans le budget plutôt que n'importe quel aliment
   // qui comble le manque au prix d'un dépassement.
-  const remainingKcal = settings.goal_kcal != null ? settings.goal_kcal - totals.kcal : null
+  const remainingKcal = daySettings.goal_kcal != null ? daySettings.goal_kcal - totals.kcal : null
 
   const handleAdd = async (entry) => {
     const { error } = await addEntry(entry)
@@ -207,15 +219,15 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             canShare={entries.length > 0}
           />
         )}
-        <CyclePhaseBadge dateStr={dateStr} days={cycleDays} cycleSettings={settings.cycle} />
+        <CyclePhaseBadge dateStr={dateStr} days={cycleDays} cycleSettings={settings.cycle} kcalDelta={cycleKcalDelta} />
         <TodayOverviewCard
           consumed={totals.kcal}
-          goal={settings.goal_kcal}
+          goal={daySettings.goal_kcal}
           prot={totals.prot}
           gluc={totals.gluc}
           lip={totals.lip}
           fib={totals.fib}
-          goals={settings}
+          goals={daySettings}
           onNavigate={onNavigate}
         />
         <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />

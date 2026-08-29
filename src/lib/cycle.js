@@ -302,6 +302,38 @@ export function phasesForRange(startStr, endStr, days, cfg) {
   return out
 }
 
+// ── Palier 3 : ajustement énergétique lutéal (opt-in) ──────────────────────
+// Delta (kcal) à ajouter à l'objectif du jour pour une phase donnée, selon les
+// réglages. 0 si non applicable. Données modestes : ~+150 kcal en phase lutéale
+// (voir docs/cycle-menstruel.md §2).
+export function energyDeltaForPhase(phase, cfg) {
+  const s = mergeCycleSettings(cfg)
+  if (!s.enabled || s.sous_contraception || !s.appliquer_delta_energie) return 0
+  if (phase !== 'luteale') return 0
+  const d = Number(s.delta_energie_luteale_kcal)
+  return Number.isFinite(d) ? Math.round(d) : 0
+}
+
+// Renvoie `settings` avec `goal_kcal` ajusté du delta de phase pour `dateStr`.
+// Objet inchangé (même référence) si aucun ajustement. Quand un ajustement
+// s'applique, `_cycleKcalDelta` et `_cyclePhase` sont ajoutés pour l'affichage.
+// Ne touche QUE goal_kcal : les macros ne sont pas recalculées (le nudge macros
+// reste indicatif, voir la page d'info).
+export function cycleAdjustedSettings(settings, days, dateStr) {
+  const cfg = settings?.cycle
+  const phase = (cfg?.enabled && Array.isArray(days) && days.length)
+    ? phaseForDate(dateStr, days, cfg)
+    : 'inconnue'
+  const delta = energyDeltaForPhase(phase, cfg)
+  if (!delta) return settings
+  return {
+    ...settings,
+    goal_kcal: Math.max(0, Math.round((settings.goal_kcal || 0) + delta)),
+    _cycleKcalDelta: delta,
+    _cyclePhase: phase,
+  }
+}
+
 // "3–7 sept." à partir de deux 'YYYY-MM-DD'.
 export function formatPredictionWindow(fromStr, toStr) {
   const from = parseYMD(fromStr)

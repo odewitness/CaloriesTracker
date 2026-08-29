@@ -228,8 +228,8 @@ même table (Palier 5).
 | Page « Cycle & alimentation » (science + limites + garde-fous, sans jargon) | `src/pages/CycleInfoPage.jsx` + route `/cycle-infos` dans `App.jsx` + bouton dans `CycleSection` | 2 ✅ |
 | Entrée changelog (`src/lib/changelog.js`) à chaque palier visible | `src/lib/changelog.js` | 2+ |
 | Écran de réglages « Cycle » dans le Profil (liste + écran dédié, pattern actuel) | `src/pages/ProfilePage.jsx` + `src/components/profile/CycleSection.jsx` | 1 ✅ |
-| Delta énergie lutéal appliqué aux cibles | là où `settings.goal_*` est consommé : `TodayOverviewCard.jsx`, `MacroBar.jsx`, `DayRecapPanel.jsx`, `HistoryPage.jsx`, `nutrients.js` (`getDayStatus`) | 3 |
-| Nudge macros lutéal | idem | 3 |
+| Delta énergie lutéal appliqué aux cibles | ✅ `TodayPage.jsx` DaySlot via `cycleAdjustedSettings` → `TodayOverviewCard`, `computeMealTargets`, gaps. **Volontairement pas** dans `HistoryPage`/calendrier (objectif à plat sur les agrégats) ni `ExplorerPage` | 3 ✅ |
+| Nudge macros lutéal | **Indicatif seulement** (page d'info + tagline de phase). Pas de recalcul numérique des macros en Palier 3 | 3 ✅ |
 | Suggestions « aliments à privilégier » par phase, tirées de Ciqual | proche de `TodayGapsSection.jsx` / `useGroceriesSuggestions.js` | 4 |
 | Suivi fer / calcium / magnésium mis en avant selon la phase | `NutrientPanel.jsx` / `ComplementNutrientPills.jsx` | 4 |
 
@@ -278,13 +278,20 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
 - [x] Entrée changelog (`src/lib/changelog.js`, 2026-08-29 « Suis ton cycle et
       adapte ton assiette »).
 
-### Palier 3 — Ajustement énergétique + macros (optionnel, off par défaut)  ▸ statut : à faire
-- [ ] Toggle « adapter mes calories à mon cycle » → +100–150 kcal en lutéale
-- [ ] Application du delta partout où les cibles `goal_*` sont lues (liste §4.3)
-- [ ] Libellé explicite « petit ajustement, base scientifique modeste »
-- [ ] Nudge macros lutéal (protéines vers le haut, glucides complexes, fibres +,
-      sodium −) — affichage indicatif, pas de recalcul brutal des objectifs
-- [ ] Entrée changelog
+### Palier 3 — Ajustement énergétique + macros (optionnel, off par défaut)  ▸ statut : codé (branche `cycle-delta-energie`)
+- [x] Toggle « adapter mes calories à ma phase lutéale » + stepper du montant
+      (défaut +120 kcal, 50–250) dans `CycleSection`
+- [x] `cycle.js` : `energyDeltaForPhase`, `cycleAdjustedSettings(settings, days,
+      dateStr)` — n'ajuste **que `goal_kcal`**, uniquement en phase lutéale
+- [x] Appliqué dans **la page du jour** (`TodayPage` DaySlot) : `TodayOverviewCard`,
+      `computeMealTargets`, gaps/`remainingKcal` passent par `daySettings`.
+      Étiquette « +120 kcal » sur `CyclePhaseBadge`.
+- [x] Libellé explicite « base scientifique modeste » dans les réglages
+- [x] Entrée changelog
+- **Choix assumés (voir §4.3) :** macros non recalculées numériquement (nudge
+      protéines/glucides complexes/fibres/sodium reste **indicatif**, porté par la
+      page d'info) ; `HistoryPage` et le calendrier gardent l'objectif à plat
+      (pas d'ajustement rétro-actif jour par jour sur les agrégats).
 
 ### Palier 4 — Focus micronutriments  ▸ statut : à faire
 - [ ] Suggestions « aliments à privilégier » par phase, tirées de la base Ciqual
@@ -348,6 +355,14 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
 
 ## 9. Journal des décisions
 
+- **2026-08-29** — Paliers 1 + 2 mergés sur `main` et poussés (déploiement
+  Netlify). Palier 3 démarré sur la branche `cycle-delta-energie`.
+- **2026-08-29** — Palier 3 codé : option « adapter mes calories à ma phase
+  lutéale » (off par défaut) qui relève **uniquement `goal_kcal`** pendant la
+  phase lutéale, du montant réglé (défaut +120). Portée limitée à la page du
+  jour (`cycleAdjustedSettings`). Macros non recalculées (nudge reste
+  indicatif). `HistoryPage`/calendrier gardent l'objectif à plat. Étiquette sur
+  la pastille de cycle + entrée changelog. `npm run build` OK.
 - **2026-08-29** — Palier 2 codé sur la branche `cycle-menstruel` : page
   d'information `CycleInfoPage` (route `/cycle-infos`, page-modal comme
   `/whatsnew`), ouverte depuis `CycleSection` (bouton « Comprendre : cycle &

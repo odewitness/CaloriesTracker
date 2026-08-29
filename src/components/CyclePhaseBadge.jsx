@@ -3,11 +3,12 @@ import { cycleInfo, PHASES, formatPredictionWindow } from '../lib/cycle'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CyclePhaseBadge — pastille discrète sur la page du jour : phase + jour du
-// cycle + fourchette estimée des prochaines règles. Lecture seule (Palier 1).
-// Ne s'affiche que si le suivi de cycle est activé et qu'on a au moins une
-// date de règles saisie.
+// cycle + fourchette estimée des prochaines règles. `kcalDelta` (Palier 3) =
+// kcal ajoutées à l'objectif du jour pour la phase lutéale, affichées ici
+// quand l'option est active. Ne s'affiche que si le suivi de cycle est activé
+// et qu'on a au moins un jour de règles saisi.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CyclePhaseBadge({ dateStr, days, cycleSettings }) {
+export default function CyclePhaseBadge({ dateStr, days, cycleSettings, kcalDelta = 0 }) {
   const cfg = cycleSettings || {}
   if (!cfg.enabled || cfg.afficher_badge_jour === false) return null
   if (!days || days.length === 0) return null
@@ -51,6 +52,15 @@ export default function CyclePhaseBadge({ dateStr, days, cycleSettings }) {
           </div>
         )}
       </div>
+      {kcalDelta > 0 && (
+        <span
+          className="chip"
+          style={{ flexShrink: 0, background: 'var(--purple-light, #ede9fe)', color: 'var(--purple, #8b5cf6)', fontSize: 11, fontWeight: 700 }}
+          title="Objectif calorique du jour relevé pour la phase lutéale"
+        >
+          +{kcalDelta} kcal
+        </span>
+      )}
     </div>
   )
 }

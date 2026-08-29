@@ -131,6 +131,34 @@ export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
             </div>
           )}
 
+          {/* Ajustement des calories (Palier 3, opt-in) */}
+          <div className="section-title">Calories</div>
+          <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>
+            <Row label="Adapter mes calories à ma phase lutéale">
+              <ToggleSwitch
+                checked={!!cfg.appliquer_delta_energie}
+                onClick={() => onPatch({ appliquer_delta_energie: !cfg.appliquer_delta_energie })}
+              />
+            </Row>
+            {cfg.appliquer_delta_energie && (
+              <Row label="Calories ajoutées en phase lutéale">
+                <Stepper
+                  value={cfg.delta_energie_luteale_kcal ?? 120}
+                  display={`+${cfg.delta_energie_luteale_kcal ?? 120} kcal`}
+                  min={50} max={250} wide
+                  onDec={() => onPatch({ delta_energie_luteale_kcal: Math.max(50, (cfg.delta_energie_luteale_kcal ?? 120) - 10) })}
+                  onInc={() => onPatch({ delta_energie_luteale_kcal: Math.min(250, (cfg.delta_energie_luteale_kcal ?? 120) + 10) })}
+                />
+              </Row>
+            )}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
+            Uniquement pendant la phase lutéale, ton objectif de calories du jour
+            est relevé de ce montant (les macros ne changent pas). Base
+            scientifique modeste : environ +150 kcal/j observés en moyenne, sur
+            des études hétérogènes. Désactivé, rien ne bouge.
+          </div>
+
           {/* Réglages fins */}
           <div className="section-title">Réglages</div>
           <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
