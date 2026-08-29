@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react'
-import { HeartPulse, Trash2, Info, BookOpen } from 'lucide-react'
+import { HeartPulse, Trash2, Info, BookOpen, ClipboardPaste, Copy } from 'lucide-react'
 import { Row, ToggleSwitch, Stepper, SectionScreen, NavRow } from './primitives'
 import CalendarMonthGrid, { buildMonthCells } from '../CalendarMonthGrid'
 import { useCycle } from '../../hooks/useCycle'
 import { fmt, todayStr } from '../../lib/dates'
 import {
   cycleInfo, phasesForRange, PHASES, formatPredictionWindow, formatDateRange,
-  cycleRegularity, amenorrheaNotice, addDays, daysBetween,
+  cycleRegularity, amenorrheaNotice, parsePeriodDatesInput, addDays, daysBetween,
 } from '../../lib/cycle'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18,8 +18,29 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
   const cfg = cycle || {}
-  const { days, blocks, loading, toggleDay, removeDays } = useCycle()
+  const { days, blocks, loading, toggleDay, removeDays, addManyDays } = useCycle()
   const [monthAnchor, setMonthAnchor] = useState(new Date())
+
+  // Import / export texte (Palier 6)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importResult, setImportResult] = useState(null) // { added } | { error }
+  const [copied, setCopied] = useState(false)
+  const parsed = useMemo(() => parsePeriodDatesInput(importText), [importText])
+  const parsedNew = useMemo(() => parsed.dates.filter(d => !days.includes(d)), [parsed.dates, days])
+
+  const doImport = async () => {
+    const { error, added } = await addManyDays(parsed.dates)
+    setImportResult(error ? { error: true } : { added })
+    if (!error) { setImportText(''); if (added > 0) setTimeout(() => setImportOpen(false), 1200) }
+  }
+  const copyDates = async () => {
+    try {
+      await navigator.clipboard.writeText([...days].sort().join('\n'))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch { /* clipboard indisponible — on ignore */ }
+  }
 
   const today = todayStr()
   const info = useMemo(() => cycleInfo(today, days, cfg), [today, days, cfg])
@@ -117,6 +138,66 @@ export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
             Touche chaque jour de règles pour le marquer (ou l'enlever). Marque
             plusieurs cycles passés — au moins 3 — pour des estimations fiables.
           </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <button
+              onClick={() => { setImportOpen(o => !o); setImportResult(null) }}
+              className="chip"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--green-light)', color: 'var(--green-dark)', fontSize: 11.5 }}
+            >
+              <ClipboardPaste size={13} /> Coller une liste de dates
+            </button>
+            {days.length > 0 && (
+              <button
+                onClick={copyDates}
+                className="chip"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--gray-bg)', color: 'var(--text-muted)', fontSize: 11.5 }}
+              >
+                <Copy size={13} /> {copied ? 'Copié !' : 'Copier mes dates'}
+              </button>
+            )}
+          </div>
+
+          {importOpen && (
+            <div className="card" style={{ padding: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 6 }}>
+                Une date par ligne (ou séparées par des virgules). Formats acceptés :
+                <br /><code>2026-08-03</code>, <code>03/08/2026</code>, <code>3/8/26</code>,
+                et les plages <code>03/08/2026 - 07/08/2026</code>.
+              </div>
+              <textarea
+                value={importText}
+                onChange={e => { setImportText(e.target.value); setImportResult(null) }}
+                rows={5}
+                placeholder={"2026-06-04\n2026-06-05\n2026-07-01 - 2026-07-05"}
+                style={{ width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 8, padding: 8, fontSize: 12, fontFamily: 'var(--font)', resize: 'vertical', background: 'var(--gray-bg)', outline: 'none' }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '6px 0' }}>
+                {importText.trim() === ''
+                  ? 'Colle tes dates ci-dessus.'
+                  : `${parsedNew.length} nouveau${parsedNew.length > 1 ? 'x' : ''} jour${parsedNew.length > 1 ? 's' : ''} à ajouter` +
+                    (parsed.dates.length - parsedNew.length > 0 ? ` · ${parsed.dates.length - parsedNew.length} déjà présent${parsed.dates.length - parsedNew.length > 1 ? 's' : ''}` : '') +
+                    (parsed.errors.length ? ` · ${parsed.errors.length} ligne${parsed.errors.length > 1 ? 's' : ''} non comprise${parsed.errors.length > 1 ? 's' : ''}` : '')}
+              </div>
+              {importResult?.added != null && (
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--green-dark)', marginBottom: 6 }}>
+                  ✓ {importResult.added} jour{importResult.added > 1 ? 's' : ''} ajouté{importResult.added > 1 ? 's' : ''}
+                </div>
+              )}
+              {importResult?.error && (
+                <div style={{ fontSize: 11.5, color: 'var(--coral)', marginBottom: 6 }}>Erreur lors de l'ajout.</div>
+              )}
+              <button
+                className="btn-primary"
+                onClick={doImport}
+                disabled={parsedNew.length === 0}
+                style={{ opacity: parsedNew.length === 0 ? 0.5 : 1 }}
+              >
+                Ajouter {parsedNew.length > 0 ? `${parsedNew.length} jour${parsedNew.length > 1 ? 's' : ''}` : ''}
+              </button>
+            </div>
+          )}
+
           <CalendarMonthGrid
             monthDate={monthAnchor}
             onChangeMonth={(dir) => setMonthAnchor(d => new Date(d.getFullYear(), d.getMonth() + dir, 1))}

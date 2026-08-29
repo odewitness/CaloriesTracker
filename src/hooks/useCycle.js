@@ -79,8 +79,22 @@ export function useCycle() {
     return days.includes(dateStr) ? removeDay(dateStr) : addDay(dateStr)
   }
 
+  // Import en lot (Palier 6) : n'insère que les jours pas déjà présents,
+  // en une seule requête. Renvoie le nombre effectivement ajouté.
+  const addManyDays = async (dateArr) => {
+    if (!user) return { error: 'Non connecté', added: 0 }
+    const clean = sortDedupe(dateArr.map(fmt)).filter(d => !days.includes(d))
+    if (!clean.length) return { error: null, added: 0 }
+    setDays(d => sortDedupe([...d, ...clean]))
+    const { error } = await supabase
+      .from('regles')
+      .insert(clean.map(d => ({ user_id: user.id, date: d })))
+    if (error) setDays(d => d.filter(x => !clean.includes(x)))
+    return { error, added: error ? 0 : clean.length }
+  }
+
   const blocks = useMemo(() => periodBlocks(days), [days])
   const starts = useMemo(() => periodStarts(days), [days])
 
-  return { days, blocks, starts, loading, addDay, removeDay, removeDays, toggleDay, refetch: load }
+  return { days, blocks, starts, loading, addDay, removeDay, removeDays, addManyDays, toggleDay, refetch: load }
 }

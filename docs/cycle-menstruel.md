@@ -323,11 +323,18 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
 - [ ] **Suivi de flux** (intensité des règles par jour) — reporté : nécessite une
       colonne sur `regles` + UI de saisie. Voir Palier 7.
 
-### Palier 6 — Entrées externes (si un jour pertinent)  ▸ statut : idée
-- [ ] Import CSV ponctuel de dates de règles (si « Mon Calendrier » ou une autre
-      app finit par exporter quelque chose)
+### Palier 6 — Entrées externes  ▸ statut : import texte codé (branche `cycle-import`)
+- [x] **Import manuel par collage** dans `CycleSection` : bouton « Coller une
+      liste de dates » → textarea + aperçu (nouveaux / déjà présents / lignes non
+      comprises) + « Ajouter ». Parseur `parsePeriodDatesInput` dans `cycle.js`
+      (formats `YYYY-MM-DD`, `JJ/MM/AAAA`, `JJ/MM/AA` avec `/ . -`, plages
+      `… - …` / `… au …` / `… to …` étendues, max 40 j). Insert en lot via
+      `useCycle.addManyDays`.
+- [x] **Export texte** : bouton « Copier mes dates » (presse-papier, une date
+      par ligne) — permet aussi de sortir les données.
 - [ ] Wrapper natif (Capacitor) → lecture Health Connect / Apple Santé alimentant
-      la table `regles`. Gros changement de nature du projet, hors périmètre actuel.
+      la table `regles`. Gros changement de nature du projet, **hors périmètre** —
+      à ne faire que sur décision explicite.
 
 ### Palier 7 — Suivi de flux (idée)  ▸ statut : idée
 - [ ] Colonne `intensite` (ex. `léger` / `moyen` / `abondant`) sur `regles`,
@@ -376,6 +383,11 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
 
 ## 9. Journal des décisions
 
+- **2026-08-29** — Palier 5 mergé sur `main` + poussé. Palier 6 : le wrapper
+  natif (Health Connect / Apple Santé) reste hors périmètre ; à la place, **import
+  par collage de texte** + export presse-papier dans `CycleSection`
+  (`parsePeriodDatesInput`, `useCycle.addManyDays`). Aucune migration. `npm run
+  build` OK. En attente : test manuel + merge.
 - **2026-08-29** — Palier 4 mergé sur `main` + poussé. Palier 5 codé sur la
   branche `cycle-apprentissage` : `cycleRegularity` (moyenne + amplitude +
   régularité, affiché dans `CycleSection`), `amenorrheaNotice` (≥ 45 j sans

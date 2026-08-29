@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Coller une liste de dates de règles',
+    description: "Pour ne pas avoir à tout retaper jour par jour sur le calendrier, tu peux maintenant coller une liste de dates dans Profil › Cycle & alimentation (bouton « Coller une liste de dates »). Une date par ligne, plusieurs formats acceptés (2026-08-03, 03/08/2026, 3/8/26) et même des plages du type « 03/08/2026 - 07/08/2026 ». L'app te dit combien de jours seront ajoutés avant que tu valides. Un bouton « Copier mes dates » fait l'inverse si tu veux récupérer ta liste ailleurs.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Ton cycle apprend de ton historique',
     description: "Au fil des cycles que tu notes, l'app affiche maintenant ta longueur de cycle moyenne, son amplitude (de tant à tant de jours) et si tes cycles sont plutôt réguliers ou pas — dans Profil › Cycle & alimentation. La fourchette des prochaines règles s'ajuste à cette régularité. Dans l'Historique, un encart « Ton cycle sur cette période » compare tes calories (et ton poids, si tu le notes) en phase lutéale et sur le reste du cycle. Et si aucune règle n'est notée depuis plus de 45 jours, un message bienveillant t'invite à en parler à un·e professionnel·le si ce n'est pas un simple oubli de saisie.",
   },

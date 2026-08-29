@@ -415,6 +415,54 @@ export function cycleAdjustedSettings(settings, days, dateStr) {
   }
 }
 
+// ── Palier 6 : import manuel de dates de règles ───────────────────────────
+// Parse un texte collé (une app tierce ne pouvant pas exporter directement,
+// l'utilisatrice colle une liste). Accepte, séparés par retours à la ligne,
+// virgules ou points-virgules : des dates isolées (YYYY-MM-DD, JJ/MM/AAAA,
+// JJ/MM/AA, avec / . ou -) et des plages ("03/08/2026 - 07/08/2026",
+// "… au …", "… to …") étendues jour par jour (max 40 j).
+function _mkDate(y, mo, d) {
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 2000 || y > 2100) return null
+  const dt = new Date(y, mo - 1, d, 12, 0, 0, 0)
+  if (dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null // ex. 31/02
+  return fmt(dt)
+}
+function _parseOneDate(raw) {
+  const s = (raw || '').trim()
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (m) return _mkDate(+m[1], +m[2], +m[3])
+  m = s.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/)
+  if (m) {
+    let y = +m[3]
+    if (y < 100) y += 2000
+    return _mkDate(y, +m[2], +m[1])
+  }
+  return null
+}
+export function parsePeriodDatesInput(text) {
+  const tokens = String(text || '').split(/[\n,;]+/).map(t => t.trim()).filter(Boolean)
+  const dates = new Set()
+  const errors = []
+  for (const tok of tokens) {
+    const parts = tok.split(/\s+(?:to|au|jusqu'au|jusqu’au|–|—|-|→)\s+/i)
+    if (parts.length === 2) {
+      const a = _parseOneDate(parts[0])
+      const b = _parseOneDate(parts[1])
+      if (a && b && a <= b && daysBetween(a, b) <= 40) {
+        let cur = a
+        while (cur <= b) { dates.add(cur); cur = addDays(cur, 1) }
+        continue
+      }
+      errors.push(tok)
+      continue
+    }
+    const d = _parseOneDate(tok)
+    if (d) dates.add(d)
+    else errors.push(tok)
+  }
+  return { dates: [...dates].sort(), errors }
+}
+
 // "3–7 sept." à partir de deux 'YYYY-MM-DD'.
 export function formatPredictionWindow(fromStr, toStr) {
   const from = parseYMD(fromStr)
