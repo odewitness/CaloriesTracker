@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { HeartPulse, Trash2, Info } from 'lucide-react'
-import { Row, ToggleSwitch, Stepper, SectionScreen } from './primitives'
+import { HeartPulse, Trash2, Info, BookOpen } from 'lucide-react'
+import { Row, ToggleSwitch, Stepper, SectionScreen, NavRow } from './primitives'
 import CalendarMonthGrid, { buildMonthCells } from '../CalendarMonthGrid'
 import { useCycle } from '../../hooks/useCycle'
 import { fmt, todayStr } from '../../lib/dates'
@@ -16,7 +16,7 @@ import {
 // Aucun changement des cibles caloriques (ce sera le Palier 3).
 // Voir docs/cycle-menstruel.md.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CycleSection({ cycle, onPatch, onBack }) {
+export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
   const cfg = cycle || {}
   const { days, blocks, loading, toggleDay, removeDays } = useCycle()
   const [monthAnchor, setMonthAnchor] = useState(new Date())
@@ -58,6 +58,16 @@ export default function CycleSection({ cycle, onPatch, onBack }) {
           <ToggleSwitch checked={enabled} onClick={() => onPatch({ enabled: !enabled })} />
         </Row>
       </div>
+
+      {onOpenInfo && (
+        <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
+          <NavRow
+            icon={<BookOpen size={18} />}
+            label="Comprendre : cycle & alimentation"
+            onClick={onOpenInfo}
+          />
+        </div>
+      )}
 
       {!enabled && (
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>

@@ -225,9 +225,9 @@ même table (Palier 5).
 | Pastille de phase sur la grille du mois | `CalendarMonthGrid.jsx` | 1 |
 | Badge « Phase lutéale · J19 · prochaines règles ~3–5 sept » sur la page du jour | `TodayPage.jsx` / `TodayOverviewCard.jsx` | 1 |
 | Annotation des phases sur le graphe de poids (rétention d'eau ≠ prise de gras) | `MeasurementsPage.jsx` / `MetricChart.jsx`, et `HistoryPage.jsx` (courbe poids/calories) | 1 |
-| Page « Cycle & alimentation » (science + limites + garde-fous, sans jargon) | nouvelle page `src/pages/CyclePage.jsx` + route dans `App.jsx` + accès depuis Profil | 2 |
+| Page « Cycle & alimentation » (science + limites + garde-fous, sans jargon) | `src/pages/CycleInfoPage.jsx` + route `/cycle-infos` dans `App.jsx` + bouton dans `CycleSection` | 2 ✅ |
 | Entrée changelog (`src/lib/changelog.js`) à chaque palier visible | `src/lib/changelog.js` | 2+ |
-| Écran de réglages « Cycle » dans le Profil (liste + écran dédié, pattern actuel) | `src/pages/ProfilePage.jsx` + `src/components/profile/` | 2 |
+| Écran de réglages « Cycle » dans le Profil (liste + écran dédié, pattern actuel) | `src/pages/ProfilePage.jsx` + `src/components/profile/CycleSection.jsx` | 1 ✅ |
 | Delta énergie lutéal appliqué aux cibles | là où `settings.goal_*` est consommé : `TodayOverviewCard.jsx`, `MacroBar.jsx`, `DayRecapPanel.jsx`, `HistoryPage.jsx`, `nutrients.js` (`getDayStatus`) | 3 |
 | Nudge macros lutéal | idem | 3 |
 | Suggestions « aliments à privilégier » par phase, tirées de Ciqual | proche de `TodayGapsSection.jsx` / `useGroceriesSuggestions.js` | 4 |
@@ -267,11 +267,16 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
       `CalorieTrendChart` (page Historique, seulement quand la courbe de poids est
       superposée, hors vue Année) + légende « rétention d'eau ≠ prise de gras »
 
-### Palier 2 — Page d'info + réglages  ▸ statut : à faire
-- [ ] Page « Cycle & alimentation » : les 4 phases, ce que dit la science **et
-      ses limites**, garde-fous, le tout sans jargon (ton tutoiement de l'app)
-- [ ] Écran de réglages « Cycle » dans le Profil
-- [ ] Entrée(s) changelog
+### Palier 2 — Page d'info + réglages  ▸ statut : codé (branche `cycle-menstruel`)
+- [x] Page « Cycle & alimentation » (`src/pages/CycleInfoPage.jsx`, route
+      `/cycle-infos` en page-modal, ouverte depuis Profil › Cycle via le bouton
+      « Comprendre : cycle & alimentation ») : les 4 phases, minéraux/vitamines
+      par moment, sections dépliables « ce que la science dit vraiment », « bon à
+      savoir », « sources ». Ton tutoiement, sans jargon.
+- [x] Écran de réglages « Cycle » dans le Profil — fait au Palier 1
+      (`CycleSection`), enrichi ici du lien vers la page d'info.
+- [x] Entrée changelog (`src/lib/changelog.js`, 2026-08-29 « Suis ton cycle et
+      adapte ton assiette »).
 
 ### Palier 3 — Ajustement énergétique + macros (optionnel, off par défaut)  ▸ statut : à faire
 - [ ] Toggle « adapter mes calories à mon cycle » → +100–150 kcal en lutéale
@@ -342,6 +347,15 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
 ---
 
 ## 9. Journal des décisions
+
+- **2026-08-29** — Palier 2 codé sur la branche `cycle-menstruel` : page
+  d'information `CycleInfoPage` (route `/cycle-infos`, page-modal comme
+  `/whatsnew`), ouverte depuis `CycleSection` (bouton « Comprendre : cycle &
+  alimentation »). Contenu : 4 phases, minéraux/vitamines par moment, sections
+  dépliables sur les limites de la science, les garde-fous et les sources. Entrée
+  changelog ajoutée. `npm run build` OK. En attente : test manuel + merge/push
+  (avec le Palier 1) après confirmation.
+
 
 - **2026-08-29** — Cadrage initial. Pas de contraception hormonale côté
   utilisatrice. Pas d'export possible depuis « Mon Calendrier » → saisie manuelle

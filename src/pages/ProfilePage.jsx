@@ -225,6 +225,7 @@ export default function ProfilePage() {
       <CycleSection
         cycle={settings.cycle}
         onPatch={(patch) => updateSettings({ cycle: { ...settings.cycle, ...patch } })}
+        onOpenInfo={() => navigate('/cycle-infos', { state: { backgroundLocation: location.state?.backgroundLocation || location } })}
         onBack={back}
       />
     )

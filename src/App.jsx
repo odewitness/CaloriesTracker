@@ -15,6 +15,7 @@ import WhatsNewPage from './pages/WhatsNewPage'
 import MeasurementsPage from './pages/MeasurementsPage'
 import SocialPage from './pages/SocialPage'
 import ExplorerPage from './pages/ExplorerPage'
+import CycleInfoPage from './pages/CycleInfoPage'
 import Loader from './components/Loader'
 import ErrorBoundary from './components/ErrorBoundary'
 import { getLatestChangelogKey } from './lib/changelog'
@@ -418,6 +419,19 @@ function AppShell() {
               </div>
               <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
                 <MeasurementsPage />
+              </div>
+            </div>
+          } />
+          <Route path="/cycle-infos" element={
+            <div className="page-modal">
+              <div className="page-modal-header">
+                <h2>Cycle &amp; alimentation</h2>
+                <button className="btn-icon" onClick={closeOverlay} aria-label="Fermer">
+                  <CloseIcon />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto' }}>
+                <CycleInfoPage />
               </div>
             </div>
           } />

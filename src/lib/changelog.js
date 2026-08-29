@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Suis ton cycle et adapte ton assiette',
+    description: "Dans Profil, une nouvelle rubrique « Cycle & alimentation ». Tu y marques tes jours de règles toi-même (l'app ne se connecte à aucune autre appli), y compris plusieurs cycles passés pour bien caler les estimations. L'app t'indique alors où tu en es dans ton cycle — règles, phase folliculaire, ovulation, phase lutéale — avec une petite pastille sur la page du jour et des couleurs sur le calendrier. Sur tes courbes de poids, les jours d'avant-règles sont surlignés : c'est le moment où le poids peut monter de 1 kg d'eau sans que ce soit de la graisse. Une page d'explications te résume, sans jargon, ce qui change côté alimentation à chaque phase et ce que la science dit vraiment (les effets sont réels mais modestes). Pour l'instant tes objectifs de calories ne changent pas : c'est purement informatif.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Ton historique fait peau neuve',
     description: "La page Historique a été repensée. Un graphique montre tes calories jour par jour (ou mois par mois sur l'année) avec ta ligne d'objectif : touche une barre pour voir juste au-dessus la date, les calories et ton poids à ce moment-là. Tu peux superposer ta courbe de poids à tes calories. Les jours où tu n'as rien noté apparaissent en gris et sont comptés à part, pour ne pas te faire croire que tu as moins mangé que dans la réalité. Un calendrier colore chaque journée selon que tu étais dans l'objectif ou au-dessus, pour voir ta régularité d'un coup d'œil. Et tu retrouves ton bilan par rapport à l'objectif, ta comparaison avec la période précédente, ta répartition moyenne par repas, ton profil par jour de semaine et tes aliments les plus fréquents. L'onglet « Jour » a été retiré : pour revoir une journée précise, ouvre-la depuis le calendrier en haut de la page du jour.",
   },
