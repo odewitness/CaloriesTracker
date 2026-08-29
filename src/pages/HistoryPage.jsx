@@ -221,15 +221,16 @@ export default function HistoryPage() {
   const goNext = () => setAnchor(a => shiftAnchor(tab, a, 1))
   const changeTab = (t) => { setTab(t); setAnchor(todayStr()); setHighlightKey(null) }
 
-  // Clic sur une barre/point du graphe → scroll + halo sur la carte du détail.
-  const handleSelect = useCallback((key) => {
+  // « Détail ↓ » du graphe / clic sur une case du calendrier → scroll + halo
+  // sur la carte jour/mois correspondante.
+  const handleJump = useCallback((key) => {
     const id = tab === 'annee' ? `hist-month-${key}` : `hist-day-${key}`
     setHighlightKey(key)
     requestAnimationFrame(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     })
-    window.clearTimeout(handleSelect._t)
-    handleSelect._t = window.setTimeout(() => setHighlightKey(null), 1400)
+    window.clearTimeout(handleJump._t)
+    handleJump._t = window.setTimeout(() => setHighlightKey(null), 1400)
   }, [tab])
 
   return (
@@ -296,7 +297,7 @@ export default function HistoryPage() {
             weightPoints={weightPoints}
             showWeight={showWeight}
             onToggleWeight={() => setShowWeight(v => !v)}
-            onSelect={handleSelect}
+            onJumpToDetail={handleJump}
           />
 
           {/* Stats clés */}
@@ -325,7 +326,7 @@ export default function HistoryPage() {
                 excludedDates={excludedDates}
                 monthDate={new Date(anchor + 'T12:00:00')}
                 year={Number(bounds.start.slice(0, 4))}
-                onSelectDate={handleSelect}
+                onSelectDate={handleJump}
               />
             </>
           )}
