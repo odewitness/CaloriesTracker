@@ -59,7 +59,7 @@ export default function CycleInfoPage() {
       <div className="card" style={{ padding: '4px 0', marginBottom: 8 }}>
         <MicroRow
           titre="Fer — pendant et juste après les règles"
-          texte="Tes règles te font perdre du fer. Associe des aliments qui en contiennent (viande rouge, boudin, lentilles, épinards…) à une source de vitamine C (agrumes, poivron, kiwi) : ça aide à l'absorber."
+          texte="Tes règles te font perdre du fer (autour de 15 à 30 mg par cycle, davantage si elles sont abondantes — renseigne leur intensité dans l'écran Cycle & alimentation et l'app t'en donne une estimation). Associe des aliments qui en contiennent (viande rouge, boudin, lentilles, épinards…) à une source de vitamine C (agrumes, poivron, kiwi) : ça aide à l'absorber."
         />
         <MicroRow
           titre="Calcium — en phase lutéale"

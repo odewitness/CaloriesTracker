@@ -799,10 +799,13 @@ create index if not exists idx_jours_exclus_user_date on jours_exclus (user_id, 
 -- d'un cycle à l'autre). Le calcul de phase, côté client (src/lib/cycle.js,
 -- src/hooks/useCycle.js), regroupe les jours contigus en blocs ; le 1er jour de
 -- chaque bloc sert de repère de cycle. Toggle côté client = insert/delete.
+-- `intensite` (nullable) ajoutée le 2026-08-29 (Palier 7) : 'leger' | 'moyen'
+-- | 'abondant', saisie par bloc côté client — voir supabase/sql/regles_intensite_setup.sql.
 create table if not exists regles (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
   date date not null,
+  intensite text,
   created_at timestamptz not null default now(),
   unique (user_id, date)
 );
@@ -872,8 +875,10 @@ alter table suggestions_manques enable row level security;
 alter table jours_exclus enable row level security;
 
 -- RLS activé sur regles dès sa création (2026-08-29), policies
--- select/insert/delete "own" (voir supabase/sql/regles_setup.sql). Pas de
--- policy update : un jour est présent ou absent, on insert/delete.
+-- select/insert/delete "own" (voir supabase/sql/regles_setup.sql). Policy
+-- update "own" ajoutée le 2026-08-29 (Palier 7) pour l'intensité du flux
+-- (voir supabase/sql/regles_intensite_setup.sql) — le reste (présence d'un
+-- jour) se fait toujours par insert/delete.
 alter table regles enable row level security;
 
 -- =============================================

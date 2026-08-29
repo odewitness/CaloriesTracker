@@ -359,17 +359,54 @@ export function microFocusForPhase(phase, cfg) {
   return PHASE_MICRO_FOCUS[phase] || []
 }
 
+// ── Palier 7 : intensité du flux ─────────────────────────────────────────
+// Pertes en fer approximatives par cycle selon l'intensité (ordre de grandeur ;
+// littérature : ~15–30 mg en moyenne, > 40 mg si abondant — voir docs §2).
+export const PERIOD_FLOW = [
+  { key: 'leger',    label: 'Léger',    ironMg: 10 },
+  { key: 'moyen',    label: 'Moyen',    ironMg: 20 },
+  { key: 'abondant', label: 'Abondant', ironMg: 35 },
+]
+export const PERIOD_FLOW_LABEL = Object.fromEntries(PERIOD_FLOW.map(f => [f.key, f.label]))
+
+// Intensité d'un bloc de règles = 1re valeur non nulle parmi ses jours.
+export function blockIntensite(block, intensiteByDate) {
+  if (!block || !intensiteByDate) return null
+  let cur = block.start
+  while (cur <= block.end) {
+    if (intensiteByDate[cur]) return intensiteByDate[cur]
+    cur = addDays(cur, 1)
+  }
+  return null
+}
+
+// Perte de fer moyenne par cycle estimée d'après les intensités renseignées
+// sur les derniers blocs. null si aucune intensité connue.
+export function estimatedIronLoss(days, intensiteByDate, window = 4) {
+  const blocks = periodBlocks(days)
+  if (!blocks.length) return null
+  const vals = blocks.slice(-window)
+    .map(b => PERIOD_FLOW.find(f => f.key === blockIntensite(b, intensiteByDate))?.ironMg)
+    .filter(v => v != null)
+  if (!vals.length) return null
+  return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length)
+}
+
 // Pour la phase courante : les nutriments à privilégier, chacun avec les
 // aliments des FAVORIS de l'utilisatrice qui en contiennent le plus (pour 100 g).
 // `favorites` = lignes de la table `favoris` (voir useFavorites). Renvoie []
 // si rien à montrer — l'appelant s'en sert aussi pour décider s'il y a du
-// contenu à déplier.
-export function cycleNutrientRows(phase, favorites, cfg, perNutrient = 6) {
+// contenu à déplier. `opts.ironLoss` (mg) nuance le conseil « fer » (Palier 7).
+export function cycleNutrientRows(phase, favorites, cfg, opts = {}) {
+  const perNutrient = opts.perNutrient || 6
   const focus = microFocusForPhase(phase, cfg)
   if (!focus.length) return []
   return focus
     .map(f => ({
       ...f,
+      hint: (f.key === 'fer' && opts.ironLoss != null)
+        ? `Environ ${opts.ironLoss} mg de fer perdus sur ce cycle. ${f.hint}`
+        : f.hint,
       foods: (favorites || [])
         .map(fav => ({
           id: fav.id,

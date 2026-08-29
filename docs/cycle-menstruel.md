@@ -332,26 +332,33 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
       `useCycle.addManyDays`.
 - [x] **Export texte** : bouton « Copier mes dates » (presse-papier, une date
       par ligne) — permet aussi de sortir les données.
-- [ ] Wrapper natif (Capacitor) → lecture Health Connect / Apple Santé alimentant
-      la table `regles`. Gros changement de nature du projet, **hors périmètre** —
-      à ne faire que sur décision explicite.
+- ~~Wrapper natif (Capacitor) → Health Connect / Apple Santé~~ — **abandonné**
+  (décision utilisatrice, 2026-08-29) : changerait la nature du projet
+  (build natif, stores). L'import/export texte couvre le besoin.
 
-### Palier 7 — Suivi de flux (idée)  ▸ statut : idée
-- [ ] Colonne `intensite` (ex. `léger` / `moyen` / `abondant`) sur `regles`,
-      saisie optionnelle par jour de règles.
-- [ ] Estimation des pertes en fer selon le flux ; nuance du conseil « fer ».
+### Palier 7 — Suivi de flux  ▸ statut : codé (branche `cycle-flux`)
+- [x] Colonne `intensite` (`leger` / `moyen` / `abondant`) sur `regles` +
+      policy `update` — `supabase/sql/regles_intensite_setup.sql`, à appliquer
+      manuellement ; `supabase_schema.sql` mis à jour.
+- [x] `useCycle` charge `date, intensite`, expose `intensiteByDate` +
+      `setDaysIntensite(arr, level)` (update en lot). Saisie **par bloc** dans
+      `CycleSection` (3 boutons Léger/Moyen/Abondant sous chaque épisode).
+- [x] `cycle.js` : `PERIOD_FLOW` (fer ≈ 10/20/35 mg par cycle), `blockIntensite`,
+      `estimatedIronLoss(days, intensiteByDate)`.
+- [x] Nuance du conseil « fer » : ligne d'estimation dans `CycleSection`, hint
+      dynamique dans la pastille de phase (`cycleNutrientRows` reçoit `ironLoss`),
+      phrase ajoutée dans `CycleInfoPage`.
+- [x] Entrée changelog
 
 ---
 
 ## 7. Reste à faire (vue rapide)
 
-Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
-1. **Palier 1** : tracking manuel + calcul de phase + affichage + annotation poids.
-2. **Palier 2** : page d'info + réglages + changelog.
-3. **Palier 3** : delta énergie lutéal + nudge macros (opt-in).
-4. **Palier 4** : suggestions micronutriments par phase.
-5. **Palier 5** : apprentissage, corrélations, suivi de flux.
-6. **Palier 6** : import CSV / Health Connect via wrapper natif.
+Paliers 1 → 6 **livrés et mergés** sur `main`. Palier 7 (intensité du flux)
+codé sur `cycle-flux`, en attente de la migration SQL + du merge.
+
+Rien de prévu au-delà. Le wrapper natif (Health Connect / Apple Santé) est
+abandonné. Toute nouvelle idée s'ajoute ici.
 
 ---
 
@@ -383,6 +390,12 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
 
 ## 9. Journal des décisions
 
+- **2026-08-29** — Palier 6 mergé sur `main` + poussé ; wrapper natif abandonné
+  (décision utilisatrice). Palier 7 codé sur la branche `cycle-flux` : colonne
+  `regles.intensite` + policy `update` (migration `regles_intensite_setup.sql` à
+  appliquer), saisie par bloc dans `CycleSection`, estimation des pertes de fer
+  (`estimatedIronLoss`), conseil « fer » nuancé. `npm run build` OK. En attente :
+  application SQL + test manuel + merge.
 - **2026-08-29** — Palier 5 mergé sur `main` + poussé. Palier 6 : le wrapper
   natif (Health Connect / Apple Santé) reste hors périmètre ; à la place, **import
   par collage de texte** + export presse-papier dans `CycleSection`

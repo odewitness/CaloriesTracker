@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { cycleInfo, cycleNutrientRows, amenorrheaNotice, PHASES, formatPredictionWindow } from '../lib/cycle'
+import { cycleInfo, cycleNutrientRows, amenorrheaNotice, estimatedIronLoss, PHASES, formatPredictionWindow } from '../lib/cycle'
 import CycleNutrientTips from './CycleNutrientTips'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -12,7 +12,7 @@ import CycleNutrientTips from './CycleNutrientTips'
 // affiche la liste « bon moment pour… ». Ne s'affiche que si le suivi de
 // cycle est activé et qu'on a au moins un jour de règles saisi.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CyclePhaseBadge({ dateStr, days, cycleSettings, kcalDelta = 0, favorites }) {
+export default function CyclePhaseBadge({ dateStr, days, cycleSettings, kcalDelta = 0, favorites, intensiteByDate }) {
   const cfg = cycleSettings || {}
   const [open, setOpen] = useState(false)
 
@@ -22,7 +22,8 @@ export default function CyclePhaseBadge({ dateStr, days, cycleSettings, kcalDelt
   const info = cycleInfo(dateStr, days, cfg)
   const phase = PHASES[info.phase] || PHASES.inconnue
 
-  const tipRows = cycleNutrientRows(info.phase, favorites, cfg)
+  const ironLoss = estimatedIronLoss(days, intensiteByDate)
+  const tipRows = cycleNutrientRows(info.phase, favorites, cfg, { ironLoss })
   const expandable = tipRows.length > 0
   const notice = amenorrheaNotice(dateStr, days, cfg)
 

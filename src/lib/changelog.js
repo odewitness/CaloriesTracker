@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Note l\'intensité de tes règles',
+    description: "Dans la liste de tes règles (Profil › Cycle & alimentation), chaque épisode a maintenant trois petits boutons : Léger, Moyen, Abondant. C'est facultatif. Si tu les renseignes, l'app estime la quantité de fer que tu perds en moyenne par cycle et te le rappelle, pour que tu penses aux aliments riches en fer au bon moment.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Coller une liste de dates de règles',
     description: "Pour ne pas avoir à tout retaper jour par jour sur le calendrier, tu peux maintenant coller une liste de dates dans Profil › Cycle & alimentation (bouton « Coller une liste de dates »). Une date par ligne, plusieurs formats acceptés (2026-08-03, 03/08/2026, 3/8/26) et même des plages du type « 03/08/2026 - 07/08/2026 ». L'app te dit combien de jours seront ajoutés avant que tu valides. Un bouton « Copier mes dates » fait l'inverse si tu veux récupérer ta liste ailleurs.",
   },

@@ -6,7 +6,8 @@ import { useCycle } from '../../hooks/useCycle'
 import { fmt, todayStr } from '../../lib/dates'
 import {
   cycleInfo, phasesForRange, PHASES, formatPredictionWindow, formatDateRange,
-  cycleRegularity, amenorrheaNotice, parsePeriodDatesInput, addDays, daysBetween,
+  cycleRegularity, amenorrheaNotice, parsePeriodDatesInput,
+  PERIOD_FLOW, blockIntensite, estimatedIronLoss, addDays, daysBetween,
 } from '../../lib/cycle'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18,8 +19,9 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
   const cfg = cycle || {}
-  const { days, blocks, loading, toggleDay, removeDays, addManyDays } = useCycle()
+  const { days, blocks, intensiteByDate, loading, toggleDay, removeDays, addManyDays, setDaysIntensite } = useCycle()
   const [monthAnchor, setMonthAnchor] = useState(new Date())
+  const ironLoss = useMemo(() => estimatedIronLoss(days, intensiteByDate), [days, intensiteByDate])
 
   // Import / export texte (Palier 6)
   const [importOpen, setImportOpen] = useState(false)
@@ -65,11 +67,16 @@ export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
     })).reverse()
   ), [blocks])
 
-  const removeBlock = (b) => {
+  const blockDays = (b) => {
     const list = []
     let cur = b.start
     while (cur <= b.end) { list.push(cur); cur = addDays(cur, 1) }
-    removeDays(list)
+    return list
+  }
+  const removeBlock = (b) => removeDays(blockDays(b))
+  const setBlockIntensite = (b, level) => {
+    const current = blockIntensite(b, intensiteByDate)
+    setDaysIntensite(blockDays(b), current === level ? null : level)
   }
 
   const enabled = !!cfg.enabled
@@ -207,23 +214,49 @@ export default function CycleSection({ cycle, onPatch, onOpenInfo, onBack }) {
           />
 
           {!loading && rows.length > 0 && (
-            <div className="card" style={{ marginBottom: 16, overflow: 'hidden' }}>
-              {rows.map((b) => (
-                <div key={b.start} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid var(--border)' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--coral)', flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{formatDateRange(b.start, b.end)}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>
-                      {b.length} jour{b.length > 1 ? 's' : ''}{b.gap != null ? ` · cycle de ${b.gap} j` : ''}
+            <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>
+              {rows.map((b) => {
+                const intens = blockIntensite(b, intensiteByDate)
+                return (
+                  <div key={b.start} style={{ padding: '11px 16px', borderBottom: '0.5px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--coral)', flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{formatDateRange(b.start, b.end)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>
+                          {b.length} jour{b.length > 1 ? 's' : ''}{b.gap != null ? ` · cycle de ${b.gap} j` : ''}
+                        </div>
+                      </div>
+                      <button onClick={() => removeBlock(b)} aria-label="Supprimer" style={{ padding: 4, color: 'var(--text-hint)', background: 'none' }}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8, marginLeft: 16 }}>
+                      {PERIOD_FLOW.map(f => (
+                        <button
+                          key={f.key}
+                          onClick={() => setBlockIntensite(b, f.key)}
+                          className="chip"
+                          style={{
+                            flex: 1, textAlign: 'center', padding: '4px 6px', fontSize: 10.5,
+                            background: intens === f.key ? 'var(--coral)' : 'var(--gray-bg)',
+                            color: intens === f.key ? 'white' : 'var(--text-muted)',
+                          }}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <button onClick={() => removeBlock(b)} aria-label="Supprimer" style={{ padding: 4, color: 'var(--text-hint)', background: 'none' }}>
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
+
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
+            Indique l'intensité de chaque épisode de règles (facultatif).
+            {ironLoss != null && ` D'après tes règles récentes, environ ${ironLoss} mg de fer perdus par cycle — pense aux aliments riches en fer autour de tes règles.`}
+          </div>
 
           {/* Ajustement des calories (Palier 3, opt-in) */}
           <div className="section-title">Calories</div>

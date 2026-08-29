@@ -6,71 +6,112 @@ import { periodBlocks, periodStarts } from '../lib/cycle'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useCycle — jours de règles saisis à la main (table `regles`). UNE LIGNE =
-// UN JOUR. Le calcul de phase se fait côté client à partir de la liste
-// complète (voir src/lib/cycle.js) : quelques dizaines de lignes par an,
-// négligeable, donc on charge tout.
+// UN JOUR, avec une `intensite` optionnelle ('leger'|'moyen'|'abondant',
+// Palier 7). Le calcul de phase se fait côté client à partir de la liste
+// complète (voir src/lib/cycle.js).
 //
-// toggleDay(date) : ajoute le jour s'il est absent, le retire sinon
-// (insert/delete, jamais d'update — même esprit que useExcludedDay).
-// removeDays(arr) : retire un lot de jours en une requête (supprimer un bloc).
+// toggleDay(date)          : ajoute/retire un jour (insert/delete).
+// addManyDays(arr)         : import en lot (insert).
+// removeDays(arr)          : retire un lot (delete).
+// setDaysIntensite(arr, l) : met l'intensité sur un lot de jours (update).
 // ─────────────────────────────────────────────────────────────────────────────
 export function useCycle() {
   const { user } = useAuth()
-  const [days, setDays] = useState([]) // ['YYYY-MM-DD', ...] triées croissant
+  const [rows, setRows] = useState([]) // [{ date:'YYYY-MM-DD', intensite:string|null }]
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    if (!user) { setDays([]); setLoading(false); return }
+    if (!user) { setRows([]); setLoading(false); return }
     setLoading(true)
     const { data } = await supabase
       .from('regles')
-      .select('date')
+      .select('date, intensite')
       .eq('user_id', user.id)
       .order('date', { ascending: true })
-    setDays((data || []).map(r => r.date))
+    setRows(data || [])
     setLoading(false)
   }, [user])
 
   useEffect(() => { load() }, [load])
 
-  const sortDedupe = (arr) => [...new Set(arr)].sort()
+  const sortRows = (arr) => {
+    const seen = new Set()
+    return [...arr]
+      .filter(r => (seen.has(r.date) ? false : seen.add(r.date)))
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  const days = useMemo(() => rows.map(r => r.date), [rows])
+  const intensiteByDate = useMemo(
+    () => Object.fromEntries(rows.map(r => [r.date, r.intensite || null])),
+    [rows],
+  )
+  const blocks = useMemo(() => periodBlocks(days), [days])
+  const starts = useMemo(() => periodStarts(days), [days])
 
   const addDay = async (date) => {
     if (!user) return { error: 'Non connecté' }
     const dateStr = fmt(date)
-    setDays(d => sortDedupe([...d, dateStr]))
+    setRows(r => sortRows([...r, { date: dateStr, intensite: null }]))
     const { error } = await supabase
       .from('regles')
       .insert([{ user_id: user.id, date: dateStr }])
-    if (error) setDays(d => d.filter(x => x !== dateStr))
+    if (error) setRows(r => r.filter(x => x.date !== dateStr))
     return { error }
   }
 
   const removeDay = async (date) => {
     if (!user) return { error: 'Non connecté' }
     const dateStr = fmt(date)
-    const prev = days
-    setDays(d => d.filter(x => x !== dateStr))
+    const prev = rows
+    setRows(r => r.filter(x => x.date !== dateStr))
     const { error } = await supabase
       .from('regles')
       .delete()
       .eq('user_id', user.id)
       .eq('date', dateStr)
-    if (error) setDays(prev)
+    if (error) setRows(prev)
     return { error }
   }
 
   const removeDays = async (dateArr) => {
     if (!user) return { error: 'Non connecté' }
     const set = new Set(dateArr.map(fmt))
-    const prev = days
-    setDays(d => d.filter(x => !set.has(x)))
+    const prev = rows
+    setRows(r => r.filter(x => !set.has(x.date)))
     const { error } = await supabase
       .from('regles')
       .delete()
       .eq('user_id', user.id)
       .in('date', [...set])
-    if (error) setDays(prev)
+    if (error) setRows(prev)
+    return { error }
+  }
+
+  const addManyDays = async (dateArr) => {
+    if (!user) return { error: 'Non connecté', added: 0 }
+    const known = new Set(days)
+    const clean = [...new Set(dateArr.map(fmt))].filter(d => !known.has(d))
+    if (!clean.length) return { error: null, added: 0 }
+    setRows(r => sortRows([...r, ...clean.map(d => ({ date: d, intensite: null }))]))
+    const { error } = await supabase
+      .from('regles')
+      .insert(clean.map(d => ({ user_id: user.id, date: d })))
+    if (error) setRows(r => r.filter(x => !clean.includes(x.date)))
+    return { error, added: error ? 0 : clean.length }
+  }
+
+  const setDaysIntensite = async (dateArr, level) => {
+    if (!user) return { error: 'Non connecté' }
+    const set = new Set(dateArr.map(fmt))
+    const prev = rows
+    setRows(r => r.map(x => (set.has(x.date) ? { ...x, intensite: level || null } : x)))
+    const { error } = await supabase
+      .from('regles')
+      .update({ intensite: level || null })
+      .eq('user_id', user.id)
+      .in('date', [...set])
+    if (error) setRows(prev)
     return { error }
   }
 
@@ -79,22 +120,9 @@ export function useCycle() {
     return days.includes(dateStr) ? removeDay(dateStr) : addDay(dateStr)
   }
 
-  // Import en lot (Palier 6) : n'insère que les jours pas déjà présents,
-  // en une seule requête. Renvoie le nombre effectivement ajouté.
-  const addManyDays = async (dateArr) => {
-    if (!user) return { error: 'Non connecté', added: 0 }
-    const clean = sortDedupe(dateArr.map(fmt)).filter(d => !days.includes(d))
-    if (!clean.length) return { error: null, added: 0 }
-    setDays(d => sortDedupe([...d, ...clean]))
-    const { error } = await supabase
-      .from('regles')
-      .insert(clean.map(d => ({ user_id: user.id, date: d })))
-    if (error) setDays(d => d.filter(x => !clean.includes(x)))
-    return { error, added: error ? 0 : clean.length }
+  return {
+    days, blocks, starts, intensiteByDate, loading,
+    addDay, removeDay, removeDays, addManyDays, setDaysIntensite, toggleDay,
+    refetch: load,
   }
-
-  const blocks = useMemo(() => periodBlocks(days), [days])
-  const starts = useMemo(() => periodStarts(days), [days])
-
-  return { days, blocks, starts, loading, addDay, removeDay, removeDays, addManyDays, toggleDay, refetch: load }
 }
