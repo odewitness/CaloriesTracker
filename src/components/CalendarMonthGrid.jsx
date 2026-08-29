@@ -17,7 +17,7 @@ export const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 // Construit la grille du mois : jours du mois précédent/suivant en padding
 // pour compléter les semaines (lundi = premier jour, convention FR).
-function buildMonthCells(monthDate) {
+export function buildMonthCells(monthDate) {
   const year = monthDate.getFullYear()
   const month = monthDate.getMonth()
   const firstOfMonth = new Date(year, month, 1)
