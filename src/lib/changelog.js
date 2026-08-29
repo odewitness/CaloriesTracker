@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Ton historique fait peau neuve',
+    description: "La page Historique a été repensée. Un graphique montre tes calories jour par jour (ou mois par mois sur l'année) avec ta ligne d'objectif : touche une barre pour sauter au détail de ce jour. Tu peux superposer ta courbe de poids à tes calories. Un calendrier colore chaque journée selon que tu étais dans l'objectif ou au-dessus, pour voir ta régularité d'un coup d'œil. Et tu retrouves ton bilan par rapport à l'objectif, ta comparaison avec la période précédente, ta répartition moyenne par repas, ton profil par jour de semaine et tes aliments les plus fréquents. L'onglet « Jour » a été retiré : pour revoir une journée précise, ouvre-la depuis le calendrier en haut de la page du jour.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Ton profil est réorganisé',
     description: "Fini le long défilement : ton profil s'ouvre maintenant sur une liste claire. Tu choisis ce que tu veux régler — tes informations, tes objectifs, la répartition par repas, l'hydratation, les notifications, ce qui s'affiche sur la page du jour — et tu entres dans un écran dédié, juste pour ça. Chaque ligne te montre déjà l'essentiel (ton objectif de calories, ton objectif d'eau…). Le calculateur de besoins caloriques est rangé dans « Objectifs nutritionnels », derrière un bouton, pour ne le sortir que quand tu en as besoin. Rien n'a disparu, tout est simplement mieux rangé.",
   },
