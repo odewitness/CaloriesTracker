@@ -16,31 +16,41 @@ const BASELINE = HEIGHT - PAD_BOTTOM
 const WEEKDAY_INITIAL = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 
-// Graphique de tendance des calories de la période affichée.
-//   - Semaine / Mois : un histogramme, une barre par jour calendaire, couleur
-//     selon l'objectif (dayStatus), barre creuse pour un jour exclu, point gris
-//     à la base pour un jour non tracké, ligne d'objectif en pointillés.
-//   - Année : une courbe lissée, un point par mois loggé (moyenne kcal/j).
-// Taper une barre / un point → sélection : la ligne de lecture au-dessus du
-// graphe affiche la date, les calories (ou « non tracké ») et le poids relevé
-// le plus proche. « Détail » saute à la carte correspondante plus bas.
-// weightPoints : [{ key, value }] — key = dateStr (barres) ou 'YYYY-MM' (courbe).
+// Graphique de tendance des calories — un histogramme dans tous les cas :
+//   - Semaine / Mois : une barre par jour calendaire.
+//   - Année : une barre par mois (moyenne kcal/j du mois).
+// Couleur selon l'objectif (dayStatus), barre creuse pour un jour/mois exclu,
+// point gris à la base pour une période non tracée, ligne d'objectif pointillée.
+// Taper une barre → sélection : la ligne de lecture au-dessus affiche la date,
+// les calories (ou « non tracké ») et le poids relevé le plus proche.
+// « Détail ↓ » saute à la carte correspondante plus bas.
+// weightPoints : [{ key, value }] — key = dateStr (jour) ou 'YYYY-MM' (mois).
 export default function CalorieTrendChart({
   tab, bounds, days, goalKcal, excludedDates,
   monthSummaries = [], avgKcal,
   weightPoints = [], showWeight, onToggleWeight, onJumpToDetail,
 }) {
   const gradId = useId()
-  const variant = tab === 'annee' ? 'line' : 'bars'
+  const isYear = tab === 'annee'
   const today = todayStr()
 
-  // ── Points de données ────────────────────────────────────────────────────
+  // ── Barres (jour ou mois) ────────────────────────────────────────────────
   const points = useMemo(() => {
-    if (variant === 'line') {
-      return monthSummaries
-        .slice()
-        .sort((a, b) => a.key.localeCompare(b.key))
-        .map(m => ({ key: m.key, value: m.avgKcal, label: m.label, excluded: false, untracked: false }))
+    if (isYear) {
+      const year = bounds.start.slice(0, 4)
+      const curMonth = today.slice(0, 7)
+      return Array.from({ length: 12 }, (_, m) => {
+        const key = `${year}-${String(m + 1).padStart(2, '0')}`
+        const ms = monthSummaries.find(s => s.key === key)
+        return {
+          key,
+          value: ms ? ms.avgKcal : 0,
+          label: new Date(key + '-01T12:00:00').toLocaleDateString('fr-FR', { month: 'long' }),
+          excluded: false,
+          untracked: !ms && key <= curMonth,
+          future: key > curMonth,
+        }
+      })
     }
     return eachDay(bounds.start, bounds.end).map(dStr => {
       const es = days[dStr] || []
@@ -56,17 +66,16 @@ export default function CalorieTrendChart({
         weekdayIdx: (d.getDay() + 6) % 7,
       }
     })
-  }, [variant, bounds.start, bounds.end, days, excludedDates, monthSummaries, today])
+  }, [isYear, bounds.start, bounds.end, days, excludedDates, monthSummaries, today])
 
   const withData = points.filter(p => p.value > 0)
   const maxVal = Math.max(goalKcal, ...points.map(p => p.value), 1) * 1.12
   const yFor = (v) => PAD_TOP + (1 - v / maxVal) * PLOT_H
   const goalY = yFor(goalKcal)
-  const xForBar = (i) => PAD_L + (i + 0.5) * (PLOT_W / points.length)
-  const xForLine = (i) => PAD_L + (points.length === 1 ? PLOT_W / 2 : (i / (points.length - 1)) * PLOT_W)
-  const xFor = (i) => (variant === 'line' ? xForLine(i) : xForBar(i))
+  const slotW = PLOT_W / points.length
+  const xFor = (i) => PAD_L + (i + 0.5) * slotW
 
-  // ── Sélection : dernier point renseigné par défaut ───────────────────────
+  // ── Sélection : dernière barre renseignée par défaut ─────────────────────
   const defaultKey = useMemo(() => {
     for (let i = points.length - 1; i >= 0; i--) if (points[i].value > 0) return points[i].key
     return points.length ? points[points.length - 1].key : null
@@ -98,7 +107,7 @@ export default function CalorieTrendChart({
       const dist = Math.abs(new Date(norm(w.key) + 'T12:00:00').getTime() - target)
       if (dist < bestD) { bestD = dist; best = w }
     }
-    const maxDist = (variant === 'line' ? 31 : 21) * 86400000
+    const maxDist = (isYear ? 31 : 21) * 86400000
     return best && bestD <= maxDist ? best : null
   }
 
@@ -114,30 +123,15 @@ export default function CalorieTrendChart({
   }, [showWeight, canWeight, points, weightByKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const weightPath = smoothPath(weightCoords)
 
-  // ── Jours / mois non tracés ────────────────────────────────────────────
-  const untrackedCount = useMemo(() => {
-    if (variant === 'bars') return points.filter(p => p.untracked && !p.excluded).length
-    const year = bounds.start.slice(0, 4)
-    const curMonth = today.slice(0, 7)
-    let c = 0
-    for (let m = 1; m <= 12; m++) {
-      const k = `${year}-${String(m).padStart(2, '0')}`
-      if (k > curMonth) break
-      if (!monthSummaries.some(s => s.key === k)) c++
-    }
-    return c
-  }, [variant, points, bounds.start, today, monthSummaries])
-
-  const enoughForLine = variant === 'line' && withData.length >= 2
-  const enoughForBars = variant === 'bars' && withData.length >= 1
-  const hasChart = enoughForBars || enoughForLine
+  const untrackedCount = points.filter(p => p.untracked && !p.excluded).length
+  const hasChart = withData.length >= 1
 
   // ── Ligne de lecture du point sélectionné ───────────────────────────────
   const selLabel = !sel ? '—'
-    : variant === 'line' ? cap(sel.label)
+    : isYear ? cap(sel.label)
     : cap(new Date(sel.key + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }))
   const selKcalTxt = !sel ? '—'
-    : sel.value > 0 ? `${Math.round(sel.value)} kcal${variant === 'line' ? '/j' : ''}`
+    : sel.value > 0 ? `${Math.round(sel.value)} kcal${isYear ? '/j' : ''}`
     : sel.future ? 'à venir' : 'non tracké'
   const selKcalColor = sel && sel.value > 0 ? STATUS_COLOR[dayStatus(sel.value, goalKcal)] : 'var(--text-hint)'
   const selWeight = sel ? weightNear(sel.key) : null
@@ -174,7 +168,7 @@ export default function CalorieTrendChart({
               {selWeight.value} kg
               {selWeight.key !== sel.key && (
                 <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>
-                  {' '}(relevé {variant === 'line'
+                  {' '}(relevé {isYear
                     ? new Date(selWeight.key + '-15T12:00:00').toLocaleDateString('fr-FR', { month: 'short' })
                     : new Date(selWeight.key + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})
                 </span>
@@ -209,15 +203,15 @@ export default function CalorieTrendChart({
             <line x1={xFor(selIndex)} y1={PAD_TOP - 4} x2={xFor(selIndex)} y2={BASELINE} stroke="var(--text)" strokeWidth="1" strokeDasharray="2 3" opacity="0.35" />
           )}
 
-          {variant === 'bars' && points.map((p, i) => {
-            const slotW = PLOT_W / points.length
+          {points.map((p, i) => {
             const barW = Math.max(3, slotW * 0.6)
-            const cx = xForBar(i)
+            const cx = xFor(i)
             const top = p.value > 0 ? yFor(p.value) : BASELINE
             const h = Math.max(0, BASELINE - top)
             const color = STATUS_COLOR[dayStatus(p.value, goalKcal)]
             const isSel = p.key === selectedKey
-            const showLabel = tab === 'semaine' || p.dayNum === 1 || p.dayNum % 5 === 0
+            const showLabel = isYear || tab === 'semaine' || p.dayNum === 1 || p.dayNum % 5 === 0
+            const labelText = isYear ? p.label.slice(0, 3) : (tab === 'semaine' ? WEEKDAY_INITIAL[p.weekdayIdx] : p.dayNum)
             return (
               <g key={p.key} onClick={() => setSelectedKey(p.key)} style={{ cursor: 'pointer' }}>
                 <rect x={cx - slotW / 2} y={PAD_TOP} width={slotW} height={PLOT_H} fill="transparent" />
@@ -237,37 +231,11 @@ export default function CalorieTrendChart({
                   <rect x={cx - barW / 2 - 1.5} y={top - 1.5} width={barW + 3} height={h + 1.5} rx={3} fill="none" stroke="var(--text)" strokeWidth="1" opacity="0.4" />
                 )}
                 {showLabel && (
-                  <text x={cx} y={HEIGHT - 7} fontSize="9" fill="var(--text-hint)" textAnchor="middle">
-                    {tab === 'semaine' ? WEEKDAY_INITIAL[p.weekdayIdx] : p.dayNum}
-                  </text>
+                  <text x={cx} y={HEIGHT - 7} fontSize="9" fill="var(--text-hint)" textAnchor="middle">{labelText}</text>
                 )}
               </g>
             )
           })}
-
-          {variant === 'line' && (() => {
-            const coords = points.map((p, i) => ({ x: xForLine(i), y: yFor(p.value) }))
-            const path = smoothPath(coords)
-            const area = `${path} L ${coords[coords.length - 1].x.toFixed(1)} ${BASELINE} L ${coords[0].x.toFixed(1)} ${BASELINE} Z`
-            return (
-              <>
-                <path d={area} fill={`url(#${gradId})`} stroke="none" />
-                <path d={path} fill="none" stroke="var(--green)" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
-                {points.map((p, i) => {
-                  const isSel = p.key === selectedKey
-                  return (
-                    <g key={p.key} onClick={() => setSelectedKey(p.key)} style={{ cursor: 'pointer' }}>
-                      <circle cx={coords[i].x} cy={coords[i].y} r={11} fill="transparent" />
-                      <circle cx={coords[i].x} cy={coords[i].y} r={isSel ? 4.5 : 2.5} fill={isSel ? 'var(--green)' : 'var(--white)'} stroke="var(--green)" strokeWidth="1.5" />
-                      <text x={coords[i].x} y={HEIGHT - 7} fontSize="9" fill="var(--text-hint)" textAnchor="middle">
-                        {p.label?.slice(0, 3)}
-                      </text>
-                    </g>
-                  )
-                })}
-              </>
-            )
-          })()}
 
           {/* Superposition poids */}
           {showWeight && canWeight && weightCoords.length >= 2 && (
@@ -281,24 +249,25 @@ export default function CalorieTrendChart({
         </svg>
       ) : (
         <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 12.5, color: 'var(--text-hint)' }}>
-          {variant === 'line'
-            ? 'Encore un mois loggé et la courbe apparaîtra ici.'
-            : 'Logge une journée pour voir apparaître le graphique.'}
+          {isYear ? 'Aucun mois loggé sur cette année.' : 'Logge une journée pour voir apparaître le graphique.'}
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: 'var(--text-hint)', marginTop: 2, gap: 8 }}>
-        <span>Ligne pointillée = objectif {goalKcal} kcal{variant === 'bars' && untrackedCount > 0 ? ' · point gris = jour non tracké' : ''}</span>
+        <span>
+          Ligne pointillée = objectif {goalKcal} kcal
+          {untrackedCount > 0 ? ` · point gris = ${isYear ? 'mois' : 'jour'} non tracké` : ''}
+        </span>
         {showWeight && canWeight && shownWeights.length >= 2 && (
           <span style={{ color: 'var(--purple)', fontWeight: 600, whiteSpace: 'nowrap' }}>Poids {wMin}–{wMax} kg</span>
         )}
       </div>
       {hasChart && untrackedCount > 0 && (
         <div style={{ fontSize: 10, marginTop: 4, color: showWeight ? 'var(--coral)' : 'var(--text-hint)' }}>
-          {variant === 'bars'
-            ? `${untrackedCount} jour${untrackedCount > 1 ? 's' : ''} non tracké${untrackedCount > 1 ? 's' : ''} sur la période`
-            : `${untrackedCount} mois sans aucun suivi`}
-          {showWeight ? ' — tes calories réelles étaient sûrement plus élevées ces jours-là.' : '.'}
+          {isYear
+            ? `${untrackedCount} mois sans aucun suivi`
+            : `${untrackedCount} jour${untrackedCount > 1 ? 's' : ''} non tracké${untrackedCount > 1 ? 's' : ''} sur la période`}
+          {showWeight ? ' — tes calories réelles étaient sûrement plus élevées.' : '.'}
         </div>
       )}
     </div>
