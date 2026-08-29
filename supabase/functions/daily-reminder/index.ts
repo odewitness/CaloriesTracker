@@ -82,6 +82,9 @@ Deno.serve(async (req) => {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', row.user_id)
       .eq('date', today)
+      // L'hydratation a ses propres rappels (water-reminder) : n'avoir loggé
+      // que de l'eau ne doit pas masquer le rappel "tu n'as rien noté".
+      .neq('meal', 'Hydratation')
 
     let title: string | null = null
     let body = ''
