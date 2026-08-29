@@ -73,10 +73,10 @@ export default function SupplementSection({ supplements, plannedSupplements = []
   }
 
   return (
-    <div style={{ marginTop: 20 }}>
+    <div className="card" style={{ marginTop: 20, overflow: 'hidden' }}>
       {/* Header */}
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed ? 0 : 8 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px' }}
       >
         <button
           onClick={() => setCollapsed(c => !c)}
@@ -118,7 +118,7 @@ export default function SupplementSection({ supplements, plannedSupplements = []
       </div>
 
       {plannedSupplements.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
+        <div style={{ padding: '0 14px 8px' }}>
           {plannedSupplements.map(r => {
             const item = (r.items || [])[0]
             const missed = !r.mange && r.date < todayStr
@@ -175,12 +175,8 @@ export default function SupplementSection({ supplements, plannedSupplements = []
       )}
 
       {!collapsed && (
-        <div style={{
-          background: 'var(--white)',
-          border: '0.5px solid var(--border)',
-          borderRadius: 'var(--radius-sm, 12px)',
-          overflow: 'hidden',
-        }}>
+        <>
+          <div className="divider" />
           {supplements.length === 0 ? (
             <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-hint)', textAlign: 'center' }}>
               Aucun complément aujourd'hui
@@ -219,7 +215,7 @@ export default function SupplementSection({ supplements, plannedSupplements = []
               </div>
             ))
           )}
-        </div>
+        </>
       )}
     </div>
   )
