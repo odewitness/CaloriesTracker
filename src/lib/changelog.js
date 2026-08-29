@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Des raccourcis rapides sur la page du jour',
+    description: "Touche le bouton « ⋯ » (trois points) en haut à droite, à côté de la date, pour dérouler une petite rangée de raccourcis pour le jour affiché. « Exclure » retire ce jour de tes moyennes et de ta série en cours (« Réinclure » pour annuler). « Relevé » ouvre ta page poids et mensurations. « Planifier » te laisse prévoir un repas sur ce jour. « Partager » envoie ta journée à tes amies. La rangée reste repliée tant que tu ne l'ouvres pas.",
+  },
+  {
+    date: '2026-08-29',
     title: "La liste des boissons ne montre plus que les eaux",
     description: "Quand tu ouvres « Autre boisson » depuis la carte Eau, la liste ne t'affiche plus que les eaux (robinet, source, minérales) au lieu de tout mélanger avec les sodas, jus et sirops. Les autres boissons restent là : tape leur nom dans la barre de recherche pour les retrouver. La section Compléments a aussi un fond blanc, comme la carte Eau.",
   },

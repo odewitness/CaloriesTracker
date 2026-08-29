@@ -20,7 +20,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { getLatestChangelogKey } from './lib/changelog'
 import { useFriends } from './hooks/useFriends'
 import { useSocialNotifications } from './hooks/useSocialNotifications'
-import { TodayHeaderProvider, useTodayHeaderInfo } from './lib/TodayHeaderContext'
+import { TodayHeaderProvider, useTodayHeaderInfo, useTodayShortcuts } from './lib/TodayHeaderContext'
 import { fmt, dateLabel } from './lib/dates'
 
 const WHATSNEW_SEEN_KEY = 'whatsnew_last_seen'
@@ -122,6 +122,18 @@ function ExplorerButtonIcon() {
   )
 }
 
+// Trois points : bascule de la barre de raccourcis du jour (exclure le jour,
+// relevé poids, planifier un repas…). Uniquement visible sur la page du jour.
+function QuickActionsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  )
+}
+
 function SocialButtonIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -163,6 +175,8 @@ function HeaderDateBlock() {
 function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClick, onExplorerClick, hasUnreadNews, hasFriendRequests, hidden }) {
   const { user } = useAuth()
   const { profile } = useProfile()
+  const { active: onTodayPage } = useTodayHeaderInfo()
+  const { open: shortcutsOpen, toggle: toggleShortcuts } = useTodayShortcuts()
   const initials = ((profile?.prenom?.[0] || '') + (profile?.nom?.[0] || '')).toUpperCase()
     || (user?.email?.[0] || '').toUpperCase()
 
@@ -170,6 +184,16 @@ function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClic
     <div className={`top-bar${hidden ? ' top-bar-hidden' : ''}`}>
       <HeaderDateBlock />
       <div className="top-bar-icons">
+        {onTodayPage && (
+          <button
+            className={`profile-avatar-btn${shortcutsOpen ? ' profile-avatar-btn-on' : ''}`}
+            onClick={toggleShortcuts}
+            aria-label="Raccourcis du jour"
+            aria-pressed={shortcutsOpen}
+          >
+            <QuickActionsIcon />
+          </button>
+        )}
         <button className="profile-avatar-btn" onClick={onExplorerClick} aria-label="Explorer les aliments">
           <ExplorerButtonIcon />
         </button>
@@ -215,6 +239,20 @@ function AppShell() {
   // React capture les events des descendants avec onScrollCapture).
   const [headerHidden, setHeaderHidden] = useState(false)
   const lastScrollTop = useRef(0)
+  // Le header (.top-bar) est un enfant flex DANS LE FLUX : le rétracter agrandit
+  // la zone qui scrolle (clientHeight ↑ → maxScroll ↓). Quand on est près du
+  // bas, le navigateur ré-abaisse alors scrollTop de force pour rester dans les
+  // bornes, ce qui émet des events scroll parasites au signe inversé → le
+  // header re-apparaît → la zone rétrécit → nouvel ajustement → clignotement.
+  // On neutralise ce cycle : après tout basculement, on ignore la DIRECTION du
+  // scroll pendant la durée de la transition CSS (.22s).
+  const suppressDirUntil = useRef(0)
+
+  const setHeaderHiddenSafe = (v) => {
+    if (headerHidden === v) return
+    suppressDirUntil.current = Date.now() + 260
+    setHeaderHidden(v)
+  }
 
   // On repart d'un header visible et d'un scroll à 0 à chaque changement
   // d'onglet, pour éviter un état incohérent avec la position de scroll
@@ -222,20 +260,22 @@ function AppShell() {
   useEffect(() => {
     setHeaderHidden(false)
     lastScrollTop.current = 0
+    suppressDirUntil.current = 0
   }, [activePath])
 
   const handleScroll = (e) => {
-    // scrollTop est bridé à [0, scrollHeight - clientHeight] : le rebond
-    // élastique en fin de scroll (trackpad/iOS) le fait sinon osciller
-    // au-delà de ces bornes, ce qui inverse le signe du delta en rafale
-    // et fait trembler le header (il se cache/réapparaît en boucle).
     const maxScroll = Math.max(0, e.target.scrollHeight - e.target.clientHeight)
+    // scrollTop bridé à [0, maxScroll] : le rebond élastique (trackpad/iOS) le
+    // fait sinon osciller au-delà de ces bornes, inversant le signe du delta.
     const top = Math.min(Math.max(e.target.scrollTop, 0), maxScroll)
     const delta = top - lastScrollTop.current
-    if (top <= 4) setHeaderHidden(false)        // tout en haut → toujours visible
-    else if (delta > 6) setHeaderHidden(true)    // scroll vers le bas → se cache
-    else if (delta < -6) setHeaderHidden(false)  // scroll vers le haut → réapparaît
-    lastScrollTop.current = top
+    lastScrollTop.current = top   // toujours à jour, même pendant la fenêtre de neutralisation
+
+    if (top <= 4) { setHeaderHiddenSafe(false); return }   // tout en haut → toujours visible
+    if (Date.now() < suppressDirUntil.current) return       // transition en cours → on ignore la direction
+    if (maxScroll - top <= 12) return                       // collé au bas → zone de rebond, on ne bascule pas
+    if (delta > 6) setHeaderHiddenSafe(true)                // scroll vers le bas → se cache
+    else if (delta < -6) setHeaderHiddenSafe(false)         // scroll vers le haut → réapparaît
   }
 
   const goToTab = (path) => { if (activePath !== path) navigate(path) }

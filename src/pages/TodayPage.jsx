@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Share2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import TodayOverviewCard from '../components/TodayOverviewCard'
 import NutrientPanel from '../components/NutrientPanel'
 import MealSection from '../components/MealSection'
@@ -15,7 +15,8 @@ import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import ShareJournalModal from '../components/ShareJournalModal'
 import TodayGapsSection from '../components/TodayGapsSection'
-import ExcludeDayBanner from '../components/ExcludeDayBanner'
+import DayShortcutsBar from '../components/DayShortcutsBar'
+import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
@@ -29,7 +30,7 @@ import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, mar
 import { computeMealTargets, computeTotals, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { fmt, dateLabel } from '../lib/dates'
-import { useSetTodayHeaderInfo } from '../lib/TodayHeaderContext'
+import { useSetTodayHeaderInfo, useTodayShortcuts } from '../lib/TodayHeaderContext'
 
 function dateOffset(base, days) {
   const d = new Date(base)
@@ -53,6 +54,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const [templateAddMeal, setTemplateAddMeal] = useState(null)    // nom du repas | null — ajout d'un repas type à ce repas
   const [templateCreateMeal, setTemplateCreateMeal] = useState(null) // nom du repas | null — création d'un repas type depuis ce repas
   const [waterSheetOpen, setWaterSheetOpen] = useState(false)
+  const [planMealOpen, setPlanMealOpen] = useState(false)
+  const { open: shortcutsOpen } = useTodayShortcuts()
 
   const waterEntries = useMemo(() => entries.filter(isWaterEntry), [entries])
   const waterCfg = settings.water
@@ -192,7 +195,15 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   WebkitOverflowScrolling: 'touch',     // ← momentum scroll iOS
 }}>
       <>
-        <ExcludeDayBanner excluded={excluded} onToggle={toggleExcluded} />
+        {shortcutsOpen && (
+          <DayShortcutsBar
+            excluded={excluded}
+            onToggleExcluded={toggleExcluded}
+            onPlanMeal={() => setPlanMealOpen(true)}
+            onShare={() => setShareTarget({ meal: null, entries })}
+            canShare={entries.length > 0}
+          />
+        )}
         <TodayOverviewCard
           consumed={totals.kcal}
           goal={settings.goal_kcal}
@@ -225,17 +236,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         )}
 
         <div style={{ marginTop: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div className="section-title" style={{ marginBottom: 0 }}>Repas du jour</div>
-            {entries.length > 0 && (
-              <button
-                onClick={() => setShareTarget({ meal: null, entries })}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--text-hint)', padding: '4px 2px' }}
-              >
-                <Share2 size={13} /> Partager ma journée
-              </button>
-            )}
-          </div>
+          <div className="section-title">Repas du jour</div>
           {MEALS.map(m => (
             <MealSection
               key={m}
@@ -290,6 +291,15 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onDelete={handleDelete}
           onClose={() => setWaterSheetOpen(false)}
         />
+      )}
+
+      {planMealOpen && createPortal(
+        <PlanMealModal
+          defaultDate={date}
+          onClose={() => setPlanMealOpen(false)}
+          onPlanned={refetchPlanifies}
+        />,
+        document.body
       )}
 
       {shareTarget && (
