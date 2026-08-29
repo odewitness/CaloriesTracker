@@ -205,17 +205,6 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         />
         <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} />
 
-        {settings.water?.card_visible !== false && (
-          <WaterSection
-            entries={waterEntries}
-            water={waterCfg}
-            beverageName={defaultBeverage?.alim_nom}
-            onQuickAdd={handleWaterQuickAdd}
-            onUndo={handleWaterUndo}
-            onOpenSheet={() => setWaterSheetOpen(true)}
-          />
-        )}
-
         {/* Uniquement sur le jour réellement affiché (le texte de la bande et
             les favoris/récents qu'elle charge n'ont de sens que pour
             "aujourd'hui" au sens propre, pas un slot voisin visité en
@@ -279,6 +268,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
           onOpenPlannedSource={onOpenSource}
         />
+
+        {settings.water?.card_visible !== false && (
+          <WaterSection
+            entries={waterEntries}
+            water={waterCfg}
+            beverageName={defaultBeverage?.alim_nom}
+            onQuickAdd={handleWaterQuickAdd}
+            onUndo={handleWaterUndo}
+            onOpenSheet={() => setWaterSheetOpen(true)}
+          />
+        )}
       </>
 
       {waterSheetOpen && (

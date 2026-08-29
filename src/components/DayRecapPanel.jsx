@@ -152,17 +152,6 @@ export default function DayRecapPanel({ date, onPlannedChange, onExcludedChange 
       <MacroBar prot={totals.prot} gluc={totals.gluc} lip={totals.lip} fib={totals.fib} goals={settings} />
       <NutrientPanel totals={totals} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
 
-      {settings.water?.card_visible !== false && (
-        <WaterSection
-          entries={waterEntries}
-          water={waterCfg}
-          beverageName={defaultBeverage?.alim_nom}
-          onQuickAdd={handleWaterQuickAdd}
-          onUndo={handleWaterUndo}
-          onOpenSheet={() => setWaterSheetOpen(true)}
-        />
-      )}
-
       <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="section-title" style={{ marginBottom: 0 }}>Repas</div>
@@ -207,6 +196,17 @@ export default function DayRecapPanel({ date, onPlannedChange, onExcludedChange 
         onOpenDetail={(entry) => setDetailEntry(entry)}
         onOpenPlannedSource={(repas) => setSourceDetail(repas)}
       />
+
+      {settings.water?.card_visible !== false && (
+        <WaterSection
+          entries={waterEntries}
+          water={waterCfg}
+          beverageName={defaultBeverage?.alim_nom}
+          onQuickAdd={handleWaterQuickAdd}
+          onUndo={handleWaterUndo}
+          onOpenSheet={() => setWaterSheetOpen(true)}
+        />
+      )}
 
       {modal && (
         <AddFoodModal
