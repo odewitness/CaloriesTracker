@@ -48,7 +48,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const isToday = dateStr === fmt(new Date())
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
-  const { dates: cycleDates } = useCycle()
+  const { days: cycleDays } = useCycle()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings, update: updateSettings } = useSettings()
   const { foods: ciqualFoods } = useCiqualCatalog()
@@ -207,7 +207,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             canShare={entries.length > 0}
           />
         )}
-        <CyclePhaseBadge dateStr={dateStr} dates={cycleDates} cycleSettings={settings.cycle} />
+        <CyclePhaseBadge dateStr={dateStr} days={cycleDays} cycleSettings={settings.cycle} />
         <TodayOverviewCard
           consumed={totals.kcal}
           goal={settings.goal_kcal}

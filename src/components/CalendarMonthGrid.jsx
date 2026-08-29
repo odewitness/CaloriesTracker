@@ -103,7 +103,8 @@ export default function CalendarMonthGrid({
           const disabled = minDate ? dStr < minDate : false
           const isExcluded = !!excludedDates?.has(dStr)
           const cyc = cycleByDate?.[dStr]
-          const phaseColor = cyc && cyc.phase !== 'inconnue' ? PHASES[cyc.phase]?.color : null
+          const isPeriodDay = !!cyc?.isPeriod
+          const phaseColor = cyc && cyc.phase !== 'inconnue' && !isPeriodDay ? PHASES[cyc.phase]?.color : null
 
           return (
             <button
@@ -141,7 +142,7 @@ export default function CalendarMonthGrid({
                   background: isSelected ? 'white' : (isMissed ? 'var(--coral)' : 'var(--purple)'),
                 }} />
               )}
-              {cyc?.isStart && (
+              {isPeriodDay && (
                 <span style={{
                   position: 'absolute', top: 3, left: 3,
                   width: 5, height: 5, borderRadius: '50%',
@@ -164,7 +165,7 @@ export default function CalendarMonthGrid({
         <Legend color="var(--coral)" label="Trop / pas assez" />
         <Legend color="var(--purple)" label="Repas planifié" dot />
         <Legend color="var(--text-hint)" label="Jour exclu des stats" />
-        {cycleByDate && <Legend color="var(--coral)" label="1er jour des règles" dot />}
+        {cycleByDate && <Legend color="var(--coral)" label="Règles" dot />}
         {cycleByDate && <Legend color="var(--purple)" label="Phase lutéale" />}
       </div>
     </div>

@@ -792,24 +792,22 @@ create table if not exists jours_exclus (
 
 create index if not exists idx_jours_exclus_user_date on jours_exclus (user_id, date);
 
--- 27. TABLE REGLES (dates de 1er jour des règles, saisies à la main — l'app
--- tierce de suivi de cycle utilisée aujourd'hui n'exporte rien. Voir
--- supabase/sql/regles_setup.sql pour le SQL complet — écrit le 2026-08-29,
--- chantier « manger en fonction du cycle menstruel », Palier 1. Une ligne = un
--- début de règles. Le calcul de phase se fait côté client à partir de la liste
--- complète (voir src/lib/cycle.js, src/hooks/useCycle.js). `date_fin` nullable,
--- pas utilisée au Palier 1 (réservée à un futur suivi de flux). Toggle côté
--- client = insert/delete.
+-- 27. TABLE REGLES (jours de règles, saisis à la main — l'app tierce de suivi
+-- de cycle utilisée aujourd'hui n'exporte rien. Voir supabase/sql/regles_setup.sql
+-- pour le SQL complet — écrit le 2026-08-29, chantier « manger en fonction du
+-- cycle menstruel », Palier 1. UNE LIGNE = UN JOUR de règles (la durée varie
+-- d'un cycle à l'autre). Le calcul de phase, côté client (src/lib/cycle.js,
+-- src/hooks/useCycle.js), regroupe les jours contigus en blocs ; le 1er jour de
+-- chaque bloc sert de repère de cycle. Toggle côté client = insert/delete.
 create table if not exists regles (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
-  date_debut date not null,
-  date_fin date,
+  date date not null,
   created_at timestamptz not null default now(),
-  unique (user_id, date_debut)
+  unique (user_id, date)
 );
 
-create index if not exists idx_regles_user_date on regles (user_id, date_debut);
+create index if not exists idx_regles_user_date on regles (user_id, date);
 
 -- =============================================
 -- RLS
@@ -874,9 +872,8 @@ alter table suggestions_manques enable row level security;
 alter table jours_exclus enable row level security;
 
 -- RLS activé sur regles dès sa création (2026-08-29), policies
--- select/insert/update/delete "own" (voir supabase/sql/regles_setup.sql).
--- update + delete nécessaires (corriger une date, supprimer une saisie
--- erronée, renseigner date_fin plus tard).
+-- select/insert/delete "own" (voir supabase/sql/regles_setup.sql). Pas de
+-- policy update : un jour est présent ou absent, on insert/delete.
 alter table regles enable row level security;
 
 -- =============================================

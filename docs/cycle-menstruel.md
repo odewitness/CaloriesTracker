@@ -128,23 +128,29 @@ l'implémentation.
 
 ## 3. Modèle physiologique retenu (calcul)
 
-Entrées : liste des **dates de 1er jour des règles** (`regles.date_debut`, triées
-croissant) + réglages (`settings.cycle`).
+Entrées : liste des **jours de règles** (`regles.date`) + réglages
+(`settings.cycle`). Côté client, on regroupe les jours contigus en **blocs**
+`{ start, end, length }` ; `start` de chaque bloc = repère de cycle.
 
-- `jourCycle(today)` = (today − dernière `date_debut` ≤ today) + 1
-- `longueurCycleUtilisée` = moyenne/médiane glissante des écarts entre `date_debut`
-  successifs sur les ~6 derniers cycles si `auto_longueur_cycle` et ≥ 2 cycles
-  connus ; sinon `longueur_cycle` réglée (défaut 28).
-- `prochainesReglesEstimées` = dernière `date_debut` + `longueurCycleUtilisée`
+- `blocCourant` = dernier bloc dont `start` ≤ today
+- `jourCycle(today)` = (today − `blocCourant.start`) + 1
+- `longueurCycleUtilisée` = si un bloc suivant est enregistré, l'écart réel
+  `start → start` ; sinon médiane glissante des écarts `start → start` sur les
+  ~6 derniers cycles (si `auto_longueur_cycle` et ≥ 2 cycles), sinon
+  `longueur_cycle` réglée (défaut 28).
+- `prochainesReglesEstimées` = `blocCourant.start` + `longueurCycleUtilisée`
 - `débutLutéaleEstimé` = `prochainesReglesEstimées` − `longueur_lutéale` (défaut 14)
 - `ovulationEstimée` ≈ `débutLutéaleEstimé` − 1
+- `finRegles` = `blocCourant.end` (jours réellement marqués). Pour le cycle EN
+  COURS seulement, on tolère jusqu'à `longueur_regles` jours si des jours ne
+  sont pas encore marqués.
 - **Phase :**
-  - `jourCycle` ≤ `longueur_regles` (défaut 5) → **menstruelle**
-  - sinon `today` < `ovulationEstimée` − 1 → **folliculaire**
-  - sinon `today` dans ±1 j de `ovulationEstimée` → **ovulatoire**
+  - today ≤ `finRegles` (ou today est un jour marqué) → **menstruelle**
+  - sinon today < `ovulationEstimée` − 1 → **folliculaire**
+  - sinon today dans ±1 j de `ovulationEstimée` → **ovulatoire**
   - sinon → **lutéale**
-  - aucune `date_debut` ≤ `today`, ou retard > `longueurCycleUtilisée` + 7 →
-    **inconnue** (afficher « en attente de tes prochaines règles »)
+  - aucun bloc ≤ today, ou retard > 7 j sur `prochainesReglesEstimées` →
+    **inconnue** (« en attente de tes prochaines règles »)
 - `fiabilité` : `bonne` si ≥ 3 cycles historiques et faible variance ; `faible`
   sinon ou en cas de retard important. L'UI affiche toujours une **fourchette**
   et le mot « estimation », jamais une date sèche.
@@ -155,27 +161,30 @@ croissant) + réglages (`settings.cycle`).
 
 ### 4.1 Base de données
 
-**Nouvelle table `regles`** (1 ligne = un début de règles). Convention : nom de
-table + champs de données en français, comme le reste de la base. Mêmes
-conventions RLS que `jours_exclus` (voir `supabase/sql/jours_exclus_setup.sql`).
-SQL complet à écrire dans `supabase/sql/regles_setup.sql`, à exécuter à la main
-dans le SQL editor Supabase, puis reporter dans `supabase_schema.sql`.
+**Nouvelle table `regles`** — **1 ligne = 1 jour de règles** (la durée varie
+d'un cycle à l'autre, donc on marque chaque jour plutôt qu'un seul « 1er
+jour »). Le calcul de phase regroupe côté client les jours contigus en blocs ;
+le 1er jour de chaque bloc sert de repère de cycle. Convention : champs en
+français. Mêmes conventions RLS que `jours_exclus`. SQL dans
+`supabase/sql/regles_setup.sql`, à exécuter à la main dans Supabase, puis
+reporter dans `supabase_schema.sql`.
 
 ```sql
 create table if not exists regles (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
-  date_debut date not null,
-  date_fin date,                 -- optionnel (suivi de flux plus tard)
+  date date not null,
   created_at timestamptz not null default now(),
-  unique (user_id, date_debut)
+  unique (user_id, date)
 );
-create index if not exists idx_regles_user_date on regles (user_id, date_debut);
+create index if not exists idx_regles_user_date on regles (user_id, date);
 alter table regles enable row level security;
--- policies select / insert / update / delete "own" (auth.uid() = user_id)
--- update + delete nécessaires : corriger une date, supprimer une saisie erronée,
--- renseigner date_fin après coup.
+-- policies select / insert / delete "own" (auth.uid() = user_id) — pas
+-- d'update : un jour est présent ou absent, insert/delete comme jours_exclus.
 ```
+
+Un futur suivi de flux (intensité par jour) ajouterait une colonne sur cette
+même table (Palier 5).
 
 **Réglages : bloc `cycle` dans `settings`** (colonne `jsonb`, même pattern que
 `settings.water` — fusion client avec des défauts via une fonction type
@@ -243,11 +252,12 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
 - [x] `src/lib/cycle.js` (calcul de phase, fonctions pures + contenu éditorial des phases)
 - [x] `src/hooks/useCycle.js`
 - [x] Bloc `settings.cycle` + fusion défauts dans `useSettings.js` (`mergeCycleSettings`)
-- [x] Saisie du 1er jour des règles depuis un calendrier (écran Profil › Cycle) +
-      **saisie rétroactive multi-cycles** + liste des cycles avec écart
+- [x] Marquer **chaque jour de règles** depuis un calendrier (écran Profil ›
+      Cycle) + **saisie rétroactive multi-cycles** + liste des blocs de règles
+      (dates, durée, cycle) avec suppression
 - [x] Pastille de phase sur la grille du mois (`CalendarMonthGrid` : prop
-      `cycleByDate`, point rouge = 1er jour, bande fine = phase) — branchée dans
-      `CalendarPage` et l'écran de réglages
+      `cycleByDate`, point rouge = jour de règles, bande fine = phase) — branchée
+      dans `CalendarPage` et l'écran de réglages
 - [x] Badge phase + jour de cycle + fourchette prochaines règles sur la page du
       jour (`CyclePhaseBadge`)
 - [x] Interrupteur maître `enabled` + interrupteur `sous_contraception` +
@@ -344,3 +354,11 @@ Tout sauf ce qui sera coché au Palier 1 ci-dessus. En résumé, dans l'ordre :
   `npm run build` OK. Restent : appliquer le SQL en base (utilisatrice),
   validation manuelle, puis annotation des phases sur les graphes de poids.
   Aucune entrée changelog pour l'instant (prévue au Palier 2 avec la page d'info).
+- **2026-08-29** — Modèle de données revu **avant tout usage** à la demande de
+  l'utilisatrice : `regles` passe de « 1 ligne = 1er jour (date_debut/date_fin) »
+  à **« 1 ligne = 1 jour de règles »**. La durée des règles varie d'un cycle à
+  l'autre : on marque chaque jour, et le calcul regroupe les jours contigus en
+  blocs (le 1er jour de chaque bloc = repère de cycle). `date_fin` supprimée,
+  plus de policy `update`. `cycle.js` : `periodBlocks` / `periodStarts`,
+  `finRegles` basée sur les jours réellement marqués (tolérance `longueur_regles`
+  pour le cycle en cours seulement). `npm run build` OK.

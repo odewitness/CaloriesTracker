@@ -57,13 +57,13 @@ export default function CalendarPage() {
   const { byDate: journalByDate, refetch: refetchJournal } = useJournalRange(rangeStart, rangeEnd)
   const { byDate: planifiesByDate, refetch: refetchPlanifies } = usePlannedMealsRange(rangeStart, rangeEnd)
   const { excludedDates, refetch: refetchExcluded } = useExcludedDaysRange(rangeStart, rangeEnd)
-  const { dates: cycleDates } = useCycle()
+  const { days: cycleDays } = useCycle()
 
   const cycleByDate = useMemo(() => {
     const cfg = settings.cycle
-    if (!cfg?.enabled || cfg.afficher_sur_calendrier === false || cycleDates.length === 0) return undefined
-    return phasesForRange(fmt(rangeStart), fmt(rangeEnd), cycleDates, cfg)
-  }, [settings.cycle, cycleDates, rangeStart, rangeEnd])
+    if (!cfg?.enabled || cfg.afficher_sur_calendrier === false || cycleDays.length === 0) return undefined
+    return phasesForRange(fmt(rangeStart), fmt(rangeEnd), cycleDays, cfg)
+  }, [settings.cycle, cycleDays, rangeStart, rangeEnd])
 
   const dayStatusByDate = useMemo(() => {
     const result = {}

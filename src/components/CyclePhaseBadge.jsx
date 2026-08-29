@@ -7,12 +7,12 @@ import { cycleInfo, PHASES, formatPredictionWindow } from '../lib/cycle'
 // Ne s'affiche que si le suivi de cycle est activé et qu'on a au moins une
 // date de règles saisie.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CyclePhaseBadge({ dateStr, dates, cycleSettings }) {
+export default function CyclePhaseBadge({ dateStr, days, cycleSettings }) {
   const cfg = cycleSettings || {}
   if (!cfg.enabled || cfg.afficher_badge_jour === false) return null
-  if (!dates || dates.length === 0) return null
+  if (!days || days.length === 0) return null
 
-  const info = cycleInfo(dateStr, dates, cfg)
+  const info = cycleInfo(dateStr, days, cfg)
   const phase = PHASES[info.phase] || PHASES.inconnue
 
   let sub = null

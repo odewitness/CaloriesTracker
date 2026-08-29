@@ -1,8 +1,10 @@
 -- =============================================
--- REGLES — dates de 1er jour des règles, saisies à la main (l'app tierce
--- utilisée aujourd'hui n'exporte rien). Une ligne = un début de règles pour
--- cet utilisateur. Sert de base au calcul de la phase du cycle menstruel
--- (voir src/lib/cycle.js et docs/cycle-menstruel.md).
+-- REGLES — jours de règles, saisis à la main (l'app tierce de suivi de cycle
+-- utilisée aujourd'hui n'exporte rien). UNE LIGNE = UN JOUR de règles (la
+-- durée varie d'un cycle à l'autre, on marque chaque jour). Le calcul de la
+-- phase du cycle regroupe les jours contigus en « règles », dont le 1er jour
+-- de chaque bloc sert de repère de cycle (voir src/lib/cycle.js,
+-- src/hooks/useCycle.js, docs/cycle-menstruel.md).
 --
 -- Écrit le 2026-08-29 (chantier « manger en fonction du cycle menstruel »,
 -- Palier 1). À exécuter une fois, à la main, dans le SQL editor Supabase
@@ -10,22 +12,22 @@
 -- Claude Code ensuite, pas un script à rejouer sur une base déjà migrée
 -- (mêmes conventions que supabase_schema.sql / jours_exclus_setup.sql).
 --
--- `date_fin` est nullable et pas utilisée au Palier 1 : réservée à un futur
--- suivi de flux (durée / intensité des règles). Toggle côté client =
--- insert/delete (voir src/hooks/useCycle.js), corrections = update de
--- date_debut ou delete + re-insert.
+-- NB : une 1re version (date_debut / date_fin, une ligne par règles) a été
+-- rédigée puis abandonnée avant tout usage. Si tu l'avais déjà exécutée,
+-- décommente la ligne suivante pour repartir propre (table vide, aucun
+-- risque de perte de données) :
+-- drop table if exists regles cascade;
 -- =============================================
 
 create table if not exists regles (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
-  date_debut date not null,
-  date_fin date,
+  date date not null,
   created_at timestamptz not null default now(),
-  unique (user_id, date_debut)
+  unique (user_id, date)
 );
 
-create index if not exists idx_regles_user_date on regles (user_id, date_debut);
+create index if not exists idx_regles_user_date on regles (user_id, date);
 
 alter table regles enable row level security;
 
@@ -33,10 +35,10 @@ create policy "regles_select_own" on regles
   for select using (auth.uid() = user_id);
 create policy "regles_insert_own" on regles
   for insert with check (auth.uid() = user_id);
-create policy "regles_update_own" on regles
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "regles_delete_own" on regles
   for delete using (auth.uid() = user_id);
+-- Pas de policy update : un jour est présent ou absent, on insert/delete
+-- (même esprit que jours_exclus).
 
 -- Réglages du suivi de cycle : bloc jsonb unique sur `settings`, même pattern
 -- que `settings.water`. Fusionné côté client avec CYCLE_DEFAULTS

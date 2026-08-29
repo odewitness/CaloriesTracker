@@ -1,7 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// cycle.js — calcul de la phase du cycle menstruel à partir des dates de 1er
-// jour des règles saisies à la main (table `regles`, voir src/hooks/useCycle.js
-// et docs/cycle-menstruel.md).
+// cycle.js — calcul de la phase du cycle menstruel à partir des JOURS DE RÈGLES
+// saisis à la main (table `regles`, une ligne = un jour ; voir
+// src/hooks/useCycle.js et docs/cycle-menstruel.md).
+//
+// Les jours contigus sont regroupés en « blocs » de règles. Le 1er jour de
+// chaque bloc sert de repère de cycle (écart d'un bloc au suivant = longueur
+// de cycle observée). La durée des règles est donc RÉELLE par cycle, pas une
+// valeur fixe.
 //
 // Tout est en fonctions pures + chaînes 'YYYY-MM-DD' (mêmes dates que Supabase).
 // Rappel scientifique (voir docs/cycle-menstruel.md) : les effets nutritionnels
@@ -22,7 +27,7 @@ export const CYCLE_DEFAULTS = {
   longueur_cycle: 28,         // utilisé si auto_longueur_cycle = false ou pas assez d'historique
   auto_longueur_cycle: true,  // longueur = médiane observée dès qu'on a assez de cycles
   longueur_luteale: 14,
-  longueur_regles: 5,
+  longueur_regles: 5,         // tolérance pour les jours pas encore marqués du cycle EN COURS
   afficher_sur_calendrier: true,
   afficher_badge_jour: true,
   afficher_conseils_micro: true,
@@ -50,29 +55,51 @@ export function daysBetween(a, b) {
   return Math.round((parseYMD(b) - parseYMD(a)) / 86400000)
 }
 
-// ── Statistiques sur l'historique des débuts de règles ──────────────────────
-export function sortedStarts(starts) {
-  return [...new Set((starts || []).filter(Boolean))].sort()
+// ── Jours de règles → blocs ────────────────────────────────────────────────
+export function periodDaySet(days) {
+  return new Set((days || []).filter(Boolean))
 }
 
-// Écarts (en jours) entre débuts de règles successifs.
-export function cycleLengths(starts) {
-  const s = sortedStarts(starts)
+// Jours de règles contigus regroupés : [{ start, end, length }], triés.
+export function periodBlocks(days) {
+  const s = [...new Set((days || []).filter(Boolean))].sort()
+  const blocks = []
+  for (const d of s) {
+    const last = blocks[blocks.length - 1]
+    if (last && daysBetween(last.end, d) === 1) {
+      last.end = d
+      last.length++
+    } else {
+      blocks.push({ start: d, end: d, length: 1 })
+    }
+  }
+  return blocks
+}
+
+// 1er jour de chaque bloc — repère de cycle.
+export function periodStarts(days) {
+  return periodBlocks(days).map(b => b.start)
+}
+
+// ── Statistiques sur l'historique ──────────────────────────────────────────
+// Écarts (jours) entre 1ers jours de règles successifs.
+export function cycleLengths(days) {
+  const s = periodStarts(days)
   const out = []
   for (let i = 1; i < s.length; i++) out.push(daysBetween(s[i - 1], s[i]))
   return out
 }
 
-// On ignore les écarts < 15 j ou > 60 j : saisie oubliée / cycle non enregistré,
+// On ignore les écarts < 15 j ou > 60 j : bloc oublié / cycle non enregistré,
 // pas une vraie longueur de cycle.
-function plausibleLengths(starts, window) {
-  const lens = cycleLengths(starts).filter(n => n >= 15 && n <= 60)
+function plausibleLengths(days, window) {
+  const lens = cycleLengths(days).filter(n => n >= 15 && n <= 60)
   return window ? lens.slice(-window) : lens
 }
 
 // Médiane des longueurs de cycle plausibles récentes, ou null si aucune.
-export function observedCycleLength(starts, window = 6) {
-  const lens = plausibleLengths(starts, window)
+export function observedCycleLength(days, window = 6) {
+  const lens = plausibleLengths(days, window)
   if (!lens.length) return null
   const sorted = [...lens].sort((a, b) => a - b)
   const mid = Math.floor(sorted.length / 2)
@@ -80,12 +107,21 @@ export function observedCycleLength(starts, window = 6) {
 }
 
 // Écart-type des longueurs récentes (régularité), ou null si < 2 cycles.
-export function cycleLengthStdDev(starts, window = 6) {
-  const lens = plausibleLengths(starts, window)
+export function cycleLengthStdDev(days, window = 6) {
+  const lens = plausibleLengths(days, window)
   if (lens.length < 2) return null
   const mean = lens.reduce((a, b) => a + b, 0) / lens.length
   const variance = lens.reduce((a, b) => a + (b - mean) ** 2, 0) / lens.length
   return Math.sqrt(variance)
+}
+
+// Durée médiane des règles observée (nb de jours par bloc), ou null.
+export function observedPeriodLength(days) {
+  const b = periodBlocks(days)
+  if (!b.length) return null
+  const lens = [...b.map(x => x.length)].sort((a, b) => a - b)
+  const mid = Math.floor(lens.length / 2)
+  return lens.length % 2 ? lens[mid] : Math.round((lens[mid - 1] + lens[mid]) / 2)
 }
 
 // ── Phases ─────────────────────────────────────────────────────────────────
@@ -155,50 +191,56 @@ export const PHASE_GUIDANCE = {
 }
 
 // ── Calcul principal ───────────────────────────────────────────────────────
-// dateStr : jour pour lequel on veut la phase ('YYYY-MM-DD', typiquement
-//   aujourd'hui, mais on l'appelle aussi par case de calendrier).
-// starts  : toutes les dates de 1er jour des règles connues.
+// dateStr : jour pour lequel on veut la phase ('YYYY-MM-DD').
+// days    : tous les jours de règles connus.
 // cfg     : bloc settings.cycle (sera fusionné avec les défauts).
-export function cycleInfo(dateStr, starts, cfg) {
+export function cycleInfo(dateStr, days, cfg) {
   const settings = mergeCycleSettings(cfg)
-  const s = sortedStarts(starts)
-  if (!s.length) return { phase: 'inconnue', reason: 'no-data', settings }
+  const blocks = periodBlocks(days)
+  if (!blocks.length) return { phase: 'inconnue', reason: 'no-data', settings }
 
-  // Dernier début de règles connu à cette date (inclus).
-  let lastStart = null
-  for (const d of s) {
-    if (d <= dateStr) lastStart = d
+  const dayset = periodDaySet(days)
+
+  // Bloc courant = dernier bloc dont le 1er jour est <= dateStr.
+  let bi = -1
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].start <= dateStr) bi = i
     else break
   }
-  if (!lastStart) return { phase: 'inconnue', reason: 'future-only', settings }
+  if (bi === -1) return { phase: 'inconnue', reason: 'future-only', settings }
 
-  const jourCycle = daysBetween(lastStart, dateStr) + 1 // J1 = jour du début des règles
+  const block = blocks[bi]
+  const nextBlock = blocks[bi + 1] || null
+  const isCurrentCycle = !nextBlock
+  const lastStart = block.start
+  const jourCycle = daysBetween(lastStart, dateStr) + 1 // J1 = 1er jour des règles
 
-  // Longueur de cycle à utiliser :
-  //  - si un début de règles postérieur est enregistré, on connaît la vraie
-  //    longueur de CE cycle → on l'utilise (tinte l'historique correctement) ;
-  //  - sinon, médiane observée (si auto + assez d'historique), sinon réglage.
-  const nextRecorded = s.find(d => d > lastStart)
-  const observed = settings.auto_longueur_cycle ? observedCycleLength(s) : null
+  // Longueur de cycle :
+  //  - bloc suivant connu → vraie longueur de CE cycle ;
+  //  - sinon médiane observée (si auto + assez d'historique), sinon réglage.
+  const observed = settings.auto_longueur_cycle ? observedCycleLength(days) : null
   const predictedLen = observed || settings.longueur_cycle
-  const cycleLen = nextRecorded ? daysBetween(lastStart, nextRecorded) : predictedLen
+  const cycleLen = nextBlock ? daysBetween(lastStart, nextBlock.start) : predictedLen
 
   const lutealLen = settings.longueur_luteale
-  const reglesLen = settings.longueur_regles
-
-  const nextStart = nextRecorded || addDays(lastStart, predictedLen)
+  const nextStart = nextBlock ? nextBlock.start : addDays(lastStart, predictedLen)
   const lutealStart = addDays(nextStart, -lutealLen)
   const ovulation = addDays(lutealStart, -1)
-  const overdueBy = nextRecorded ? 0 : daysBetween(nextStart, dateStr) // > 0 => en retard
+  const overdueBy = nextBlock ? 0 : daysBetween(nextStart, dateStr) // > 0 => en retard
+
+  // Fin des règles : on fait confiance aux jours enregistrés du bloc. Pour le
+  // cycle EN COURS uniquement, on tolère des jours pas encore marqués jusqu'à
+  // `longueur_regles` (sinon un jour non saisi basculerait à tort en
+  // folliculaire).
+  const fallbackEnd = addDays(lastStart, Math.max(1, settings.longueur_regles) - 1)
+  const menstrualEnd = isCurrentCycle && fallbackEnd > block.end ? fallbackEnd : block.end
 
   let phase
   if (settings.sous_contraception) {
-    // Sous contraception hormonale : le cycle naturel ne s'exprime pas, on ne
-    // qualifie que les jours de règles saisis, pas de phases.
-    phase = jourCycle <= reglesLen ? 'menstruelle' : 'inconnue'
+    phase = dateStr <= menstrualEnd ? 'menstruelle' : 'inconnue'
   } else if (overdueBy > 7) {
     phase = 'inconnue'
-  } else if (jourCycle <= reglesLen) {
+  } else if (dateStr <= menstrualEnd || dayset.has(dateStr)) {
     phase = 'menstruelle'
   } else if (dateStr < addDays(ovulation, -1)) {
     phase = 'folliculaire'
@@ -208,9 +250,8 @@ export function cycleInfo(dateStr, starts, cfg) {
     phase = 'luteale'
   }
 
-  // Fiabilité de la prédiction des prochaines règles.
-  const nCycles = plausibleLengths(s).length
-  const sd = cycleLengthStdDev(s)
+  const nCycles = plausibleLengths(days).length
+  const sd = cycleLengthStdDev(days)
   let fiabilite = 'faible'
   if (nCycles >= 3 && sd != null && sd <= 4 && overdueBy <= 3) fiabilite = 'bonne'
   else if (nCycles >= 2 && overdueBy <= 5) fiabilite = 'moyenne'
@@ -223,8 +264,11 @@ export function cycleInfo(dateStr, starts, cfg) {
     jourCycle,
     cycleLen,
     observedCycleLen: observed,
+    observedPeriodLen: observedPeriodLength(days),
     predictedLen,
     lastStart,
+    periodEnd: block.end,
+    menstrualEnd,
     nextStart,
     nextStartFrom: addDays(nextStart, -margin),
     nextStartTo: addDays(nextStart, margin),
@@ -239,26 +283,26 @@ export function cycleInfo(dateStr, starts, cfg) {
 }
 
 // Phase seule pour une date (utilisé pour teinter le calendrier).
-export function phaseForDate(dateStr, starts, cfg) {
-  return cycleInfo(dateStr, starts, cfg).phase
+export function phaseForDate(dateStr, days, cfg) {
+  return cycleInfo(dateStr, days, cfg).phase
 }
 
-// { 'YYYY-MM-DD': { phase, isStart } } pour toutes les dates d'une plage
+// { 'YYYY-MM-DD': { phase, isPeriod } } pour toutes les dates d'une plage
 // inclusive — pratique pour une grille de calendrier.
-export function phasesForRange(startStr, endStr, starts, cfg) {
-  const startSet = new Set(sortedStarts(starts))
+export function phasesForRange(startStr, endStr, days, cfg) {
+  const dayset = periodDaySet(days)
   const out = {}
   let cur = startStr
   let guard = 0
   while (cur <= endStr && guard < 400) {
-    out[cur] = { phase: phaseForDate(cur, starts, cfg), isStart: startSet.has(cur) }
+    out[cur] = { phase: phaseForDate(cur, days, cfg), isPeriod: dayset.has(cur) }
     cur = addDays(cur, 1)
     guard++
   }
   return out
 }
 
-// "3–7 sept." à partir de deux 'YYYY-MM-DD' encadrant la prédiction.
+// "3–7 sept." à partir de deux 'YYYY-MM-DD'.
 export function formatPredictionWindow(fromStr, toStr) {
   const from = parseYMD(fromStr)
   const to = parseYMD(toStr)
@@ -268,4 +312,19 @@ export function formatPredictionWindow(fromStr, toStr) {
   if (sameMonth) return `${dayFrom}–${to.getDate()} ${monthTo}`
   const monthFrom = from.toLocaleDateString('fr-FR', { month: 'short' })
   return `${dayFrom} ${monthFrom} – ${to.getDate()} ${monthTo}`
+}
+
+// "3–7 août 2026" / "28 juil. – 2 août 2026" pour un bloc de règles.
+export function formatDateRange(fromStr, toStr) {
+  const from = parseYMD(fromStr)
+  const to = parseYMD(toStr)
+  const year = to.getFullYear()
+  if (fromStr === toStr) {
+    return `${from.getDate()} ${to.toLocaleDateString('fr-FR', { month: 'long' })} ${year}`
+  }
+  const sameMonth = from.getMonth() === to.getMonth()
+  const monthTo = to.toLocaleDateString('fr-FR', { month: 'long' })
+  if (sameMonth) return `${from.getDate()}–${to.getDate()} ${monthTo} ${year}`
+  const monthFrom = from.toLocaleDateString('fr-FR', { month: 'short' })
+  return `${from.getDate()} ${monthFrom} – ${to.getDate()} ${to.toLocaleDateString('fr-FR', { month: 'short' })} ${year}`
 }
