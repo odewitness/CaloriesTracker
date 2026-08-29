@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
@@ -6,495 +6,25 @@ import { useMeasurements } from '../hooks/useMeasurements'
 import { usePushSubscription } from '../hooks/usePushSubscription'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { User, Calendar, Scale, Ruler, Mail, LogOut, Target, Flame, Dumbbell, Wheat, Droplets, Droplet, Leaf, Coffee, Sun, Moon, Cookie, RotateCcw, Pill, ChevronRight, Bell, Users, Calculator, Lightbulb, Plus, Minus } from 'lucide-react'
-import { computeMealTargets, MEALS_ORDER, MEAL_ENABLED_DEFAULTS, computeCalorieNeeds, ACTIVITY_LEVELS, CALORIE_OBJECTIVES } from '../lib/nutrients'
-import { WATER_DEFAULTS, suggestGoalMl, litres } from '../lib/water'
+import {
+  User, Scale, Target, UtensilsCrossed, Droplet, Bell, Lightbulb,
+  LogOut, ChevronRight, ChevronDown, Info,
+} from 'lucide-react'
+import { litres } from '../lib/water'
 import Loader from '../components/Loader'
+import { NavRow } from '../components/profile/primitives'
+import InfosSection from '../components/profile/InfosSection'
+import GoalsSection from '../components/profile/GoalsSection'
+import MealSplitSection from '../components/profile/MealSplitSection'
+import HydrationSection from '../components/profile/HydrationSection'
+import NotificationsSection from '../components/profile/NotificationsSection'
+import TodaySection from '../components/profile/TodaySection'
 
-const MEAL_ICONS = { 'Petit-déjeuner': Coffee, 'Déjeuner': Sun, 'Dîner': Moon, 'Collation': Cookie }
-
-function Row({ icon, label, children }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderBottom: '0.5px solid var(--border)', gap: 12 }}>
-      <div style={{ color: 'var(--green)', flexShrink: 0 }}>{icon}</div>
-      <div style={{ flex: 1, fontSize: 14 }}>{label}</div>
-      {children}
-    </div>
-  )
-}
-
-function ToggleSwitch({ checked, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        width: 36, height: 20, borderRadius: 10, position: 'relative', flexShrink: 0,
-        background: checked ? 'var(--green)' : 'var(--border-md)',
-        transition: 'background .2s',
-      }}
-    >
-      <div style={{
-        position: 'absolute', top: 2, left: checked ? 18 : 2,
-        width: 16, height: 16, borderRadius: '50%', background: 'white',
-        transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
-      }} />
-    </button>
-  )
-}
-
-function GoalField({ icon, label, value, unit, color, onChange }) {
-  // Buffer texte local : évite qu'effacer le champ pour taper une nouvelle
-  // valeur ne le fasse passer furtivement par 0 (voir CLAUDE.md / historique).
-  const [text, setText] = useState(String(value))
-  useEffect(() => { setText(String(value)) }, [value])
-
-  const handleChange = (e) => {
-    const v = e.target.value
-    setText(v)
-    if (v === '') return // en cours d'effacement, ne pas forcer 0 tant que rien n'est retapé
-    const num = parseInt(v, 10)
-    if (!isNaN(num)) onChange(num)
-  }
-
-  const handleBlur = () => {
-    // Champ laissé vide ou invalide au blur : revient à la dernière valeur valide
-    if (text === '' || isNaN(parseInt(text, 10))) setText(String(value))
-  }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderBottom: '0.5px solid var(--border)', gap: 12 }}>
-      <div style={{ color, flexShrink: 0 }}>{icon}</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>Objectif quotidien</div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <input
-          type="number"
-          value={text}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          style={{ width: 72, textAlign: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 6px', fontSize: 15, fontWeight: 700, fontFamily: 'var(--font)', color, background: 'var(--gray-bg)', outline: 'none' }}
-        />
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 24 }}>{unit}</span>
-      </div>
-    </div>
-  )
-}
-
-function CalorieCalculatorCard({ sexe, tailleCm, niveauActivite, onActivite, objective, onObjective, targetWeight, onTargetWeight, weeks, onWeeks, poidsKg, age, onOpenMeasurements, onApply }) {
-  const missing = []
-  if (!sexe) missing.push('sexe')
-  if (!age) missing.push('âge')
-  if (!tailleCm) missing.push('taille')
-  if (!poidsKg) missing.push('poids')
-  const missingLabel = missing.length > 1
-    ? missing.slice(0, -1).join(', ') + ' et ' + missing[missing.length - 1]
-    : missing[0]
-
-  const needsWeightGoal = objective !== 'maintien'
-  const objectiveWeightKg = targetWeight ? parseFloat(targetWeight) : null
-  const objectiveWeeks = weeks ? parseFloat(weeks) : null
-
-  // Pour la perte, le poids objectif doit être inférieur au poids actuel (et
-  // inversement pour la prise) — sinon le calcul donnerait un ajustement dans
-  // le mauvais sens (ex. un surplus alors qu'on a choisi « Perte de poids »).
-  const wrongDirection = needsWeightGoal && poidsKg != null && objectiveWeightKg != null && (
-    (objective === 'perte' && objectiveWeightKg >= poidsKg) ||
-    (objective === 'prise' && objectiveWeightKg <= poidsKg)
-  )
-
-  const needs = wrongDirection ? null : computeCalorieNeeds({
-    sexe,
-    age: age ? parseInt(age, 10) : null,
-    tailleCm: tailleCm ? parseFloat(tailleCm) : null,
-    poidsKg,
-    activityKey: niveauActivite,
-    objectiveKey: objective,
-    objectiveWeightKg: needsWeightGoal ? objectiveWeightKg : null,
-    objectiveWeeks: needsWeightGoal ? objectiveWeeks : null,
-  })
-
-  return (
-    <div className="card" style={{ padding: '14px 16px', marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-        <Calculator size={16} color="var(--green)" />
-        <div style={{ fontWeight: 700, fontSize: 14 }}>Calculateur de besoins caloriques</div>
-      </div>
-
-      {missing.length > 0 && (
-        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 12, lineHeight: 1.5 }}>
-          Il manque : {missingLabel}, pour voir l'estimation (sexe, âge et taille se règlent dans tes informations personnelles ci-dessus).
-        </div>
-      )}
-
-      <div onClick={onOpenMeasurements} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, cursor: 'pointer' }}>
-        <div style={{ flex: 1, fontSize: 13 }}>Poids</div>
-        <span style={{ fontSize: 13, color: poidsKg != null ? 'var(--text)' : 'var(--coral)', fontWeight: 600 }}>
-          {poidsKg != null ? `${poidsKg} kg` : 'à renseigner'}
-        </span>
-        <ChevronRight size={14} color="var(--text-hint)" />
-      </div>
-
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 6 }}>Niveau d'activité</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {ACTIVITY_LEVELS.map(a => (
-            <button key={a.key} onClick={() => onActivite(a.key)} style={{
-              textAlign: 'left', padding: '8px 10px', borderRadius: 8, fontFamily: 'var(--font)',
-              border: `1.5px solid ${niveauActivite === a.key ? 'var(--green)' : 'var(--border)'}`,
-              background: niveauActivite === a.key ? 'var(--green-light)' : 'var(--white)',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: niveauActivite === a.key ? 'var(--green-dark)' : 'var(--text)' }}>{a.label}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>{a.desc}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: needsWeightGoal ? 10 : 14 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 6 }}>Objectif</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {CALORIE_OBJECTIVES.map(o => (
-            <button key={o.key} onClick={() => onObjective(o.key)} style={{
-              flex: 1, padding: '8px 4px', borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)',
-              background: objective === o.key ? 'var(--green)' : 'var(--green-light)',
-              color: objective === o.key ? 'white' : 'var(--green-dark)',
-            }}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {needsWeightGoal && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>Poids objectif</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input
-                type="number" value={targetWeight} onChange={e => onTargetWeight(e.target.value)} placeholder="—"
-                style={{ width: '100%', textAlign: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 6px', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font)', color: 'var(--text)', background: 'var(--gray-bg)', outline: 'none' }}
-              />
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>kg</span>
-            </div>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>En combien de temps</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input
-                type="number" value={weeks} onChange={e => onWeeks(e.target.value)} placeholder="—"
-                style={{ width: '100%', textAlign: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 6px', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font)', color: 'var(--text)', background: 'var(--gray-bg)', outline: 'none' }}
-              />
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>sem.</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {wrongDirection && (
-        <div style={{ fontSize: 12, color: 'var(--coral)', marginBottom: 12, lineHeight: 1.5 }}>
-          {objective === 'perte'
-            ? 'Ton poids objectif doit être inférieur à ton poids actuel pour une perte de poids.'
-            : 'Ton poids objectif doit être supérieur à ton poids actuel pour une prise de muscle.'}
-        </div>
-      )}
-
-      {needs && needs.macros ? (
-        <div style={{ background: 'var(--gray-bg)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-hint)' }}>Métabolisme de base : <strong style={{ color: 'var(--text)' }}>{needs.bmr} kcal</strong></div>
-          <div style={{ fontSize: 12, color: 'var(--text-hint)' }}>Dépense totale (maintien) : <strong style={{ color: 'var(--text)' }}>{needs.tdee} kcal</strong></div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--coral)', marginTop: 6 }}>
-            Objectif estimé : {needs.targetKcal} kcal/jour
-          </div>
-          {needs.paceKgPerWeek != null && (
-            <div style={{ fontSize: 11, color: needs.unsafePace ? 'var(--coral)' : 'var(--text-hint)', marginTop: 2 }}>
-              Rythme : ≈ {needs.paceKgPerWeek > 0 ? '+' : ''}{needs.paceKgPerWeek.toFixed(2)} kg/semaine
-              {needs.unsafePace && (objective === 'perte'
-                ? ' — plus rapide que recommandé (max ~1 kg/semaine), risque de fonte musculaire et de reprise'
-                : ' — plus rapide que recommandé (max ~0,5 kg/semaine), au-delà c\'est surtout du gras')}
-            </div>
-          )}
-        </div>
-      ) : (missing.length === 0 && needsWeightGoal && !wrongDirection && (!targetWeight || !weeks)) ? (
-        <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 12, lineHeight: 1.5 }}>
-          Renseigne ton poids objectif et la durée pour voir l'estimation.
-        </div>
-      ) : null}
-
-      <button className="btn-primary" disabled={!needs || !needs.macros} onClick={() => onApply(needs)} style={{ opacity: (needs && needs.macros) ? 1 : 0.5 }}>
-        Appliquer ces valeurs aux objectifs
-      </button>
-    </div>
-  )
-}
-
-function MealTargetCard({ meal, target, allTargets, goalKcal, onChange, onReset, onToggleEnabled }) {
-  const Icon = MEAL_ICONS[meal]
-  const hasOverride = target.enabled && (!target.isAuto.kcal || !target.isAuto.prot || !target.isAuto.gluc || !target.isAuto.lip)
-
-  // Total des kcal attribuées = somme de tous les repas actifs
-  const totalAllocated = Object.values(allTargets).reduce((s, t) => s + (t.enabled ? t.kcal : 0), 0)
-  const kcalRemaining = goalKcal - totalAllocated
-
-  const field = (key, label, color) => (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-      <input
-        type="number"
-        value={target[key]}
-        disabled={!target.enabled}
-        onChange={e => onChange(key, e.target.value)}
-        style={{
-          width: 56, textAlign: 'center',
-          border: `1.5px solid ${!target.enabled ? 'var(--border)' : target.isAuto[key] ? 'var(--border)' : color}`,
-          borderRadius: 6, padding: '6px 4px', fontSize: 13, fontWeight: 700,
-          color: !target.enabled ? 'var(--text-hint)' : color,
-          background: !target.enabled ? 'var(--gray-bg)' : target.isAuto[key] ? 'var(--gray-bg)' : 'var(--white)',
-          fontFamily: 'var(--font)', outline: 'none', opacity: target.enabled ? 1 : 0.5,
-        }}
-      />
-      <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>{label}</span>
-    </div>
-  )
-
-  return (
-    <div className="card" style={{ padding: '12px 14px', marginBottom: 8, opacity: target.enabled ? 1 : 0.6, transition: 'opacity .2s' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: target.enabled ? 9 : 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          {Icon && <Icon size={15} color={target.enabled ? 'var(--green)' : 'var(--text-hint)'} />}
-          <div style={{ fontWeight: 700, fontSize: 13, color: target.enabled ? 'var(--text)' : 'var(--text-hint)' }}>{meal}</div>
-          {!target.enabled && (
-            <span style={{ fontSize: 10, color: 'var(--text-hint)', background: 'var(--gray-bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px' }}>désactivé</span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {hasOverride && target.enabled && (
-            <button onClick={onReset} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-hint)', fontFamily: 'var(--font)' }}>
-              <RotateCcw size={11} /> Auto
-            </button>
-          )}
-          {/* Toggle actif/inactif */}
-          <button
-            onClick={onToggleEnabled}
-            style={{
-              width: 36, height: 20, borderRadius: 10, position: 'relative', flexShrink: 0,
-              background: target.enabled ? 'var(--green)' : 'var(--border-md)',
-              transition: 'background .2s',
-            }}
-          >
-            <div style={{
-              position: 'absolute', top: 2, left: target.enabled ? 18 : 2,
-              width: 16, height: 16, borderRadius: '50%', background: 'white',
-              transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
-            }} />
-          </button>
-        </div>
-      </div>
-
-      {target.enabled && (
-        <>
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between' }}>
-            {field('kcal', 'kcal', 'var(--text)')}
-            {field('prot', 'Prot.', 'var(--green)')}
-            {field('gluc', 'Gluc.', 'var(--amber)')}
-            {field('lip',  'Lip.',  'var(--coral)')}
-          </div>
-          {!target.isAuto.kcal && (
-            <div style={{ marginTop: 7, fontSize: 11, color: Math.abs(kcalRemaining) < 2 ? 'var(--green)' : kcalRemaining < 0 ? 'var(--coral)' : 'var(--amber)' }}>
-              {Math.abs(kcalRemaining) < 2
-                ? '✓ Budget calorique équilibré'
-                : kcalRemaining < 0
-                  ? `⚠ ${Math.abs(Math.round(kcalRemaining))} kcal en trop au total`
-                  : `${Math.round(kcalRemaining)} kcal non attribuées (réparties automatiquement)`}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
-// ── Section Hydratation (objectif d'eau + rappels paramétrables) ───────────
-const WATER_NOTIF_MODES = [
-  { key: 'interval', label: 'Toutes les X heures', desc: 'Un rappel régulier pendant la journée' },
-  { key: 'once', label: 'Une fois par jour', desc: "Un seul rappel, à l'heure de ton choix" },
-  { key: 'smart', label: "Seulement si je n'ai pas assez bu", desc: "L'app vérifie et ne te dérange qu'au besoin" },
-]
-
-function Stepper({ value, display, onDec, onInc, min, max, wide }) {
-  const btn = { width: 30, height: 30, borderRadius: '50%', background: 'var(--gray-bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <button onClick={onDec} disabled={min != null && value <= min} style={{ ...btn, opacity: min != null && value <= min ? 0.4 : 1 }} aria-label="Moins"><Minus size={15} /></button>
-      <div style={{ minWidth: wide ? 84 : 56, textAlign: 'center', fontSize: 15, fontWeight: 700, color: 'var(--blue)' }}>{display}</div>
-      <button onClick={onInc} disabled={max != null && value >= max} style={{ ...btn, opacity: max != null && value >= max ? 0.4 : 1 }} aria-label="Plus"><Plus size={15} /></button>
-    </div>
-  )
-}
-
-const hLabel = (h) => `${String(h).padStart(2, '0')}:00`
-
-function HydrationSection({ water, onPatch, weightKg, pushGranted }) {
-  const w = { ...WATER_DEFAULTS, ...(water || {}) }
-  const n = { ...WATER_DEFAULTS.notif, ...(water?.notif || {}) }
-  const patchNotif = (patch) => onPatch({ notif: { ...n, ...patch } })
-  const suggestion = suggestGoalMl(weightKg)
-
-  return (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Droplet size={16} color="var(--blue)" />
-        <div className="section-title" style={{ marginBottom: 0 }}>Hydratation</div>
-      </div>
-
-      <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderBottom: '0.5px solid var(--border)', gap: 12 }}>
-          <div style={{ color: 'var(--blue)', flexShrink: 0 }}><Droplet size={18} /></div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 500 }}>Objectif quotidien</div>
-            <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>eau + autres boissons</div>
-          </div>
-          <Stepper
-            value={w.goal_ml} display={`${litres(w.goal_ml)} L`} wide
-            min={500} max={5000}
-            onDec={() => onPatch({ goal_ml: Math.max(500, w.goal_ml - 250) })}
-            onInc={() => onPatch({ goal_ml: Math.min(5000, w.goal_ml + 250) })}
-          />
-        </div>
-        <div style={{ padding: '10px 16px', display: 'flex', flexWrap: 'wrap', gap: 7, borderBottom: '0.5px solid var(--border)' }}>
-          {[1500, 2000, 2500, 3000].map((ml) => (
-            <button
-              key={ml}
-              onClick={() => onPatch({ goal_ml: ml })}
-              className="chip"
-              style={w.goal_ml === ml ? { background: 'var(--blue)', color: 'white' } : { background: 'var(--blue-light)', color: 'var(--blue-dark)' }}
-            >
-              {litres(ml)} L
-            </button>
-          ))}
-        </div>
-        {suggestion && (
-          <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '0.5px solid var(--border)' }}>
-            <div style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-              Selon ton poids ({weightKg} kg) : ~{litres(suggestion)} L / jour
-            </div>
-            {w.goal_ml !== suggestion && (
-              <button
-                onClick={() => onPatch({ goal_ml: suggestion })}
-                style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)', fontFamily: 'var(--font)', flexShrink: 0 }}
-              >
-                Appliquer
-              </button>
-            )}
-          </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', gap: 12 }}>
-          <div style={{ flex: 1, fontSize: 14 }}>Afficher la carte eau sur la page du jour</div>
-          <ToggleSwitch checked={w.card_visible !== false} onClick={() => onPatch({ card_visible: !(w.card_visible !== false) })} />
-        </div>
-      </div>
-
-      {/* Rappels */}
-      <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', gap: 12, borderBottom: n.enabled ? '0.5px solid var(--border)' : 'none' }}>
-          <div style={{ color: 'var(--blue)', flexShrink: 0 }}><Bell size={18} /></div>
-          <div style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>Rappels d'hydratation</div>
-          <ToggleSwitch checked={!!n.enabled} onClick={() => patchNotif({ enabled: !n.enabled })} />
-        </div>
-
-        {n.enabled && !pushGranted && (
-          <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--coral)', lineHeight: 1.5 }}>
-            Active d'abord les notifications dans la section « Notifications » ci-dessous pour recevoir ces rappels.
-          </div>
-        )}
-
-        {n.enabled && (
-          <div style={{ padding: '12px 16px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
-              {WATER_NOTIF_MODES.map((m) => {
-                const on = n.mode === m.key
-                return (
-                  <button
-                    key={m.key}
-                    onClick={() => patchNotif({ mode: m.key })}
-                    style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
-                      padding: '10px 12px', borderRadius: 10, fontFamily: 'var(--font)',
-                      border: `1.5px solid ${on ? 'var(--blue)' : 'var(--border)'}`,
-                      background: on ? 'var(--blue-light)' : 'var(--white)',
-                    }}
-                  >
-                    <span style={{ width: 15, height: 15, borderRadius: '50%', border: `2px solid ${on ? 'var(--blue)' : '#C4C4C4'}`, flexShrink: 0, marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {on && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--blue)' }} />}
-                    </span>
-                    <span style={{ flex: 1 }}>
-                      <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: on ? 'var(--blue-dark)' : 'var(--text)' }}>{m.label}</span>
-                      <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>{m.desc}</span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {n.mode === 'interval' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ flex: 1, fontSize: 13 }}>Fréquence</div>
-                  <Stepper value={n.every_h} display={`${n.every_h} h`} min={1} max={8}
-                    onDec={() => patchNotif({ every_h: Math.max(1, n.every_h - 1) })}
-                    onInc={() => patchNotif({ every_h: Math.min(8, n.every_h + 1) })} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ flex: 1, fontSize: 13 }}>À partir de</div>
-                  <Stepper value={n.start_h} display={hLabel(n.start_h)} min={0} max={n.end_h - 1} wide
-                    onDec={() => patchNotif({ start_h: Math.max(0, n.start_h - 1) })}
-                    onInc={() => patchNotif({ start_h: Math.min(n.end_h - 1, n.start_h + 1) })} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ flex: 1, fontSize: 13 }}>Jusqu'à</div>
-                  <Stepper value={n.end_h} display={hLabel(n.end_h)} min={n.start_h + 1} max={23} wide
-                    onDec={() => patchNotif({ end_h: Math.max(n.start_h + 1, n.end_h - 1) })}
-                    onInc={() => patchNotif({ end_h: Math.min(23, n.end_h + 1) })} />
-                </div>
-              </div>
-            )}
-
-            {n.mode === 'once' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1, fontSize: 13 }}>Heure du rappel</div>
-                <Stepper value={n.once_h} display={hLabel(n.once_h)} min={0} max={23} wide
-                  onDec={() => patchNotif({ once_h: Math.max(0, n.once_h - 1) })}
-                  onInc={() => patchNotif({ once_h: Math.min(23, n.once_h + 1) })} />
-              </div>
-            )}
-
-            {n.mode === 'smart' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ flex: 1, fontSize: 13 }}>Vérifier à</div>
-                  <Stepper value={n.smart_h} display={hLabel(n.smart_h)} min={0} max={23} wide
-                    onDec={() => patchNotif({ smart_h: Math.max(0, n.smart_h - 1) })}
-                    onInc={() => patchNotif({ smart_h: Math.min(23, n.smart_h + 1) })} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ flex: 1, fontSize: 13 }}>Me prévenir si je suis sous</div>
-                  <Stepper value={n.smart_threshold} display={`${n.smart_threshold} %`} min={20} max={90}
-                    onDec={() => patchNotif({ smart_threshold: Math.max(20, n.smart_threshold - 10) })}
-                    onInc={() => patchNotif({ smart_threshold: Math.min(90, n.smart_threshold + 10) })} />
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, paddingTop: 12, borderTop: '0.5px solid var(--border)' }}>
-              <div style={{ flex: 1, fontSize: 13 }}>Ne plus rappeler une fois l'objectif atteint</div>
-              <ToggleSwitch checked={n.stop_when_done !== false} onClick={() => patchNotif({ stop_when_done: !(n.stop_when_done !== false) })} />
-            </div>
-          </div>
-        )}
-      </div>
-    </>
-  )
-}
+// Champs de `settings` réellement pilotés par les écrans Objectifs / Répartition.
+// `goals` est une copie figée de `settings` prise au chargement : ne renvoyer que
+// ces clés à la sauvegarde évite d'écraser en base un changement fait entre-temps
+// ailleurs (ex. un toggle notification) avec sa valeur périmée.
+const GOAL_FIELDS = ['goal_kcal', 'goal_proteines', 'goal_glucides', 'goal_lipides', 'goal_fibres', 'meal_overrides', 'meal_enabled']
 
 export default function ProfilePage() {
   const toast = useToast()
@@ -506,22 +36,16 @@ export default function ProfilePage() {
   const { entries: measurementEntries } = useMeasurements()
   const { supported: pushSupported, permission: pushPermission, subscribed: pushSubscribed, loading: pushLoading, subscribe: subscribePush } = usePushSubscription()
 
-  // Les préférences de notification s'appliquent immédiatement (pas de bouton
-  // "Sauvegarder") — contrairement aux objectifs nutritionnels, ce ne sont
-  // pas des valeurs qu'on ajuste plusieurs fois avant de valider.
-  const [enablingPush, setEnablingPush] = useState(false)
-  const handleEnablePush = async () => {
-    setEnablingPush(true)
-    const { error } = await subscribePush()
-    setEnablingPush(false)
-    if (error) toast(pushPermission === 'denied' ? 'Permission refusée' : "Impossible d'activer les notifications")
-    else toast('✓ Notifications activées !')
-  }
+  // ── Navigation interne (hub ↔ écran de détail) ─────────────────────────────
+  // section === null → le hub. Sinon on affiche l'écran correspondant.
+  // Le bouton retour Android/navigateur est géré par useBackButton dans
+  // SectionScreen : il ramène au hub avant de fermer l'overlay Profil.
+  const [section, setSection] = useState(null)
 
   const openMeasurements = () => navigate('/mensurations', { state: { backgroundLocation: location.state?.backgroundLocation || location } })
   const latestWeight = measurementEntries.find(e => e.poids_kg != null)?.poids_kg
 
-  // ── Infos personnelles ──────────────────────────────────────────────────
+  // ── Infos personnelles ────────────────────────────────────────────────────
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [age, setAge] = useState('')
@@ -545,7 +69,8 @@ export default function ProfilePage() {
     }
   }, [profile])
 
-  const markProfileDirty = (setter) => (v) => { setter(v); setProfileDirty(true) }
+  const SETTERS = { prenom: setPrenom, nom: setNom, age: setAge, sexe: setSexe, tailleCm: setTailleCm }
+  const setInfoField = (field, value) => { SETTERS[field]?.(value); setProfileDirty(true) }
 
   const saveProfile = async () => {
     setSavingProfile(true)
@@ -562,21 +87,23 @@ export default function ProfilePage() {
     else toast('Erreur lors de la sauvegarde')
   }
 
-  // ── Objectifs nutritionnels ─────────────────────────────────────────────
+  // Le niveau d'activité ne se règle que depuis le calculateur (écran Objectifs) :
+  // un choix unique parmi une liste → sauvegarde immédiate, comme les toggles,
+  // plutôt que de traîner un état "à sauvegarder" dans un autre écran.
+  const handleActivite = async (key) => {
+    setNiveauActivite(key)
+    await updateProfile({ niveau_activite: key })
+  }
+
+  // ── Objectifs nutritionnels ──────────────────────────────────────────────
   const [goals, setGoals] = useState(null)
   const [goalsDirty, setGoalsDirty] = useState(false)
 
   useEffect(() => {
     if (!settingsLoading && settings && !goals) setGoals({ ...settings })
-    }, [settings, settingsLoading])
+  }, [settings, settingsLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setGoal = (k, v) => { setGoals(g => ({ ...g, [k]: v })); setGoalsDirty(true) }
-
-  // Champs réellement gérés par cette section. `goals` est une copie figée de
-  // `settings` prise au chargement de la page : si on renvoyait l'objet entier
-  // à la sauvegarde, on écraserait en base tout changement fait entre-temps
-  // ailleurs sur la page (ex. toggle notification), avec sa valeur périmée.
-  const GOAL_FIELDS = ['goal_kcal', 'goal_proteines', 'goal_glucides', 'goal_lipides', 'goal_fibres', 'meal_overrides', 'meal_enabled']
 
   const saveGoals = async () => {
     const patch = {}
@@ -590,61 +117,124 @@ export default function ProfilePage() {
     if (!needs) return
     setGoals(g => ({ ...g, ...needs.macros }))
     setGoalsDirty(true)
-    toast('✓ Objectifs mis à jour, pense à les sauvegarder ci-dessous')
+    toast('✓ Objectifs mis à jour, pense à les enregistrer')
   }
 
-  // ── Répartition par repas (auto basé sur la science, surchargeable) ────
-  const mealTargets = useMemo(() => computeMealTargets(goals), [goals])
-
-  const setMealOverride = (meal, key, rawValue) => {
-    setGoals(g => {
-      const overrides = { ...(g.meal_overrides || {}) }
-      const mealOv = { ...(overrides[meal] || {}) }
-      if (rawValue === '') {
-        delete mealOv[key]
-      } else {
-        const num = parseFloat(rawValue)
-        if (!isNaN(num)) mealOv[key] = num
-      }
-      if (Object.keys(mealOv).length === 0) delete overrides[meal]
-      else overrides[meal] = mealOv
-      return { ...g, meal_overrides: overrides }
-    })
-    setGoalsDirty(true)
+  // ── Notifications ────────────────────────────────────────────────────────
+  const [enablingPush, setEnablingPush] = useState(false)
+  const handleEnablePush = async () => {
+    setEnablingPush(true)
+    const { error } = await subscribePush()
+    setEnablingPush(false)
+    if (error) toast(pushPermission === 'denied' ? 'Permission refusée' : "Impossible d'activer les notifications")
+    else toast('✓ Notifications activées !')
   }
 
-  const resetMealOverrides = (meal) => {
-    setGoals(g => {
-      const overrides = { ...(g.meal_overrides || {}) }
-      delete overrides[meal]
-      return { ...g, meal_overrides: overrides }
-    })
-    setGoalsDirty(true)
-  }
+  const handleSignOut = async () => { await signOut() }
 
-  const toggleMealEnabled = (meal) => {
-    setGoals(g => {
-      const enabled = { ...MEAL_ENABLED_DEFAULTS, ...(g.meal_enabled || {}) }
-      enabled[meal] = !enabled[meal]
-      // Quand on désactive, on purge les surcharges pour rendre le budget aux repas auto actifs
-      const overrides = { ...(g.meal_overrides || {}) }
-      if (!enabled[meal]) delete overrides[meal]
-      return { ...g, meal_enabled: enabled, meal_overrides: overrides }
-    })
-    setGoalsDirty(true)
-  }
-
-  const handleSignOut = async () => {
-    await signOut()
-  }
+  const [aboutOpen, setAboutOpen] = useState(false)
 
   if (profileLoading || settingsLoading || !goals) return <Loader />
 
   const initials = ((prenom?.[0] || '') + (nom?.[0] || '')).toUpperCase() || (user?.email?.[0] || '?').toUpperCase()
+  const back = () => setSection(null)
+
+  // ── Écrans de détail ─────────────────────────────────────────────────────
+  if (section === 'infos') {
+    return (
+      <InfosSection
+        prenom={prenom} nom={nom} age={age} sexe={sexe} tailleCm={tailleCm}
+        onChange={setInfoField}
+        dirty={profileDirty} saving={savingProfile} onSave={saveProfile}
+        onBack={back}
+      />
+    )
+  }
+
+  if (section === 'objectifs') {
+    return (
+      <GoalsSection
+        goals={goals} setGoal={setGoal}
+        dirty={goalsDirty} saving={false} onSave={saveGoals}
+        onBack={back}
+        calc={{
+          sexe, tailleCm, niveauActivite, onActivite: handleActivite,
+          objective: calcObjective, onObjective: setCalcObjective,
+          targetWeight: calcTargetWeight, onTargetWeight: setCalcTargetWeight,
+          weeks: calcWeeks, onWeeks: setCalcWeeks,
+          poidsKg: latestWeight, age,
+          onOpenMeasurements: openMeasurements,
+          onApply: applyCalorieNeeds,
+        }}
+      />
+    )
+  }
+
+  if (section === 'repartition') {
+    return (
+      <MealSplitSection
+        goals={goals} setGoals={setGoals} setGoalsDirty={setGoalsDirty}
+        dirty={goalsDirty} saving={false} onSave={saveGoals}
+        onBack={back}
+      />
+    )
+  }
+
+  if (section === 'hydratation') {
+    return (
+      <HydrationSection
+        water={settings.water}
+        onPatch={(patch) => updateSettings({ water: { ...settings.water, ...patch } })}
+        weightKg={latestWeight}
+        pushGranted={pushPermission === 'granted'}
+        onBack={back}
+      />
+    )
+  }
+
+  if (section === 'notifications') {
+    return (
+      <NotificationsSection
+        pushSupported={pushSupported}
+        pushPermission={pushPermission}
+        pushLoading={pushLoading}
+        enablingPush={enablingPush}
+        onEnablePush={handleEnablePush}
+        reminderEnabled={settings.notif_reminder_enabled !== false}
+        socialEnabled={settings.notif_social_enabled !== false}
+        onToggleReminder={() => updateSettings({ notif_reminder_enabled: !(settings.notif_reminder_enabled !== false) })}
+        onToggleSocial={() => updateSettings({ notif_social_enabled: !(settings.notif_social_enabled !== false) })}
+        onBack={back}
+      />
+    )
+  }
+
+  if (section === 'jour') {
+    return (
+      <TodaySection
+        manquesEnabled={settings.afficher_manques_jour !== false}
+        onToggleManques={() => updateSettings({ afficher_manques_jour: !(settings.afficher_manques_jour !== false) })}
+        onBack={back}
+      />
+    )
+  }
+
+  // ── Hub ──────────────────────────────────────────────────────────────────
+  const infosSummary = (age || tailleCm)
+    ? [age && `${age} ans`, tailleCm && `${tailleCm} cm`].filter(Boolean).join(' · ')
+    : 'À compléter'
+  const repartitionCustom = Object.keys(goals.meal_overrides || {}).length > 0
+    || Object.values(goals.meal_enabled || {}).some(v => v === false)
+  const w = settings.water || {}
+  const hydrationSummary = `${litres(w.goal_ml)} L/j`
+  const notifSummary = pushPermission === 'granted'
+    ? ((settings.notif_reminder_enabled !== false || settings.notif_social_enabled !== false) ? 'Activées' : 'Désactivées')
+    : 'À activer'
+  const jourSummary = settings.afficher_manques_jour !== false ? 'Manques affichés' : 'Manques masqués'
 
   return (
     <div className="page-content">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 20 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
         <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--green-light)', color: 'var(--green-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, marginBottom: 10 }}>
           {initials}
         </div>
@@ -652,223 +242,46 @@ export default function ProfilePage() {
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{user?.email}</div>
       </div>
 
-      <div className="section-title">Informations personnelles</div>
-      <div className="card" style={{ marginBottom: profileDirty ? 12 : 20, overflow: 'hidden' }}>
-        <Row icon={<User size={18} />} label="Prénom">
-          <input className="input-sm" style={{ width: 120, textAlign: 'left' }} value={prenom} onChange={e => markProfileDirty(setPrenom)(e.target.value)} placeholder="—" />
-        </Row>
-        <Row icon={<User size={18} />} label="Nom">
-          <input className="input-sm" style={{ width: 120, textAlign: 'left' }} value={nom} onChange={e => markProfileDirty(setNom)(e.target.value)} placeholder="—" />
-        </Row>
-        <Row icon={<Calendar size={18} />} label="Âge">
-          <input className="input-sm" type="number" value={age} onChange={e => markProfileDirty(setAge)(e.target.value)} placeholder="—" />
-        </Row>
-        <Row icon={<User size={18} />} label="Sexe">
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[['F', 'Femme'], ['H', 'Homme']].map(([key, label]) => (
-              <button key={key} onClick={() => markProfileDirty(setSexe)(key)} style={{
-                padding: '6px 10px', borderRadius: 7, fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)',
-                background: sexe === key ? 'var(--green)' : 'var(--gray-bg)',
-                color: sexe === key ? 'white' : 'var(--text-muted)',
-                border: '1px solid var(--border)',
-              }}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </Row>
-        <Row icon={<Ruler size={18} />} label="Taille">
-          <input className="input-sm" type="number" style={{ width: 64 }} value={tailleCm} onChange={e => markProfileDirty(setTailleCm)(e.target.value)} placeholder="—" />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>cm</span>
-        </Row>
-        <div
-          onClick={openMeasurements}
-          style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderBottom: '0.5px solid var(--border)', gap: 12, cursor: 'pointer' }}
-        >
-          <div style={{ color: 'var(--green)', flexShrink: 0 }}><Scale size={18} /></div>
-          <div style={{ flex: 1, fontSize: 14 }}>Poids & mensurations</div>
-          <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>{latestWeight != null ? `${latestWeight} kg` : '—'}</div>
-          <ChevronRight size={16} color="var(--text-hint)" />
-        </div>
-        <Row icon={<Mail size={18} />} label="Email">
-          <span style={{ fontSize: 13, color: 'var(--text-hint)' }}>{user?.email}</span>
-        </Row>
-      </div>
-
-      {profileDirty && (
-        <button className="btn-primary" onClick={saveProfile} disabled={savingProfile} style={{ marginBottom: 20, opacity: savingProfile ? 0.7 : 1 }}>
-          {savingProfile ? 'Sauvegarde...' : '💾 Sauvegarder le profil'}
-        </button>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Target size={16} color="var(--green)" />
-        <div className="section-title" style={{ marginBottom: 0 }}>Objectifs nutritionnels</div>
-      </div>
-
-      <CalorieCalculatorCard
-        sexe={sexe}
-        tailleCm={tailleCm}
-        niveauActivite={niveauActivite}
-        onActivite={markProfileDirty(setNiveauActivite)}
-        objective={calcObjective}
-        onObjective={setCalcObjective}
-        targetWeight={calcTargetWeight}
-        onTargetWeight={setCalcTargetWeight}
-        weeks={calcWeeks}
-        onWeeks={setCalcWeeks}
-        poidsKg={latestWeight}
-        age={age}
-        onOpenMeasurements={openMeasurements}
-        onApply={applyCalorieNeeds}
-      />
-
-      <div className="card" style={{ marginBottom: goalsDirty ? 12 : 20, overflow: 'hidden' }}>
-        <GoalField icon={<Flame size={18} />}    label="Calories"   value={goals.goal_kcal}      unit="kcal" color="var(--coral)"  onChange={v => setGoal('goal_kcal', v)} />
-        <GoalField icon={<Dumbbell size={18} />} label="Protéines"  value={goals.goal_proteines} unit="g"    color="var(--green)"  onChange={v => setGoal('goal_proteines', v)} />
-        <GoalField icon={<Wheat size={18} />}    label="Glucides"   value={goals.goal_glucides}  unit="g"    color="var(--amber)"  onChange={v => setGoal('goal_glucides', v)} />
-        <GoalField icon={<Droplets size={18} />} label="Lipides"    value={goals.goal_lipides}   unit="g"    color="var(--coral)"  onChange={v => setGoal('goal_lipides', v)} />
-        <GoalField icon={<Leaf size={18} />}     label="Fibres"     value={goals.goal_fibres}    unit="g"    color="var(--blue)"   onChange={v => setGoal('goal_fibres', v)} />
-      </div>
-
-      {goalsDirty && (
-        <button className="btn-primary" onClick={saveGoals} style={{ marginBottom: 20 }}>💾 Sauvegarder les objectifs</button>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Target size={16} color="var(--green)" />
-        <div className="section-title" style={{ marginBottom: 0 }}>Répartition par repas</div>
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 10 }}>
-        Calculée automatiquement à partir de tes objectifs ci-dessus (calories réparties selon les repères nutritionnels usuels, protéines réparties à parts égales entre les 3 repas principaux pour mieux soutenir la synthèse musculaire). Modifie une valeur pour la fixer manuellement, ou appuie sur « Auto » pour revenir au calcul automatique.
-      </div>
-
-      {MEALS_ORDER.map(meal => (
-        <MealTargetCard
-          key={meal}
-          meal={meal}
-          target={mealTargets[meal]}
-          allTargets={mealTargets}
-          goalKcal={goals.goal_kcal}
-          onChange={(key, val) => setMealOverride(meal, key, val)}
-          onReset={() => resetMealOverrides(meal)}
-          onToggleEnabled={() => toggleMealEnabled(meal)}
-        />
-      ))}
-
-      {/* Toggle Compléments alimentaires — pas un repas, pas de calcul kcal/macros */}
-      <div className="card" style={{ padding: '12px 14px', marginBottom: 8, opacity: goals.meal_enabled?.['Compléments'] !== false ? 1 : 0.6, transition: 'opacity .2s' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Pill size={15} color={goals.meal_enabled?.['Compléments'] !== false ? 'var(--purple, #8b5cf6)' : 'var(--text-hint)'} />
-            <div style={{ fontWeight: 700, fontSize: 13, color: goals.meal_enabled?.['Compléments'] !== false ? 'var(--text)' : 'var(--text-hint)' }}>
-              Compléments
-            </div>
-            {goals.meal_enabled?.['Compléments'] === false && (
-              <span style={{ fontSize: 10, color: 'var(--text-hint)', background: 'var(--gray-bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px' }}>désactivé</span>
-            )}
-          </div>
-          <button
-            onClick={() => toggleMealEnabled('Compléments')}
-            style={{
-              width: 36, height: 20, borderRadius: 10, position: 'relative', flexShrink: 0,
-              background: goals.meal_enabled?.['Compléments'] !== false ? 'var(--green)' : 'var(--border-md)',
-              transition: 'background .2s',
-            }}
-          >
-            <div style={{
-              position: 'absolute', top: 2,
-              left: goals.meal_enabled?.['Compléments'] !== false ? 18 : 2,
-              width: 16, height: 16, borderRadius: '50%', background: 'white',
-              transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
-            }} />
-          </button>
-        </div>
-      </div>
-
-      {goalsDirty && (
-        <button className="btn-primary" onClick={saveGoals} style={{ marginTop: 4, marginBottom: 20 }}>💾 Sauvegarder les objectifs</button>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Lightbulb size={16} color="var(--green)" />
-        <div className="section-title" style={{ marginBottom: 0 }}>Page du jour</div>
-      </div>
-
+      <div className="section-title">Profil &amp; objectifs</div>
       <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
-        <Row icon={<Lightbulb size={18} />} label="Manques du jour et suggestions">
-          <ToggleSwitch
-            checked={settings.afficher_manques_jour !== false}
-            onClick={() => updateSettings({ afficher_manques_jour: !(settings.afficher_manques_jour !== false) })}
-          />
-        </Row>
+        <NavRow icon={<User size={18} />} label="Mes informations" value={infosSummary} onClick={() => setSection('infos')} />
+        <NavRow icon={<Scale size={18} />} label="Poids & mensurations" value={latestWeight != null ? `${latestWeight} kg` : '—'} onClick={openMeasurements} />
+        <NavRow icon={<Target size={18} />} label="Objectifs nutritionnels" value={`${goals.goal_kcal} kcal`} onClick={() => setSection('objectifs')} />
+        <NavRow icon={<UtensilsCrossed size={18} />} label="Répartition par repas" value={repartitionCustom ? 'Personnalisée' : 'Automatique'} onClick={() => setSection('repartition')} />
       </div>
 
-      <HydrationSection
-        water={settings.water}
-        onPatch={(patch) => updateSettings({ water: { ...settings.water, ...patch } })}
-        weightKg={latestWeight}
-        pushGranted={pushPermission === 'granted'}
-      />
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Bell size={16} color="var(--green)" />
-        <div className="section-title" style={{ marginBottom: 0 }}>Notifications</div>
-      </div>
-
+      <div className="section-title">Rappels &amp; affichage</div>
       <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
-        {!pushSupported ? (
-          <div style={{ padding: '13px 16px', fontSize: 12.5, color: 'var(--text-hint)' }}>
-            Non disponible sur ce navigateur.
-          </div>
-        ) : pushPermission !== 'granted' ? (
-          <div style={{ padding: '13px 16px' }}>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-              Reçois un rappel si tu n'as rien noté, et sois prévenue de l'activité de tes amies. Fonctionne mieux si l'app est ajoutée à l'écran d'accueil.
-            </div>
-            <button className="btn-primary" onClick={handleEnablePush} disabled={enablingPush || pushLoading}>
-              {enablingPush ? '...' : 'Activer les notifications'}
-            </button>
-            {pushPermission === 'denied' && (
-              <div style={{ fontSize: 12, color: 'var(--coral)', marginTop: 8 }}>
-                Permission refusée — à réactiver dans les réglages du navigateur pour ce site.
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <Row icon={<Bell size={18} />} label="Rappel si rien noté">
-              <ToggleSwitch
-                checked={settings.notif_reminder_enabled !== false}
-                onClick={() => updateSettings({ notif_reminder_enabled: !(settings.notif_reminder_enabled !== false) })}
-              />
-            </Row>
-            <Row icon={<Users size={18} />} label="Activité sociale">
-              <ToggleSwitch
-                checked={settings.notif_social_enabled !== false}
-                onClick={() => updateSettings({ notif_social_enabled: !(settings.notif_social_enabled !== false) })}
-              />
-            </Row>
-          </>
-        )}
+        <NavRow icon={<Droplet size={18} />} label="Hydratation" value={hydrationSummary} onClick={() => setSection('hydratation')} />
+        <NavRow icon={<Bell size={18} />} label="Notifications" value={notifSummary} onClick={() => setSection('notifications')} />
+        <NavRow icon={<Lightbulb size={18} />} label="Page du jour" value={jourSummary} onClick={() => setSection('jour')} />
       </div>
 
       <button
         onClick={handleSignOut}
         className="card"
-        style={{ width: '100%', padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--coral)', fontFamily: 'var(--font)', fontSize: 14, fontWeight: 600, marginBottom: 16 }}
+        style={{ width: '100%', padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--coral)', fontFamily: 'var(--font)', fontSize: 14, fontWeight: 600, marginBottom: 20 }}
       >
         <LogOut size={18} />
         Se déconnecter
       </button>
 
-      <div className="card" style={{ padding: '14px 16px' }}>
-        <div className="section-title">À propos</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Données nutritionnelles : <strong>Table Ciqual 2025</strong> (ANSES) + <strong>Open Food Facts</strong><br/>
-          Base de données : <strong>Supabase</strong><br/>
-          Version : 1.0.0
-        </div>
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <button
+          onClick={() => setAboutOpen(o => !o)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', fontFamily: 'var(--font)', textAlign: 'left', background: 'none' }}
+        >
+          <Info size={18} color="var(--text-hint)" />
+          <div style={{ flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>À propos</div>
+          <span style={{ fontSize: 12.5, color: 'var(--text-hint)' }}>v1.0.0</span>
+          {aboutOpen ? <ChevronDown size={16} color="var(--text-hint)" /> : <ChevronRight size={16} color="var(--text-hint)" />}
+        </button>
+        {aboutOpen && (
+          <div style={{ padding: '0 16px 14px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Données nutritionnelles : <strong>Table Ciqual 2025</strong> (ANSES) + <strong>Open Food Facts</strong><br />
+            Base de données : <strong>Supabase</strong>
+          </div>
+        )}
       </div>
     </div>
   )
