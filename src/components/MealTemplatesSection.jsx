@@ -10,6 +10,7 @@ import AddToJournalSheet from './AddToJournalSheet'
 import MealTemplateSortModal from './MealTemplateSortModal'
 import { saveMealTemplate, deleteMealTemplate } from '../hooks/useMealTemplates'
 import { getNutriBadge } from '../lib/nutriBadge'
+import { todayStr } from '../lib/dates'
 import { getRecipeCategoryIcon, getRecipeCategoryColor } from '../lib/categoryIcons'
 import { RECIPE_CATEGORIES, UNCATEGORIZED_LABEL } from '../lib/recipeCategories'
 import {
@@ -175,7 +176,7 @@ const MealTemplatesSection = forwardRef(function MealTemplatesSection({ active }
   const [editTarget, setEditTarget] = useState(null) // null = fermé, {} = nouveau, repas = édition
   const [addToJournalTarget, setAddToJournalTarget] = useState(null)
   const [planTarget, setPlanTarget] = useState(null) // repas type en cours de planification
-  const [journalDate, setJournalDate] = useState(new Date().toISOString().slice(0, 10))
+  const [journalDate, setJournalDate] = useState(todayStr())
   const [journalMeal, setJournalMeal] = useState('Déjeuner')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState(DEFAULT_SORT)
@@ -248,7 +249,7 @@ const MealTemplatesSection = forwardRef(function MealTemplatesSection({ active }
   }
 
   const handleAddToJournal = async (repas) => {
-    setJournalDate(new Date().toISOString().slice(0, 10))
+    setJournalDate(todayStr())
     setAddToJournalTarget(repas)
   }
 

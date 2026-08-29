@@ -1,6 +1,7 @@
 import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
 import { MEALS_ORDER as MEALS } from '../lib/nutrients'
+import { todayStr } from '../lib/dates'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AddToJournalSheet — choix du jour + du repas avant d'ajouter un groupe
@@ -21,9 +22,9 @@ import { MEALS_ORDER as MEALS } from '../lib/nutrients'
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AddToJournalSheet({ nom, journalDate, onDateChange, journalMeal, onMealChange, qty, onQtyChange, onConfirm, onClose }) {
   useBackButton(onClose)
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
-  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  const today = todayStr()
+  const yesterdayStr = todayStr(-1)
+  const tomorrowStr = todayStr(1)
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -61,9 +62,9 @@ export default function AddToJournalSheet({ nom, journalDate, onDateChange, jour
             Hier
           </button>
           <button
-            onClick={() => onDateChange(todayStr)}
+            onClick={() => onDateChange(today)}
             className="chip"
-            style={journalDate === todayStr ? { background: 'var(--green)', color: 'white' } : undefined}
+            style={journalDate === today ? { background: 'var(--green)', color: 'white' } : undefined}
           >
             Aujourd'hui
           </button>

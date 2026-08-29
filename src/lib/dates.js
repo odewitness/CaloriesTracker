@@ -10,6 +10,17 @@ export function fmt(date) {
   return `${y}-${m}-${d}`
 }
 
+// 'YYYY-MM-DD' (fuseau LOCAL) pour aujourd'hui, avec un décalage optionnel de
+// `offsetDays` jours (−1 = hier, +1 = demain). À utiliser partout où l'on veut
+// "le jour courant" : `new Date().toISOString().slice(0, 10)` renvoie la date
+// UTC et bascule donc d'un jour trop tôt entre minuit et 1h/2h du matin en
+// France — ce qui ferait enregistrer un aliment sur la mauvaise journée.
+export function todayStr(offsetDays = 0) {
+  const d = new Date()
+  if (offsetDays) d.setDate(d.getDate() + offsetDays)
+  return fmt(d)
+}
+
 // "Aujourd'hui" / "Hier" / "Demain" / sinon "lundi 3 mars" (fr-FR).
 export function dateLabel(date) {
   const today = new Date(); today.setHours(0, 0, 0, 0)

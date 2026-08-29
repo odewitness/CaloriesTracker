@@ -5,6 +5,7 @@ import { ALL_NUTRIENT_KEYS, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import AddFoodModal from './AddFoodModal'
 import { useJournal } from '../hooks/useJournal'
 import { useBackButton } from '../hooks/useBackButton'
+import { todayStr } from '../lib/dates'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import Loader from './Loader'
@@ -20,10 +21,10 @@ import EmptyState from './EmptyState'
 function ImportFromDayModal({ onImport, onClose }) {
   useBackButton(onClose)
   const toast = useToast()
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const today = todayStr()
+  const yesterdayStr = todayStr(-1)
 
-  const [date, setDate] = useState(todayStr)
+  const [date, setDate] = useState(today)
   const [selectedMeal, setSelectedMeal] = useState(MEALS[0])
   const { entries, loading } = useJournal(date)
   const [checked, setChecked] = useState({})
@@ -74,9 +75,9 @@ function ImportFromDayModal({ onImport, onClose }) {
             Hier
           </button>
           <button
-            onClick={() => setDate(todayStr)}
+            onClick={() => setDate(today)}
             className="chip"
-            style={date === todayStr ? { background: 'var(--green)', color: 'white' } : undefined}
+            style={date === today ? { background: 'var(--green)', color: 'white' } : undefined}
           >
             Aujourd'hui
           </button>
@@ -84,7 +85,7 @@ function ImportFromDayModal({ onImport, onClose }) {
             type="date"
             className="input"
             value={date}
-            max={todayStr}
+            max={today}
             onChange={e => setDate(e.target.value)}
             style={{ flex: 1 }}
           />

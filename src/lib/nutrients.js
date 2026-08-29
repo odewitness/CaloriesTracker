@@ -411,9 +411,9 @@ export function computeTotals(entries) {
 // ── getDayStatus ─────────────────────────────────────────────────────────
 // Statut couleur d'un jour pour le calendrier nutritionnel :
 //   'none' — aucune entrée journal ce jour-là → gris
-//   'ok'   — kcal ET protéines ET glucides ET lipides tous à ±5% de l'objectif → vert
+//   'ok'   — kcal ET protéines ET glucides ET lipides tous à ±15% de l'objectif → vert
 //   'off'  — au moins une des 4 valeurs sort de cette bande → rouge
-// Tolérance volontairement stricte (±5%) : la couleur reflète un vrai
+// Tolérance (±15%, cf. DAY_STATUS_TOLERANCE) : la couleur reflète un vrai
 // suivi précis, pas une simple présence de données.
 export const DAY_STATUS_TOLERANCE = 0.15
 

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Ajouter un aliment juste après minuit tombe sur le bon jour',
+    description: "Si tu notais un aliment entre minuit et 2h du matin, l'app te proposait par défaut la veille : le bouton \"Aujourd'hui\", la date pré-remplie pour un repas type ou une recette, et l'historique pouvaient tous être décalés d'un jour. C'est corrigé, la nuit comme le reste de la journée.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Plus de compléments dans les suggestions "À combler aujourd\'hui"',
     description: "Les compléments alimentaires n'apparaissent plus dans les suggestions de la section \"À combler aujourd'hui\" : elles s'affichaient avec une quantité en grammes (\"100 g\") qui n'avait aucun sens pour des gélules ou des comprimés. Tes compléments restent gérés comme avant dans leur propre section, avec le compteur de doses.",
   },

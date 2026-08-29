@@ -27,6 +27,7 @@ import AddToJournalSheet from '../components/AddToJournalSheet'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
 import { useToast } from '../lib/toast'
+import { todayStr } from '../lib/dates'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerPage — parcours de la base Ciqual pour trouver des aliments adaptés
@@ -257,7 +258,7 @@ export default function ExplorerPage() {
   const { settings } = useSettings()
   const toast = useToast()
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const today = useMemo(() => todayStr(), [])
   const { entries } = useJournal(today)
 
   // Ouverture depuis une pastille de manque de la page du jour (voir

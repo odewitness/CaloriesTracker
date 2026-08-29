@@ -12,6 +12,7 @@ import SortModal from './SortModal'
 import AddToJournalSheet from './AddToJournalSheet'
 import ShareRecipeModal from './ShareRecipeModal'
 import { getRecipeCategoryIcon, getRecipeCategoryColor } from '../lib/categoryIcons'
+import { todayStr } from '../lib/dates'
 import {
   DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort,
   filterByCategories, filterByTimeRanges, isCustomFilter, describeActiveFilters,
@@ -259,11 +260,11 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
 
   // ── "Ajouter au journal" depuis le détail d'une recette ───────────────────
   const [addToJournalTarget, setAddToJournalTarget] = useState(null) // { nom, items } | null
-  const [journalDate, setJournalDate] = useState(new Date().toISOString().slice(0, 10))
+  const [journalDate, setJournalDate] = useState(todayStr())
   const [journalMeal, setJournalMeal] = useState('Déjeuner')
 
   const handleAddToJournal = (items, recette) => {
-    setJournalDate(new Date().toISOString().slice(0, 10))
+    setJournalDate(todayStr())
     setAddToJournalTarget({ nom: recette.nom, items })
   }
 

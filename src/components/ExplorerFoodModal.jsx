@@ -7,6 +7,7 @@ import { useBackButton } from '../hooks/useBackButton'
 import { useFavorites } from '../hooks/useFavorites'
 import { useJournal } from '../hooks/useJournal'
 import { scaleFood, ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { todayStr } from '../lib/dates'
 import { getPortion, getCategoryLabel, findBetterAlternative, formatValue } from '../lib/ciqualExplorer'
 import { patchCachedPortions } from '../hooks/useCiqualCatalog'
 import MacroPreview from './MacroPreview'
@@ -43,7 +44,7 @@ export default function ExplorerFoodModal({ food, onClose, foods, gaps, onPickFo
   const initialPortion = getPortion(food)
   const [qty, setQty] = useState(String(initialPortion.g))
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [journalDate, setJournalDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [journalDate, setJournalDate] = useState(() => todayStr())
   const [journalMeal, setJournalMeal] = useState('Déjeuner')
   const [saving, setSaving] = useState(false)
 

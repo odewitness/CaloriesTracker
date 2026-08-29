@@ -8,6 +8,7 @@ import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
 import NutrientPanel from '../components/NutrientPanel'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { todayStr } from '../lib/dates'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
 
@@ -20,10 +21,6 @@ const TABS = [
 
 const MEAL_ORDER = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 const EMPTY_SET = new Set()
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 // Bornes [start, end] (inclus, format YYYY-MM-DD) de la période affichée + libellé FR.
 function getPeriodBounds(tab, anchor) {
@@ -198,7 +195,7 @@ export default function HistoryPage() {
 
   // Série en cours : indépendante de la période affichée, toujours calculée
   // depuis aujourd'hui en remontant (comme avant).
-  const streakFrom = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 60); return d.toISOString().slice(0, 10) }, [])
+  const streakFrom = useMemo(() => todayStr(-60), [])
   const { excludedDates: streakExcludedDates } = useExcludedDaysRange(streakFrom, today)
 
   useEffect(() => {
@@ -215,8 +212,7 @@ export default function HistoryPage() {
       for (const e of (data || [])) byDate[e.date] = (byDate[e.date] || 0) + (e.energie_kcal || 0)
       let s = 0
       for (let i = 0; i < 60; i++) {
-        const d = new Date(); d.setDate(d.getDate() - i)
-        const dStr = d.toISOString().slice(0, 10)
+        const dStr = todayStr(-i)
         if (streakExcludedDates.has(dStr)) continue // jour exclu → ignoré, ni compté ni interrompu
         const kcal = byDate[dStr]
         if (!kcal) break

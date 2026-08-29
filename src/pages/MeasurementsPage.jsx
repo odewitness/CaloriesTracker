@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Scale, Ruler, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { useMeasurements } from '../hooks/useMeasurements'
 import { useToast } from '../lib/toast'
+import { todayStr } from '../lib/dates'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
 import MetricChart from '../components/MetricChart'
@@ -22,10 +23,6 @@ const METRICS = [
   { key: 'poids_kg', label: 'Poids', unit: 'kg', color: 'var(--green)' },
   ...MEASURE_FIELDS.map(f => ({ ...f, unit: 'cm' })),
 ]
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 function emptyForm(date) {
   const f = { date, poids_kg: '' }

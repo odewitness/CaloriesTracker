@@ -91,7 +91,11 @@ export function useSocialNotifications() {
 
     collected.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     setItems(collected)
-    setHasUnseen(collected.some(i => i.createdAt > lastSeen))
+    // Comparaison en Date, pas en chaînes : les timestamps Postgres arrivent en
+    // "...+00:00" alors que markSeen écrit du "...Z" (toISOString) — un ">" sur
+    // les chaînes brutes se tromperait sur les deux formats.
+    const lastSeenTime = new Date(lastSeen).getTime()
+    setHasUnseen(collected.some(i => new Date(i.createdAt).getTime() > lastSeenTime))
     setLoading(false)
   }, [user])
 
