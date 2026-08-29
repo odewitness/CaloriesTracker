@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: "La liste des boissons ne montre plus que les eaux",
+    description: "Quand tu ouvres « Autre boisson » depuis la carte Eau, la liste ne t'affiche plus que les eaux (robinet, source, minérales) au lieu de tout mélanger avec les sodas, jus et sirops. Les autres boissons restent là : tape leur nom dans la barre de recherche pour les retrouver. La section Compléments a aussi un fond blanc, comme la carte Eau.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Suis ton eau depuis la page du jour',
     description: "Une carte « Eau » est apparue sur la page du jour : appuie sur Verre, Bouteille ou Gourde pour ajouter une portion en un seul geste, la jauge se remplit au fur et à mesure. Le bouton « Autre boisson » ouvre le détail : tu y choisis ta boisson (eau du robinet par défaut, eaux minérales, thé, café… depuis la base Ciqual), tu ajustes la quantité et tu crées tes propres portions. Les minéraux et vitamines de tout ce que tu bois comptent dans tes stats, comme un aliment. Dans Profil > Hydratation, tu règles ton objectif du jour et des rappels pour penser à boire (toutes les X heures, une fois par jour, ou seulement si tu n'as pas assez bu).",
   },

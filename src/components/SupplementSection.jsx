@@ -176,7 +176,8 @@ export default function SupplementSection({ supplements, plannedSupplements = []
 
       {!collapsed && (
         <div style={{
-          background: 'var(--gray-bg)',
+          background: 'var(--white)',
+          border: '0.5px solid var(--border)',
           borderRadius: 'var(--radius-sm, 12px)',
           overflow: 'hidden',
         }}>

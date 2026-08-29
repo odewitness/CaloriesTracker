@@ -56,8 +56,14 @@ export default function AddWaterSheet({ entries = [], water, onUpdateWater, onAd
   const shownBeverages = useMemo(() => {
     const q = norm(search.trim())
     if (q) return beverages.filter((f) => norm(f.alim_nom).includes(q)).slice(0, 40)
+    // Sans recherche : on ne montre que les eaux (nom contenant « eau ») pour ne
+    // pas noyer la liste dans les sodas / jus / sirops de la catégorie Ciqual
+    // « Eaux et autres boissons ». La boisson par défaut reste épinglée en tête
+    // même si ce n'est pas une eau ; les autres boissons restent accessibles en
+    // tapant leur nom.
+    const waters = beverages.filter((f) => norm(f.alim_nom).includes('eau') && f.alim_code !== defaultBev?.alim_code)
     const head = defaultBev ? [defaultBev] : []
-    return [...head, ...beverages.filter((f) => f.alim_code !== defaultBev?.alim_code)].slice(0, 40)
+    return [...head, ...waters].slice(0, 40)
   }, [beverages, defaultBev, search])
 
   // Apports vitamines/minéraux de la portion en cours (mêmes réf. que NutrientPanel).
@@ -121,7 +127,7 @@ export default function AddWaterSheet({ entries = [], water, onUpdateWater, onAd
           <Search size={15} color="var(--text-hint)" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)' }} />
           <input
             className="input"
-            placeholder="Filtrer les eaux et boissons…"
+            placeholder="Autre boisson ? tape son nom (soda, jus, thé…)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ paddingLeft: 34, paddingRight: search ? 34 : 12 }}
