@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Ton profil est réorganisé',
+    description: "Fini le long défilement : ton profil s'ouvre maintenant sur une liste claire. Tu choisis ce que tu veux régler — tes informations, tes objectifs, la répartition par repas, l'hydratation, les notifications, ce qui s'affiche sur la page du jour — et tu entres dans un écran dédié, juste pour ça. Chaque ligne te montre déjà l'essentiel (ton objectif de calories, ton objectif d'eau…). Le calculateur de besoins caloriques est rangé dans « Objectifs nutritionnels », derrière un bouton, pour ne le sortir que quand tu en as besoin. Rien n'a disparu, tout est simplement mieux rangé.",
+  },
+  {
+    date: '2026-08-29',
     title: 'Des raccourcis rapides sur la page du jour',
     description: "Touche le bouton « ⋯ » (trois points) en haut à droite, à côté de la date, pour dérouler une petite rangée de raccourcis pour le jour affiché. « Exclure » retire ce jour de tes moyennes et de ta série en cours (« Réinclure » pour annuler). « Relevé » ouvre ta page poids et mensurations. « Planifier » te laisse prévoir un repas sur ce jour. « Partager » envoie ta journée à tes amies. La rangée reste repliée tant que tu ne l'ouvres pas.",
   },
