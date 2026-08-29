@@ -216,7 +216,18 @@ create table if not exists settings (
   -- Ajoutée le 2026-08-20 : affiche/masque la section "À combler aujourd'hui"
   -- (manques nutritionnels + suggestion) sur la page du jour (voir Profil >
   -- Page du jour, et TodayGapsSection côté client).
-  afficher_manques_jour boolean not null default true
+  afficher_manques_jour boolean not null default true,
+  -- Ajoutées le 2026-08-29 pour le tracker d'eau (voir
+  -- supabase/sql/water_tracker_setup.sql).
+  -- `water` = bloc unique { goal_ml, default_food_ref_id (alim_code Ciqual de
+  -- la boisson par défaut), portions [{id,label,ml}], card_visible, notif
+  -- {enabled, mode 'interval'|'once'|'smart', every_h, start_h, end_h, once_h,
+  -- smart_h, smart_threshold, stop_when_done} }. Fusionné côté client avec
+  -- WATER_DEFAULTS (src/lib/water.js), comme meal_enabled.
+  water jsonb not null default '{"goal_ml":2000,"default_food_ref_id":null,"portions":[{"id":"verre","label":"Verre","ml":250},{"id":"bouteille","label":"Bouteille","ml":500},{"id":"gourde","label":"Gourde","ml":750}],"card_visible":true,"notif":{"enabled":false,"mode":"interval","every_h":2,"start_h":8,"end_h":21,"once_h":13,"smart_h":17,"smart_threshold":60,"stop_when_done":true}}',
+  -- Horodatage du dernier rappel d'hydratation envoyé (écrit par l'Edge
+  -- Function water-reminder, à part du blob `water` que le client édite).
+  water_last_reminder_at timestamptz
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;

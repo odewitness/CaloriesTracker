@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-29',
+    title: 'Suis ton eau depuis la page du jour',
+    description: "Une carte « Eau » est apparue sur la page du jour : appuie sur Verre, Bouteille ou Gourde pour ajouter une portion en un seul geste, la jauge se remplit au fur et à mesure. Le bouton « Autre boisson » ouvre le détail : tu y choisis ta boisson (eau du robinet par défaut, eaux minérales, thé, café… depuis la base Ciqual), tu ajustes la quantité et tu crées tes propres portions. Les minéraux et vitamines de tout ce que tu bois comptent dans tes stats, comme un aliment. Dans Profil > Hydratation, tu règles ton objectif du jour et des rappels pour penser à boire (toutes les X heures, une fois par jour, ou seulement si tu n'as pas assez bu).",
+  },
+  {
+    date: '2026-08-29',
     title: 'Ajouter un aliment juste après minuit tombe sur le bon jour',
     description: "Si tu notais un aliment entre minuit et 2h du matin, l'app te proposait par défaut la veille : le bouton \"Aujourd'hui\", la date pré-remplie pour un repas type ou une recette, et l'historique pouvaient tous être décalés d'un jour. C'est corrigé, la nuit comme le reste de la journée.",
   },
