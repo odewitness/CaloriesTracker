@@ -16,9 +16,11 @@ import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import ShareJournalModal from '../components/ShareJournalModal'
 import TodayGapsSection from '../components/TodayGapsSection'
 import DayShortcutsBar from '../components/DayShortcutsBar'
+import CyclePhaseBadge from '../components/CyclePhaseBadge'
 import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
+import { useCycle } from '../hooks/useCycle'
 import { useSettings } from '../hooks/useSettings'
 import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
 import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
@@ -46,6 +48,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const isToday = dateStr === fmt(new Date())
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
+  const { dates: cycleDates } = useCycle()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings, update: updateSettings } = useSettings()
   const { foods: ciqualFoods } = useCiqualCatalog()
@@ -204,6 +207,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             canShare={entries.length > 0}
           />
         )}
+        <CyclePhaseBadge dateStr={dateStr} dates={cycleDates} cycleSettings={settings.cycle} />
         <TodayOverviewCard
           consumed={totals.kcal}
           goal={settings.goal_kcal}

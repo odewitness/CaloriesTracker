@@ -9,7 +9,9 @@ import { useJournalRange } from '../hooks/useJournalRange'
 import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
+import { useCycle } from '../hooks/useCycle'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
+import { phasesForRange } from '../lib/cycle'
 import { fmt } from '../lib/dates'
 
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
@@ -55,6 +57,13 @@ export default function CalendarPage() {
   const { byDate: journalByDate, refetch: refetchJournal } = useJournalRange(rangeStart, rangeEnd)
   const { byDate: planifiesByDate, refetch: refetchPlanifies } = usePlannedMealsRange(rangeStart, rangeEnd)
   const { excludedDates, refetch: refetchExcluded } = useExcludedDaysRange(rangeStart, rangeEnd)
+  const { dates: cycleDates } = useCycle()
+
+  const cycleByDate = useMemo(() => {
+    const cfg = settings.cycle
+    if (!cfg?.enabled || cfg.afficher_sur_calendrier === false || cycleDates.length === 0) return undefined
+    return phasesForRange(fmt(rangeStart), fmt(rangeEnd), cycleDates, cfg)
+  }, [settings.cycle, cycleDates, rangeStart, rangeEnd])
 
   const dayStatusByDate = useMemo(() => {
     const result = {}
@@ -162,6 +171,7 @@ export default function CalendarPage() {
           dayStatusByDate={dayStatusByDate}
           hasPlannedByDate={hasPlannedByDate}
           excludedDates={excludedDates}
+          cycleByDate={cycleByDate}
         />
       ) : (
         <CalendarWeekStrip

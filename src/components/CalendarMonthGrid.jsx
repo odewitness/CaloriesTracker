@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { fmt } from '../lib/dates'
+import { PHASES } from '../lib/cycle'
 
 const STATUS_COLOR = {
   ok:   'var(--green)',
@@ -61,6 +62,7 @@ export default function CalendarMonthGrid({
   monthDate, onChangeMonth, selectedDate, onSelectDate,
   dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
   selectedDates, onToggleDate, minDate,
+  cycleByDate,
 }) {
   const cells = useMemo(() => buildMonthCells(monthDate), [monthDate.getFullYear(), monthDate.getMonth()])
   const todayStr = fmt(new Date())
@@ -100,6 +102,8 @@ export default function CalendarMonthGrid({
           const isMissed = plannedStatus === 'missed'
           const disabled = minDate ? dStr < minDate : false
           const isExcluded = !!excludedDates?.has(dStr)
+          const cyc = cycleByDate?.[dStr]
+          const phaseColor = cyc && cyc.phase !== 'inconnue' ? PHASES[cyc.phase]?.color : null
 
           return (
             <button
@@ -137,6 +141,19 @@ export default function CalendarMonthGrid({
                   background: isSelected ? 'white' : (isMissed ? 'var(--coral)' : 'var(--purple)'),
                 }} />
               )}
+              {cyc?.isStart && (
+                <span style={{
+                  position: 'absolute', top: 3, left: 3,
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: isSelected ? 'white' : 'var(--coral)',
+                }} />
+              )}
+              {phaseColor && !isSelected && (
+                <span style={{
+                  position: 'absolute', left: 4, right: 4, bottom: 2,
+                  height: 2, borderRadius: 1, background: phaseColor, opacity: 0.55,
+                }} />
+              )}
             </button>
           )
         })}
@@ -147,6 +164,8 @@ export default function CalendarMonthGrid({
         <Legend color="var(--coral)" label="Trop / pas assez" />
         <Legend color="var(--purple)" label="Repas planifié" dot />
         <Legend color="var(--text-hint)" label="Jour exclu des stats" />
+        {cycleByDate && <Legend color="var(--coral)" label="1er jour des règles" dot />}
+        {cycleByDate && <Legend color="var(--purple)" label="Phase lutéale" />}
       </div>
     </div>
   )

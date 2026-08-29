@@ -4,6 +4,7 @@ import { useAuth } from '../lib/AuthContext'
 
 import { MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
 import { WATER_DEFAULTS, mergeWaterSettings } from '../lib/water'
+import { CYCLE_DEFAULTS, mergeCycleSettings } from '../lib/cycle'
 
 const DEFAULTS = {
   goal_kcal: 1800, goal_proteines: 100, goal_glucides: 180, goal_lipides: 60, goal_fibres: 30,
@@ -13,13 +14,15 @@ const DEFAULTS = {
   notif_social_enabled: true,
   afficher_manques_jour: true,
   water: { ...WATER_DEFAULTS },
+  cycle: { ...CYCLE_DEFAULTS },
 }
 
-// Applique le même traitement que meal_enabled/meal_overrides au bloc `water`
-// (fusion avec les valeurs par défaut), pour rester robuste si la colonne
-// `settings.water` est absente (base pas encore migrée) ou partielle.
+// Applique le même traitement que meal_enabled/meal_overrides aux blocs `water`
+// et `cycle` (fusion avec les valeurs par défaut), pour rester robuste si la
+// colonne `settings.water` / `settings.cycle` est absente (base pas encore
+// migrée) ou partielle.
 function withWater(row) {
-  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, water: mergeWaterSettings(row?.water) }
+  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle) }
 }
 
 export function useSettings() {

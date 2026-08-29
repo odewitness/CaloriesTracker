@@ -227,7 +227,16 @@ create table if not exists settings (
   water jsonb not null default '{"goal_ml":2000,"default_food_ref_id":null,"portions":[{"id":"verre","label":"Verre","ml":250},{"id":"bouteille","label":"Bouteille","ml":500},{"id":"gourde","label":"Gourde","ml":750}],"card_visible":true,"notif":{"enabled":false,"mode":"interval","every_h":2,"start_h":8,"end_h":21,"once_h":13,"smart_h":17,"smart_threshold":60,"stop_when_done":true}}',
   -- Horodatage du dernier rappel d'hydratation envoyé (écrit par l'Edge
   -- Function water-reminder, à part du blob `water` que le client édite).
-  water_last_reminder_at timestamptz
+  water_last_reminder_at timestamptz,
+  -- Ajoutée le 2026-08-29 (chantier « manger en fonction du cycle menstruel »,
+  -- Palier 1 — voir supabase/sql/regles_setup.sql et docs/cycle-menstruel.md).
+  -- Bloc unique de réglages du suivi de cycle, même pattern que `water` :
+  -- { enabled, sous_contraception, longueur_cycle, auto_longueur_cycle,
+  --   longueur_luteale, longueur_regles, afficher_sur_calendrier,
+  --   afficher_badge_jour, afficher_conseils_micro, appliquer_delta_energie,
+  --   delta_energie_luteale_kcal }. Fusionné côté client avec CYCLE_DEFAULTS
+  -- (src/lib/cycle.js). Défaut = suivi désactivé (opt-in).
+  cycle jsonb not null default '{"enabled":false,"sous_contraception":false,"longueur_cycle":28,"auto_longueur_cycle":true,"longueur_luteale":14,"longueur_regles":5,"afficher_sur_calendrier":true,"afficher_badge_jour":true,"afficher_conseils_micro":true,"appliquer_delta_energie":false,"delta_energie_luteale_kcal":120}'
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
@@ -783,6 +792,25 @@ create table if not exists jours_exclus (
 
 create index if not exists idx_jours_exclus_user_date on jours_exclus (user_id, date);
 
+-- 27. TABLE REGLES (dates de 1er jour des règles, saisies à la main — l'app
+-- tierce de suivi de cycle utilisée aujourd'hui n'exporte rien. Voir
+-- supabase/sql/regles_setup.sql pour le SQL complet — écrit le 2026-08-29,
+-- chantier « manger en fonction du cycle menstruel », Palier 1. Une ligne = un
+-- début de règles. Le calcul de phase se fait côté client à partir de la liste
+-- complète (voir src/lib/cycle.js, src/hooks/useCycle.js). `date_fin` nullable,
+-- pas utilisée au Palier 1 (réservée à un futur suivi de flux). Toggle côté
+-- client = insert/delete.
+create table if not exists regles (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date_debut date not null,
+  date_fin date,
+  created_at timestamptz not null default now(),
+  unique (user_id, date_debut)
+);
+
+create index if not exists idx_regles_user_date on regles (user_id, date_debut);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -844,6 +872,12 @@ alter table suggestions_manques enable row level security;
 -- pas de policy update, le toggle exclu/inclus est un insert/delete côté
 -- client, jamais une modification de ligne existante.
 alter table jours_exclus enable row level security;
+
+-- RLS activé sur regles dès sa création (2026-08-29), policies
+-- select/insert/update/delete "own" (voir supabase/sql/regles_setup.sql).
+-- update + delete nécessaires (corriger une date, supprimer une saisie
+-- erronée, renseigner date_fin plus tard).
+alter table regles enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)
