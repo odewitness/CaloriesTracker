@@ -497,8 +497,28 @@ anti-doublon par **flag par séance** « déjà compté dans mes pas ».
 - [x] `src/pages/TodayPage.jsx` : `dayActivityKcal` alimente `daySettings`
       (effort) + `SportSection` (bilan), `StepsSheet` monté via l'état de la page.
 - [x] Entrée changelog (2026-08-30 « Tes pas du jour, et deux sports en plus »).
-- [ ] Historique (pas dans `SportHistorySection`) — **sous-palier 10b**, différé
-      pour garder ce lot revuable.
+
+**Sous-palier 10b — Historique** ▸ statut : codé (branche `suivi-sport-p10b-historique`)
+Décisions utilisatrice (2026-08-30) : graphe multi-séries **dans la section
+Sport** (pas de superposition sur le grand graphe des calories) ; pas agrégés
+en **moyenne/jour** par tranche (pas en somme) ; section sport **sortie du
+verrou « repas loggés »**.
+- [x] `useSportRange` charge aussi `pas_jour` de la plage → renvoie `pasByDate`
+      (+ `compte_dans_pas` sur les séances).
+- [x] `SportHistorySection` réécrit : sélecteur de série **Minutes / Pas / Kcal
+      dépensées** (SVG à barres, tranches jour/semaine/mois inchangées ; somme
+      pour minutes & kcal, moyenne/j pour les pas), tuiles Temps / Séances /
+      Pas moy./j / ≈ Kcal dépensées, bouton **Poids** (courbe violette, échelle
+      Y à part, relevé le plus proche du milieu de tranche) + **bandes phase
+      lutéale** en fond (repris de `CalorieTrendChart`).
+- [x] `HistoryPage` : section sport + `SportPhaseSection` affichées aussi quand
+      la période n'a **aucun repas loggé** mais des séances / des pas
+      (`hasSport`). Résout la « limite connue » du Palier 2.
+- [x] `HistoryPage` `cyclePhaseStats` : deux lignes en plus dans l'encart « Ton
+      cycle sur cette période » — **Pas moy./j** et **≈ kcal dépensées/j**,
+      lutéale vs reste du cycle (même base de jours loggés que les calories).
+- [x] Entrée changelog (2026-08-30 « Tes pas et ton sport dans l'Historique »).
+- Pas de SQL (tout existe déjà). `npm run build` OK.
 
 ---
 
@@ -513,8 +533,9 @@ anti-doublon par **flag par séance** « déjà compté dans mes pas ».
 - **Palier 5 (Strava) : abandonné** (friction infra).
 - **Palier 9 (rappels push) : abandonné** (« pas besoin de rappel de sport »).
 - **Palier 10 (pas quotidiens + pilates / tapis) : mergé + poussé** sur `main`
-  le 2026-08-30 (SQL `pas_jour_setup.sql` appliqué + testé). Sous-palier 10b
-  (pas dans l'Historique) différé.
+  le 2026-08-30 (SQL `pas_jour_setup.sql` appliqué + testé).
+- **Sous-palier 10b (pas + sport dans l'Historique) : codé** (branche
+  `suivi-sport-p10b-historique`). Reste : test manuel + merge/push. Pas de SQL.
 
 Toute nouvelle idée s'ajoute ici.
 
@@ -552,6 +573,16 @@ Toute nouvelle idée s'ajoute ici.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — **Sous-palier 10b (Historique)** codé sur
+  `suivi-sport-p10b-historique`. Décisions : graphe multi-séries (Minutes / Pas
+  / Kcal dépensées) **dans la section Sport** de l'Historique, pas de
+  superposition sur `CalorieTrendChart` (déjà chargé) ; pas agrégés en
+  **moyenne/jour** par tranche ; **superposition poids + bandes lutéales** sur
+  ce graphe (repris de `CalorieTrendChart`) ; section sport + `SportPhaseSection`
+  **hissées hors du verrou « repas loggés »** (résout la limite connue du
+  Palier 2) ; encart cycle enrichi de 2 lignes (pas moy./j, kcal dépensées/j
+  lutéale vs reste). `useSportRange` charge `pas_jour`. Aucun SQL. `npm run
+  build` OK. Reste : test manuel + merge/push.
 - **2026-08-30** — **Palier 10 (pas quotidiens)** mergé + poussé sur `main`
   (SQL `pas_jour_setup.sql` appliqué + testé par l'utilisatrice). Décisions
   utilisatrice : carte des pas **intégrée** au

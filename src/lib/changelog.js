@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Tes pas et ton sport dans l\'Historique',
+    description: "Dans l'Historique, la partie sport a un vrai graphique : tu choisis ce que tu veux voir — minutes actives, nombre de pas, ou calories dépensées — par jour, par semaine ou par mois. Tu peux poser ta courbe de poids par-dessus pour repérer un lien, avec les périodes de ta phase lutéale grisées en fond. Et le résumé « ton cycle sur cette période » indique maintenant aussi tes pas et tes calories dépensées selon la phase. Bonus : ces stats s'affichent même sur une période où tu n'as pas noté tes repas.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Tes pas du jour, et deux sports en plus',
     description: "Dans le bloc Activité de la page du jour, tu peux maintenant noter ton nombre de pas (recopié depuis ton téléphone ou ta montre) et te fixer un objectif quotidien. Pilates et tapis de marche s'ajoutent à la liste des activités. Et si tu notes à la fois une séance de marche et ton total de pas, tu peux cocher « déjà compté dans mes pas » sur la séance pour éviter de compter la même chose deux fois dans le bilan. Tout ça se règle dans Profil › Sport.",
   },
