@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { fmt } from '../lib/dates'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -184,48 +183,21 @@ export async function deletePlannedMealSeries(recurrenceGroupId, userId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// markAsEaten — copie les items du repas planifié dans `journal` (à sa date
-// et son repas), puis marque le repas planifié comme mangé. On ne supprime
-// PAS la ligne repas_planifies : elle garde la trace de ce qui était prévu
-// ce jour-là (utile pour le point violet "planifié" une fois passé à vert).
+// markAsEaten — copie les items du repas planifié dans `journal` (à sa date et
+// son repas) ET marque le repas planifié comme mangé, de façon ATOMIQUE via la
+// fonction SQL `mark_planned_meal_eaten` (voir
+// supabase/sql/mark_planned_meal_eaten_setup.sql). Les deux réussissent ou
+// échouent ensemble → plus de cas « aliments ajoutés mais repas encore à
+// faire » qui provoquait des doublons quand on recliquait. La fonction est
+// idempotente : rappelée sur un repas déjà mangé, elle ne réinsère rien.
 //
-// Non atomique (2 requêtes : insert journal, puis update `mange`). Garde
-// anti-doublon : on relit d'abord `mange` en base. Ça couvre le double-tap et
-// le cas où un précédent appel avait inséré les aliments mais échoué sur
-// l'update (réseau) — sans ça, un 2ᵉ « marquer mangé » réinsérait tout.
-// Le vrai correctif atomique (fonction SQL transactionnelle) reste à faire,
-// voir docs/analyse-et-roadmap.md §2.2.
+// On ne supprime PAS la ligne repas_planifies : elle garde la trace de ce qui
+// était prévu ce jour-là (point violet "planifié" une fois passé à vert).
+//
+// `userId` n'est plus utilisé (la fonction SQL s'appuie sur auth.uid()) mais
+// reste dans la signature pour ne pas toucher aux appelants.
 // ─────────────────────────────────────────────────────────────────────────────
-export async function markAsEaten(repas, userId) {
-  const { data: fresh, error: checkError } = await supabase
-    .from('repas_planifies')
-    .select('mange')
-    .eq('id', repas.id)
-    .eq('user_id', userId)
-    .single()
-  if (checkError) return { error: checkError }
-  if (fresh?.mange) return { data: null, error: null, alreadyEaten: true }
-
-  // `items` peut contenir des champs superflus selon leur origine (ex:
-  // recette_id, id, created_at pour un item copié depuis recette_ingredients
-  // via AddFromRecipeModal) — on ne garde QUE les colonnes valides sur
-  // `journal`, dans la forme exacte produite par scaleFood().
-  const JOURNAL_FIELDS = ['food_name', 'food_source', 'food_ref_id', 'qty_g', 'energie_kcal', 'proteines', 'glucides', 'lipides', 'fibres', ...ALL_NUTRIENT_KEYS]
-  const rows = (repas.items || []).map(item => {
-    const row = { date: repas.date, meal: repas.meal, user_id: userId }
-    for (const key of JOURNAL_FIELDS) row[key] = item[key] ?? null
-    return row
-  })
-  if (rows.length > 0) {
-    const { error: insertError } = await supabase.from('journal').insert(rows)
-    if (insertError) return { error: insertError }
-  }
-  const { data, error } = await supabase
-    .from('repas_planifies')
-    .update({ mange: true, mange_at: new Date().toISOString() })
-    .eq('id', repas.id)
-    .eq('user_id', userId)
-    .select()
-    .single()
+export async function markAsEaten(repas, userId) { // eslint-disable-line no-unused-vars
+  const { data, error } = await supabase.rpc('mark_planned_meal_eaten', { p_repas_id: repas.id })
   return { data, error }
 }

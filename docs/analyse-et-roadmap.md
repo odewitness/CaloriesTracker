@@ -81,9 +81,9 @@ Traité le 2026-08-30 (voir §2.2, §2.4, §2.5, §2.6) :
 - **`TodayPage`** : largeur du viewport suivie en state (`viewportW` +
   écouteurs `resize` / `orientationchange`) au lieu de `window.innerWidth` lu en
   direct → plus de slider décalé après rotation.
-- **`markAsEaten`** : garde d'idempotence (relit `mange` en base avant
-  d'insérer). Mitige le double-tap et la reprise après échec ; le correctif
-  atomique complet (RPC transactionnelle) reste ouvert, voir §2.2.
+- **`markAsEaten`** : passe par la fonction SQL transactionnelle
+  `mark_planned_meal_eaten` (insert `journal` + update `mange` d'un bloc,
+  idempotente). Voir §2.2.
 
 ---
 
@@ -157,24 +157,21 @@ create policy "marques_own" on marques for all
 l'inscription publique dans Supabase (Auth → Providers) et créer les comptes à
 la main.
 
-### 2.2 — 🟠 `markAsEaten` n'est pas atomique → doublons possibles
+### 2.2 — 🟠 `markAsEaten` n'est pas atomique → doublons possibles — ✅ traité le 2026-08-30
 
-> 🟡 **Mitigé le 2026-08-30** (garde d'idempotence côté client, voir §1.5). Le
-> correctif atomique complet ci-dessous reste à faire.
+Était : `src/hooks/usePlannedMeals.js` insérait les aliments dans `journal`
+**puis** marquait `repas_planifies.mange = true` en deux requêtes. Si la 2ᵉ
+échouait (réseau), les aliments étaient au journal mais le repas restait « à
+faire » → un 2ᵉ « marquer mangé » ajoutait tout une 2ᵉ fois.
 
-`src/hooks/usePlannedMeals.js`. La fonction insère les aliments dans `journal`
-**puis** marque `repas_planifies.mange = true`, en deux requêtes. Si la 2ᵉ
-échoue (réseau), les aliments sont au journal mais le repas reste « à faire » →
-l'utilisatrice reclique « marquer mangé » → tout est ajouté une 2ᵉ fois.
-
-*État actuel :* `markAsEaten` relit `mange` en base avant d'insérer et sort si
-c'est déjà vrai (`{ alreadyEaten: true }`). Couvre le double-tap et la reprise
-après échec de l'update.
-
-*Correctif complet restant :* une fonction SQL (RPC) transactionnelle qui fait
-l'insert journal + l'update `mange` d'un bloc. Attention : elle doit recopier
-**tous** les micronutriments (`ALL_NUTRIENT_KEYS`, ~60 colonnes), pas seulement
-les 5 macros — c'est ce qui la rend fastidieuse à écrire en SQL.
+Correctif : fonction SQL `mark_planned_meal_eaten(p_repas_id)` (voir
+`supabase/sql/mark_planned_meal_eaten_setup.sql`, appliquée en base le
+2026-08-30). Insert `journal` + update `mange` dans **une transaction** ;
+idempotente (repas déjà mangé → ne réinsère rien) ; `for update` +
+`user_id = auth.uid()` pour verrouiller/autoriser. La copie des colonnes passe
+par `jsonb_populate_record(null::journal, …)` → pas besoin de réénumérer les
+~70 colonnes de nutriments. `markAsEaten` côté client appelle maintenant ce RPC
+(`supabase.rpc('mark_planned_meal_eaten', …)`).
 
 ### 2.3 — 🟠 Aucune gestion d'erreur réseau dans les hooks de données
 
@@ -523,8 +520,8 @@ de wrapper natif).
 ## 5. Ordre suggéré
 
 1. ~~**§2.1 RLS**~~ ✅ 2026-08-30 (chapitre clos, 32 tables en `rowsecurity`).
-2. ~~**§2.2 / §2.4 / §2.5 / §2.6**~~ ✅ 2026-08-30 (bloc client, voir §1.5).
-   Restent : le RPC atomique de §2.2 (besoin SQL) et §2.3.
+2. ~~**§2.2 / §2.4 / §2.5 / §2.6**~~ ✅ 2026-08-30. §2.2 inclut désormais la
+   fonction SQL atomique `mark_planned_meal_eaten`.
 3. ~~**§3.1 hisser les hooks non datés**~~ ✅ 2026-08-30 (via `TodayDataContext`).
 4. **§2.3** (gestion d'erreur réseau) + **§3.2** (`useSupabaseQuery`) — à faire
    ensemble, plus tard, sur branche dédiée. Pas bloquant.

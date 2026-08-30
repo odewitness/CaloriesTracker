@@ -1254,3 +1254,64 @@ grant execute on function set_ciqual_portions(text, jsonb) to authenticated;
 -- de profiles le temps de la recherche).
 -- create or replace function find_profile_by_pseudo(p_pseudo text)
 -- returns table (id uuid, pseudo text, prenom text) ...
+
+-- =============================================
+-- FUNCTION : mark_planned_meal_eaten
+-- =============================================
+-- Ajoutée le 2026-08-30 (roadmap §2.2). Version ATOMIQUE de markAsEaten
+-- (src/hooks/usePlannedMeals.js) : copie les items d'un repas planifié dans
+-- `journal` ET passe `mange = true` dans la même transaction → plus de
+-- doublons si un 2e « marquer mangé » survient après un échec partiel.
+-- Idempotente (repas déjà mangé → ne réinsère rien). security invoker : les
+-- policies RLS « own » de journal / repas_planifies s'appliquent.
+-- Copie des colonnes via jsonb_populate_record(null::journal, ...) pour ne pas
+-- réénumérer les ~70 colonnes de nutriments. Appelée via
+-- supabase.rpc('mark_planned_meal_eaten', { p_repas_id }).
+-- SQL complet : supabase/sql/mark_planned_meal_eaten_setup.sql — appliqué en
+-- base le 2026-08-30.
+create or replace function mark_planned_meal_eaten(p_repas_id uuid)
+returns repas_planifies
+language plpgsql
+as $$
+declare
+  v_repas repas_planifies;
+begin
+  select * into v_repas
+  from repas_planifies
+  where id = p_repas_id and user_id = auth.uid()
+  for update;
+
+  if not found then
+    raise exception 'repas planifié introuvable ou non autorisé (id=%)', p_repas_id;
+  end if;
+
+  if v_repas.mange then
+    return v_repas;
+  end if;
+
+  if jsonb_typeof(v_repas.items) = 'array' and jsonb_array_length(v_repas.items) > 0 then
+    insert into journal
+    select (jsonb_populate_record(
+              null::journal,
+              (item - 'id' - 'created_at' - 'user_id' - 'date' - 'meal')
+                || jsonb_build_object(
+                     'id',         gen_random_uuid(),
+                     'user_id',    auth.uid(),
+                     'date',       v_repas.date,
+                     'meal',       v_repas.meal,
+                     'created_at', now()
+                   )
+            )).*
+    from jsonb_array_elements(v_repas.items) as t(item);
+  end if;
+
+  update repas_planifies
+  set mange = true, mange_at = now()
+  where id = p_repas_id and user_id = auth.uid()
+  returning * into v_repas;
+
+  return v_repas;
+end;
+$$;
+
+grant execute on function mark_planned_meal_eaten(uuid) to authenticated;
