@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Vois ce que tu manges face à ce que tu dépenses',
+    description: "Dans l'Historique, onglet Résumé, un nouveau bouton « Dépense » pose sur ta courbe de calories une ligne de ce que ton corps brûle environ : ton métabolisme de base plus tes pas et tes séances. Quand une barre dépasse la ligne, tu as mangé plus que dépensé ; en dessous, l'inverse. En touchant une barre tu vois les deux chiffres et l'écart. En vue Semaine et Mois c'est jour par jour (avec tes phases de cycle en fond), en vue Année c'est la moyenne par mois. C'est une estimation (±20 %) qui ne change pas ton objectif.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Le calendrier de régularité va de nouveau jusqu\'à aujourd\'hui',
     description: "Sur les longues périodes, surtout en vue Année, le calendrier des couleurs se figeait en plein mois et les jours récents restaient blancs même quand tu avais bien loggé tes repas. C'était une limite de chargement qui coupait les données les plus récentes. C'est réparé : le calendrier, la série en cours et le record prennent maintenant en compte toutes tes journées.",
   },
