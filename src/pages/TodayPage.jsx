@@ -25,6 +25,7 @@ import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCycle } from '../hooks/useCycle'
 import { useSport } from '../hooks/useSport'
 import { useMeasurements } from '../hooks/useMeasurements'
+import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
 import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
 import { useFavorites } from '../hooks/useFavorites'
@@ -34,7 +35,7 @@ import { saveMealTemplate } from '../hooks/useMealTemplates'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
-import { computeMealTargets, computeTotals, MEALS_ORDER as MEALS } from '../lib/nutrients'
+import { computeMealTargets, computeTotals, computeCalorieNeeds, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
@@ -58,6 +59,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const { days: cycleDays, intensiteByDate, symptomesByDate, toggleDay: toggleCycleDay, setDaysIntensite, setDaysSymptomes } = useCycle()
   const { activites: sportActivites, week: sportWeek, add: addSport, update: updateSport, remove: removeSport } = useSport(dateStr)
   const { entries: measurementEntries } = useMeasurements()
+  const { profile } = useProfile()
   const { favorites } = useFavorites()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings, update: updateSettings } = useSettings()
@@ -96,6 +98,16 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     () => measurementEntries.find(e => e.poids_kg != null)?.poids_kg,
     [measurementEntries],
   )
+
+  // Dépense d'entretien estimée (TDEE) — pour le bilan énergétique en lecture
+  // seule du bloc Activité (Palier 6). null si le profil est incomplet.
+  const maintenanceKcal = useMemo(() => {
+    const n = computeCalorieNeeds({
+      sexe: profile?.sexe, age: profile?.age, tailleCm: profile?.taille_cm,
+      poidsKg: latestWeight ?? profile?.poids_kg, activityKey: profile?.niveau_activite,
+    })
+    return n?.tdee ?? null
+  }, [profile, latestWeight])
 
   const handleSaveSport = async (payload) => {
     if (sportSheet?.initial) {
@@ -348,6 +360,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         activites={sportActivites}
         week={sportWeek}
         sportCfg={settings.sport}
+        consumedKcal={totals.kcal}
+        maintenanceKcal={maintenanceKcal}
         onOpenSheet={() => setSportSheet({ initial: null })}
         onOpenEntry={(a) => setSportSheet({ initial: a })}
       />

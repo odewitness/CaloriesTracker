@@ -148,6 +148,25 @@ export function streakWeeks(activites, todayDateStr, goalMin) {
   return n
 }
 
+// ── Bilan énergétique du jour (Palier 6 — LECTURE SEULE) ───────────────────
+// Ne modifie AUCUN objectif. `maintenanceKcal` = dépense d'entretien estimée
+// (TDEE), qui intègre déjà une part d'activité habituelle : d'où le garde-fou
+// d'affichage « ne pas cumuler » côté UI. Renvoie null si on n'a pas de
+// maintenance estimée (profil incomplet).
+export function dayEnergyBalance({ consumedKcal, maintenanceKcal, sportKcal } = {}) {
+  const maint = Number(maintenanceKcal) || 0
+  if (maint <= 0) return null
+  const cons = Number(consumedKcal) || 0
+  const sport = Math.max(0, Number(sportKcal) || 0)
+  const depense = maint + sport
+  return {
+    maintenance: Math.round(maint),
+    sport: Math.round(sport),
+    depense: Math.round(depense),
+    bilan: Math.round(cons - depense), // > 0 = surplus, < 0 = déficit
+  }
+}
+
 // Agrège une liste de séances (chacune { date, duree_min, energie_kcal }) sur
 // la semaine contenant `anyDateInWeek`.
 export function weeklyStats(activites, anyDateInWeek) {

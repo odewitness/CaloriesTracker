@@ -80,6 +80,22 @@ export default function SportSection({ sport, onPatch, onBack }) {
             depuis Profil › Page du jour.
           </div>
 
+          <div className="section-title">Bilan énergétique</div>
+          <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>
+            <Row label="Afficher le bilan du jour (indicatif)">
+              <ToggleSwitch
+                checked={cfg.mode_energie === 'bilan'}
+                onClick={() => onPatch({ mode_energie: cfg.mode_energie === 'bilan' ? 'aucun' : 'bilan' })}
+              />
+            </Row>
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
+            Ajoute une ligne « mangé vs dépense estimée » dans le bloc Activité de
+            la page du jour. C'est <strong>uniquement informatif</strong> : ton
+            objectif de calories ne bouge pas, et ta dépense d'entretien inclut
+            déjà une partie de ton activité (à ne pas cumuler avec tes séances).
+          </div>
+
           <div style={{ display: 'flex', gap: 8, fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.55, marginBottom: 24 }}>
             <Info size={26} style={{ flexShrink: 0, marginTop: 1 }} />
             <span>

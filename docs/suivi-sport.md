@@ -364,11 +364,20 @@ base : `activites_sport.source` vaut toujours `'manuel'`, `source_id` /
 `modifie_manuellement` sont simplement inutilisés — inoffensifs, gardés au cas
 où un import (texte, autre) arriverait plus tard.
 
-### Palier 6 — Bilan énergétique (lecture seule) ▸ statut : à faire
-- [ ] `mode_energie: 'bilan'` dans Profil › Sport
-- [ ] Ligne « apports vs dépense estimée » sur la page du jour, avec mention
-      explicite du recouvrement avec `niveau_activite` — `goal_kcal` inchangé
-- [ ] Entrée changelog
+### Palier 6 — Bilan énergétique (lecture seule) ▸ statut : codé (branche `suivi-sport-p6`)
+- [x] Toggle « Afficher le bilan du jour » dans Profil › Sport → bascule
+      `mode_energie` entre `'aucun'` et `'bilan'` (le 3ᵉ mode
+      `'manger_selon_effort'` reste pour le Palier 7).
+- [x] `sport.js` : `dayEnergyBalance({ consumedKcal, maintenanceKcal, sportKcal })`
+      (pure, lecture seule, null si pas de maintenance).
+- [x] Bloc « Bilan du jour · approximatif » dans `SportSection` (page du jour) :
+      mangé vs dépense estimée (`maintenance` = TDEE via `computeCalorieNeeds` +
+      kcal des séances du jour), surplus / déficit, + garde-fou d'affichage
+      « ta dépense d'entretien intègre déjà une part d'activité — ne cumule pas ;
+      ton objectif ne change pas ». `TodayPage` calcule `maintenanceKcal` depuis
+      `useProfile` + dernier poids.
+- [x] `goal_kcal` strictement inchangé — aucune écriture, aucun recalcul de cible.
+- [x] Entrée changelog (2026-08-30 « Un bilan énergétique du jour, si tu veux »)
 
 ### Palier 7 — « Manger selon l'effort » (option, à décider plus tard) ▸ statut : non tranché
 - [ ] `mode_energie: 'manger_selon_effort'` : cible de base recalculée sur
@@ -399,12 +408,11 @@ où un import (texte, autre) arriverait plus tard.
 
 - Palier 1 : mergé dans `main` en local (SQL `sport_setup.sql` appliqué par
   l'utilisatrice, testé). Reste : `git push` vers `main` (à confirmer).
-- Paliers 1 → 3 : mergés + poussés sur `main` (déployés Netlify).
-- Palier 4 : codé sur la branche `suivi-sport-p4`. Aucune migration. Reste :
+- Paliers 1 → 4 : mergés + poussés sur `main` (déployés Netlify).
+- **Palier 5 (Strava) : abandonné.**
+- Palier 6 : codé sur la branche `suivi-sport-p6`. Aucune migration. Reste :
   test manuel, merge + push après confirmation.
-- **Palier 5 (Strava) : abandonné.** Aucune migration restante pour le chantier.
-- Palier 6 (bilan lecture seule) à faire. Paliers 7 → 9 non tranchés. Aucun ne
-  dépend de Strava.
+- Paliers 7 → 9 non tranchés. Aucun ne dépend de Strava.
 
 ---
 
@@ -440,6 +448,12 @@ où un import (texte, autre) arriverait plus tard.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — Palier 4 mergé + poussé. Palier 6 codé sur la branche
+  `suivi-sport-p6` : toggle `mode_energie` `aucun`/`bilan` dans Profil › Sport,
+  `dayEnergyBalance` (pur), bloc « Bilan du jour · approximatif » dans
+  `SportSection` (mangé vs TDEE + séances, surplus/déficit, garde-fou
+  « ne cumule pas / objectif inchangé »). `goal_kcal` jamais touché. `npm run
+  build` OK. En attente : test manuel + merge/push.
 - **2026-08-30** — **Palier 5 (Strava) abandonné** (décision utilisatrice) :
   trop de plomberie (app Strava + Edge Functions + secret + cron) pour le gain.
   §4.4 conservée pour référence. Aucun autre palier n'en dépendait ; la table
