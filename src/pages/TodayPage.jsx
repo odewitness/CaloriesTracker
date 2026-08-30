@@ -22,6 +22,7 @@ import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import ShareJournalModal from '../components/ShareJournalModal'
 import TodayGapsSection from '../components/TodayGapsSection'
 import DayShortcutsBar from '../components/DayShortcutsBar'
+import ShareImageModal from '../components/ShareImageModal'
 import CyclePhaseBadge from '../components/CyclePhaseBadge'
 import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
@@ -85,6 +86,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const [pasSheet, setPasSheet] = useState(false)
   const [energyInfoOpen, setEnergyInfoOpen] = useState(false)
   const [planMealOpen, setPlanMealOpen] = useState(false)
+  const [shareImageOpen, setShareImageOpen] = useState(false)
   const { open: shortcutsOpen } = useTodayShortcuts()
 
   const waterEntries = useMemo(() => entries.filter(isWaterEntry), [entries])
@@ -532,6 +534,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             onToggleExcluded={toggleExcluded}
             onPlanMeal={() => setPlanMealOpen(true)}
             onShare={() => setShareTarget({ meal: null, entries })}
+            onShareImage={() => setShareImageOpen(true)}
             canShare={entries.length > 0}
           />
         )}
@@ -617,6 +620,16 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onPlanned={refetchPlanifies}
         />,
         document.body
+      )}
+
+      {shareImageOpen && (
+        <ShareImageModal
+          date={date}
+          totals={totals}
+          goals={daySettings}
+          entryCount={entries.filter(e => !isWaterEntry(e)).length}
+          onClose={() => setShareImageOpen(false)}
+        />
       )}
 
       {shareTarget && (
