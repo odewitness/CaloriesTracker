@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Dumbbell, Plus, ChevronDown, ChevronRight, Share2 } from 'lucide-react'
+import { Dumbbell, Plus, ChevronDown, ChevronRight, Share2, Footprints } from 'lucide-react'
 import {
   sportTypeEmoji, sportTypeLabel, sportIntensiteLabel,
   formatDuree, formatHeure, dayEnergyBalance,
@@ -18,12 +18,15 @@ import {
 //   sportCfg      — settings.sport
 //   consumedKcal  — kcal mangées ce jour (pour le bilan, mode_energie 'bilan')
 //   maintenanceKcal — dépense d'entretien estimée (TDEE) ou null
+//   activity      — dayActivityKcal(...) : { total, pas, seances, hasSteps, seancesDansPas }
+//   pasJour       — total de pas du jour (nombre) ou null (Palier 10)
 //   adjust        — mode 'manger_selon_effort' : { delta, base, credit, goal, applied } ou null
 //   onOpenSheet() — ouvre la feuille « Ajouter une séance »
 //   onOpenEntry(activite) — ouvre la feuille en édition
+//   onOpenPas()   — ouvre la feuille « Mes pas du jour »
 //   onShareWeek() — partage le résumé de la semaine sur le fil
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SportSection({ activites = [], week, sportCfg, consumedKcal, maintenanceKcal, adjust, onOpenSheet, onOpenEntry, onShareWeek }) {
+export default function SportSection({ activites = [], week, sportCfg, consumedKcal, maintenanceKcal, activity, pasJour, adjust, onOpenSheet, onOpenEntry, onOpenPas, onShareWeek }) {
   const goalMin = Number(sportCfg?.objectif_hebdo_minutes) || 0
   const weekMin = Math.round(week?.minutes || 0)
   const pct = goalMin > 0 ? Math.round((weekMin / goalMin) * 100) : 0
@@ -31,12 +34,19 @@ export default function SportSection({ activites = [], week, sportCfg, consumedK
   const reached = goalMin > 0 && weekMin >= goalMin
   const hasEntries = activites.length > 0
 
+  // Pas du jour (Palier 10) — carte intégrée, affichée si afficher_pas.
+  const showPas = !!sportCfg?.afficher_pas
+  const goalPas = Number(sportCfg?.objectif_pas_jour) || 0
+  const nbPas = Number(pasJour) || 0
+  const pasPct = goalPas > 0 && nbPas > 0 ? Math.round((nbPas / goalPas) * 100) : 0
+  const pasReached = goalPas > 0 && nbPas >= goalPas
+
   // Bilan énergétique du jour (Palier 6) — lecture seule, n'affecte pas les
-  // objectifs. Affiché uniquement si l'utilisatrice a activé mode_energie 'bilan'.
-  const sportKcalToday = activites.reduce((s, a) => s + (Number(a.energie_kcal) || 0), 0)
+  // objectifs. `activity.total` est DÉJÀ dédoublonné (pas + séances hors pas).
+  const activityKcalToday = activity?.total ?? activites.reduce((s, a) => s + (Number(a.energie_kcal) || 0), 0)
   const showBilan = sportCfg?.mode_energie === 'bilan'
   const bilan = showBilan
-    ? dayEnergyBalance({ consumedKcal, maintenanceKcal, sportKcal: sportKcalToday })
+    ? dayEnergyBalance({ consumedKcal, maintenanceKcal, sportKcal: activityKcalToday })
     : null
   // « Manger selon l'effort » (Palier 7) — l'objectif du jour EST déjà ajusté
   // en amont (daySettings). Ici on explique seulement l'ajustement.
@@ -134,6 +144,43 @@ export default function SportSection({ activites = [], week, sportCfg, consumedK
               </div>
             )}
 
+            {showPas && (
+              <button
+                onClick={onOpenPas}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '9px 11px', borderRadius: 10, background: 'var(--gray-bg)',
+                  textAlign: 'left', fontFamily: 'var(--font)', marginBottom: 12,
+                }}
+              >
+                <Footprints size={16} color="var(--green)" style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>
+                    {nbPas > 0 ? `${nbPas.toLocaleString('fr-FR')} pas` : 'Ajouter mes pas'}
+                    {goalPas > 0 && nbPas > 0 && (
+                      <span style={{ fontWeight: 500, color: 'var(--text-hint)' }}> · {pasPct} %</span>
+                    )}
+                  </span>
+                  <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                    {nbPas > 0
+                      ? (goalPas > 0
+                          ? (pasReached ? 'Objectif du jour atteint 🎉' : `Objectif ${goalPas.toLocaleString('fr-FR')} pas`)
+                          : 'Total du jour')
+                      : 'Recopie le total de ton téléphone ou ta montre'}
+                  </span>
+                  {goalPas > 0 && nbPas > 0 && (
+                    <span style={{ display: 'block', height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden', marginTop: 5 }}>
+                      <span style={{
+                        display: 'block', width: `${Math.min(100, pasPct)}%`, height: '100%',
+                        background: 'var(--green)', opacity: pasReached ? 1 : 0.7, borderRadius: 2,
+                      }} />
+                    </span>
+                  )}
+                </span>
+                <ChevronRight size={15} color="var(--text-hint)" style={{ flexShrink: 0 }} />
+              </button>
+            )}
+
             {showEffort && (
               <div style={{ background: 'var(--gray-bg)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>
@@ -159,7 +206,7 @@ export default function SportSection({ activites = [], week, sportCfg, consumedK
                   </div>
                 )}
                 <div style={{ fontSize: 10, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.5 }}>
-                  Ton objectif de base repasse à un équivalent sédentaire, et tes séances du jour se rajoutent (plafond +{sportCfg?.depense_max_creditee_kcal ?? 400}). Estimation ±25 %. Historique et calendrier gardent ton objectif à plat. Désactivable à tout moment dans Profil › Sport.
+                  Ton objectif de base repasse à un équivalent sédentaire, et tes pas et tes séances du jour se rajoutent (plafond commun +{sportCfg?.depense_max_creditee_kcal ?? 400}). Estimation ±25 %. Historique et calendrier gardent ton objectif à plat. Désactivable à tout moment dans Profil › Sport.
                 </div>
               </div>
             )}
@@ -174,17 +221,24 @@ export default function SportSection({ activites = [], week, sportCfg, consumedK
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
                       Mangé <strong>{Math.round(consumedKcal || 0)}</strong> · dépense estimée ≈{' '}
                       <strong>{bilan.depense}</strong> ({bilan.maintenance} entretien
-                      {bilan.sport > 0 ? ` + ${bilan.sport} sport` : ''})
+                      {bilan.sport > 0 ? ` + ${bilan.sport} activité` : ''})
                     </div>
+                    {activity?.hasSteps && (
+                      <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 2 }}>
+                        dont ≈ {activity.pas} kcal de pas
+                        {activity.seances > 0 ? ` + ${activity.seances} kcal de séances` : ''}
+                        {activity.seancesDansPas > 0 ? ' — marche/tapis déjà dans les pas, non recomptés' : ''}
+                      </div>
+                    )}
                     <div style={{ fontSize: 13, fontWeight: 700, marginTop: 3, color: bilan.bilan > 0 ? 'var(--amber)' : 'var(--green)' }}>
                       {bilan.bilan >= 0 ? 'Surplus' : 'Déficit'} ≈ {Math.abs(bilan.bilan)} kcal
                     </div>
                   </>
                 ) : (
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    {sportKcalToday > 0
-                      ? <>Dépense sport du jour ≈ <strong>{Math.round(sportKcalToday)}</strong> kcal.</>
-                      : 'Pas encore de séance aujourd\'hui.'}
+                    {activityKcalToday > 0
+                      ? <>Dépense d'activité du jour ≈ <strong>{Math.round(activityKcalToday)}</strong> kcal.</>
+                      : 'Pas encore d\'activité notée aujourd\'hui.'}
                     {' '}Renseigne ton profil (sexe, âge, taille, poids, niveau d'activité) pour un bilan complet.
                   </div>
                 )}

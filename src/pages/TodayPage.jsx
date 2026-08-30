@@ -13,6 +13,7 @@ import WaterSection from '../components/WaterSection'
 import AddWaterSheet from '../components/AddWaterSheet'
 import SportSection from '../components/SportSection'
 import SportEntrySheet from '../components/SportEntrySheet'
+import StepsSheet from '../components/StepsSheet'
 import ShareSportModal from '../components/ShareSportModal'
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
@@ -39,7 +40,7 @@ import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, mar
 import { computeMealTargets, computeTotals, computeCalorieNeeds, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
-import { sportAdjustedSettings, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
+import { sportAdjustedSettings, dayActivityKcal, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { fmt, dateLabel } from '../lib/dates'
 import { useSetTodayHeaderInfo, useTodayShortcuts } from '../lib/TodayHeaderContext'
@@ -59,7 +60,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
   const { days: cycleDays, intensiteByDate, symptomesByDate, toggleDay: toggleCycleDay, setDaysIntensite, setDaysSymptomes } = useCycle()
-  const { activites: sportActivites, week: sportWeek, add: addSport, update: updateSport, remove: removeSport } = useSport(dateStr)
+  const { activites: sportActivites, week: sportWeek, pasJour, setPas, add: addSport, update: updateSport, remove: removeSport } = useSport(dateStr)
   const { entries: measurementEntries } = useMeasurements()
   const { profile } = useProfile()
   const { favorites } = useFavorites()
@@ -73,6 +74,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const [templateCreateMeal, setTemplateCreateMeal] = useState(null) // nom du repas | null — création d'un repas type depuis ce repas
   const [waterSheetOpen, setWaterSheetOpen] = useState(false)
   const [sportSheet, setSportSheet] = useState(null) // { initial: activite|null } | null
+  const [pasSheet, setPasSheet] = useState(false)
   const [planMealOpen, setPlanMealOpen] = useState(false)
   const { open: shortcutsOpen } = useTodayShortcuts()
 
@@ -162,10 +164,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
 
   const totals = useMemo(() => computeTotals(entries), [entries])
 
-  const sportKcalToday = useMemo(
-    () => sportActivites.reduce((s, a) => s + (Number(a.energie_kcal) || 0), 0),
-    [sportActivites],
+  // Énergie d'activité du jour, DÉDOUBLONNÉE (Palier 10) : pas + séances, en
+  // écartant les séances marquées « déjà dans mes pas » quand un total de pas
+  // est saisi. Consommée par le bilan (Palier 6) et « manger selon l'effort ».
+  const dayActivity = useMemo(
+    () => dayActivityKcal(sportActivites, pasJour, {
+      poidsKg: latestWeight,
+      seuil: settings.sport?.pas_seuil_baseline,
+    }),
+    [sportActivites, pasJour, latestWeight, settings.sport?.pas_seuil_baseline],
   )
+  const sportKcalToday = dayActivity.total
 
   // Objectifs du jour éventuellement ajustés — cycle (delta lutéal, opt-in) PUIS
   // sport (« manger selon l'effort », opt-in : base sédentaire + crédit des
@@ -176,7 +185,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const daySettings = useMemo(
     () => sportAdjustedSettings(
       cycleAdjustedSettings(settings, cycleDays, dateStr),
-      { profile, weightKg: latestWeight, sportKcalToday },
+      { profile, weightKg: latestWeight, activityKcalToday: sportKcalToday },
     ),
     [settings, cycleDays, dateStr, profile, latestWeight, sportKcalToday],
   )
@@ -406,11 +415,14 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         sportCfg={settings.sport}
         consumedKcal={totals.kcal}
         maintenanceKcal={maintenanceKcal}
+        activity={dayActivity}
+        pasJour={pasJour}
         adjust={settings.sport?.mode_energie === 'manger_selon_effort'
           ? { delta: sportKcalAdjust, base: daySettings._sportBaseGoal, credit: daySettings._sportCredit, goal: daySettings.goal_kcal, applied: daySettings._sportBaseGoal != null }
           : null}
         onOpenSheet={() => setSportSheet({ initial: null })}
         onOpenEntry={(a) => setSportSheet({ initial: a })}
+        onOpenPas={() => setPasSheet(true)}
         onShareWeek={handleShareWeek}
       />
     ) : null,
@@ -466,6 +478,22 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onDelete={handleDeleteSport}
           onShare={handleShareSeance}
           onClose={() => setSportSheet(null)}
+        />
+      )}
+
+      {pasSheet && (
+        <StepsSheet
+          date={date}
+          initial={pasJour}
+          poidsKg={latestWeight}
+          seuil={settings.sport?.pas_seuil_baseline ?? 4000}
+          objectif={Number(settings.sport?.objectif_pas_jour) || 0}
+          onSave={async (nb) => {
+            const { error } = await setPas(nb)
+            if (error) toast('Erreur')
+            else toast(nb > 0 ? '✓ Pas enregistrés !' : 'Effacé')
+          }}
+          onClose={() => setPasSheet(false)}
         />
       )}
 

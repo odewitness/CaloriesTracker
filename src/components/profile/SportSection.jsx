@@ -1,5 +1,5 @@
 import React from 'react'
-import { Dumbbell, Info } from 'lucide-react'
+import { Dumbbell, Info, Footprints } from 'lucide-react'
 import { Row, ToggleSwitch, Stepper, SectionScreen } from './primitives'
 import { sportBaseFrom } from '../../lib/sport'
 import { ACTIVITY_LEVELS } from '../../lib/nutrients'
@@ -22,6 +22,7 @@ export default function SportSection({ sport, goalKcal, profile, weightKg, onPat
   const enabled = !!cfg.enabled
   const goalMin = Number(cfg.objectif_hebdo_minutes) || 0
   const goalSeances = Number(cfg.objectif_hebdo_seances) || 0
+  const goalPas = Number(cfg.objectif_pas_jour) || 0
   const mode = cfg.mode_energie || 'aucun'
 
   const effortBase = sportBaseFrom({ goalKcal, profile, weightKg })
@@ -74,6 +75,32 @@ export default function SportSection({ sport, goalKcal, profile, weightKg, onPat
             Un repère, pas une contrainte : rien ne se passe si tu ne l'atteins
             pas. Mets « Aucun » pour masquer la jauge. L'OMS suggère au moins
             150 min d'activité modérée par semaine.
+          </div>
+
+          <div className="section-title">Pas quotidiens</div>
+          <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>
+            <Row icon={<Footprints size={18} />} label="Carte des pas sur la page du jour">
+              <ToggleSwitch
+                checked={!!cfg.afficher_pas}
+                onClick={() => onPatch({ afficher_pas: !cfg.afficher_pas })}
+              />
+            </Row>
+            {cfg.afficher_pas && (
+              <Row label="Objectif par jour">
+                <Stepper
+                  value={goalPas}
+                  display={goalPas > 0 ? `${goalPas.toLocaleString('fr-FR')} pas` : 'Aucun'}
+                  min={0} max={30000} wide
+                  onDec={() => onPatch({ objectif_pas_jour: Math.max(0, goalPas - 500) })}
+                  onInc={() => onPatch({ objectif_pas_jour: Math.min(30000, goalPas + 500) })}
+                />
+              </Row>
+            )}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
+            Tu recopies à la main le total affiché par ton téléphone ou ta montre.
+            Une séance de marche ou de tapis peut être marquée « déjà comptée dans
+            mes pas » à la saisie, pour ne pas la compter deux fois dans le bilan.
           </div>
 
           <div className="section-title">Affichage</div>
@@ -129,9 +156,10 @@ export default function SportSection({ sport, goalKcal, profile, weightKg, onPat
           {mode === 'bilan' && (
             <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
               Ajoute une ligne « mangé vs dépense estimée » dans le bloc Activité de
-              la page du jour. <strong>Uniquement informatif</strong> : ton objectif
-              de calories ne bouge pas, et ta dépense d'entretien inclut déjà une
-              partie de ton activité (à ne pas cumuler avec tes séances).
+              la page du jour (métabolisme + tes pas + tes séances, sans doublon).
+              <strong> Uniquement informatif</strong> : ton objectif de calories ne
+              bouge pas, et ta dépense d'entretien inclut déjà une partie de ton
+              activité (à ne pas cumuler mentalement).
             </div>
           )}
 
@@ -150,8 +178,8 @@ export default function SportSection({ sport, goalKcal, profile, weightKg, onPat
                       Les jours <strong>sans séance</strong> : objectif ≈{' '}
                       <strong style={{ color: 'var(--text)' }}>{effortBase.base} kcal</strong>{' '}
                       <span style={{ color: 'var(--text-hint)' }}>(au lieu de {goalKcal})</span>.<br />
-                      Les jours <strong>de séance</strong> : {effortBase.base} + tes calories
-                      dépensées, plafonné à <strong>+{cap}</strong>.
+                      Les jours <strong>actifs</strong> : {effortBase.base} + tes pas et
+                      tes séances, plafonné à <strong>+{cap}</strong> (plafond commun).
                     </div>
                   </div>
                   <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>

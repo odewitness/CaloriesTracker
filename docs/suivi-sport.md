@@ -3,9 +3,11 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-08-30.
 
-**État au 2026-08-30 : chantier terminé.** Paliers 1–4, 6, 7, 8 livrés et
-déployés. Palier 5 (Strava) et Palier 9 (rappels push) abandonnés — friction
-d'infra Supabase jugée non rentable par l'utilisatrice.
+**État au 2026-08-30 : chantier terminé, avec un Palier 10 en cours.** Paliers
+1–4, 6, 7, 8 livrés et déployés. Palier 5 (Strava) et Palier 9 (rappels push)
+abandonnés — friction d'infra Supabase jugée non rentable par l'utilisatrice.
+**Palier 10 (pas quotidiens + pilates / tapis de marche)** codé sur la branche
+`suivi-sport-p10-pas`, en attente d'application SQL + test manuel + merge.
 
 ---
 
@@ -81,7 +83,11 @@ kcal ≈ MET × 3,5 × poids_kg / 200 × durée_min
 - **type** : clé prédéfinie (`SPORT_TYPES` dans `src/lib/sport.js`), avec libellé
   FR, icône, valeur MET, booléen « a une distance ». Jeu de départ :
   `course`, `marche`, `velo`, `natation`, `muscu`, `yoga`, `hiit`, `danse`,
-  `rando`, `sport_co`, `autre`.
+  `rando`, `sport_co`, `autre`. Ajoutés au Palier 10 : `pilates` (MET 3.0) et
+  `tapis` (tapis de marche, MET 3.5, avec distance).
+- **compte_dans_pas** (Palier 10) : booléen, séance déjà incluse dans le total
+  de pas du jour → non recomptée en énergie (voir §3.3). Défaut : `true` pour
+  `marche` / `tapis`, `false` sinon.
 - **durée** (min, obligatoire), **date** (obligatoire), **heure de début**
   (optionnelle), **distance** (km, optionnelle selon le type), **intensité**
   (optionnelle : `faible` / `moderee` / `elevee`), **notes** (optionnelles).
@@ -103,6 +109,31 @@ kcal ≈ MET × 3,5 × poids_kg / 200 × durée_min
   sont créditées, **plafonnées** à `depense_max_creditee_kcal`, jamais sous le
   minimum habituel. Écran de réglage avec **avant / après chiffré**. Palier 7
   (option), à décider après quelques semaines de `bilan`.
+
+### 3.3 Pas quotidiens (Palier 10)
+
+- **Donnée** : 1 total par jour, table `pas_jour` (`user_id`, `date`, `nb_pas`),
+  RLS « own ». Saisie manuelle (recopie depuis téléphone / montre). Réglages
+  dans `settings.sport` : `afficher_pas`, `objectif_pas_jour` (**journalier**,
+  0 = aucun), `pas_seuil_baseline` (défaut 4000, non exposé en UI).
+- **Carte intégrée** au bloc « Activité » (pas de nouvelle section
+  `todaySections`) : une ligne pas + mini-jauge du jour, une feuille de saisie
+  `StepsSheet` (portal).
+- **Énergie des pas** = `max(0, nb_pas − seuil) × poids_kg × 0.0005`
+  (`stepKcal`). On ne compte QUE le marginal au-dessus du seuil : la marche
+  incidente est déjà dans le TDEE (même logique que `activityBakedIn` de
+  `sportBaseFrom`). Toujours « ≈ ».
+- **Branché sur le `mode_energie` existant**, pas de nouveau mécanisme :
+  `aucun` → affichage seul ; `bilan` → entre dans `dayEnergyBalance` ;
+  `manger_selon_effort` → crédité comme les séances, **sous le même plafond
+  partagé** `depense_max_creditee_kcal` (pas + séances ensemble ≤ plafond).
+- **Anti-doublon pas ↔ séance de marche** (`dayActivityKcal`) : un seul nombre
+  d'énergie d'activité du jour = `stepKcal(nb_pas)` + Σ kcal des séances **non**
+  marquées `compte_dans_pas`. Les vélo/natation/muscu ne génèrent pas de pas →
+  toujours comptés. S'il n'y a **pas** de total de pas saisi ce jour-là →
+  `stepKcal = 0` et toutes les séances comptent (comportement d'avant). Le flag
+  `compte_dans_pas` est **par séance**, réglé à la saisie (décision utilisatrice
+  2026-08-30), pré-coché pour marche / tapis.
 
 ---
 
@@ -441,6 +472,35 @@ Edge Function `sport-reminder` + cron + migration — même friction que Strava.
 Le bloc `settings.sport.rappels` reste dans `SPORT_DEFAULTS` (inutilisé,
 inoffensif) au cas où.
 
+### Palier 10 — Pas quotidiens + pilates / tapis de marche ▸ statut : codé (branche `suivi-sport-p10-pas`)
+Décisions utilisatrice (2026-08-30) : carte des pas **intégrée** au bloc
+« Activité » (pas de section séparée) ; objectif de pas **journalier** ;
+anti-doublon par **flag par séance** « déjà compté dans mes pas ».
+- [x] `supabase/sql/pas_jour_setup.sql` : table `pas_jour` (PK `user_id,date`,
+      RLS « own » select/insert/update/delete), colonne
+      `activites_sport.compte_dans_pas` (défaut false), nouveau défaut
+      `settings.sport` (`afficher_pas`, `objectif_pas_jour`,
+      `pas_seuil_baseline`). MAJ `supabase_schema.sql` (table 32 + col + défaut
+      + note RLS). **Application manuelle Supabase à faire.**
+- [x] `src/lib/sport.js` : 2 types (`pilates`, `tapis`), `STEP_GENERATING_TYPES`
+      / `defaultCompteDansPas`, `stepKcal`, `dayActivityKcal` (nombre unique
+      dédoublonné), `sportAdjustedSettings` accepte `activityKcalToday` (plafond
+      partagé), clés `SPORT_DEFAULTS`.
+- [x] `src/hooks/useSport.js` : charge `pas_jour` de la semaine, expose
+      `pasJour` / `pasWeek` / `setPas` (upsert on conflict `user_id,date`,
+      0/vide = delete).
+- [x] `src/components/StepsSheet.jsx` (feuille de saisie, portal) + ligne pas
+      dans `SportSection` (carte page du jour) + flag `compte_dans_pas` dans
+      `SportEntrySheet`.
+- [x] `src/components/profile/SportSection.jsx` : section « Pas quotidiens »
+      (toggle `afficher_pas` + stepper `objectif_pas_jour`), textes bilan /
+      effort mis à jour (pas + séances, sans doublon).
+- [x] `src/pages/TodayPage.jsx` : `dayActivityKcal` alimente `daySettings`
+      (effort) + `SportSection` (bilan), `StepsSheet` monté via l'état de la page.
+- [x] Entrée changelog (2026-08-30 « Tes pas du jour, et deux sports en plus »).
+- [ ] Historique (pas dans `SportHistorySection`) — **sous-palier 10b**, différé
+      pour garder ce lot revuable.
+
 ---
 
 ## 7. Reste à faire (vue rapide)
@@ -453,6 +513,9 @@ inoffensif) au cas où.
 
 - **Palier 5 (Strava) : abandonné** (friction infra).
 - **Palier 9 (rappels push) : abandonné** (« pas besoin de rappel de sport »).
+- **Palier 10 (pas quotidiens + pilates / tapis) : codé** (branche
+  `suivi-sport-p10-pas`). Reste : appliquer `pas_jour_setup.sql` dans Supabase,
+  test manuel, merge + push. Sous-palier 10b (pas dans l'Historique) différé.
 
 Toute nouvelle idée s'ajoute ici.
 
@@ -490,6 +553,18 @@ Toute nouvelle idée s'ajoute ici.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — **Palier 10 (pas quotidiens)** ouvert et codé sur
+  `suivi-sport-p10-pas`. Décisions utilisatrice : carte des pas **intégrée** au
+  bloc « Activité » (pas de section `todaySections` dédiée) ; objectif de pas
+  **journalier** (jauge du jour) ; anti-doublon pas ↔ séance de marche géré par
+  un **flag par séance** `compte_dans_pas` (pré-coché marche / tapis), pas par
+  une règle automatique. Modèle : un seul nombre d'énergie d'activité/jour
+  (`dayActivityKcal` = `stepKcal` des pas au-dessus d'un seuil baseline 4000 +
+  séances hors pas), consommé par le bilan (P6) et « manger selon l'effort »
+  (P7) sous le **plafond partagé** existant. Types `pilates` (MET 3) et `tapis`
+  (MET 3.5, distance) ajoutés. `npm run build` OK. En attente : application
+  `pas_jour_setup.sql` dans Supabase + test manuel + merge/push. Sous-palier
+  10b (pas dans l'Historique) différé.
 - **2026-08-30** — Palier 8 mergé + poussé (SQL `partages_sport_setup.sql`
   appliqué + testé). **Palier 9 (rappels push) abandonné** (« pas besoin de
   rappel de sport »). **Chantier terminé** : Paliers 1–4, 6, 7, 8 livrés ;

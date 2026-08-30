@@ -14,26 +14,39 @@ import { weekStart, weekEnd, weeklyStats, sortActivites } from '../lib/sport'
 //   activites  : séances de `dateStr`, triées pour l'affichage
 //   week       : { minutes, seances, kcal } sur toute la semaine
 //   add(payload) / update(id, patch) / remove(id)
+//   pasJour    : total de pas de `dateStr` (nombre) ou null (Palier 10)
+//   pasWeek    : somme des pas sur la semaine
+//   setPas(nbPas) : upsert le total du jour (0 / null / vide = supprime la ligne)
 // ─────────────────────────────────────────────────────────────────────────────
 export function useSport(dateStr) {
   const { user } = useAuth()
   const [rows, setRows] = useState([]) // toutes les séances de la semaine
+  const [pasRows, setPasRows] = useState([]) // pas_jour de la semaine
   const [loading, setLoading] = useState(true)
 
   const start = dateStr ? weekStart(dateStr) : null
   const end = dateStr ? weekEnd(dateStr) : null
 
   const load = useCallback(async () => {
-    if (!user?.id || !start || !end) { setRows([]); setLoading(false); return }
+    if (!user?.id || !start || !end) { setRows([]); setPasRows([]); setLoading(false); return }
     setLoading(true)
-    const { data } = await supabase
-      .from('activites_sport')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('date', start)
-      .lte('date', end)
-      .order('date', { ascending: true })
-    setRows(data || [])
+    const [{ data: act }, { data: pas }] = await Promise.all([
+      supabase
+        .from('activites_sport')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('date', start)
+        .lte('date', end)
+        .order('date', { ascending: true }),
+      supabase
+        .from('pas_jour')
+        .select('date, nb_pas')
+        .eq('user_id', user.id)
+        .gte('date', start)
+        .lte('date', end),
+    ])
+    setRows(act || [])
+    setPasRows(pas || [])
     setLoading(false)
   }, [user?.id, start, end])
 
@@ -44,6 +57,40 @@ export function useSport(dateStr) {
     [rows, dateStr],
   )
   const week = useMemo(() => weeklyStats(rows, dateStr), [rows, dateStr])
+
+  const pasJour = useMemo(() => {
+    const r = pasRows.find(p => p.date === fmt(dateStr))
+    return r ? Number(r.nb_pas) : null
+  }, [pasRows, dateStr])
+  const pasWeek = useMemo(
+    () => pasRows.reduce((s, p) => s + (Number(p.nb_pas) || 0), 0),
+    [pasRows],
+  )
+
+  const setPas = async (nbPas) => {
+    if (!user) return { error: 'Non connecté' }
+    const d = fmt(dateStr)
+    const n = Number(nbPas)
+    if (!n || n <= 0) {
+      const prev = pasRows
+      setPasRows(p => p.filter(x => x.date !== d))
+      const { error } = await supabase
+        .from('pas_jour').delete().eq('user_id', user.id).eq('date', d)
+      if (error) setPasRows(prev)
+      return { error }
+    }
+    const value = Math.round(n)
+    const { data, error } = await supabase
+      .from('pas_jour')
+      .upsert({ user_id: user.id, date: d, nb_pas: value, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,date' })
+      .select('date, nb_pas')
+      .single()
+    if (!error && data) {
+      setPasRows(p => [...p.filter(x => x.date !== d), data])
+    }
+    return { data, error }
+  }
 
   const add = async (payload) => {
     if (!user) return { error: 'Non connecté' }
@@ -82,7 +129,7 @@ export function useSport(dateStr) {
     return { error }
   }
 
-  return { activites, week, loading, add, update, remove, refetch: load }
+  return { activites, week, pasJour, pasWeek, setPas, loading, add, update, remove, refetch: load }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

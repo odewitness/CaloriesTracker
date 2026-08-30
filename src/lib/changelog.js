@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Tes pas du jour, et deux sports en plus',
+    description: "Dans le bloc Activité de la page du jour, tu peux maintenant noter ton nombre de pas (recopié depuis ton téléphone ou ta montre) et te fixer un objectif quotidien. Pilates et tapis de marche s'ajoutent à la liste des activités. Et si tu notes à la fois une séance de marche et ton total de pas, tu peux cocher « déjà compté dans mes pas » sur la séance pour éviter de compter la même chose deux fois dans le bilan. Tout ça se règle dans Profil › Sport.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Tes portions personnalisées sont bien gardées',
     description: "Quand tu ajoutais une portion à un aliment (par exemple « 1 tranche · 30 g ») au moment de l'ajouter à ton journal, ou depuis sa fiche, elle s'affichait sur le moment mais repartait au rechargement suivant. C'est corrigé : les portions que tu crées sont maintenant vraiment enregistrées et te seront reproposées la prochaine fois.",
   },
