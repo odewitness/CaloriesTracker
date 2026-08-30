@@ -4,11 +4,6 @@ import { fmt } from '../lib/dates'
 import { PHASES } from '../lib/cycle'
 import CalendarDayMarkers, { CalendarLegend } from './CalendarDayMarkers'
 
-const STATUS_COLOR = {
-  ok:   'var(--green)',
-  off:  'var(--coral)',
-  none: 'var(--border-md)',
-}
 const STATUS_BG = {
   ok:   'var(--green-light)',
   off:  'var(--coral-light)',
@@ -140,12 +135,6 @@ export default function CalendarMonthGrid({
               }}>
                 {date.getDate()}
               </span>
-              {status !== 'none' && !isSelected && !isExcluded && (
-                <span style={{
-                  width: 4, height: 4, borderRadius: '50%',
-                  background: STATUS_COLOR[status], marginTop: 2,
-                }} />
-              )}
               <CalendarDayMarkers marks={{
                 planned: plannedStatus, hasSport, phaseColor,
                 isPeriod: isPeriodDay, isSelected, compact: true,
