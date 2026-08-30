@@ -31,6 +31,7 @@ export default function CalorieTrendChart({
   monthSummaries = [], avgKcal,
   weightPoints = [], showWeight, onToggleWeight, onJumpToDetail,
   cycleDays, cycleSettings,
+  sportDates,
 }) {
   const gradId = useId()
   const isYear = tab === 'annee'
@@ -127,6 +128,13 @@ export default function CalorieTrendChart({
 
   const untrackedCount = points.filter(p => p.untracked && !p.excluded).length
   const hasChart = withData.length >= 1
+
+  // Jours avec au moins une séance de sport → petit tiret vert sous la barre
+  // (vues Semaine / Mois uniquement — au mois près, ça n'a pas de sens en Année).
+  const sportBarIdx = useMemo(() => {
+    if (isYear || !sportDates || sportDates.size === 0) return []
+    return points.map((p, i) => (sportDates.has(p.key) ? i : -1)).filter(i => i >= 0)
+  }, [isYear, sportDates, points])
 
   // Bandes de phase lutéale en arrière-plan, uniquement quand la courbe de
   // poids est superposée (contexte : rétention d'eau ≠ prise de gras) et hors
@@ -257,6 +265,15 @@ export default function CalorieTrendChart({
             )
           })}
 
+          {/* Jours de sport : tiret vert sous la barre */}
+          {sportBarIdx.map(i => (
+            <line
+              key={`sp${i}`}
+              x1={xFor(i)} y1={BASELINE + 3} x2={xFor(i)} y2={BASELINE + 7}
+              stroke="var(--green)" strokeWidth="2" strokeLinecap="round"
+            />
+          ))}
+
           {/* Superposition poids */}
           {showWeight && canWeight && weightCoords.length >= 2 && (
             <>
@@ -294,6 +311,12 @@ export default function CalorieTrendChart({
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginTop: 4, color: 'var(--text-hint)' }}>
           <span style={{ width: 16, height: 9, borderRadius: 2, background: 'var(--purple)', opacity: 0.16, flexShrink: 0 }} />
           Bandes = phase lutéale : le poids peut monter de 0,5 à 2 kg d'eau.
+        </div>
+      )}
+      {sportBarIdx.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginTop: 4, color: 'var(--text-hint)' }}>
+          <span style={{ width: 2, height: 10, borderRadius: 1, background: 'var(--green)', flexShrink: 0 }} />
+          Tiret vert = jour avec au moins une séance de sport.
         </div>
       )}
     </div>

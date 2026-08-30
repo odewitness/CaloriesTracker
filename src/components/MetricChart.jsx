@@ -56,6 +56,7 @@ function smoothPath(coords) {
 export default function MetricChart({
   entries, fieldKey, label, unit, color = 'var(--green)',
   showCyclePhases = false, cycleDays, cycleSettings,
+  sportDates,
 }) {
   const gradId = useId()
   const [range, setRange] = useState('tout')
@@ -169,6 +170,13 @@ export default function MetricChart({
               {i === selectedIndex && (
                 <line x1={coords[i].x} y1={PAD_TOP - 6} x2={coords[i].x} y2={HEIGHT - PAD_BOTTOM} stroke={color} strokeWidth="1" strokeDasharray="2 3" opacity="0.5" />
               )}
+              {sportDates?.has(p.date) && (
+                <line
+                  x1={coords[i].x} y1={HEIGHT - PAD_BOTTOM + 4}
+                  x2={coords[i].x} y2={HEIGHT - PAD_BOTTOM + 8}
+                  stroke="var(--green)" strokeWidth="2" strokeLinecap="round"
+                />
+              )}
               <circle
                 cx={coords[i].x}
                 cy={coords[i].y}
@@ -210,6 +218,13 @@ export default function MetricChart({
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: 'var(--text-hint)', marginBottom: stats ? 12 : 0, lineHeight: 1.4 }}>
           <span style={{ width: 18, height: 10, borderRadius: 2, background: 'var(--purple)', opacity: 0.18, flexShrink: 0 }} />
           Phase lutéale — le poids peut monter de 0,5 à 2 kg d'eau, ce n'est pas de la graisse.
+        </div>
+      )}
+
+      {points.length >= 2 && sportDates && points.some(p => sportDates.has(p.date)) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: 'var(--text-hint)', marginBottom: stats ? 12 : 0, lineHeight: 1.4 }}>
+          <span style={{ width: 2, height: 10, borderRadius: 1, background: 'var(--green)', flexShrink: 0 }} />
+          Tiret vert = relevé fait un jour de séance de sport.
         </div>
       )}
 

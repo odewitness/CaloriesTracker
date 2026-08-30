@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Tes jours de sport sur tes courbes',
+    description: "Dans l'Historique, les jours où tu as fait une séance sont maintenant marqués d'un petit tiret vert sous le graphique des calories, et une phrase compare tes calories moyennes les jours avec sport et les jours sans (et ton poids, si tu le notes). Le même tiret vert apparaît sur ta courbe de poids (Poids & mensurations) pour les pesées faites un jour de séance.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Ton sport, semaine après semaine',
     description: "Le bloc « Activité » affiche maintenant un anneau : tes minutes actives de la semaine par rapport à ton objectif (réglable dans Profil › Sport, ou « Aucun » si tu préfères sans). Et dans l'Historique, une section « Sport » récapitule tes minutes et tes séances sur la période choisie, avec un petit graphique par jour, par semaine ou par mois, et le nombre de semaines d'affilée où tu as tenu ton objectif.",
   },

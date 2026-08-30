@@ -66,6 +66,7 @@ export default function HistoryPage() {
   // Séances de sport de la période affichée (récap dédié, indépendant du journal).
   const { byDate: sportByDate } = useSportRange(bounds.start, bounds.end)
   const sportActs = useMemo(() => Object.values(sportByDate).flat(), [sportByDate])
+  const sportDates = useMemo(() => new Set(Object.keys(sportByDate)), [sportByDate])
 
   // ── Chargement du journal (période affichée + précédente) ─────────────────
   useEffect(() => {
@@ -215,6 +216,33 @@ export default function HistoryPage() {
   const daysObjectif = statDateKeys.filter(d => sumKcal(days[d]) <= settings.goal_kcal).length
   const energyBalance = statDateKeys.reduce((s, d) => s + (sumKcal(days[d]) - settings.goal_kcal), 0)
 
+  // Corrélation sport ↔ calories / poids sur la période — jours AVEC séance vs
+  // jours SANS (jours loggés & non exclus). Hors vue Année. Min. 2 + 2 jours.
+  const sportPeriodStats = useMemo(() => {
+    if (tab === 'annee' || !settings.sport?.enabled || sportDates.size === 0) return null
+    const withS = { k: [], w: [] }, without = { k: [], w: [] }
+    for (const d of statDateKeys) {
+      const kcal = sumKcal(days[d])
+      if (kcal <= 0) continue
+      ;(sportDates.has(d) ? withS : without).k.push(kcal)
+    }
+    for (const m of measurementEntries) {
+      if (m.poids_kg == null || m.date < bounds.start || m.date > bounds.end) continue
+      ;(sportDates.has(m.date) ? withS : without).w.push(m.poids_kg)
+    }
+    if (withS.k.length < 2 || without.k.length < 2) return null
+    const mean = a => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null)
+    const kW = mean(withS.k), kO = mean(without.k)
+    const wW = mean(withS.w), wO = mean(without.w)
+    return {
+      kWith: Math.round(kW), kWithout: Math.round(kO), kDelta: Math.round(kW - kO),
+      nWith: withS.k.length, nWithout: without.k.length,
+      wWith: wW != null ? Math.round(wW * 10) / 10 : null,
+      wWithout: wO != null ? Math.round(wO * 10) / 10 : null,
+      wDelta: (wW != null && wO != null) ? Math.round((wW - wO) * 10) / 10 : null,
+    }
+  }, [tab, settings.sport, sportDates, statDateKeys, days, measurementEntries, bounds.start, bounds.end])
+
   // Delta moy. kcal/j vs période précédente (jours loggés & non exclus)
   const deltaPrev = useMemo(() => {
     const byDate = {}
@@ -339,6 +367,7 @@ export default function HistoryPage() {
             onJumpToDetail={handleJump}
             cycleDays={cycleDays}
             cycleSettings={settings.cycle}
+            sportDates={settings.sport?.enabled ? sportDates : undefined}
           />
 
           {cyclePhaseStats && (
@@ -389,6 +418,26 @@ export default function HistoryPage() {
               bounds={bounds}
               goalMin={Number(settings.sport?.objectif_hebdo_minutes) || 0}
             />
+          )}
+
+          {sportPeriodStats && (
+            <div className="card" style={{ padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--green)' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>Sport &amp; calories sur cette période</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                Calories moy. : <strong>{sportPeriodStats.kWith}</strong> les jours avec séance vs{' '}
+                <strong>{sportPeriodStats.kWithout}</strong> les jours sans{' '}
+                (<span style={{ color: sportPeriodStats.kDelta >= 0 ? 'var(--amber)' : 'var(--green)', fontWeight: 700 }}>
+                  {sportPeriodStats.kDelta >= 0 ? '+' : ''}{sportPeriodStats.kDelta}
+                </span>).
+                {sportPeriodStats.wDelta != null && (
+                  <> Poids moy. : <strong>{sportPeriodStats.wWith}</strong> vs <strong>{sportPeriodStats.wWithout}</strong> kg{' '}
+                  ({sportPeriodStats.wDelta >= 0 ? '+' : ''}{sportPeriodStats.wDelta}).</>
+                )}
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.4 }}>
+                Simple observation, pas une relation de cause à effet. Sur {sportPeriodStats.nWith} + {sportPeriodStats.nWithout} jours notés.
+              </div>
+            </div>
           )}
 
           {/* Régularité */}
