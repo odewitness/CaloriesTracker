@@ -411,20 +411,21 @@ export function computeTotals(entries) {
 // ── getDayStatus ─────────────────────────────────────────────────────────
 // Statut couleur d'un jour pour le calendrier nutritionnel :
 //   'none' — aucune entrée journal ce jour-là → gris
-//   'ok'   — kcal ET protéines ET glucides ET lipides tous à ±15% de l'objectif → vert
-//   'off'  — au moins une des 4 valeurs sort de cette bande → rouge
-// Tolérance (±15%, cf. DAY_STATUS_TOLERANCE) : la couleur reflète un vrai
-// suivi précis, pas une simple présence de données.
-export const DAY_STATUS_TOLERANCE = 0.15
+//   'ok'   — calories à ±15% de l'objectif ET chaque macro à ±30% → vert
+//   'off'  — les calories ou une macro sortent de leur bande → rouge
+// Deux tolérances : serrée sur les calories (le cœur du suivi), plus lâche sur
+// protéines / glucides / lipides qui servent surtout de garde-fou « rien
+// d'aberrant ». Une macro dont l'objectif n'est pas défini (0) empêche le vert.
+export const DAY_STATUS_TOLERANCE = 0.15        // calories
+export const DAY_STATUS_MACRO_TOLERANCE = 0.30  // protéines / glucides / lipides
 
 export function getDayStatus(totals, settings, hasEntries) {
   if (!hasEntries) return 'none'
-  const checks = [
-    [totals.kcal, settings?.goal_kcal],
-    [totals.prot, settings?.goal_proteines],
-    [totals.gluc, settings?.goal_glucides],
-    [totals.lip,  settings?.goal_lipides],
-  ]
-  const ok = checks.every(([val, goal]) => goal > 0 && Math.abs(val - goal) / goal <= DAY_STATUS_TOLERANCE)
+  const within = (val, goal, tol) => goal > 0 && Math.abs(val - goal) / goal <= tol
+  const ok =
+    within(totals.kcal, settings?.goal_kcal, DAY_STATUS_TOLERANCE) &&
+    within(totals.prot, settings?.goal_proteines, DAY_STATUS_MACRO_TOLERANCE) &&
+    within(totals.gluc, settings?.goal_glucides, DAY_STATUS_MACRO_TOLERANCE) &&
+    within(totals.lip,  settings?.goal_lipides,  DAY_STATUS_MACRO_TOLERANCE)
   return ok ? 'ok' : 'off'
 }
