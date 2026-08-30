@@ -64,10 +64,12 @@ export default function HistoryPage() {
   const { excludedDates } = useExcludedDaysRange(bounds.start, bounds.end)
   const { excludedDates: prevExcluded } = useExcludedDaysRange(prevBounds.start, prevBounds.end)
 
-  // Séances de sport de la période affichée (récap dédié, indépendant du journal).
-  const { byDate: sportByDate } = useSportRange(bounds.start, bounds.end)
+  // Séances de sport + pas de la période affichée (récap dédié, indépendant du
+  // journal — s'affiche même sur une période sans aucun repas loggé).
+  const { byDate: sportByDate, pasByDate } = useSportRange(bounds.start, bounds.end)
   const sportActs = useMemo(() => Object.values(sportByDate).flat(), [sportByDate])
   const sportDates = useMemo(() => new Set(Object.keys(sportByDate)), [sportByDate])
+  const hasSport = !!settings.sport?.enabled && (sportActs.length > 0 || Object.keys(pasByDate).length > 0)
 
   // ── Chargement du journal (période affichée + précédente) ─────────────────
   useEffect(() => {
@@ -191,11 +193,16 @@ export default function HistoryPage() {
   const cyclePhaseStats = useMemo(() => {
     const cfg = settings.cycle
     if (tab === 'annee' || !cfg?.enabled || cfg.sous_contraception || !cycleDays.length) return null
-    const lut = { k: [], w: [] }, rest = { k: [], w: [] }
+    const lut = { k: [], w: [], pas: [], dep: [] }, rest = { k: [], w: [], pas: [], dep: [] }
     for (const d of statDateKeys) {
       const kcal = sumKcal(days[d])
       if (kcal <= 0) continue
-      ;(phaseForDate(d, cycleDays, cfg) === 'luteale' ? lut : rest).k.push(kcal)
+      const bucket = phaseForDate(d, cycleDays, cfg) === 'luteale' ? lut : rest
+      bucket.k.push(kcal)
+      const p = pasByDate[d]
+      if (p > 0) bucket.pas.push(p)
+      const dep = (sportByDate[d] || []).reduce((s, a) => s + (Number(a.energie_kcal) || 0), 0)
+      if (dep > 0) bucket.dep.push(dep)
     }
     for (const m of measurementEntries) {
       if (m.poids_kg == null || m.date < bounds.start || m.date > bounds.end) continue
@@ -205,14 +212,22 @@ export default function HistoryPage() {
     const mean = a => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null)
     const kLut = mean(lut.k), kRest = mean(rest.k)
     const wLut = mean(lut.w), wRest = mean(rest.w)
+    const pasLut = mean(lut.pas), pasRest = mean(rest.pas)
+    const depLut = mean(lut.dep), depRest = mean(rest.dep)
     return {
       kLut: Math.round(kLut), kRest: Math.round(kRest), kDelta: Math.round(kLut - kRest),
       nLut: lut.k.length, nRest: rest.k.length,
       wLut: wLut != null ? Math.round(wLut * 10) / 10 : null,
       wRest: wRest != null ? Math.round(wRest * 10) / 10 : null,
       wDelta: (wLut != null && wRest != null) ? Math.round((wLut - wRest) * 10) / 10 : null,
+      pasLut: pasLut != null ? Math.round(pasLut) : null,
+      pasRest: pasRest != null ? Math.round(pasRest) : null,
+      pasDelta: (pasLut != null && pasRest != null) ? Math.round(pasLut - pasRest) : null,
+      depLut: depLut != null ? Math.round(depLut) : null,
+      depRest: depRest != null ? Math.round(depRest) : null,
+      depDelta: (depLut != null && depRest != null) ? Math.round(depLut - depRest) : null,
     }
-  }, [tab, settings.cycle, cycleDays, statDateKeys, days, measurementEntries, bounds.start, bounds.end])
+  }, [tab, settings.cycle, cycleDays, statDateKeys, days, measurementEntries, bounds.start, bounds.end, pasByDate, sportByDate])
 
   const daysObjectif = statDateKeys.filter(d => sumKcal(days[d]) <= settings.goal_kcal).length
   const energyBalance = statDateKeys.reduce((s, d) => s + (sumKcal(days[d]) - settings.goal_kcal), 0)
@@ -347,8 +362,32 @@ export default function HistoryPage() {
 
       {loading && <Loader />}
 
-      {!loading && !hasEntries && (
+      {!loading && !hasEntries && !hasSport && (
         <EmptyState icon={<TrendingDown size={40} />} title="Aucune donnée sur cette période" description="Logge tes repas pour voir tes stats ici" />
+      )}
+
+      {/* Période sans repas loggé mais avec des séances / des pas : on affiche
+          quand même le récap d'activité (indépendant du journal). */}
+      {!loading && !hasEntries && hasSport && (
+        <>
+          <SportHistorySection
+            activites={sportActs}
+            pasByDate={pasByDate}
+            streakRows={sportStreakRows}
+            tab={tab}
+            bounds={bounds}
+            goalMin={Number(settings.sport?.objectif_hebdo_minutes) || 0}
+            weightPoints={weightPoints}
+            cycleDays={cycleDays}
+            cycleSettings={settings.cycle}
+          />
+          {tab !== 'annee' && settings.cycle?.enabled && (
+            <SportPhaseSection activites={sportActs} cycleDays={cycleDays} cycleSettings={settings.cycle} />
+          )}
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '8px 2px 16px' }}>
+            Aucun repas loggé sur cette période — seules tes données d'activité s'affichent.
+          </div>
+        </>
       )}
 
       {!loading && hasEntries && (
@@ -385,6 +424,21 @@ export default function HistoryPage() {
                   ({cyclePhaseStats.wDelta >= 0 ? '+' : ''}{cyclePhaseStats.wDelta}).</>
                 )}
               </div>
+              {(cyclePhaseStats.pasDelta != null || cyclePhaseStats.depDelta != null) && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
+                  {cyclePhaseStats.pasDelta != null && (
+                    <>Pas moy./j : <strong>{cyclePhaseStats.pasLut.toLocaleString('fr-FR')}</strong> vs{' '}
+                    <strong>{cyclePhaseStats.pasRest.toLocaleString('fr-FR')}</strong>{' '}
+                    (<span style={{ color: cyclePhaseStats.pasDelta >= 0 ? 'var(--green)' : 'var(--text-muted)', fontWeight: 700 }}>
+                      {cyclePhaseStats.pasDelta >= 0 ? '+' : ''}{cyclePhaseStats.pasDelta.toLocaleString('fr-FR')}
+                    </span>).{' '}</>
+                  )}
+                  {cyclePhaseStats.depDelta != null && (
+                    <>Kcal dépensées/j : ≈ <strong>{cyclePhaseStats.depLut}</strong> vs ≈ <strong>{cyclePhaseStats.depRest}</strong>{' '}
+                    ({cyclePhaseStats.depDelta >= 0 ? '+' : ''}{cyclePhaseStats.depDelta}).</>
+                  )}
+                </div>
+              )}
               <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.4 }}>
                 Un petit écart est attendu ; côté poids c'est surtout de l'eau. Sur {cyclePhaseStats.nLut} + {cyclePhaseStats.nRest} jours notés.
               </div>
@@ -414,10 +468,14 @@ export default function HistoryPage() {
           {settings.sport?.enabled && (
             <SportHistorySection
               activites={sportActs}
+              pasByDate={pasByDate}
               streakRows={sportStreakRows}
               tab={tab}
               bounds={bounds}
               goalMin={Number(settings.sport?.objectif_hebdo_minutes) || 0}
+              weightPoints={weightPoints}
+              cycleDays={cycleDays}
+              cycleSettings={settings.cycle}
             />
           )}
 

@@ -167,35 +167,49 @@ export function useSportStreak(weeks = 16) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useSportRange(start, end) — séances sur une plage, regroupées par date (vue
-// calendrier). Même forme que useJournalRange.
+// calendrier + graphe Historique). Même forme que useJournalRange.
+//   byDate    : { 'YYYY-MM-DD': [séances] }
+//   pasByDate : { 'YYYY-MM-DD': nb_pas } (Palier 10b — courbe des pas)
 // ─────────────────────────────────────────────────────────────────────────────
 export function useSportRange(startDate, endDate) {
   const { user } = useAuth()
   const [byDate, setByDate] = useState({})
+  const [pasByDate, setPasByDate] = useState({})
   const [loading, setLoading] = useState(true)
 
   const start = fmt(startDate)
   const end = fmt(endDate)
 
   const load = useCallback(async () => {
-    if (!user?.id || !start || !end) { setByDate({}); setLoading(false); return }
+    if (!user?.id || !start || !end) { setByDate({}); setPasByDate({}); setLoading(false); return }
     setLoading(true)
-    const { data } = await supabase
-      .from('activites_sport')
-      .select('id, date, type, duree_min, energie_kcal')
-      .eq('user_id', user.id)
-      .gte('date', start)
-      .lte('date', end)
+    const [{ data: act }, { data: pas }] = await Promise.all([
+      supabase
+        .from('activites_sport')
+        .select('id, date, type, duree_min, energie_kcal, compte_dans_pas')
+        .eq('user_id', user.id)
+        .gte('date', start)
+        .lte('date', end),
+      supabase
+        .from('pas_jour')
+        .select('date, nb_pas')
+        .eq('user_id', user.id)
+        .gte('date', start)
+        .lte('date', end),
+    ])
     const grouped = {}
-    for (const a of data || []) {
+    for (const a of act || []) {
       if (!grouped[a.date]) grouped[a.date] = []
       grouped[a.date].push(a)
     }
+    const pasMap = {}
+    for (const p of pas || []) pasMap[p.date] = Number(p.nb_pas) || 0
     setByDate(grouped)
+    setPasByDate(pasMap)
     setLoading(false)
   }, [user?.id, start, end])
 
   useEffect(() => { load() }, [load])
 
-  return { byDate, loading, refetch: load }
+  return { byDate, pasByDate, loading, refetch: load }
 }
