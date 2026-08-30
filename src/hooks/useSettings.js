@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
 import { WATER_DEFAULTS, mergeWaterSettings } from '../lib/water'
 import { CYCLE_DEFAULTS, mergeCycleSettings } from '../lib/cycle'
+import { SPORT_DEFAULTS, mergeSportSettings } from '../lib/sport'
 import { DEFAULT_TODAY_SECTIONS_ORDER, normalizeTodaySectionsOrder } from '../lib/todaySections'
 
 const DEFAULTS = {
@@ -17,14 +18,15 @@ const DEFAULTS = {
   ordre_sections_jour: [...DEFAULT_TODAY_SECTIONS_ORDER],
   water: { ...WATER_DEFAULTS },
   cycle: { ...CYCLE_DEFAULTS },
+  sport: { ...SPORT_DEFAULTS },
 }
 
-// Applique le même traitement que meal_enabled/meal_overrides aux blocs `water`
-// et `cycle` (fusion avec les valeurs par défaut), pour rester robuste si la
-// colonne `settings.water` / `settings.cycle` est absente (base pas encore
-// migrée) ou partielle.
+// Applique le même traitement que meal_enabled/meal_overrides aux blocs `water`,
+// `cycle` et `sport` (fusion avec les valeurs par défaut), pour rester robuste
+// si la colonne `settings.water` / `settings.cycle` / `settings.sport` est
+// absente (base pas encore migrée) ou partielle.
 function withWater(row) {
-  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle) }
+  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle), sport: mergeSportSettings(row?.sport) }
 }
 
 export function useSettings() {

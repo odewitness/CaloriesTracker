@@ -8,7 +8,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import {
   User, Scale, Target, UtensilsCrossed, Droplet, Bell, Lightbulb,
-  LogOut, ChevronRight, ChevronDown, Info, HeartPulse,
+  LogOut, ChevronRight, ChevronDown, Info, HeartPulse, Dumbbell,
 } from 'lucide-react'
 import { litres } from '../lib/water'
 import Loader from '../components/Loader'
@@ -20,6 +20,7 @@ import HydrationSection from '../components/profile/HydrationSection'
 import NotificationsSection from '../components/profile/NotificationsSection'
 import TodaySection from '../components/profile/TodaySection'
 import CycleSection from '../components/profile/CycleSection'
+import SportSection from '../components/profile/SportSection'
 
 // Champs de `settings` réellement pilotés par les écrans Objectifs / Répartition.
 // `goals` est une copie figée de `settings` prise au chargement : ne renvoyer que
@@ -236,6 +237,16 @@ export default function ProfilePage() {
     )
   }
 
+  if (section === 'sport') {
+    return (
+      <SportSection
+        sport={settings.sport}
+        onPatch={(patch) => updateSettings({ sport: { ...settings.sport, ...patch } })}
+        onBack={back}
+      />
+    )
+  }
+
   // ── Hub ──────────────────────────────────────────────────────────────────
   const infosSummary = (age || tailleCm)
     ? [age && `${age} ans`, tailleCm && `${tailleCm} cm`].filter(Boolean).join(' · ')
@@ -249,6 +260,7 @@ export default function ProfilePage() {
     : 'À activer'
   const jourSummary = settings.afficher_manques_jour !== false ? 'Manques affichés' : 'Manques masqués'
   const cycleSummary = settings.cycle?.enabled ? 'Activé' : 'À activer'
+  const sportSummary = settings.sport?.enabled ? 'Activé' : 'À activer'
 
   return (
     <div className="page-content">
@@ -272,6 +284,7 @@ export default function ProfilePage() {
       <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
         <NavRow icon={<Droplet size={18} />} label="Hydratation" value={hydrationSummary} onClick={() => setSection('hydratation')} />
         <NavRow icon={<HeartPulse size={18} />} label="Cycle & alimentation" value={cycleSummary} onClick={() => setSection('cycle')} />
+        <NavRow icon={<Dumbbell size={18} />} label="Sport" value={sportSummary} onClick={() => setSection('sport')} />
         <NavRow icon={<Bell size={18} />} label="Notifications" value={notifSummary} onClick={() => setSection('notifications')} />
         <NavRow icon={<Lightbulb size={18} />} label="Page du jour" value={jourSummary} onClick={() => setSection('jour')} />
       </div>

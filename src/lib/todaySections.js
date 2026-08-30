@@ -2,10 +2,10 @@
 // L'utilisatrice le règle depuis Profil > Page du jour ; il est persisté dans
 // `settings.ordre_sections_jour` (jsonb) et partagé sur tous les jours.
 //
-// Seuls ces 6 blocs de contenu sont réordonnables. La barre de raccourcis et la
+// Seuls ces blocs de contenu sont réordonnables. La barre de raccourcis et la
 // pastille de phase du cycle restent fixées en haut.
 
-export const TODAY_SECTION_KEYS = ['phase', 'bilan', 'nutriments', 'manques', 'repas', 'complements', 'eau']
+export const TODAY_SECTION_KEYS = ['phase', 'bilan', 'nutriments', 'manques', 'repas', 'sport', 'complements', 'eau']
 
 export const TODAY_SECTION_LABELS = {
   phase: 'Phase du cycle',
@@ -13,6 +13,7 @@ export const TODAY_SECTION_LABELS = {
   nutriments: 'Détail des nutriments',
   manques: 'À combler aujourd\'hui',
   repas: 'Repas du jour',
+  sport: 'Activité',
   complements: 'Compléments',
   eau: 'Eau',
 }
