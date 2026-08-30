@@ -39,6 +39,7 @@ import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/
 import { sportAdjustedSettings, dayActivityKcal, dayEnergyBalance, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { fmt, dateLabel } from '../lib/dates'
+import { hapticTap, hapticRemove, hapticNav } from '../lib/haptics'
 import { useSetTodayHeaderInfo, useTodayShortcuts, useRequestTodayDate } from '../lib/TodayHeaderContext'
 
 function dateOffset(base, days) {
@@ -97,6 +98,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     if (!defaultBeverage) { toast('Boissons en cours de chargement…'); return }
     const { error } = await addEntry(buildWaterEntry(defaultBeverage, ml))
     if (error) toast("Erreur lors de l'ajout")
+    else hapticTap()
   }
   const handleWaterUndo = async () => {
     const last = waterEntries[waterEntries.length - 1]
@@ -304,12 +306,13 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
 
   const handleAdd = async (entry) => {
     const { error } = await addEntry(entry)
-    if (!error) toast('✓ Ajouté !')
+    if (!error) { hapticTap(); toast('✓ Ajouté !') }
     else toast("Erreur lors de l'ajout")
   }
 
   const handleDelete = async (id) => {
     await deleteEntry(id)
+    hapticRemove()
     toast('Supprimé')
   }
 
@@ -723,6 +726,7 @@ export default function TodayPage() {
   const commitNav = useCallback((dir) => {
     // dir = -1 (suivant) ou +1 (précédent)
     // 1. Animer jusqu'au slot voisin
+    hapticNav()
     setAnimating(true)
     setDragPx(dir * viewportW)
     setTimeout(() => {

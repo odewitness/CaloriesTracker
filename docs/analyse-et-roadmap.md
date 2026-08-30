@@ -327,24 +327,21 @@ de wrapper natif).
 
 ### 4.1 — Faciles (quelques dizaines de lignes, aucune infra)
 
-#### F1 — « J'ai mangé comme hier »
-- **Quoi.** Bouton dans la barre de raccourcis du jour : duplique le journal
-  d'une date choisie (souvent la veille) vers le jour courant.
-- **Pourquoi.** Cas ultra-fréquent (petit-déj identique tous les jours).
-- **Esquisse.** Lire `journal` de la date source, `map` pour nettoyer
-  (`id`, `date`, `created_at`), ré-insérer avec la nouvelle `date`. La logique
-  de nettoyage existe déjà dans `markAsEaten` (`JOURNAL_FIELDS`).
-- **Effort.** ~30 lignes.
-- **PWA.** RAS.
+#### F1 — « J'ai mangé comme hier » — ~~à faire~~ déjà en place
 
-#### F2 — Retour haptique
-- **Quoi.** `navigator.vibrate(10)` sur ajout / suppression / objectif atteint.
-- **Pourquoi.** L'app fait immédiatement « native » sur Android.
-- **Esquisse.** Un helper `haptic()` appelé dans les `handleAdd` / `handleDelete`
-  de `TodayPage` (garde `if ('vibrate' in navigator)`).
-- **Effort.** ~10 lignes. (iOS ne supporte pas `vibrate` — dégradation propre.)
+Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
+2026-08-30). Fiche conservée pour mémoire.
 
-#### F3 — Bouton « Installer l'app » maison
+#### F2 — Retour haptique — ✅ fait le 2026-08-30
+- `src/lib/haptics.js` : `haptic()` + intentions nommées (`hapticTap`,
+  `hapticRemove`, `hapticNav`, `hapticSuccess`). Sûr sans garde, no-op si
+  `navigator.vibrate` absent (iOS Safari).
+- Câblé dans `TodayPage` : ajout d'aliment, suppression, ajout d'eau rapide,
+  changement de jour au swipe (`commitNav`).
+- `hapticSuccess` prêt pour le « objectif atteint » — sera déclenché avec la
+  célébration de F5.
+
+#### F3 — Bouton « Installer l'app » maison — écartée par l'utilisatrice (2026-08-30)
 - **Quoi.** Capter `beforeinstallprompt`, afficher une bannière discrète tant
   que l'app n'est pas installée.
 - **Pourquoi.** Beaucoup d'utilisateurs ne connaissent pas « Ajouter à l'écran
@@ -355,7 +352,7 @@ de wrapper natif).
 - **Effort.** ~40 lignes + un composant bannière.
 - **PWA.** Cœur du sujet.
 
-#### F4 — Note du jour (humeur, faim, digestion, sommeil, énergie)
+#### F4 — Note du jour (humeur, faim, digestion, sommeil, énergie) — écartée par l'utilisatrice (2026-08-30)
 - **Quoi.** Un petit encart sur la page du jour : texte libre + quelques tags
   rapides.
 - **Pourquoi.** Très parlant croisé avec le cycle et l'historique (« je grignote
@@ -370,7 +367,7 @@ de wrapper natif).
 - **Esquisse.** Calcul côté client à partir de `WaterSection` / historique eau.
 - **Effort.** ~50 lignes.
 
-#### F6 — Pré-remplir un repas avec les habitudes
+#### F6 — Pré-remplir un repas avec les habitudes — écartée par l'utilisatrice (2026-08-30)
 - **Quoi.** Bouton « ajouter mes 3 habituels » sur un repas vide.
 - **Esquisse.** `useMealSuggestions` calcule déjà le classement par fréquence ;
   il suffit d'un bouton qui ajoute les N premiers avec leur dernière quantité.
@@ -525,8 +522,11 @@ de wrapper natif).
 3. ~~**§3.1 hisser les hooks non datés**~~ ✅ 2026-08-30 (via `TodayDataContext`).
 4. **§2.3** (gestion d'erreur réseau) + **§3.2** (`useSupabaseQuery`) — à faire
    ensemble, plus tard, sur branche dédiée. Pas bloquant.
-5. Fonctionnalités **faciles** (F1, F2, F3, F6) — rapport valeur / effort élevé.
-   ← **prochaine étape conseillée**
+5. Fonctionnalités **faciles** restantes après tri du 2026-08-30 (F1 déjà en
+   place ; F3, F4, F6 écartées) : **F2** (haptique), **F5** (série
+   d'hydratation), **F7** (carte partageable), **F8** (recherche aliments
+   perso), **F9** (rappels contextuels, besoin Edge Function).
+   ← **prochaine étape**
 6. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
 7. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
 8. Le reste selon l'envie.
