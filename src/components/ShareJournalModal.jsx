@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useBackButton } from '../hooks/useBackButton'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,7 +24,11 @@ export default function ShareJournalModal({ title, subtitle, onConfirm, onClose 
     setSending(false)
   }
 
-  return (
+  // Montée en portal sur document.body : appelée depuis DaySlot (TodayPage), qui
+  // vit dans le slider de swipe en transform:translateX → un enfant
+  // position:fixed s'y calerait (largeur ×3, décalé) au lieu du viewport, d'où la
+  // feuille coupée sur les bords. Voir la règle « Notes utiles » de CLAUDE.md.
+  return createPortal(
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet">
         <div className="modal-handle" />
@@ -64,6 +69,7 @@ export default function ShareJournalModal({ title, subtitle, onConfirm, onClose 
         </button>
         <button className="btn-ghost" style={{ width: '100%', textAlign: 'center', marginTop: 6 }} onClick={onClose}>Annuler</button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

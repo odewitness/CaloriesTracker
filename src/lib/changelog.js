@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'La fenêtre de partage ne déborde plus',
+    description: "Depuis la page principale, quand tu touches « Partager » dans le petit menu en haut (ou le partage d'un repas), la fenêtre qui s'ouvrait décalée et coupée sur les côtés s'affiche maintenant bien centrée.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Planifie tes menus de la semaine',
     description: "Dans le Calendrier, un nouveau bouton « Menus » (à côté de Mois et Semaine) affiche ta semaine jour par jour avec une ligne par repas. Touche le « + » d'une case pour prévoir un repas ce jour-là, à cet horaire précis (le jour et le repas sont déjà choisis pour toi). Touche un repas prévu pour le retirer ou le marquer mangé.",
   },
