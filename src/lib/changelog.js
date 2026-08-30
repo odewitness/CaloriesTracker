@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Réorganise ta page du jour',
+    description: "Dans Profil › Page du jour, tu peux maintenant choisir l'ordre des blocs de l'écran principal (phase du cycle, bilan des calories, détail des nutriments, à combler aujourd'hui, repas du jour, compléments, eau) avec de petites flèches haut/bas. L'ordre que tu choisis s'applique à tous les jours.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Sport et symptômes selon ta phase',
     description: "Sur la page du jour, la pastille de phase (« Règles », « Phase lutéale »…) se déplie maintenant en un clic : tu y trouves une explication de la phase et des repères sport adaptés. Pendant tes règles, tu peux aussi marquer ou retirer le jour, noter l'intensité de ton flux et cocher tes symptômes (crampes, fatigue, maux de tête…) — avec la possibilité d'en ajouter d'autres à la main. Ces notes ne sont visibles que par toi.",
   },

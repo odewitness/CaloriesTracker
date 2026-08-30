@@ -217,6 +217,13 @@ create table if not exists settings (
   -- (manques nutritionnels + suggestion) sur la page du jour (voir Profil >
   -- Page du jour, et TodayGapsSection côté client).
   afficher_manques_jour boolean not null default true,
+  -- Ajoutée le 2026-08-30 (voir supabase/sql/today_sections_order_setup.sql).
+  -- Ordre des blocs de contenu de la page du jour, réglé par l'utilisatrice
+  -- depuis Profil > Page du jour. Tableau des clés 'phase' | 'bilan' |
+  -- 'nutriments' | 'manques' | 'repas' | 'complements' | 'eau'. Fusionné côté
+  -- client avec l'ordre par défaut (normalizeTodaySectionsOrder,
+  -- src/lib/todaySections.js).
+  ordre_sections_jour jsonb not null default '["phase","bilan","nutriments","manques","repas","complements","eau"]',
   -- Ajoutées le 2026-08-29 pour le tracker d'eau (voir
   -- supabase/sql/water_tracker_setup.sql).
   -- `water` = bloc unique { goal_ml, default_food_ref_id (alim_code Ciqual de

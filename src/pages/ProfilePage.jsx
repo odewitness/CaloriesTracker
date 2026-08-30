@@ -218,6 +218,8 @@ export default function ProfilePage() {
       <TodaySection
         manquesEnabled={settings.afficher_manques_jour !== false}
         onToggleManques={() => updateSettings({ afficher_manques_jour: !(settings.afficher_manques_jour !== false) })}
+        sectionsOrder={settings.ordre_sections_jour}
+        onReorder={(next) => updateSettings({ ordre_sections_jour: next })}
         onBack={back}
       />
     )

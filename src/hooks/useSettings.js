@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
 import { WATER_DEFAULTS, mergeWaterSettings } from '../lib/water'
 import { CYCLE_DEFAULTS, mergeCycleSettings } from '../lib/cycle'
+import { DEFAULT_TODAY_SECTIONS_ORDER, normalizeTodaySectionsOrder } from '../lib/todaySections'
 
 const DEFAULTS = {
   goal_kcal: 1800, goal_proteines: 100, goal_glucides: 180, goal_lipides: 60, goal_fibres: 30,
@@ -13,6 +14,7 @@ const DEFAULTS = {
   notif_reminder_enabled: true,
   notif_social_enabled: true,
   afficher_manques_jour: true,
+  ordre_sections_jour: [...DEFAULT_TODAY_SECTIONS_ORDER],
   water: { ...WATER_DEFAULTS },
   cycle: { ...CYCLE_DEFAULTS },
 }
@@ -22,7 +24,7 @@ const DEFAULTS = {
 // colonne `settings.water` / `settings.cycle` est absente (base pas encore
 // migrée) ou partielle.
 function withWater(row) {
-  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle) }
+  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle) }
 }
 
 export function useSettings() {
