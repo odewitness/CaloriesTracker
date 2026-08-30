@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useSettings } from '../hooks/useSettings'
 import { useAuth } from '../lib/AuthContext'
@@ -16,6 +17,7 @@ import NutrientPanel from '../components/NutrientPanel'
 import { ALL_NUTRIENT_KEYS, computeCalorieNeeds } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getPeriodBounds, shiftAnchor, dayStatus, eachDay } from '../lib/history'
+import { useRequestTodayDate } from '../lib/TodayHeaderContext'
 import { fetchAllRows } from '../lib/fetchAllRows'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
@@ -57,6 +59,16 @@ export default function HistoryPage() {
   const { days: cycleDays } = useCycle()
   const { rows: sportStreakRows } = useSportStreak(16)
   const { profile } = useProfile()
+  const navigate = useNavigate()
+  const { setRequestedDate } = useRequestTodayDate()
+
+  // Clic sur une carte « Détail par jour » → on mémorise la date puis on
+  // bascule sur la page du jour, qui lit `requestedDate` à son montage (même
+  // mécanisme que « Ouvrir cette journée » du calendrier).
+  const openDayInToday = useCallback((dateStr) => {
+    setRequestedDate(dateStr)
+    navigate('/today')
+  }, [navigate, setRequestedDate])
 
   const [tab, setTab] = useState('semaine')
   const [view, setView] = useState('resume')
@@ -566,6 +578,7 @@ export default function HistoryPage() {
                     <DayCard
                       key={d} dateStr={d} entries={days[d]} goalKcal={settings.goal_kcal}
                       excluded={excludedDates.has(d)} highlight={highlightKey === d}
+                      onOpenDay={openDayInToday}
                     />
                   ))}
             </>

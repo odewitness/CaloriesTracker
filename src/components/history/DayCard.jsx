@@ -1,11 +1,12 @@
 import React from 'react'
-import { EyeOff } from 'lucide-react'
+import { EyeOff, ChevronRight } from 'lucide-react'
 import { dayStatus, STATUS_COLOR } from '../../lib/history'
 
 // Carte d'un jour dans le détail des onglets Semaine / Mois. `id` permet au
 // graphique de tendance de scroller jusqu'ici ; `highlight` déclenche un halo
-// bref après le clic sur la barre correspondante.
-export default function DayCard({ dateStr, entries, goalKcal, excluded, highlight }) {
+// bref après le clic sur la barre correspondante. `onOpenDay(dateStr)` : la
+// carte devient cliquable et ouvre cette journée dans la page du jour.
+export default function DayCard({ dateStr, entries, goalKcal, excluded, highlight, onOpenDay }) {
   const kcal = entries.reduce((s, e) => s + (e.energie_kcal || 0), 0)
   const prot = entries.reduce((s, e) => s + (e.proteines || 0), 0)
   const gluc = entries.reduce((s, e) => s + (e.glucides || 0), 0)
@@ -17,14 +18,22 @@ export default function DayCard({ dateStr, entries, goalKcal, excluded, highligh
   const d = new Date(dateStr + 'T12:00:00')
   const label = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })
 
+  const clickable = typeof onOpenDay === 'function'
+  const open = () => clickable && onOpenDay(dateStr)
+
   return (
     <div
       id={`hist-day-${dateStr}`}
       className="card"
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={open}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } } : undefined}
       style={{
         padding: '13px 16px', marginBottom: 8, opacity: excluded ? 0.55 : 1,
         outline: highlight ? '2px solid var(--green)' : '2px solid transparent',
         transition: 'outline-color .3s',
+        cursor: clickable ? 'pointer' : 'default',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -44,9 +53,12 @@ export default function DayCard({ dateStr, entries, goalKcal, excluded, highligh
             <span className="c-lip">L {Math.round(lip)}g</span>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color }}>{diff <= 0 ? `−${Math.abs(diff)}` : `+${diff}`} kcal</div>
-          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2 }}>{entries.length} aliment{entries.length > 1 ? 's' : ''}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color }}>{diff <= 0 ? `−${Math.abs(diff)}` : `+${diff}`} kcal</div>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2 }}>{entries.length} aliment{entries.length > 1 ? 's' : ''}</div>
+          </div>
+          {clickable && <ChevronRight size={16} style={{ color: 'var(--text-hint)', flexShrink: 0 }} />}
         </div>
       </div>
       <div style={{ height: 5, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>

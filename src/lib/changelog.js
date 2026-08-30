@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Ouvre un jour depuis l\'historique',
+    description: "Dans l'Historique, onglet Résumé, la liste « Détail par jour » est maintenant cliquable : touche une journée et tu arrives directement dessus dans la page principale, avec tous tes repas et le détail. Une petite flèche à droite de chaque ligne te montre qu'elle est cliquable.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Les raccourcis du jour plus compacts',
     description: "Quand tu ouvres le menu « … » en haut de la page du jour, les raccourcis (exclure ce jour, relevé de poids, planifier un repas, cycle, partager) s'affichent maintenant en petites pastilles rondes avec juste l'icône, sans le texte. Ça prend beaucoup moins de place. Le nom de chaque raccourci apparaît si tu restes appuyée dessus.",
   },
