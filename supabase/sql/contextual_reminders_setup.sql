@@ -1,0 +1,21 @@
+-- =============================================
+-- RAPPELS CONTEXTUELS (roadmap §F9) — colonne d'état anti-doublon.
+-- Écrit le 2026-08-30. À exécuter une fois, à la main, dans le SQL editor
+-- Supabase. Référence pour Claude Code ensuite.
+--
+-- L'Edge Function daily-reminder (supabase/functions/daily-reminder/index.ts)
+-- envoie désormais jusqu'à deux rappels contextuels par jour (check à 14h et à
+-- 21h, heure Europe/Paris), chacun au plus un push, en nommant les repas
+-- principaux non notés (petit-déj / déjeuner / dîner ; jamais la collation).
+--
+-- `notif_reminder_state` mémorise, par utilisateur, quels checks du jour ont
+-- déjà été traités :
+--   { "d": "YYYY-MM-DD", "sent": ["midday", "evening"] }
+-- La valeur est ignorée si "d" n'est pas la date du jour (pas besoin de purge).
+--
+-- APRÈS avoir exécuté ce bloc : redéployer la fonction daily-reminder
+-- (dashboard → Edge Functions, ou `supabase functions deploy daily-reminder
+-- --no-verify-jwt`). Le cron horaire existant n'a pas à changer.
+-- =============================================
+
+alter table settings add column if not exists notif_reminder_state jsonb not null default '{}'::jsonb;

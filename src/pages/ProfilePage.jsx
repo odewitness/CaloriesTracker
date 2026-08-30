@@ -162,6 +162,10 @@ export default function ProfilePage() {
         goals={goals} setGoal={setGoal}
         dirty={goalsDirty} saving={false} onSave={saveGoals}
         onBack={back}
+        autoAdjustEnabled={settings?.goal_auto_adjust?.enabled === true}
+        onToggleAutoAdjust={() => updateSettings({
+          goal_auto_adjust: { ...settings?.goal_auto_adjust, enabled: !(settings?.goal_auto_adjust?.enabled === true) },
+        })}
         calc={{
           sexe, tailleCm, niveauActivite, onActivite: handleActivite,
           objective: calcObjective, onObjective: setCalcObjective,

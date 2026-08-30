@@ -8,6 +8,8 @@ import { CYCLE_DEFAULTS, mergeCycleSettings } from '../lib/cycle'
 import { SPORT_DEFAULTS, mergeSportSettings } from '../lib/sport'
 import { DEFAULT_TODAY_SECTIONS_ORDER, normalizeTodaySectionsOrder } from '../lib/todaySections'
 
+export const GOAL_AUTO_ADJUST_DEFAULTS = { enabled: false, last_prompt: null }
+
 const DEFAULTS = {
   goal_kcal: 1800, goal_proteines: 100, goal_glucides: 180, goal_lipides: 60, goal_fibres: 30,
   meal_overrides: {},
@@ -16,6 +18,7 @@ const DEFAULTS = {
   notif_social_enabled: true,
   afficher_manques_jour: true,
   ordre_sections_jour: [...DEFAULT_TODAY_SECTIONS_ORDER],
+  goal_auto_adjust: { ...GOAL_AUTO_ADJUST_DEFAULTS },
   water: { ...WATER_DEFAULTS },
   cycle: { ...CYCLE_DEFAULTS },
   sport: { ...SPORT_DEFAULTS },
@@ -26,7 +29,7 @@ const DEFAULTS = {
 // si la colonne `settings.water` / `settings.cycle` / `settings.sport` est
 // absente (base pas encore migrée) ou partielle.
 function withWater(row) {
-  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle), sport: mergeSportSettings(row?.sport) }
+  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), goal_auto_adjust: { ...GOAL_AUTO_ADJUST_DEFAULTS, ...(row?.goal_auto_adjust && typeof row.goal_auto_adjust === 'object' ? row.goal_auto_adjust : {}) }, water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle), sport: mergeSportSettings(row?.sport) }
 }
 
 export function useSettings() {

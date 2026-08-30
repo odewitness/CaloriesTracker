@@ -23,6 +23,7 @@ import ShareJournalModal from '../components/ShareJournalModal'
 import TodayGapsSection from '../components/TodayGapsSection'
 import DayShortcutsBar from '../components/DayShortcutsBar'
 import ShareImageModal from '../components/ShareImageModal'
+import GoalAdjustBanner from '../components/GoalAdjustBanner'
 import CyclePhaseBadge from '../components/CyclePhaseBadge'
 import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
@@ -69,7 +70,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   // Données non datées, montées une seule fois pour les 3 slots (voir
   // TodayDataContext). Destructuration identique à l'ancien appel direct des
   // hooks — seul l'endroit de l'appel change.
-  const { cycle, measurements, profile: profileQuery, favorites: favoritesQuery, settings: settingsQuery, ciqual, feed, waterStreak } = useTodayData()
+  const { cycle, measurements, profile: profileQuery, favorites: favoritesQuery, settings: settingsQuery, ciqual, feed, waterStreak, goalAdjust } = useTodayData()
   const { days: cycleDays, intensiteByDate, symptomesByDate, toggleDay: toggleCycleDay, setDaysIntensite, setDaysSymptomes } = cycle
   const { entries: measurementEntries } = measurements
   const { profile } = profileQuery
@@ -536,6 +537,13 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             onShare={() => setShareTarget({ meal: null, entries })}
             onShareImage={() => setShareImageOpen(true)}
             canShare={entries.length > 0}
+          />
+        )}
+        {isToday && goalAdjust?.suggestion && (
+          <GoalAdjustBanner
+            suggestion={goalAdjust.suggestion}
+            onApply={() => { const g = goalAdjust.suggestion.newGoal; goalAdjust.apply(); toast(`✓ Objectif ajusté à ${g} kcal`) }}
+            onDismiss={goalAdjust.dismiss}
           />
         )}
         {sectionsOrder

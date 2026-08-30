@@ -227,10 +227,20 @@ create table if not exists settings (
   notif_reminder_enabled boolean not null default true,
   notif_social_enabled boolean not null default true,
   last_reminder_sent_date date,
+  -- Ajoutée le 2026-08-30 (roadmap §F9, rappels contextuels — voir
+  -- supabase/sql/contextual_reminders_setup.sql). État anti-doublon des deux
+  -- checks quotidiens de daily-reminder : { "d":"YYYY-MM-DD", "sent":[...] }
+  -- (valeur ignorée si "d" ≠ date du jour).
+  notif_reminder_state jsonb not null default '{}'::jsonb,
   -- Ajoutée le 2026-08-20 : affiche/masque la section "À combler aujourd'hui"
   -- (manques nutritionnels + suggestion) sur la page du jour (voir Profil >
   -- Page du jour, et TodayGapsSection côté client).
   afficher_manques_jour boolean not null default true,
+  -- Ajoutée le 2026-08-30 (roadmap §M3 — voir supabase/sql/goal_auto_adjust_setup.sql).
+  -- { "enabled": bool, "last_prompt": "YYYY-MM-DD" | null }. Opt-in : propose un
+  -- ajustement de goal_kcal (±100) selon la tendance de poids. Fusionné client
+  -- avec GOAL_AUTO_ADJUST_DEFAULTS (src/hooks/useSettings.js).
+  goal_auto_adjust jsonb not null default '{"enabled":false,"last_prompt":null}'::jsonb,
   -- Ajoutée le 2026-08-30 (voir supabase/sql/today_sections_order_setup.sql).
   -- Ordre des blocs de contenu de la page du jour, réglé par l'utilisatrice
   -- depuis Profil > Page du jour. Tableau des clés 'phase' | 'bilan' |

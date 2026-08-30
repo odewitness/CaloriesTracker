@@ -388,13 +388,17 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
   dans l'app).
 - **Effort.** ~40 lignes.
 
-#### F9 — Rappels contextuels
-- **Quoi.** « Il est 15 h, rien noté au déjeuner. »
-- **Esquisse.** Le cron push existe déjà (`push_notifications_setup.sql`).
-  Ajouter une condition dans l'Edge Function d'envoi : comparer l'heure locale
-  de l'utilisatrice et l'existence d'entrées pour le repas attendu.
-- **Effort.** Moyen (logique côté Edge Function).
-- **PWA.** Push déjà en place.
+#### F9 — Rappels contextuels — ✅ fait le 2026-08-30 (branche `feat-f9-m3`)
+- `supabase/functions/daily-reminder/index.ts` réécrit : **2 points de contrôle**
+  (14h et 21h, Europe/Paris), 1 push max chacun. À chaque check, si un repas
+  principal **activé** (petit-déj / déjeuner / dîner — jamais la collation) n'a
+  aucune entrée au journal du jour → rappel qui nomme ce qui manque. Sinon,
+  retombe sur le rappel « repas planifié pas encore mangé ».
+- Anti-doublon : nouvelle colonne `settings.notif_reminder_state` jsonb
+  (`supabase/sql/contextual_reminders_setup.sql`).
+- **À déployer par l'utilisatrice** : exécuter le SQL + redéployer la fonction
+  `daily-reminder` (`--no-verify-jwt`). Le cron horaire ne change pas. Tant que
+  ce n'est pas fait, la fonction dégrade proprement (0 push).
 
 ### 4.2 — Mode sombre (facile en théorie, moyen en pratique)
 
@@ -429,15 +433,21 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
   `journal_photos`), compression client avant upload.
 - **Effort.** Moyen.
 
-#### M3 — Objectifs adaptatifs
-- **Quoi.** Chaque semaine, comparer la tendance réelle du poids
-  (`mensurations`) à l'objectif et corriger `goal_kcal` de ±50–100 kcal.
-- **Esquisse.** Fonction hebdo (client au chargement, ou cron) : régression
-  simple sur les relevés des 2-3 dernières semaines vs `paceKgPerWeek` visé
-  (déjà calculé dans `computeCalorieNeeds`). Proposer l'ajustement, ne pas
-  l'imposer.
-- **Effort.** Moyen. **Attention** : même piège de double comptage que « manger
-  selon l'effort » (cf. `docs/suivi-sport.md` §8) — cadrer avec l'utilisatrice.
+#### M3 — Objectifs adaptatifs — ✅ fait le 2026-08-30 (branche `feat-f9-m3`)
+- **Opt-in** : toggle « Ajuster selon mon poids » dans Profil › Objectifs
+  nutritionnels (défaut off). `settings.goal_auto_adjust` jsonb
+  (`supabase/sql/goal_auto_adjust_setup.sql`).
+- `src/hooks/useGoalAdjustment.js` : régression linéaire sur le poids des ~3
+  dernières semaines (≥ 3 relevés sur ≥ 14 j), comparée au rythme que
+  l'objectif actuel vise (`−(TDEE − goal_kcal)×7/7700` — pas besoin de stocker
+  l'objectif de poids, il se déduit de `goal_kcal`). Marche aussi en
+  « maintien » (rythme visé ≈ 0).
+- Si l'écart dépasse ~0,12 kg/sem → **bandeau** `GoalAdjustBanner` sur la page
+  du jour proposant un `goal_kcal` corrigé de ±100 kcal max. `Appliquer` /
+  `Plus tard` ; throttle 7 jours (`goal_auto_adjust.last_prompt`). Rien n'est
+  modifié sans validation.
+- Pas de double comptage : on **ajuste** l'objectif existant, on n'empile rien
+  par-dessus (contrairement à « manger selon l'effort »).
 
 #### M4 — Statistiques nutriments sur la durée
 - **Quoi.** « Apport moyen en fer sur 30 j vs RNP », pas seulement le jour.
@@ -525,9 +535,10 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
 3. ~~**§3.1 hisser les hooks non datés**~~ ✅ 2026-08-30 (via `TodayDataContext`).
 4. **§2.3** (gestion d'erreur réseau) + **§3.2** (`useSupabaseQuery`) — à faire
    ensemble, plus tard, sur branche dédiée. Pas bloquant.
-5. Fonctionnalités **faciles** : F2 ✅, F5 ✅, F7 ✅ (2026-08-30 ; F1 déjà en
-   place ; F3, F4, F6 écartées). Restent **F8** (recherche aliments perso) et
-   **F9** (rappels contextuels, besoin Edge Function) si envie.
-6. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
-7. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
-8. Le reste selon l'envie.
+5. Fonctionnalités **faciles** : F2 ✅, F5 ✅, F7 ✅, F9 ✅ (2026-08-30 ; F1 déjà
+   en place ; F3, F4, F6 écartées ; C2 abandonnée, coût API). Reste **F8**
+   (recherche aliments perso) si envie.
+6. **M3 objectifs adaptatifs** ✅ (2026-08-30).
+7. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
+8. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
+9. Le reste selon l'envie.
