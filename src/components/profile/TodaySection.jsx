@@ -53,8 +53,9 @@ export default function TodaySection({ manquesEnabled, onToggleManques, sections
       <div style={{ fontSize: 12, color: 'var(--text-hint)', lineHeight: 1.5 }}>
         L'ordre choisi s'applique à tous les jours. Chaque bloc n'apparaît que
         s'il a du contenu : « Phase du cycle » si le suivi de cycle est activé,
-        « À combler aujourd'hui » le jour même et si l'option ci-dessus est
-        activée. La carte « Eau » se masque depuis l'écran « Hydratation ».
+        « Activité » si le suivi du sport est activé, « À combler aujourd'hui »
+        le jour même et si l'option ci-dessus est activée. La carte « Eau » se
+        masque depuis l'écran « Hydratation ».
       </div>
     </SectionScreen>
   )

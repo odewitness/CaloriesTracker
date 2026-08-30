@@ -1,0 +1,439 @@
+# Chantier « Suivi de l'activité sportive »
+
+Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
+Créé le 2026-08-30.
+
+---
+
+## 1. Objectif et périmètre
+
+Ajouter à l'app un suivi des séances de sport : les saisir, les visualiser sur la
+page du jour / le calendrier / l'historique, se fixer un objectif hebdomadaire,
+et — plus tard, avec beaucoup de précautions — relier la dépense estimée aux
+cibles caloriques.
+
+**Décisions cadrées avec l'utilisatrice (2026-08-30) :**
+
+- **Pas d'app native.** On reste une PWA (cohérent avec la décision du chantier
+  cycle, 2026-08-29 : un wrapper natif « changerait la nature du projet — build
+  natif, stores »). Conséquence directe : **Health Connect, Apple Santé, Mi
+  Fitness en direct et Garmin Connect en direct sont hors de portée** (APIs sur
+  l'appareil ou réservées aux partenaires B2B). Voir §4.4.
+- **Saisie manuelle = source de vérité** (Palier 1), comme pour la table
+  `regles`. La base est conçue pour qu'un import (Strava, plus tard autre chose)
+  alimente **la même table `activites_sport`** sans refonte.
+- **Strava en option** (Palier 5), branché via des **Edge Functions Supabase**
+  (le secret client et le rafraîchissement de token restent côté serveur).
+  - Couvre **proprement** la montre **Garmin** de la 2ᵉ utilisatrice (auto-sync
+    natif Garmin Connect → Strava, à activer une fois).
+  - Couvre **partiellement** la montre **Xiaomi** de la 1ʳᵉ utilisatrice :
+    Mi Fitness → Strava ne remonte que les **sports avec GPS** (+ pas / calories
+    / distance), pas la muscu ni le yoga en salle, et la sync a été instable
+    courant 2026. La saisie manuelle reste le filet de sécurité.
+- **« Manger selon l'effort » visé à terme, mais reconnu comme un piège.** Le
+  `goal_kcal` actuel **intègre déjà** l'activité sportive (multiplicateur
+  `ACTIVITY_LEVELS` ×1.2 → ×1.9 dans `computeCalorieNeeds`). Ajouter les séances
+  par-dessus = **double comptage**. → On fait d'abord un **bilan en lecture
+  seule** (Palier 6), et la vraie bascule de modèle (Palier 7) reste une option
+  tardive, explicite et encadrée. Voir §3.2 et §8.
+- **Deux utilisatrices** (comptes distincts). Toutes les nouvelles tables sont
+  **par utilisatrice, RLS « own »** (pattern `mensurations` / `regles`), jamais
+  le pattern mono-utilisateur de `journal` / `settings`.
+- **On avance par paliers** (voir §6). Ce qui n'est pas encore fait est en §7.
+
+---
+
+## 2. Repères (estimations & modèles de budget)
+
+### 2.1 Estimer les calories d'une séance
+
+Formule MET (Compendium of Physical Activities), avec le poids déjà connu du
+profil :
+
+```
+kcal ≈ MET × 3,5 × poids_kg / 200 × durée_min
+```
+
+- Précision réelle : **±15 à 30 %**. Les kcal affichées par les montres (surtout
+  l'entrée de gamme Xiaomi) ne sont **pas plus fiables**.
+- → Toujours afficher « ≈ », jamais une valeur sèche. Ne **jamais** bâtir une
+  cible d'apport dessus sans garde-fou (§8).
+- L'intensité ressentie module un peu l'estimation : `faible ×0,85`,
+  `modérée ×1,0`, `élevée ×1,15` (grossier, assumé).
+
+### 2.2 Les deux modèles de budget calorique (mutuellement exclusifs)
+
+| Modèle | Principe | État dans l'app |
+|---|---|---|
+| **A — « activité incluse » (TDEE)** | `niveau_activite` multiplie le métabolisme de base ; l'objectif est **plat tous les jours**, le sport habituel est déjà dedans. Ça se compense sur la semaine. | **Utilisé aujourd'hui.** `computeCalorieNeeds` + `ACTIVITY_LEVELS` dans `src/lib/nutrients.js`, appliqué en one-shot par le bouton « Appliquer » du calculateur (Profil › Objectifs) → `goal_kcal` fige le multiplicateur. |
+| **B — base + « eat-back »** | L'objectif de base ne couvre que la vie hors sport (≈ sédentaire / léger). Chaque séance **s'ajoute** au budget du jour où elle a lieu. Le budget suit l'activité réelle. | Non implémenté. C'est le Palier 7 (option). |
+
+**Le bug à éviter :** faire tourner les deux en même temps (garder un
+`niveau_activite` « modéré » = sport 3–5 j/sem **et** créditer chaque séance).
+
+---
+
+## 3. Modèle retenu
+
+### 3.1 Données d'une séance
+
+- **type** : clé prédéfinie (`SPORT_TYPES` dans `src/lib/sport.js`), avec libellé
+  FR, icône, valeur MET, booléen « a une distance ». Jeu de départ :
+  `course`, `marche`, `velo`, `natation`, `muscu`, `yoga`, `hiit`, `danse`,
+  `rando`, `sport_co`, `autre`.
+- **durée** (min, obligatoire), **date** (obligatoire), **heure de début**
+  (optionnelle), **distance** (km, optionnelle selon le type), **intensité**
+  (optionnelle : `faible` / `moderee` / `elevee`), **notes** (optionnelles).
+- **energie_kcal** : estimée à la saisie (MET), **éditable**. Pour une séance
+  importée, on prend la valeur de la source si elle existe.
+- **fc_moyenne** / **fc_max** : optionnelles, surtout utiles à l'import.
+- **source** : `manuel` | `strava`. **source_id** : id externe (dédup imports).
+
+### 3.2 Sport ↔ cibles caloriques : la progression
+
+`settings.sport.mode_energie` ∈ :
+
+- **`aucun`** (défaut) — le sport n'a **aucun effet** sur les cibles. Palier 1.
+- **`bilan`** — ligne indicative « apports vs dépense estimée (métabolisme +
+  séances) », avec la mention *« recouvrement avec ton niveau d'activité — ne
+  pas cumuler mentalement »*. **`goal_kcal` inchangé.** Palier 6.
+- **`manger_selon_effort`** — bascule vers le modèle B : la cible de base est
+  **recalculée sur `niveau_activite` = sédentaire**, puis les séances du jour
+  sont créditées, **plafonnées** à `depense_max_creditee_kcal`, jamais sous le
+  minimum habituel. Écran de réglage avec **avant / après chiffré**. Palier 7
+  (option), à décider après quelques semaines de `bilan`.
+
+---
+
+## 4. Architecture technique
+
+### 4.1 Base de données
+
+**Nouvelle table `activites_sport`** — 1 ligne = 1 séance. Champs en français.
+RLS « own » **select / insert / update / delete** (l'`update` est nécessaire,
+contrairement à `regles` : on édite une séance). SQL dans
+`supabase/sql/sport_setup.sql`, à exécuter à la main dans Supabase, puis reporter
+dans `supabase_schema.sql`.
+
+```sql
+create table if not exists activites_sport (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date date not null,
+  heure_debut time,               -- nullable
+  type text not null,             -- clé de SPORT_TYPES
+  duree_min numeric not null,
+  distance_km numeric,            -- nullable
+  intensite text,                 -- nullable : 'faible' | 'moderee' | 'elevee'
+  energie_kcal numeric,           -- nullable : estimée (MET) ou source, éditable
+  fc_moyenne integer,             -- nullable
+  fc_max integer,                 -- nullable
+  source text not null default 'manuel',   -- 'manuel' | 'strava'
+  source_id text,                 -- nullable : id externe, pour la déduplication
+  modifie_manuellement boolean not null default false,  -- séance importée puis retouchée : une resync ne l'écrase pas
+  notes text,                     -- nullable
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists idx_activites_sport_source
+  on activites_sport (user_id, source, source_id) where source_id is not null;
+create index if not exists idx_activites_sport_user_date
+  on activites_sport (user_id, date desc);
+
+alter table activites_sport enable row level security;
+-- policies select / insert / update / delete "own" (auth.uid() = user_id)
+```
+
+**Réglages : bloc `sport` dans `settings`** (colonne `jsonb`, même pattern que
+`settings.water` / `settings.cycle` — fusion client avec des défauts via
+`mergeSportSettings`, robuste si la colonne est absente).
+
+```jsonc
+{
+  "enabled": false,                    // toute la feature est opt-in
+  "objectif_hebdo_minutes": 150,       // 0 = pas d'objectif en minutes
+  "objectif_hebdo_seances": 0,         // 0 = pas d'objectif en nombre de séances
+  "afficher_page_jour": true,
+  "afficher_calendrier": true,
+  "mode_energie": "aucun",             // 'aucun' | 'bilan' | 'manger_selon_effort'
+  "depense_max_creditee_kcal": 400,    // plafond quand mode_energie = 'manger_selon_effort'
+  "rappels": { "enabled": false, "jours": [], "heure": 18 },
+  "strava": {                          // affichage seulement — AUCUN token ici
+    "connected": false,
+    "athlete_nom": null,
+    "derniere_synchro": null,
+    "auto": true
+  }
+}
+```
+
+**Table `connexions_sport`** (Palier 5) — tokens OAuth, **jamais lus par le
+client**.
+
+```sql
+create table if not exists connexions_sport (
+  user_id uuid not null references auth.users(id),
+  fournisseur text not null,           -- 'strava'
+  access_token text not null,
+  refresh_token text not null,
+  expires_at timestamptz not null,
+  external_athlete_id text,
+  scope text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, fournisseur)
+);
+alter table connexions_sport enable row level security;
+-- AUCUNE policy pour anon / authenticated : lecture + écriture réservées aux
+-- Edge Functions (service_role contourne RLS). Le client ne voit que l'état
+-- "connecté" + nom d'athlète, via settings.sport.strava.
+```
+
+Tables sociales `partages_sport` / `reactions_sport` / `commentaires_sport` :
+seulement au Palier 8, calquées sur `partages_journal` & co.
+
+### 4.2 Client
+
+- `src/lib/sport.js` — fonctions pures : `SPORT_TYPES`, `SPORT_DEFAULTS`,
+  `mergeSportSettings(raw)`, `estimateKcal({ type, poidsKg, dureeMin, intensite })`,
+  `weeklyStats(activites, weekStart)`, `phaseForActivite` (Palier 4).
+- `src/hooks/useSport.js` — CRUD sur `activites_sport` pour une plage de dates
+  (`add` / `update` / `remove`), sur le modèle de `useCycle` / `useMeasurements`.
+- Réglages via `useSettings` (bloc `sport`) : ajouter `SPORT_DEFAULTS` /
+  `mergeSportSettings` à `DEFAULTS` et à `withWater` dans `src/hooks/useSettings.js`.
+- `src/lib/todaySections.js` — ajouter la clé `'sport'` à `TODAY_SECTION_KEYS`,
+  `TODAY_SECTION_LABELS` (« Activité ») et `DEFAULT_TODAY_SECTIONS_ORDER`.
+  `normalizeTodaySectionsOrder` réinsère déjà une clé nouvelle à sa place chez
+  les utilisatrices ayant un ordre enregistré — rien d'autre à faire.
+- Feuille de saisie : nouveau composant **monté via `createPortal(...,
+  document.body)`** (contrainte CLAUDE.md sur les modales de `TodayPage` — sinon
+  cassée par le slider de jours).
+
+### 4.3 Points d'accroche UI
+
+| Zone | Fichier | Palier |
+|---|---|---|
+| Feuille « Ajouter une séance » (type, durée, distance, intensité, kcal estimé éditable, notes) | nouveau `SportEntrySheet.jsx` (portal) | 1 |
+| Bloc « Activité » sur la page du jour (séances du jour + ajout rapide) | `TodayPage.jsx` DaySlot + nouveau `SportSection.jsx` ; clé `sport` dans `todaySections.js` | 1 |
+| Pastille « séance » sur la grille du mois | `CalendarMonthGrid.jsx` (prop `sportByDate`) + `CalendarPage.jsx` | 1 |
+| Écran Profil › Sport (activation, objectif hebdo minutes) | `ProfilePage.jsx` + `src/components/profile/SportSection.jsx` | 1 |
+| Entrée changelog (`src/lib/changelog.js`) à chaque palier visible | `src/lib/changelog.js` | 1+ |
+| Anneau « minutes actives cette semaine » vs objectif + série discrète | `SportSection.jsx` / `TodayOverviewCard.jsx` | 2 |
+| Historique : minutes & séances par semaine / mois, courbe | `HistoryPage.jsx` + composant graphe | 2 |
+| Corrélations sport ↔ poids / énergie + annotation des graphes les jours de séance | `HistoryPage.jsx`, `MetricChart.jsx` | 3 |
+| Boucle cycle : rattacher chaque séance à sa phase, rétrospectif « ton sport selon ta phase » face à `PHASE_SPORT_GUIDANCE` | `src/lib/cycle.js`, `CyclePhaseBadge.jsx`, `HistoryPage.jsx` | 4 |
+| Connexion Strava : écran « Connexions » dans le Profil, bouton connecter / déconnecter, dernière synchro | `SportSection.jsx` + Edge Functions | 5 |
+| Bilan énergétique lecture seule (`mode_energie: 'bilan'`) | `SportSection.jsx` / `TodayOverviewCard.jsx` | 6 |
+| « Manger selon l'effort » : base recalculée sur sédentaire + crédit séances, plafonné | `nutrients.js` (`computeCalorieNeeds` base sédentaire), `TodayPage` `daySettings`, `computeMealTargets`, gaps | 7 (option) |
+| Partage social d'une séance / résumé hebdo | tables sociales + `useFeed.js` + `SocialPage.jsx` | 8 (option) |
+| Rappels push « tu n'as pas bougé » / objectif hebdo | `push_subscriptions` + Edge Function cron | 9 (option) |
+
+### 4.4 Intégration Strava (Palier 5)
+
+**Pré-requis (une fois) :** créer une application sur
+`https://www.strava.com/settings/api` → `Client ID`, `Client Secret`, domaine de
+callback autorisé (celui de l'Edge Function). Une appli « single athlete »
+fonctionne sans demande d'accès étendu ; au-delà, formulaire à remplir.
+
+**Flow OAuth (Edge Function `strava-oauth`) :**
+
+1. Le client ouvre `https://www.strava.com/oauth/authorize?client_id=…&redirect_uri=<edge fn>&response_type=code&scope=activity:read_all&approval_prompt=auto`.
+2. Strava redirige vers `strava-oauth` avec `?code=…`.
+3. L'Edge Function échange `code` → `access_token` + `refresh_token`
+   (POST `https://www.strava.com/oauth/token` **avec le `client_secret`**, jamais
+   exposé au client), écrit dans `connexions_sport`, met
+   `settings.sport.strava.connected = true` + `athlete_nom`.
+
+**Synchro (Edge Function `strava-sync`) :**
+
+- Rafraîchit le token via `refresh_token` (les tokens Strava expirent toutes les
+  ~6 h).
+- `GET https://www.strava.com/api/v3/athlete/activities?after=<ts derniere_synchro>&per_page=…`
+  → mapping vers `activites_sport` (type Strava → clé `SPORT_TYPES`,
+  `moving_time` → `duree_min`, `distance` → `distance_km`,
+  `average_heartrate` / `max_heartrate`, `calories` via `/activities/{id}` si
+  besoin, `id` → `source_id`).
+- Insert avec `on conflict (user_id, source, source_id) do nothing` (dédup). Une
+  resync ne réécrit **jamais** une séance `modifie_manuellement = true`.
+- Déclenchement : **cron `pg_cron`** toutes les X h (infra déjà en place pour le
+  rappel d'eau) pour démarrer. Le webhook Strava (push à chaque nouvelle
+  activité, avec réponse au challenge de validation) est une amélioration
+  ultérieure.
+- Limites de débit Strava (100 req / 15 min, 1000 / j en lecture) : très
+  largement suffisantes pour 2 comptes.
+
+**CGU Strava (nov. 2024) :** données affichées uniquement à l'athlète
+propriétaire, pas d'agrégation inter-utilisatrices, pas d'entraînement d'IA. OK
+pour l'usage perso ici. Le fil social (Palier 8) ne partage donc **que** des
+séances saisies manuellement, ou un **résumé agrégé** que l'utilisatrice publie
+elle-même — pas de rediffusion brute de données Strava d'une utilisatrice à
+l'autre.
+
+---
+
+## 5. Workflow git
+
+Gros chantier → **branche dédiée** (`suivi-sport`, ou une branche par palier),
+`npm run build` + validation manuelle par l'utilisatrice sur `localhost:5173`,
+puis merge + push vers `main` après confirmation. Migration SQL = étape manuelle
+à faire exécuter par l'utilisatrice dans Supabase **avant** que le code qui en
+dépend ne parte en prod. Toujours demander confirmation avant `git push`.
+
+---
+
+## 6. Paliers
+
+### Palier 1 — Saisie manuelle + affichage (aucun effet sur les cibles) ▸ statut : codé (branche `suivi-sport`), en attente d'application SQL + test manuel + merge
+- [x] `supabase/sql/sport_setup.sql` (table `activites_sport` + colonne
+      `settings.sport` + nouveau défaut `ordre_sections_jour`) + MAJ
+      `supabase_schema.sql` — **application manuelle dans Supabase encore à faire**
+- [x] `src/lib/sport.js` (`SPORT_TYPES`, `SPORT_INTENSITES`, `SPORT_DEFAULTS`,
+      `mergeSportSettings`, `estimateKcal`, `weekStart`/`weekEnd`, `weeklyStats`,
+      `formatDuree`, `sortActivites`)
+- [x] `src/hooks/useSport.js` : `useSport(dateStr)` (séances du jour + agrégats
+      de la semaine + CRUD) et `useSportRange(start, end)` (calendrier)
+- [x] Bloc `settings.sport` + fusion défauts dans `useSettings.js`
+      (`mergeSportSettings` dans `withWater`)
+- [x] Clé `'sport'` dans `src/lib/todaySections.js` (label « Activité »,
+      insérée entre `repas` et `complements`)
+- [x] `SportEntrySheet.jsx` (feuille ajout/édition, montée via `createPortal`) —
+      type, durée (+ chips), distance (types concernés), intensité, heure,
+      kcal estimé éditable avec « Réestimer », notes ; suppression en édition
+- [x] Bloc « Activité » sur la page du jour (`SportSection.jsx` repliable +
+      wiring dans `TodayPage` `DaySlot`, poids courant via `useMeasurements`)
+- [x] Point vert « séance » sur `CalendarMonthGrid` (prop `sportByDate`) +
+      `CalendarPage` (via `useSportRange`, respecte `afficher_calendrier`)
+- [x] Écran Profil › Sport (`src/components/profile/SportSection.jsx`) :
+      interrupteur `enabled`, objectifs hebdo (minutes / séances), toggles
+      d'affichage + `NavRow` dans le hub Profil
+- [x] Entrée changelog (2026-08-30 « Note tes séances de sport »)
+
+### Palier 2 — Objectifs & historique ▸ statut : à faire
+- [ ] Anneau « minutes actives cette semaine » vs `objectif_hebdo_minutes` +
+      série discrète (pas de dramatisation)
+- [ ] Vue Historique : minutes & nombre de séances par semaine et par mois,
+      courbe
+- [ ] Entrée changelog
+
+### Palier 3 — Corrélations ▸ statut : à faire
+- [ ] Encart « Ton sport sur cette période » dans `HistoryPage` (énergie / poids
+      les semaines chargées vs légères)
+- [ ] Annotation des graphes de poids / calories les jours de séance
+- [ ] Entrée changelog
+
+### Palier 4 — Boucle cycle ▸ statut : à faire
+- [ ] `cycle.js` : rattacher chaque séance à la phase où elle tombe
+- [ ] Rétrospectif « ton sport selon ta phase » face à `PHASE_SPORT_GUIDANCE`
+      (déjà écrit au Palier 8 du chantier cycle) — informatif, jamais prescriptif
+- [ ] Comparaison volume par phase dans `HistoryPage`
+- [ ] Entrée changelog
+
+### Palier 5 — Connexion Strava ▸ statut : à faire
+- [ ] `supabase/sql/connexions_sport_setup.sql` (table `connexions_sport`, RLS
+      sans policy client) + MAJ `supabase_schema.sql`
+- [ ] Edge Functions `strava-oauth` (échange de code) et `strava-sync` (refresh +
+      pull + mapping + dédup)
+- [ ] Cron `pg_cron` de synchro
+- [ ] Écran « Connexions » dans Profil › Sport (connecter / déconnecter, dernière
+      synchro, bascule `auto`)
+- [ ] Badge « importé de Strava » sur les séances concernées ;
+      `modifie_manuellement` posé dès qu'on édite une séance importée
+- [ ] Entrée changelog (« Connecte ta montre via Strava »)
+
+### Palier 6 — Bilan énergétique (lecture seule) ▸ statut : à faire
+- [ ] `mode_energie: 'bilan'` dans Profil › Sport
+- [ ] Ligne « apports vs dépense estimée » sur la page du jour, avec mention
+      explicite du recouvrement avec `niveau_activite` — `goal_kcal` inchangé
+- [ ] Entrée changelog
+
+### Palier 7 — « Manger selon l'effort » (option, à décider plus tard) ▸ statut : non tranché
+- [ ] `mode_energie: 'manger_selon_effort'` : cible de base recalculée sur
+      `niveau_activite = sédentaire`, crédit des séances du jour, plafonné à
+      `depense_max_creditee_kcal`, jamais sous le minimum
+- [ ] Écran de réglage avec **avant / après chiffré** + libellé « base
+      scientifique modeste, estimation ±25 % »
+- [ ] Avertissement si `niveau_activite` ≠ sédentaire / léger (risque de double
+      comptage)
+- [ ] Appliqué **uniquement à la page du jour** (comme le delta lutéal) ;
+      `HistoryPage` / calendrier gardent l'objectif à plat
+- [ ] Entrée changelog
+
+### Palier 8 — Social (option) ▸ statut : non tranché
+- [ ] Tables `partages_sport` / `reactions_sport` / `commentaires_sport`
+- [ ] Partage d'une séance manuelle ou d'un résumé hebdo agrégé (pas de
+      rediffusion brute de données Strava — voir §4.4)
+- [ ] Entrée changelog
+
+### Palier 9 — Rappels push (option) ▸ statut : non tranché
+- [ ] Rappel « tu n'as pas bougé aujourd'hui » / « objectif hebdo à X min » via
+      `push_subscriptions` + Edge Function cron existante
+- [ ] Réglage dans Profil › Sport (`rappels`)
+- [ ] Entrée changelog
+
+---
+
+## 7. Reste à faire (vue rapide)
+
+Palier 1 codé sur la branche `suivi-sport` — en attente : application de
+`supabase/sql/sport_setup.sql` dans Supabase par l'utilisatrice, test manuel sur
+`localhost:5173`, puis merge + push vers `main` après confirmation.
+
+Paliers 2 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
+(Palier 5). Paliers 7 → 9 non tranchés — à confirmer au moment venu.
+
+---
+
+## 8. Garde-fous et alertes ⚠️
+
+1. **kcal = estimation.** Jamais une valeur sèche ; « ≈ » systématique. MET comme
+   montre : ±15–30 %.
+2. **Par défaut (`mode_energie: 'aucun'`), le sport n'a aucun effet sur les
+   cibles d'apport.** Aucune injonction (« bouge plus », « rattrape-toi »). Ton
+   neutre, formulations souples (esprit `jours_exclus`).
+3. **« Manger selon l'effort » = bascule de modèle explicite** (base recalculée
+   sur sédentaire) + opt-in + plafond + jamais sous le minimum habituel +
+   désactivable en un geste. Écran de réglage avec avant / après chiffré. Même
+   philosophie que le delta énergétique lutéal du chantier cycle.
+4. **Ne jamais faire tourner les deux modèles de budget en même temps.** Si
+   `mode_energie = 'manger_selon_effort'` et `niveau_activite` ≠ sédentaire /
+   léger → avertir.
+5. **Objectifs hebdo = encouragement doux.** Pas de culpabilisation si non
+   atteint. Série (streak) **discrète**, pas de « tu as cassé ta série ! », pas
+   de gamification agressive.
+6. **Pas un dispositif médical.** FC et zones à titre indicatif, disclaimer clair.
+7. **Compensation / surentraînement.** Suivre à la fois les apports *et* la
+   dépense peut nourrir un rapport anxieux à l'équilibre énergétique — c'est
+   exactement ce qu'une app de calories doit prendre au sérieux (cf. garde-fou
+   aménorrhée du chantier cycle). Ne pas sur-solliciter.
+8. **Séances importées.** Une resync Strava n'écrase jamais une valeur corrigée à
+   la main (`modifie_manuellement`).
+9. **Multi-utilisatrices.** `activites_sport` et `connexions_sport` en RLS
+   « own » strict (pattern `mensurations` / `regles`). Tokens Strava
+   inaccessibles au client (Edge Functions / `service_role` uniquement).
+
+---
+
+## 9. Journal des décisions
+
+- **2026-08-30** — Palier 1 codé sur la branche `suivi-sport` : migration
+  `sport_setup.sql` (table `activites_sport` RLS « own », colonne
+  `settings.sport`, défaut `ordre_sections_jour` élargi à `sport`),
+  `src/lib/sport.js`, `src/hooks/useSport.js` (`useSport` + `useSportRange`),
+  `SportEntrySheet` (portal), `SportSection` (carte page du jour repliable),
+  point vert sur `CalendarMonthGrid`, écran Profil › Sport
+  (`components/profile/SportSection.jsx`) + `NavRow` dans le hub, entrée
+  changelog. `mode_energie` présent dans les réglages mais **sans effet** au
+  Palier 1. `npm run build` OK. En attente : application SQL par l'utilisatrice,
+  test manuel, merge + push après confirmation.
+- **2026-08-30** — Cadrage initial. App native **écartée** (on reste PWA,
+  cohérent avec la décision du chantier cycle) → Health Connect / Apple Santé /
+  Mi Fitness direct / Garmin direct hors de portée. **Saisie manuelle = source
+  de vérité** (Palier 1). **Strava en option** (Palier 5) via Edge Functions :
+  couvre la Garmin de la 2ᵉ utilisatrice proprement, la montre Xiaomi de la 1ʳᵉ
+  partiellement (Mi Fitness → Strava limité aux sports GPS, instable en 2026).
+  **« Manger selon l'effort »** reconnu comme un piège de double comptage (le
+  `goal_kcal` intègre déjà l'activité via `ACTIVITY_LEVELS`) → **bilan en lecture
+  seule d'abord** (Palier 6), bascule de modèle explicite ensuite (Palier 7,
+  option non tranchée). **Deux utilisatrices** confirmé → toutes les tables en
+  RLS « own ». Ce document créé.

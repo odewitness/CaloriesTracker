@@ -17,6 +17,11 @@
 -- Complété le 2026-08-26 : table 26 (jours_exclus), pas encore confirmée
 -- appliquée en base au moment de l'écriture de ce fichier — voir
 -- supabase/sql/jours_exclus_setup.sql pour le SQL complet.
+-- Complété le 2026-08-30 : table 28 (activites_sport) + colonne settings.sport
+-- + nouveau défaut de settings.ordre_sections_jour (ajout de la clé 'sport'),
+-- chantier « Suivi de l'activité sportive » Palier 1 — voir
+-- supabase/sql/sport_setup.sql et docs/suivi-sport.md. Pas encore confirmé
+-- appliqué en base au moment de l'écriture de ce fichier.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -220,10 +225,11 @@ create table if not exists settings (
   -- Ajoutée le 2026-08-30 (voir supabase/sql/today_sections_order_setup.sql).
   -- Ordre des blocs de contenu de la page du jour, réglé par l'utilisatrice
   -- depuis Profil > Page du jour. Tableau des clés 'phase' | 'bilan' |
-  -- 'nutriments' | 'manques' | 'repas' | 'complements' | 'eau'. Fusionné côté
-  -- client avec l'ordre par défaut (normalizeTodaySectionsOrder,
-  -- src/lib/todaySections.js).
-  ordre_sections_jour jsonb not null default '["phase","bilan","nutriments","manques","repas","complements","eau"]',
+  -- 'nutriments' | 'manques' | 'repas' | 'sport' | 'complements' | 'eau'.
+  -- Fusionné côté client avec l'ordre par défaut (normalizeTodaySectionsOrder,
+  -- src/lib/todaySections.js). Défaut élargi le 2026-08-30 avec la clé 'sport'
+  -- (chantier suivi sport, voir supabase/sql/sport_setup.sql).
+  ordre_sections_jour jsonb not null default '["phase","bilan","nutriments","manques","repas","sport","complements","eau"]',
   -- Ajoutées le 2026-08-29 pour le tracker d'eau (voir
   -- supabase/sql/water_tracker_setup.sql).
   -- `water` = bloc unique { goal_ml, default_food_ref_id (alim_code Ciqual de
@@ -243,7 +249,17 @@ create table if not exists settings (
   --   afficher_badge_jour, afficher_conseils_micro, appliquer_delta_energie,
   --   delta_energie_luteale_kcal }. Fusionné côté client avec CYCLE_DEFAULTS
   -- (src/lib/cycle.js). Défaut = suivi désactivé (opt-in).
-  cycle jsonb not null default '{"enabled":false,"sous_contraception":false,"longueur_cycle":28,"auto_longueur_cycle":true,"longueur_luteale":14,"longueur_regles":5,"afficher_sur_calendrier":true,"afficher_badge_jour":true,"afficher_conseils_micro":true,"appliquer_delta_energie":false,"delta_energie_luteale_kcal":120}'
+  cycle jsonb not null default '{"enabled":false,"sous_contraception":false,"longueur_cycle":28,"auto_longueur_cycle":true,"longueur_luteale":14,"longueur_regles":5,"afficher_sur_calendrier":true,"afficher_badge_jour":true,"afficher_conseils_micro":true,"appliquer_delta_energie":false,"delta_energie_luteale_kcal":120}',
+  -- Ajoutée le 2026-08-30 (chantier « Suivi de l'activité sportive », Palier 1 —
+  -- voir supabase/sql/sport_setup.sql et docs/suivi-sport.md). Bloc unique de
+  -- réglages du suivi sport, même pattern que `water` / `cycle` :
+  -- { enabled, objectif_hebdo_minutes, objectif_hebdo_seances,
+  --   afficher_page_jour, afficher_calendrier, mode_energie
+  --   ('aucun'|'bilan'|'manger_selon_effort' — sans effet sur les cibles au
+  --   Palier 1), depense_max_creditee_kcal, rappels {enabled, jours, heure},
+  --   strava {connected, athlete_nom, derniere_synchro, auto} }. Fusionné côté
+  -- client avec SPORT_DEFAULTS (src/lib/sport.js). Défaut = suivi désactivé.
+  sport jsonb not null default '{"enabled":false,"objectif_hebdo_minutes":150,"objectif_hebdo_seances":0,"afficher_page_jour":true,"afficher_calendrier":true,"mode_energie":"aucun","depense_max_creditee_kcal":400,"rappels":{"enabled":false,"jours":[],"heure":18},"strava":{"connected":false,"athlete_nom":null,"derniere_synchro":null,"auto":true}}'
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
@@ -823,6 +839,40 @@ create table if not exists regles (
 
 create index if not exists idx_regles_user_date on regles (user_id, date);
 
+-- 28. TABLE ACTIVITES_SPORT (séances de sport, saisies à la main — chantier
+-- « Suivi de l'activité sportive », Palier 1, voir supabase/sql/sport_setup.sql
+-- et docs/suivi-sport.md — écrit le 2026-08-30, pas encore confirmé appliqué en
+-- base). UNE LIGNE = UNE SÉANCE. `source` = 'manuel' au Palier 1 ; 'strava'
+-- plus tard (Palier 5) avec `source_id` = id de l'activité côté fournisseur
+-- pour la déduplication (index unique partiel user_id+source+source_id).
+-- `modifie_manuellement` : posé à true si une séance importée est retouchée,
+-- pour qu'une resynchro ne l'écrase pas. App à deux comptes → RLS « own »
+-- stricte (select/insert/update/delete), comme mensurations.
+create table if not exists activites_sport (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date date not null,
+  heure_debut time,
+  type text not null, -- clé de SPORT_TYPES (src/lib/sport.js) : 'course' | 'marche' | 'velo' | 'natation' | 'rando' | 'muscu' | 'hiit' | 'yoga' | 'danse' | 'sport_co' | 'autre'
+  duree_min numeric not null,
+  distance_km numeric,
+  intensite text, -- 'faible' | 'moderee' | 'elevee' (nullable)
+  energie_kcal numeric, -- estimée (MET) ou fournie par la source, éditable
+  fc_moyenne integer,
+  fc_max integer,
+  source text not null default 'manuel', -- 'manuel' | 'strava'
+  source_id text, -- id externe (nullable), pour la déduplication des imports
+  modifie_manuellement boolean not null default false,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists idx_activites_sport_source
+  on activites_sport (user_id, source, source_id) where source_id is not null;
+create index if not exists idx_activites_sport_user_date
+  on activites_sport (user_id, date desc);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -892,6 +942,12 @@ alter table jours_exclus enable row level security;
 -- jour) se fait toujours par insert/delete. Colonne `symptomes` (Palier 8)
 -- réutilise cette même policy update, aucune policy supplémentaire.
 alter table regles enable row level security;
+
+-- RLS activé sur activites_sport dès sa création (2026-08-30), policies
+-- select/insert/update/delete "own" (auth.uid() = user_id) — voir
+-- supabase/sql/sport_setup.sql. La policy update sert à l'édition d'une séance
+-- (contrairement à regles où un jour est simplement présent ou absent).
+alter table activites_sport enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

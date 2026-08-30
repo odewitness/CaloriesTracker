@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Note tes séances de sport',
+    description: "Un nouveau bloc « Activité » arrive sur ta page du jour (à activer dans Profil › Sport). Tu y ajoutes tes séances en quelques secondes : type (course, muscu, yoga, vélo…), durée, ressenti, et l'app estime les calories dépensées — tu peux les corriger. Tu vois tes minutes actives de la semaine, avec un objectif si tu en veux un, et les jours où tu as bougé sont marqués d'un point vert sur le calendrier. Ça ne change rien à tes objectifs de calories.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Réorganise ta page du jour',
     description: "Dans Profil › Page du jour, tu peux maintenant choisir l'ordre des blocs de l'écran principal (phase du cycle, bilan des calories, détail des nutriments, à combler aujourd'hui, repas du jour, compléments, eau) avec de petites flèches haut/bas. L'ordre que tu choisis s'applique à tous les jours.",
   },

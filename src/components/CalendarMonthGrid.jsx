@@ -62,7 +62,7 @@ export default function CalendarMonthGrid({
   monthDate, onChangeMonth, selectedDate, onSelectDate,
   dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
   selectedDates, onToggleDate, minDate,
-  cycleByDate,
+  cycleByDate, sportByDate,
 }) {
   const cells = useMemo(() => buildMonthCells(monthDate), [monthDate.getFullYear(), monthDate.getMonth()])
   const todayStr = fmt(new Date())
@@ -105,6 +105,7 @@ export default function CalendarMonthGrid({
           const cyc = cycleByDate?.[dStr]
           const isPeriodDay = !!cyc?.isPeriod
           const phaseColor = cyc && cyc.phase !== 'inconnue' && !isPeriodDay ? PHASES[cyc.phase]?.color : null
+          const hasSport = !!(sportByDate?.[dStr]?.length)
 
           return (
             <button
@@ -155,6 +156,13 @@ export default function CalendarMonthGrid({
                   height: 2, borderRadius: 1, background: phaseColor, opacity: 0.55,
                 }} />
               )}
+              {hasSport && (
+                <span style={{
+                  position: 'absolute', bottom: 3, right: 3,
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: isSelected ? 'white' : 'var(--green)',
+                }} />
+              )}
             </button>
           )
         })}
@@ -167,6 +175,7 @@ export default function CalendarMonthGrid({
         <Legend color="var(--text-hint)" label="Jour exclu des stats" />
         {cycleByDate && <Legend color="var(--coral)" label="Règles" dot />}
         {cycleByDate && <Legend color="var(--purple)" label="Phase lutéale" />}
+        {sportByDate && <Legend color="var(--green)" label="Séance de sport" dot />}
       </div>
     </div>
   )

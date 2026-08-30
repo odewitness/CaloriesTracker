@@ -11,6 +11,8 @@ import EditSupplementModal from '../components/EditSupplementModal'
 import SupplementSection, { SUPPLEMENT_MEAL } from '../components/SupplementSection'
 import WaterSection from '../components/WaterSection'
 import AddWaterSheet from '../components/AddWaterSheet'
+import SportSection from '../components/SportSection'
+import SportEntrySheet from '../components/SportEntrySheet'
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import ShareJournalModal from '../components/ShareJournalModal'
@@ -21,6 +23,8 @@ import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCycle } from '../hooks/useCycle'
+import { useSport } from '../hooks/useSport'
+import { useMeasurements } from '../hooks/useMeasurements'
 import { useSettings } from '../hooks/useSettings'
 import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
 import { useFavorites } from '../hooks/useFavorites'
@@ -52,6 +56,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
   const { days: cycleDays, intensiteByDate, symptomesByDate, toggleDay: toggleCycleDay, setDaysIntensite, setDaysSymptomes } = useCycle()
+  const { activites: sportActivites, week: sportWeek, add: addSport, update: updateSport, remove: removeSport } = useSport(dateStr)
+  const { entries: measurementEntries } = useMeasurements()
   const { favorites } = useFavorites()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings, update: updateSettings } = useSettings()
@@ -61,6 +67,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const [templateAddMeal, setTemplateAddMeal] = useState(null)    // nom du repas | null — ajout d'un repas type à ce repas
   const [templateCreateMeal, setTemplateCreateMeal] = useState(null) // nom du repas | null — création d'un repas type depuis ce repas
   const [waterSheetOpen, setWaterSheetOpen] = useState(false)
+  const [sportSheet, setSportSheet] = useState(null) // { initial: activite|null } | null
   const [planMealOpen, setPlanMealOpen] = useState(false)
   const { open: shortcutsOpen } = useTodayShortcuts()
 
@@ -81,6 +88,30 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     if (last) await deleteEntry(last.id)
   }
   const handleUpdateWater = (patch) => updateSettings({ water: { ...waterCfg, ...patch } })
+
+  // Poids courant (dernier relevé de mensurations) — sert à l'estimation des
+  // calories d'une séance. Approximatif : si aucun relevé, l'estimation reste
+  // vide et éditable à la main.
+  const latestWeight = useMemo(
+    () => measurementEntries.find(e => e.poids_kg != null)?.poids_kg,
+    [measurementEntries],
+  )
+
+  const handleSaveSport = async (payload) => {
+    if (sportSheet?.initial) {
+      const { error } = await updateSport(sportSheet.initial.id, payload)
+      if (!error) toast('✓ Séance modifiée !'); else toast('Erreur')
+    } else {
+      const { error } = await addSport(payload)
+      if (!error) toast('✓ Séance ajoutée !'); else toast("Erreur lors de l'ajout")
+    }
+    setSportSheet(null)
+  }
+  const handleDeleteSport = async (id) => {
+    await removeSport(id)
+    toast('Supprimé')
+    setSportSheet(null)
+  }
 
   const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
 
@@ -312,6 +343,15 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         onOpenSheet={() => setWaterSheetOpen(true)}
       />
     ) : null,
+    sport: (settings.sport?.enabled && settings.sport?.afficher_page_jour !== false) ? (
+      <SportSection
+        activites={sportActivites}
+        week={sportWeek}
+        sportCfg={settings.sport}
+        onOpenSheet={() => setSportSheet({ initial: null })}
+        onOpenEntry={(a) => setSportSheet({ initial: a })}
+      />
+    ) : null,
   }
 
   return (
@@ -352,6 +392,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onAdd={handleAdd}
           onDelete={handleDelete}
           onClose={() => setWaterSheetOpen(false)}
+        />
+      )}
+
+      {sportSheet && (
+        <SportEntrySheet
+          date={date}
+          poidsKg={latestWeight}
+          initial={sportSheet.initial}
+          onSave={handleSaveSport}
+          onDelete={handleDeleteSport}
+          onClose={() => setSportSheet(null)}
         />
       )}
 

@@ -10,6 +10,7 @@ import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
 import { useCycle } from '../hooks/useCycle'
+import { useSportRange } from '../hooks/useSport'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
 import { phasesForRange } from '../lib/cycle'
 import { fmt } from '../lib/dates'
@@ -58,12 +59,19 @@ export default function CalendarPage() {
   const { byDate: planifiesByDate, refetch: refetchPlanifies } = usePlannedMealsRange(rangeStart, rangeEnd)
   const { excludedDates, refetch: refetchExcluded } = useExcludedDaysRange(rangeStart, rangeEnd)
   const { days: cycleDays } = useCycle()
+  const { byDate: sportByDateRaw } = useSportRange(rangeStart, rangeEnd)
 
   const cycleByDate = useMemo(() => {
     const cfg = settings.cycle
     if (!cfg?.enabled || cfg.afficher_sur_calendrier === false || cycleDays.length === 0) return undefined
     return phasesForRange(fmt(rangeStart), fmt(rangeEnd), cycleDays, cfg)
   }, [settings.cycle, cycleDays, rangeStart, rangeEnd])
+
+  const sportByDate = useMemo(() => {
+    const cfg = settings.sport
+    if (!cfg?.enabled || cfg.afficher_calendrier === false) return undefined
+    return sportByDateRaw
+  }, [settings.sport, sportByDateRaw])
 
   const dayStatusByDate = useMemo(() => {
     const result = {}
@@ -172,6 +180,7 @@ export default function CalendarPage() {
           hasPlannedByDate={hasPlannedByDate}
           excludedDates={excludedDates}
           cycleByDate={cycleByDate}
+          sportByDate={sportByDate}
         />
       ) : (
         <CalendarWeekStrip
