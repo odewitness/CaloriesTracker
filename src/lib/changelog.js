@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Partage tes séances avec tes amies',
+    description: "Tu peux maintenant partager une séance sur le fil : ouvre-la (bloc Activité de la page du jour) et touche « Partager avec mes amies ». Ou partage un résumé de ta semaine (temps total, nombre de séances) avec « Partager ma semaine » sous le bloc Activité. Tes amies peuvent réagir et commenter, comme pour un repas ou une recette.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Manger selon l\'effort (nouvelle option)',
     description: "Dans Profil › Sport, un 3ᵉ choix pour les calories : « Manger selon l'effort ». Ton objectif de base repasse à un équivalent sédentaire (ce que tu dépenses sans sport), et tes séances du jour viennent s'ajouter, dans une limite que tu règles. Résultat : les jours sans séance ton objectif est plus bas, les jours chargés plus haut. Ça ne s'applique que sur la page du jour — ton historique et ton calendrier gardent ton objectif habituel. Opt-in, désactivable en un geste, et l'écran te montre les chiffres avant / après.",
   },

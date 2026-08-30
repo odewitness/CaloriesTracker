@@ -13,6 +13,7 @@ import WaterSection from '../components/WaterSection'
 import AddWaterSheet from '../components/AddWaterSheet'
 import SportSection from '../components/SportSection'
 import SportEntrySheet from '../components/SportEntrySheet'
+import ShareSportModal from '../components/ShareSportModal'
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
 import ShareJournalModal from '../components/ShareJournalModal'
@@ -38,7 +39,7 @@ import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, mar
 import { computeMealTargets, computeTotals, computeCalorieNeeds, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
-import { sportAdjustedSettings } from '../lib/sport'
+import { sportAdjustedSettings, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { fmt, dateLabel } from '../lib/dates'
 import { useSetTodayHeaderInfo, useTodayShortcuts } from '../lib/TodayHeaderContext'
@@ -65,8 +66,9 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings, update: updateSettings } = useSettings()
   const { foods: ciqualFoods } = useCiqualCatalog()
-  const { shareJournal } = useFeed()
+  const { shareJournal, shareSport } = useFeed()
   const [shareTarget, setShareTarget] = useState(null) // { meal: string|null, entries: [...] } | null
+  const [shareSportTarget, setShareSportTarget] = useState(null) // { payload, title, subtitle } | null
   const [templateAddMeal, setTemplateAddMeal] = useState(null)    // nom du repas | null — ajout d'un repas type à ce repas
   const [templateCreateMeal, setTemplateCreateMeal] = useState(null) // nom du repas | null — création d'un repas type depuis ce repas
   const [waterSheetOpen, setWaterSheetOpen] = useState(false)
@@ -124,6 +126,36 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     await removeSport(id)
     toast('Supprimé')
     setSportSheet(null)
+  }
+  const handleShareSeance = (a) => {
+    setSportSheet(null)
+    setShareSportTarget({
+      title: 'Partager cette séance',
+      subtitle: `${sportTypeLabel(a.type)} · ${formatDuree(a.duree_min)}${a.energie_kcal != null ? ` · ≈ ${Math.round(a.energie_kcal)} kcal` : ''}`,
+      payload: {
+        kind: 'seance', date: a.date, type: a.type,
+        duree_min: a.duree_min, distance_km: a.distance_km ?? null,
+        intensite: a.intensite ?? null, energie_kcal: a.energie_kcal ?? null,
+      },
+    })
+  }
+  const handleShareWeek = () => {
+    setShareSportTarget({
+      title: 'Partager ma semaine',
+      subtitle: `${formatDuree(sportWeek?.minutes || 0)} · ${sportWeek?.seances || 0} séance${(sportWeek?.seances || 0) > 1 ? 's' : ''} cette semaine`,
+      payload: {
+        kind: 'semaine', semaine_debut: weekStart(dateStr),
+        total_min: Math.round(sportWeek?.minutes || 0),
+        nb_seances: sportWeek?.seances || 0,
+        total_kcal: Math.round(sportWeek?.kcal || 0) || null,
+      },
+    })
+  }
+  const confirmShareSport = async (message) => {
+    const { error } = await shareSport({ ...shareSportTarget.payload, message })
+    if (!error) toast('✓ Partagé avec tes amies !')
+    else toast('Erreur lors du partage')
+    setShareSportTarget(null)
   }
 
   const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
@@ -379,6 +411,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           : null}
         onOpenSheet={() => setSportSheet({ initial: null })}
         onOpenEntry={(a) => setSportSheet({ initial: a })}
+        onShareWeek={handleShareWeek}
       />
     ) : null,
   }
@@ -431,7 +464,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           initial={sportSheet.initial}
           onSave={handleSaveSport}
           onDelete={handleDeleteSport}
+          onShare={handleShareSeance}
           onClose={() => setSportSheet(null)}
+        />
+      )}
+
+      {shareSportTarget && (
+        <ShareSportModal
+          title={shareSportTarget.title}
+          subtitle={shareSportTarget.subtitle}
+          onConfirm={confirmShareSport}
+          onClose={() => setShareSportTarget(null)}
         />
       )}
 
