@@ -9,6 +9,8 @@ import { todayStr } from '../lib/dates'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
 import MetricChart from '../components/MetricChart'
+import WeightProjectionCard from '../components/WeightProjectionCard'
+import { useWeightProjection } from '../hooks/useWeightProjection'
 
 const MEASURE_FIELDS = [
   { key: 'poitrine_cm',      label: 'Poitrine',      color: 'var(--blue)' },
@@ -127,6 +129,7 @@ export default function MeasurementsPage() {
   const [saving, setSaving] = useState(false)
   const formTopRef = useRef(null)
   const [selectedMetric, setSelectedMetric] = useState('poids_kg')
+  const weightProjection = useWeightProjection(entries)
 
   // Si la métrique affichée n'a aucune donnée (ex. seulement des mensurations
   // ont été loggées, jamais le poids), on bascule automatiquement sur la
@@ -262,6 +265,7 @@ export default function MeasurementsPage() {
               />
             )
           })()}
+          {selectedMetric === 'poids_kg' && <WeightProjectionCard projection={weightProjection} />}
         </>
       )}
 
