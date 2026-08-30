@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { ChevronRight } from 'lucide-react'
 import TodayOverviewCard from '../components/TodayOverviewCard'
 import NutrientPanel from '../components/NutrientPanel'
 import MealSection from '../components/MealSection'
@@ -14,6 +15,7 @@ import AddWaterSheet from '../components/AddWaterSheet'
 import SportSection from '../components/SportSection'
 import SportEntrySheet from '../components/SportEntrySheet'
 import StepsSheet from '../components/StepsSheet'
+import SportEnergySheet from '../components/SportEnergySheet'
 import ShareSportModal from '../components/ShareSportModal'
 import RecipeDetailWrapper from '../components/RecipeDetailWrapper'
 import MealTemplateDetailWrapper from '../components/MealTemplateDetailWrapper'
@@ -40,7 +42,7 @@ import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, mar
 import { computeMealTargets, computeTotals, computeCalorieNeeds, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
-import { sportAdjustedSettings, dayActivityKcal, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
+import { sportAdjustedSettings, dayActivityKcal, dayEnergyBalance, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { fmt, dateLabel } from '../lib/dates'
 import { useSetTodayHeaderInfo, useTodayShortcuts, useRequestTodayDate } from '../lib/TodayHeaderContext'
@@ -81,6 +83,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const [waterSheetOpen, setWaterSheetOpen] = useState(false)
   const [sportSheet, setSportSheet] = useState(null) // { initial: activite|null } | null
   const [pasSheet, setPasSheet] = useState(false)
+  const [energyInfoOpen, setEnergyInfoOpen] = useState(false)
   const [planMealOpen, setPlanMealOpen] = useState(false)
   const { open: shortcutsOpen } = useTodayShortcuts()
 
@@ -197,6 +200,69 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   )
   const cycleKcalDelta = daySettings._cycleKcalDelta || 0
   const sportKcalAdjust = daySettings._sportKcalAdjust || 0
+
+  // Ligne « bilan d'énergie » sous l'anneau de calories (déplacée depuis la
+  // carte Activité pour l'alléger). Résumé d'une ligne ici ; détail chiffré +
+  // garde-fous (§8 docs/suivi-sport.md) derrière un tap → SportEnergySheet.
+  const sportEnergyMode = settings.sport?.enabled ? (settings.sport?.mode_energie || 'aucun') : 'aucun'
+  const energyBilan = sportEnergyMode === 'bilan'
+    ? dayEnergyBalance({ consumedKcal: totals.kcal, maintenanceKcal, sportKcal: dayActivity.total })
+    : null
+  const energyFooter = useMemo(() => {
+    if (sportEnergyMode === 'aucun') return null
+    const k = (n) => Math.round(n).toLocaleString('fr-FR')
+    let label
+    if (sportEnergyMode === 'manger_selon_effort') {
+      if (daySettings._sportBaseGoal != null) {
+        // base habituelle (sans sport ni cycle) + supplément sport + supplément
+        // cycle = objectif du jour. `_sportBaseGoal` intègre déjà le delta cycle.
+        const habitualBase = daySettings._sportBaseGoal - cycleKcalDelta
+        const sportPart = daySettings._sportCredit || 0
+        label = (
+          <>
+            <span style={{ color: 'var(--text-hint)' }}>{k(habitualBase)} base</span>
+            {' + '}
+            <span style={{ color: 'var(--green)' }}>{k(sportPart)} sport</span>
+            {cycleKcalDelta !== 0 && (
+              <>
+                {cycleKcalDelta > 0 ? ' + ' : ' − '}
+                <span style={{ color: 'var(--purple)' }}>{k(Math.abs(cycleKcalDelta))} cycle</span>
+              </>
+            )}
+            {' = '}
+            <strong>{k(daySettings.goal_kcal)} kcal</strong>
+          </>
+        )
+      } else {
+        label = <span style={{ color: 'var(--text-hint)' }}>Objectif habituel — complète Profil&nbsp;› Sport</span>
+      }
+    } else if (energyBilan) {
+      const surplus = energyBilan.bilan > 0
+      label = (
+        <>Bilan du jour ≈{' '}
+          <strong style={{ color: surplus ? 'var(--amber)' : 'var(--green)' }}>
+            {surplus ? 'surplus' : 'déficit'} {Math.abs(energyBilan.bilan)} kcal
+          </strong>
+        </>
+      )
+    } else if (dayActivity.total > 0) {
+      label = <>Dépense d'activité ≈ <strong>{k(dayActivity.total)} kcal</strong></>
+    } else {
+      label = <span style={{ color: 'var(--text-hint)' }}>Complète ton profil pour le bilan du jour</span>
+    }
+    return (
+      <button
+        onClick={() => setEnergyInfoOpen(true)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          textAlign: 'left', fontFamily: 'var(--font)', fontSize: 12, color: 'var(--text-muted)',
+        }}
+      >
+        <span style={{ flex: 1, minWidth: 0 }}>{label}</span>
+        <ChevronRight size={14} color="var(--text-hint)" style={{ flexShrink: 0 }} />
+      </button>
+    )
+  }, [sportEnergyMode, energyBilan, daySettings._sportBaseGoal, daySettings._sportCredit, daySettings.goal_kcal, cycleKcalDelta, dayActivity.total])
 
   const cyclePhase = useMemo(() => (
     settings.cycle?.enabled && cycleDays.length ? phaseForDate(dateStr, cycleDays, settings.cycle) : null
@@ -346,6 +412,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         fib={totals.fib}
         goals={daySettings}
         onNavigate={onNavigate}
+        energyFooter={energyFooter}
       />
     ),
     nutriments: (
@@ -419,13 +486,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         activites={sportActivites}
         week={sportWeek}
         sportCfg={settings.sport}
-        consumedKcal={totals.kcal}
-        maintenanceKcal={maintenanceKcal}
-        activity={dayActivity}
         pasJour={pasJour}
-        adjust={settings.sport?.mode_energie === 'manger_selon_effort'
-          ? { delta: sportKcalAdjust, base: daySettings._sportBaseGoal, credit: daySettings._sportCredit, goal: daySettings.goal_kcal, applied: daySettings._sportBaseGoal != null }
-          : null}
         onOpenSheet={() => setSportSheet({ initial: null })}
         onOpenEntry={(a) => setSportSheet({ initial: a })}
         onOpenPas={() => setPasSheet(true)}
@@ -500,6 +561,24 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             else toast(nb > 0 ? '✓ Pas enregistrés !' : 'Effacé')
           }}
           onClose={() => setPasSheet(false)}
+        />
+      )}
+
+      {energyInfoOpen && (
+        <SportEnergySheet
+          mode={sportEnergyMode}
+          consumedKcal={totals.kcal}
+          bilan={energyBilan}
+          activity={dayActivity}
+          adjust={{
+            delta: sportKcalAdjust,
+            base: daySettings._sportBaseGoal,
+            credit: daySettings._sportCredit,
+            goal: daySettings.goal_kcal,
+            applied: daySettings._sportBaseGoal != null,
+          }}
+          cycleKcalDelta={cycleKcalDelta}
+          onClose={() => setEnergyInfoOpen(false)}
         />
       )}
 

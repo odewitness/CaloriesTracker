@@ -578,6 +578,26 @@ Toute nouvelle idée s'ajoute ici.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — **Refonte de la carte « Activité » (page du jour)**, branche
+  `refonte-section-activite`. Demande utilisatrice : « trop d'infos, trop de
+  boutons ». Décisions : (1) **bloc anneau SVG hebdo supprimé** — l'en-tête
+  (sous-titre « X / Y min · Z % » + barre fine 3px) suffit ; le corps ne montre
+  plus que la ligne pas + les séances. (2) **Ligne « pas » compactée** au gabarit
+  d'une ligne de séance (icône + « N pas · P % », plus de sous-ligne ni de
+  mini-jauge). (3) **Encart énergie relocalisé** : « Bilan du jour » /
+  « Objectif ajusté · manger selon l'effort » quitte `SportSection` et s'affiche
+  en **une ligne sous l'anneau de calories** (`TodayOverviewCard`, nouvelle prop
+  `energyFooter`), le détail chiffré + les garde-fous du §8 passant derrière un
+  tap → nouveau `SportEnergySheet.jsx` (portal, lecture seule, textes déplacés
+  tels quels). En mode « manger selon l'effort », la ligne montre la
+  **décomposition** demandée par l'utilisatrice : `base habituelle + supplément
+  sport (+ supplément cycle, le cas échéant) = objectif du jour` — pas de
+  « + / − vs moyenne » sur cette ligne (gardé pour le détail). `_sportBaseGoal`
+  intègre déjà le delta cycle → base habituelle = `_sportBaseGoal −
+  _cycleKcalDelta`. (4) Pied de section réduit : « Ajouter une séance » seulement en
+  état vide, « Partager ma semaine » inchangé. `goal_kcal` et
+  `sportAdjustedSettings` **strictement inchangés** — on ne déplace que
+  l'explication. Aucun SQL. `npm run build` OK. Reste : test manuel + merge/push.
 - **2026-08-30** — **Overlay « Dépense » sur le graphe des apports** (Historique
   › Résumé, `CalorieTrendChart`), branche `historique-depense-vs-apports`.
   Demande utilisatrice : « voir le lien entre kcal mangées et kcal dépensées +

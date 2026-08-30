@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'La partie « Activité » allégée',
+    description: "La carte Activité de ta page du jour était trop chargée. Elle ne garde plus que l'essentiel : ta progression de la semaine en haut, tes pas du jour sur une seule ligne, et tes séances. Le petit bilan d'énergie (ce que tu manges face à ce que tu dépenses, ou ton objectif ajusté si tu as choisi « manger selon l'effort ») s'affiche maintenant en une ligne juste sous ton cercle de calories ; touche-la pour voir le détail.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Ajout rapide depuis « À combler aujourd\'hui » réparé',
     description: "Depuis la page du jour, quand tu touchais le « + » d'une suggestion de « À combler aujourd'hui » (ou le bouton « … » pour voir tous tes manques), la petite fenêtre qui s'ouvrait était décalée et rognée sur les côtés : le bouton « Ajouter » se retrouvait hors de l'écran. Elle s'affiche de nouveau correctement, bien centrée.",
   },
