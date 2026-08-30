@@ -33,6 +33,7 @@ import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, mar
 import { computeMealTargets, computeTotals, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
+import { normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { fmt, dateLabel } from '../lib/dates'
 import { useSetTodayHeaderInfo, useTodayShortcuts } from '../lib/TodayHeaderContext'
 
@@ -208,6 +209,111 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     setShareTarget(null)
   }
 
+  const sectionsOrder = normalizeTodaySectionsOrder(settings.ordre_sections_jour)
+
+  // Blocs de contenu de la page du jour, rendus dans l'ordre choisi par
+  // l'utilisatrice (Profil > Page du jour, persisté dans
+  // settings.ordre_sections_jour). Une valeur peut être null si le bloc est
+  // masqué ; l'espacement inter-blocs (16px) est porté par le wrapper du .map
+  // plus bas, pas par chaque bloc, pour rester régulier quel que soit l'ordre.
+  const sectionNodes = {
+    // Même garde que CyclePhaseBadge (qui renvoie null dans ces cas) : on la
+    // reproduit ici pour que le bloc soit filtré du .map et n'occupe pas un
+    // wrapper vide (avec sa marge) quand la pastille ne s'affiche pas.
+    phase: (settings.cycle?.enabled && settings.cycle?.afficher_badge_jour !== false && cycleDays.length > 0) ? (
+      <CyclePhaseBadge
+        dateStr={dateStr}
+        days={cycleDays}
+        cycleSettings={settings.cycle}
+        kcalDelta={cycleKcalDelta}
+        favorites={favorites}
+        intensiteByDate={intensiteByDate}
+        symptomesByDate={symptomesByDate}
+        onToggleDay={toggleCycleDay}
+        onSetIntensite={(d, level) => setDaysIntensite([d], level)}
+        onSetSymptomes={(d, arr) => setDaysSymptomes([d], arr)}
+      />
+    ) : null,
+    bilan: (
+      <TodayOverviewCard
+        consumed={totals.kcal}
+        goal={daySettings.goal_kcal}
+        prot={totals.prot}
+        gluc={totals.gluc}
+        lip={totals.lip}
+        fib={totals.fib}
+        goals={daySettings}
+        onNavigate={onNavigate}
+      />
+    ),
+    nutriments: (
+      <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} highlightKeys={microFocusKeys} />
+    ),
+    // Uniquement sur le jour réellement affiché (le texte de la bande et les
+    // favoris/récents qu'elle charge n'ont de sens que pour "aujourd'hui" au
+    // sens propre, pas un slot voisin visité en swipant), et seulement si
+    // l'utilisatrice ne l'a pas masquée depuis Profil > Page du jour.
+    manques: (isToday && settings.afficher_manques_jour !== false) ? (
+      <TodayGapsSection
+        dateStr={dateStr}
+        gaps={gaps}
+        allGaps={allGaps}
+        top10Gaps={top10Gaps}
+        entries={entries}
+        remainingKcal={remainingKcal}
+        onAddEntry={handleAdd}
+      />
+    ) : null,
+    repas: (
+      <div>
+        <div className="section-title">Repas du jour</div>
+        {MEALS.map(m => (
+          <MealSection
+            key={m}
+            name={m}
+            entries={entries.filter(e => e.meal === m)}
+            target={mealTargets[m]}
+            plannedItems={nonMangesPlanifies.filter(r => r.meal === m)}
+            onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd, top10Gaps })}
+            onDelete={handleDelete}
+            onUpdate={handleUpdate}
+            onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
+            onMarkPlannedEaten={handleMarkPlannedEaten}
+            onDeletePlanned={handleDeletePlanned}
+            onDeleteSeries={handleDeleteSeries}
+            onOpenPlannedSource={onOpenSource}
+            onShare={(meal) => setShareTarget({ meal, entries: entries.filter(e => e.meal === meal) })}
+            onAddFromTemplate={setTemplateAddMeal}
+            onCreateTemplate={setTemplateCreateMeal}
+          />
+        ))}
+      </div>
+    ),
+    complements: (
+      <SupplementSection
+        supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
+        plannedSupplements={nonMangesPlanifies.filter(r => r.meal === SUPPLEMENT_MEAL)}
+        onOpenModal={onOpenModal}
+        onAdd={handleAdd}
+        onDelete={handleDelete}
+        onMarkPlannedEaten={handleMarkPlannedEaten}
+        onDeletePlanned={handleDeletePlanned}
+        onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
+        onOpenPlannedSource={onOpenSource}
+      />
+    ),
+    eau: settings.water?.card_visible !== false ? (
+      <WaterSection
+        entries={waterEntries}
+        water={waterCfg}
+        beverageName={defaultBeverage?.alim_nom}
+        onQuickAdd={handleWaterQuickAdd}
+        onUndo={handleWaterUndo}
+        onOpenSheet={() => setWaterSheetOpen(true)}
+      />
+    ) : null,
+  }
+
   return (
     <div style={{
   width: '33.333%',
@@ -229,94 +335,13 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             canShare={entries.length > 0}
           />
         )}
-        <CyclePhaseBadge
-          dateStr={dateStr}
-          days={cycleDays}
-          cycleSettings={settings.cycle}
-          kcalDelta={cycleKcalDelta}
-          favorites={favorites}
-          intensiteByDate={intensiteByDate}
-          symptomesByDate={symptomesByDate}
-          onToggleDay={toggleCycleDay}
-          onSetIntensite={(d, level) => setDaysIntensite([d], level)}
-          onSetSymptomes={(d, arr) => setDaysSymptomes([d], arr)}
-        />
-        <TodayOverviewCard
-          consumed={totals.kcal}
-          goal={daySettings.goal_kcal}
-          prot={totals.prot}
-          gluc={totals.gluc}
-          lip={totals.lip}
-          fib={totals.fib}
-          goals={daySettings}
-          onNavigate={onNavigate}
-        />
-        <NutrientPanel totals={totals} hasEntries={entries.length > 0} entries={entries} onUpdate={handleUpdate} highlightKeys={microFocusKeys} />
-
-        {/* Uniquement sur le jour réellement affiché (le texte de la bande et
-            les favoris/récents qu'elle charge n'ont de sens que pour
-            "aujourd'hui" au sens propre, pas un slot voisin visité en
-            swipant), et seulement si l'utilisatrice ne l'a pas masquée depuis
-            Profil > Page du jour. */}
-        {isToday && settings.afficher_manques_jour !== false && (
-          <div style={{ marginTop: 16 }}>
-            <TodayGapsSection
-              dateStr={dateStr}
-              gaps={gaps}
-              allGaps={allGaps}
-              top10Gaps={top10Gaps}
-              entries={entries}
-              remainingKcal={remainingKcal}
-              onAddEntry={handleAdd}
-            />
-          </div>
-        )}
-
-        <div style={{ marginTop: 16 }}>
-          <div className="section-title">Repas du jour</div>
-          {MEALS.map(m => (
-            <MealSection
-              key={m}
-              name={m}
-              entries={entries.filter(e => e.meal === m)}
-              target={mealTargets[m]}
-              plannedItems={nonMangesPlanifies.filter(r => r.meal === m)}
-              onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd, top10Gaps })}
-              onDelete={handleDelete}
-              onUpdate={handleUpdate}
-              onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
-              onMarkPlannedEaten={handleMarkPlannedEaten}
-              onDeletePlanned={handleDeletePlanned}
-              onDeleteSeries={handleDeleteSeries}
-              onOpenPlannedSource={onOpenSource}
-              onShare={(meal) => setShareTarget({ meal, entries: entries.filter(e => e.meal === meal) })}
-              onAddFromTemplate={setTemplateAddMeal}
-              onCreateTemplate={setTemplateCreateMeal}
-            />
+        {sectionsOrder
+          .filter(k => sectionNodes[k] != null)
+          .map((k, i) => (
+            <div key={k} style={i === 0 ? undefined : { marginTop: 16 }}>
+              {sectionNodes[k]}
+            </div>
           ))}
-        </div>
-        <SupplementSection
-          supplements={entries.filter(e => e.meal === SUPPLEMENT_MEAL)}
-          plannedSupplements={nonMangesPlanifies.filter(r => r.meal === SUPPLEMENT_MEAL)}
-          onOpenModal={onOpenModal}
-          onAdd={handleAdd}
-          onDelete={handleDelete}
-          onMarkPlannedEaten={handleMarkPlannedEaten}
-          onDeletePlanned={handleDeletePlanned}
-          onOpenDetail={(entry) => onOpenDetail({ entry, onUpdate: handleUpdate })}
-          onOpenPlannedSource={onOpenSource}
-        />
-
-        {settings.water?.card_visible !== false && (
-          <WaterSection
-            entries={waterEntries}
-            water={waterCfg}
-            beverageName={defaultBeverage?.alim_nom}
-            onQuickAdd={handleWaterQuickAdd}
-            onUndo={handleWaterUndo}
-            onOpenSheet={() => setWaterSheetOpen(true)}
-          />
-        )}
       </>
 
       {waterSheetOpen && (
