@@ -338,12 +338,19 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
       `MeasurementsPage` charge `useSportRange` sur la fenêtre des relevés.
 - [x] Entrée changelog (2026-08-30 « Tes jours de sport sur tes courbes »)
 
-### Palier 4 — Boucle cycle ▸ statut : à faire
-- [ ] `cycle.js` : rattacher chaque séance à la phase où elle tombe
-- [ ] Rétrospectif « ton sport selon ta phase » face à `PHASE_SPORT_GUIDANCE`
-      (déjà écrit au Palier 8 du chantier cycle) — informatif, jamais prescriptif
-- [ ] Comparaison volume par phase dans `HistoryPage`
-- [ ] Entrée changelog
+### Palier 4 — Boucle cycle ▸ statut : codé (branche `suivi-sport-p4`)
+- [x] Rattachement séance → phase via `phaseForDate` (cycle.js, déjà existant —
+      pas de nouveau helper nécessaire)
+- [x] `src/components/history/SportPhaseSection.jsx` : rétrospectif « Ton sport
+      selon ta phase » dans `HistoryPage` — minutes / séances par phase (règles,
+      folliculaire, ovulation, lutéale) + mini-barre + note `PHASE_SPORT_GUIDANCE`
+      par phase. Hors vue Année. Ne s'affiche que si cycle actif (hors
+      contraception) + sport actif + ≥ 3 séances rattachables sur la période.
+      Note de bas de bloc « pas un programme à suivre ».
+- [x] Entrée changelog (2026-08-30 « Ton sport, phase par phase »)
+- Pas de modif de la pastille de phase (`CyclePhaseBadge`) au Palier 4 : le
+  rétrospectif vit dans l'Historique, la pastille du jour garde le cadrage
+  cycle existant (Palier 8 du chantier cycle).
 
 ### Palier 5 — Connexion Strava ▸ statut : à faire
 - [ ] `supabase/sql/connexions_sport_setup.sql` (table `connexions_sport`, RLS
@@ -393,10 +400,10 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
 
 - Palier 1 : mergé dans `main` en local (SQL `sport_setup.sql` appliqué par
   l'utilisatrice, testé). Reste : `git push` vers `main` (à confirmer).
-- Paliers 1 & 2 : mergés + poussés sur `main` (déployés Netlify).
-- Palier 3 : codé sur la branche `suivi-sport-p3`. Aucune migration. Reste :
+- Paliers 1 → 3 : mergés + poussés sur `main` (déployés Netlify).
+- Palier 4 : codé sur la branche `suivi-sport-p4`. Aucune migration. Reste :
   test manuel, merge + push après confirmation.
-- Paliers 4 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
+- Paliers 5 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
   (Palier 5). Paliers 7 → 9 non tranchés.
 
 ---
@@ -433,6 +440,12 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — Palier 3 mergé + poussé. Palier 4 codé sur la branche
+  `suivi-sport-p4` : `SportPhaseSection` dans `HistoryPage` (répartition
+  minutes/séances par phase du cycle + repère `PHASE_SPORT_GUIDANCE` par phase,
+  ≥ 3 séances rattachables, hors Année). Pas de modif de `CyclePhaseBadge` — le
+  rétrospectif reste dans l'Historique. `npm run build` OK. En attente : test
+  manuel + merge/push.
 - **2026-08-30** — Paliers 1 & 2 mergés + poussés sur `main` (déployés). Palier 3
   codé sur la branche `suivi-sport-p3` : encart « Sport & calories sur cette
   période » (jours avec séance vs sans, kcal + poids moy.) dans `HistoryPage`,
