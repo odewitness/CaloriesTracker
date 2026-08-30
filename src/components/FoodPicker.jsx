@@ -118,6 +118,11 @@ export default function FoodPicker({
   const [savingPortions, setSavingPortions] = useState(false)
   const searchRef = useRef(null)
   const timerRef = useRef(null)
+  // Numéro de la recherche en cours : incrémenté à chaque appel de doSearch.
+  // Une réponse réseau n'est appliquée que si elle correspond encore à la
+  // dernière recherche lancée — sinon la réponse lente de "pou" pouvait
+  // revenir après celle de "poulet" et écraser l'affichage.
+  const searchSeq = useRef(0)
 
   // Un aliment favori reste affiché dans les récents (l'utilisateur veut voir
   // les deux). Quand un récent correspond à un favori, on fusionne les portions
@@ -195,6 +200,7 @@ export default function FoodPicker({
   }, [step])
 
   const doSearch = useCallback(async (q) => {
+    const seq = ++searchSeq.current
     if (!q || q.length < 2) { setResults([]); return }
     setSearching(true)
 
@@ -210,6 +216,7 @@ export default function FoodPicker({
         const data = await fetchOFFWithRetry(
           `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=product_name,product_name_fr,categories,brands,nutriments,serving_size`
         )
+        if (seq !== searchSeq.current) return   // une recherche plus récente a démarré
         const products = (data.products || [])
           .filter(p => p.product_name || p.product_name_fr)
           .map(mapOFFProduct)
@@ -217,6 +224,7 @@ export default function FoodPicker({
         setOffBrandFilter('')
         setOffCategoryFilter('')
       } catch {
+        if (seq !== searchSeq.current) return
         toast('Open Food Facts est temporairement indisponible, réessaie dans un instant')
         setResults([])
       }
@@ -244,6 +252,8 @@ export default function FoodPicker({
             .limit(5)
         : Promise.resolve({ data: [] }),
     ])
+
+    if (seq !== searchSeq.current) return   // une recherche plus récente a démarré
 
     if (ciqualRes.error) console.error('search_ciqual error:', ciqualRes.error)
 

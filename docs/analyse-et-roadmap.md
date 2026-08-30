@@ -62,22 +62,41 @@ réseau à chaque frappe. Regroupées en `Promise.all` → ~3× plus rapide.
 Voir §2.1. SQL exécuté par l'utilisatrice dans l'éditeur Supabase le
 2026-08-30 : `journal`, `settings`, `aliments_custom`, `repas_types`, `marques`
 passent en RLS activé + policy « own ». `supabase_schema.sql` mis à jour.
-**Reste à faire** : vérifier le statut RLS de `profiles`, `recettes`,
-`recette_ingredients`, `favoris`, `listes_courses`, `liste_courses_items`,
-`repas_planifies`, `suggestions_manques` (voir fin de §2.1).
+**Vérif complète le 2026-08-30** (`select tablename, rowsecurity from pg_tables
+where schemaname='public'`) : **les 32 tables ont `rowsecurity = true`**. Le
+chapitre RLS est clos (la justesse fine des policies des tables secondaires n'a
+pas été auditée ligne à ligne, mais l'app fonctionne → elles sont au moins
+opérationnelles).
+
+### 1.5 — Bugs « doublons / pertes silencieuses » — bloc client ✅
+
+Traité le 2026-08-30 (voir §2.2, §2.4, §2.5, §2.6) :
+
+- **`useSettings.update`** : construit le prochain état depuis une ref tenue à
+  jour de façon synchrone (plus de closure figée), et sérialise les écritures
+  Supabase (`writeChain`) pour qu'elles arrivent en base dans l'ordre.
+- **`FoodPicker.doSearch`** : garde « dernière recherche gagne » (`searchSeq`) —
+  une réponse réseau n'est appliquée que si elle correspond encore à la dernière
+  frappe.
+- **`TodayPage`** : largeur du viewport suivie en state (`viewportW` +
+  écouteurs `resize` / `orientationchange`) au lieu de `window.innerWidth` lu en
+  direct → plus de slider décalé après rotation.
+- **`markAsEaten`** : garde d'idempotence (relit `mange` en base avant
+  d'insérer). Mitige le double-tap et la reprise après échec ; le correctif
+  atomique complet (RPC transactionnelle) reste ouvert, voir §2.2.
 
 ---
 
 ## 2. Bugs & fragilités restants
 
-Classés par gravité. Rien ici n'a encore été traité.
+Classés par gravité.
 
 ### 2.1 — 🔴 CRITIQUE : RLS désactivé sur des tables contenant des données perso
 
-> ✅ **Traité le 2026-08-30** pour `journal`, `settings`, `aliments_custom`,
-> `repas_types`, `marques` (SQL ci-dessous exécuté par l'utilisatrice,
-> `supabase_schema.sql` mis à jour). Il reste la vérification des autres tables
-> listées en fin de section.
+> ✅ **Clos le 2026-08-30.** SQL ci-dessous exécuté pour `journal`, `settings`,
+> `aliments_custom`, `repas_types`, `marques` ; `supabase_schema.sql` mis à
+> jour. Vérif `pg_tables` : les 32 tables ont `rowsecurity = true`. La suite de
+> cette section garde la trace du problème initial et du raisonnement.
 
 `supabase_schema.sql`, section RLS (état d'avant le correctif) :
 
@@ -130,23 +149,32 @@ create policy "marques_own" on marques for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
-**À vérifier aussi** (le schéma indique « statut RLS non vérifié ») :
-`profiles`, `recettes`, `recette_ingredients`, `favoris`, `listes_courses`,
-`liste_courses_items`, `repas_planifies`, `suggestions_manques`.
+**Vérifié le 2026-08-30** : `profiles`, `recettes`, `recette_ingredients`,
+`favoris`, `listes_courses`, `liste_courses_items`, `repas_planifies`,
+`suggestions_manques` — toutes ont déjà `rowsecurity = true`.
 
-**Après** : mettre `supabase_schema.sql` à jour, et si l'app reste à quelques
-personnes, désactiver l'inscription publique dans Supabase (Auth → Providers)
-et créer les comptes à la main.
+**Reste conseillé** : si l'app reste à quelques personnes, désactiver
+l'inscription publique dans Supabase (Auth → Providers) et créer les comptes à
+la main.
 
 ### 2.2 — 🟠 `markAsEaten` n'est pas atomique → doublons possibles
+
+> 🟡 **Mitigé le 2026-08-30** (garde d'idempotence côté client, voir §1.5). Le
+> correctif atomique complet ci-dessous reste à faire.
 
 `src/hooks/usePlannedMeals.js`. La fonction insère les aliments dans `journal`
 **puis** marque `repas_planifies.mange = true`, en deux requêtes. Si la 2ᵉ
 échoue (réseau), les aliments sont au journal mais le repas reste « à faire » →
 l'utilisatrice reclique « marquer mangé » → tout est ajouté une 2ᵉ fois.
 
-*Correctif :* une fonction SQL (RPC) qui fait les deux dans une transaction.
-À défaut : relire `mange` juste avant d'insérer, et ne rien faire si déjà vrai.
+*État actuel :* `markAsEaten` relit `mange` en base avant d'insérer et sort si
+c'est déjà vrai (`{ alreadyEaten: true }`). Couvre le double-tap et la reprise
+après échec de l'update.
+
+*Correctif complet restant :* une fonction SQL (RPC) transactionnelle qui fait
+l'insert journal + l'update `mange` d'un bloc. Attention : elle doit recopier
+**tous** les micronutriments (`ALL_NUTRIENT_KEYS`, ~60 colonnes), pas seulement
+les 5 macros — c'est ce qui la rend fastidieuse à écrire en SQL.
 
 ### 2.3 — 🟠 Aucune gestion d'erreur réseau dans les hooks de données
 
@@ -168,6 +196,10 @@ proposé en §3.2).
 
 ### 2.4 — 🟡 `useSettings.update` : écrasement concurrent
 
+> ✅ **Traité le 2026-08-30** (voir §1.5) : ref synchrone + sérialisation des
+> écritures. Reste une piste : ne persister que le patch plutôt que l'objet
+> entier defaults-mergé.
+
 ```js
 const update = async (patch) => {
   const next = { ...settings, ...patch }        // settings = closure figée
@@ -184,23 +216,17 @@ touchées volontairement.
 *Correctif :* `setSettings(s => { const next = { ...s, ...patch }; persist(next);
 return next })`, et ne persister que le patch si possible.
 
-### 2.5 — 🟡 Course de requêtes dans la recherche d'aliments
+### 2.5 — 🟡 Course de requêtes dans la recherche d'aliments — ✅ traité le 2026-08-30
 
-`FoodPicker.doSearch` : pas d'`AbortController` ni de garde « dernière requête
-gagne ». On tape vite → la réponse de `"pou"` peut revenir après celle de
-`"poulet"` et écraser l'affichage. Le debounce 250 ms réduit sans supprimer.
+`FoodPicker.doSearch` : compteur `searchSeq` incrémenté à chaque appel ; toute
+réponse (Ciqual ou OFF) est ignorée si `seq` n'est plus le dernier. Voir §1.5.
 
-*Correctif :* un compteur de requête (`reqId` incrémenté à chaque `doSearch`,
-on ignore la réponse si `reqId` a changé), ou un `AbortController`.
+### 2.6 — 🟡 Rotation d'écran → slider décalé — ✅ traité le 2026-08-30
 
-### 2.6 — 🟡 Rotation d'écran → slider décalé
-
-`src/pages/TodayPage.jsx` lit `window.innerWidth` pendant le rendu (calcul du
-swipe) sans écouteur `resize` / `orientationchange`. Le manifest force le
-portrait sur mobile, donc c'est surtout visible sur tablette / desktop : après
-rotation, le slider est mal positionné jusqu'au swipe suivant.
-
-*Correctif :* stocker la largeur dans un state mis à jour sur `resize`.
+`src/pages/TodayPage.jsx` lisait `window.innerWidth` pendant le rendu sans
+écouteur `resize` / `orientationchange` → slider mal positionné après rotation
+(tablette / desktop surtout). Largeur désormais dans un state `viewportW` mis à
+jour sur `resize` + `orientationchange`. Voir §1.5.
 
 ### 2.7 — 🟡 `ErrorBoundary` unique et tout en haut
 
@@ -477,11 +503,11 @@ de wrapper natif).
 
 ## 5. Ordre suggéré
 
-1. ~~**§2.1 RLS**~~ ✅ fait le 2026-08-30 (reste la vérif des tables secondaires).
-2. **§2.2 / §2.3 / §2.4** — bugs qui produisent des doublons ou des pertes
-   silencieuses.
+1. ~~**§2.1 RLS**~~ ✅ 2026-08-30 (chapitre clos, 32 tables en `rowsecurity`).
+2. ~~**§2.2 / §2.4 / §2.5 / §2.6**~~ ✅ 2026-08-30 (bloc client, voir §1.5).
+   Restent : le RPC atomique de §2.2 (besoin SQL) et §2.3.
 3. **§3.2 `useSupabaseQuery`** puis **§3.1 hisser les hooks non datés** — débloque
-   la perf et la gestion d'erreur pour tout le reste.
+   la perf et la gestion d'erreur (§2.3) pour tout le reste. ← **prochaine étape**
 4. Fonctionnalités **faciles** (F1, F2, F3, F6) — rapport valeur / effort élevé.
 5. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
 6. **M1 hors-ligne** quand on veut resserrer l'identité PWA.

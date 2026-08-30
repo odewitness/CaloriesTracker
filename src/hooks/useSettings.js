@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 
@@ -34,33 +34,52 @@ export function useSettings() {
   const [settings, setSettings] = useState(DEFAULTS)
   const [loading, setLoading] = useState(true)
 
+  // Dernier état connu, tenu à jour de façon synchrone : `update()` construit le
+  // prochain settings à partir de CETTE ref, pas de la valeur `settings` figée
+  // dans sa closure. Sans ça, deux update() rapprochés (ex. régler l'eau puis
+  // l'ordre des sections) partaient tous deux du même `settings` périmé et le
+  // 2ᵉ écrasait le 1ᵉ en réécrivant l'objet entier.
+  const settingsRef = useRef(settings)
+  const setSettingsSynced = useCallback((next) => {
+    settingsRef.current = next
+    setSettings(next)
+  }, [])
+
+  // Sérialise les écritures Supabase : un upsert ne part qu'une fois le
+  // précédent résolu, pour que l'ordre en base suive l'ordre des appels.
+  const writeChain = useRef(Promise.resolve())
+
   const load = useCallback(async () => {
-    if (!user) { setSettings(DEFAULTS); setLoading(false); return }
+    if (!user) { setSettingsSynced(DEFAULTS); setLoading(false); return }
     setLoading(true)
     const { data } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle()
     if (data) {
-      setSettings(withWater(data))
+      setSettingsSynced(withWater(data))
     } else {
       const { data: created } = await supabase
         .from('settings')
         .insert([{ ...DEFAULTS, user_id: user.id }])
         .select()
         .single()
-      setSettings(withWater(created || {}))
+      setSettingsSynced(withWater(created || {}))
     }
     setLoading(false)
-  }, [user])
+  }, [user, setSettingsSynced])
 
   useEffect(() => { load() }, [load])
 
-  const update = async (patch) => {
+  const update = useCallback(async (patch) => {
     if (!user) return
-    const next = { ...settings, ...patch }
-    setSettings(next)
-    await supabase
-      .from('settings')
-      .upsert({ ...next, user_id: user.id, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-  }
+    const next = { ...settingsRef.current, ...patch }
+    setSettingsSynced(next)
+    writeChain.current = writeChain.current
+      .then(() => supabase
+        .from('settings')
+        .upsert({ ...next, user_id: user.id, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }))
+      .then(({ error } = {}) => { if (error) console.error('useSettings.update error:', error) })
+      .catch((e) => console.error('useSettings.update error:', e))
+    return writeChain.current
+  }, [user, setSettingsSynced])
 
   return { settings, loading, update }
 }

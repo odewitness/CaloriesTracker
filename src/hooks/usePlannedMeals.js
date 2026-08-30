@@ -188,8 +188,24 @@ export async function deletePlannedMealSeries(recurrenceGroupId, userId) {
 // et son repas), puis marque le repas planifié comme mangé. On ne supprime
 // PAS la ligne repas_planifies : elle garde la trace de ce qui était prévu
 // ce jour-là (utile pour le point violet "planifié" une fois passé à vert).
+//
+// Non atomique (2 requêtes : insert journal, puis update `mange`). Garde
+// anti-doublon : on relit d'abord `mange` en base. Ça couvre le double-tap et
+// le cas où un précédent appel avait inséré les aliments mais échoué sur
+// l'update (réseau) — sans ça, un 2ᵉ « marquer mangé » réinsérait tout.
+// Le vrai correctif atomique (fonction SQL transactionnelle) reste à faire,
+// voir docs/analyse-et-roadmap.md §2.2.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function markAsEaten(repas, userId) {
+  const { data: fresh, error: checkError } = await supabase
+    .from('repas_planifies')
+    .select('mange')
+    .eq('id', repas.id)
+    .eq('user_id', userId)
+    .single()
+  if (checkError) return { error: checkError }
+  if (fresh?.mange) return { data: null, error: null, alreadyEaten: true }
+
   // `items` peut contenir des champs superflus selon leur origine (ex:
   // recette_id, id, created_at pour un item copié depuis recette_ingredients
   // via AddFromRecipeModal) — on ne garde QUE les colonnes valides sur

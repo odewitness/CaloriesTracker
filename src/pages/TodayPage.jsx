@@ -665,6 +665,23 @@ export default function TodayPage() {
 
   const wrapperRef = useRef(null)
 
+  // Largeur du viewport, suivie explicitement : elle sert à convertir le drag
+  // en % et à calculer les seuils de bascule. Lue en direct via
+  // window.innerWidth, elle restait figée après une rotation d'écran
+  // (tablette/desktop surtout) → slider mal positionné jusqu'au swipe suivant.
+  const [viewportW, setViewportW] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 0
+  )
+  useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+
   const onTouchStart = useCallback((e) => {
     // Si le geste démarre dans une bande qui défile horizontalement (ex. les
     // pastilles de nutriments de "À combler aujourd'hui"), on laisse ce
@@ -708,7 +725,7 @@ export default function TodayPage() {
     // dir = -1 (suivant) ou +1 (précédent)
     // 1. Animer jusqu'au slot voisin
     setAnimating(true)
-    setDragPx(dir * window.innerWidth)
+    setDragPx(dir * viewportW)
     setTimeout(() => {
       // 2. Changer la date ET couper la transition AVANT de reset dragPx
       //    → le slider se retrouve visuellement au même endroit grâce au recalcul
@@ -720,11 +737,11 @@ export default function TodayPage() {
       // 3. Ré-autoriser la transition au prochain frame
       requestAnimationFrame(() => { settled.current = false })
     }, 280)
-  }, [])
+  }, [viewportW])
 
   const onTouchEnd = useCallback(() => {
     if (!isHorizontal.current) return
-    const threshold = window.innerWidth * SWIPE_THRESHOLD
+    const threshold = viewportW * SWIPE_THRESHOLD
     if (dragPx < -threshold) {
       commitNav(-1)  // swipe gauche → jour suivant
     } else if (dragPx > threshold) {
@@ -737,7 +754,7 @@ export default function TodayPage() {
     }
     touchStartX.current = null
     isHorizontal.current = false
-  }, [dragPx, commitNav])
+  }, [dragPx, commitNav, viewportW])
 
   // navigate appelé depuis DateHeader
   // dir = -1 | 1 | 0 (0 = retour aujourd'hui)
@@ -751,7 +768,7 @@ export default function TodayPage() {
 
   // Position du slider : le slot central est à l'index 1 (0-based), donc offset -100%
   // On ajoute le drag en cours (converti en %)
-  const dragPct = (dragPx / window.innerWidth) * 100
+  const dragPct = viewportW ? (dragPx / viewportW) * 100 : 0
   // Le slider fait 300% de large ; chaque slot fait 33.333%
   // translateX du slider : quand dragPct=0, slot central centré → slider à -33.333%
   const sliderTranslate = -33.333 + dragPct / 3
@@ -763,7 +780,7 @@ export default function TodayPage() {
   // dépassé le seuil de bascule, on prévisualise déjà le jour voisin (seuil
   // identique à celui qui déclenchera réellement la navigation au relâchement).
   const previewDate = (() => {
-    const threshold = window.innerWidth * SWIPE_THRESHOLD
+    const threshold = viewportW * SWIPE_THRESHOLD
     if (dragPx < -threshold) return dateNext
     if (dragPx > threshold) return datePrev
     return date
