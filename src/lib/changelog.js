@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Le calendrier de régularité va de nouveau jusqu\'à aujourd\'hui',
+    description: "Sur les longues périodes, surtout en vue Année, le calendrier des couleurs se figeait en plein mois et les jours récents restaient blancs même quand tu avais bien loggé tes repas. C'était une limite de chargement qui coupait les données les plus récentes. C'est réparé : le calendrier, la série en cours et le record prennent maintenant en compte toutes tes journées.",
+  },
+  {
+    date: '2026-08-30',
     title: "L'Historique est rangé en onglets",
     description: "La page Historique devenait longue à faire défiler. Elle est maintenant découpée en onglets, sous le choix Semaine / Mois / Année : « Résumé » (ta courbe de calories, tes stats clés, le calendrier et le détail jour par jour), « Nutrition » (tes moyennes, le détail des vitamines et minéraux, la répartition par repas, ton profil par jour de semaine, tes aliments les plus fréquents), « Activité » (ton sport et tes pas) et « Cycle » (tes calories et ton poids selon ta phase). Les onglets Activité et Cycle n'apparaissent que si tu suis le sport ou ton cycle. Rien n'a disparu, tout est juste mieux rangé. Au passage, les barres du « profil par jour de semaine » qui restaient toutes minuscules sont réparées.",
   },

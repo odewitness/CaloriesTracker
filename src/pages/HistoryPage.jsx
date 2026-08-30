@@ -14,6 +14,7 @@ import NutrientPanel from '../components/NutrientPanel'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getPeriodBounds, shiftAnchor, dayStatus, eachDay } from '../lib/history'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
 import CalorieTrendChart from '../components/history/CalorieTrendChart'
@@ -87,16 +88,23 @@ export default function HistoryPage() {
     const load = async () => {
       if (!user) { setEntries([]); setPrevEntries([]); setLoading(false); return }
       setLoading(true)
-      const [cur, prev] = await Promise.all([
-        supabase.from('journal').select('*').eq('user_id', user.id)
-          .gte('date', bounds.start).lte('date', bounds.end).order('date', { ascending: true }),
-        supabase.from('journal').select('date, energie_kcal').eq('user_id', user.id)
-          .gte('date', prevBounds.start).lte('date', prevBounds.end),
-      ])
-      if (!cancelled) {
-        setEntries(cur.data || [])
-        setPrevEntries(prev.data || [])
-        setLoading(false)
+      try {
+        // Pagination obligatoire : sur la vue Année le journal dépasse le
+        // plafond PostgREST de 1000 lignes, sinon les jours récents manquent.
+        const [cur, prev] = await Promise.all([
+          fetchAllRows(() => supabase.from('journal').select('*').eq('user_id', user.id)
+            .gte('date', bounds.start).lte('date', bounds.end)
+            .order('date', { ascending: true }).order('id', { ascending: true })),
+          fetchAllRows(() => supabase.from('journal').select('date, energie_kcal').eq('user_id', user.id)
+            .gte('date', prevBounds.start).lte('date', prevBounds.end)
+            .order('date', { ascending: true }).order('id', { ascending: true })),
+        ])
+        if (!cancelled) { setEntries(cur); setPrevEntries(prev) }
+      } catch (e) {
+        console.error('HistoryPage: chargement du journal', e)
+        if (!cancelled) { setEntries([]); setPrevEntries([]) }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
     load()
@@ -120,8 +128,15 @@ export default function HistoryPage() {
     let cancelled = false
     const compute = async () => {
       if (!user) { setStreak(0); setRecordStreak(0); return }
-      const { data } = await supabase
-        .from('journal').select('date, energie_kcal').eq('user_id', user.id).gte('date', histFrom)
+      let data
+      try {
+        data = await fetchAllRows(() => supabase.from('journal')
+          .select('date, energie_kcal').eq('user_id', user.id)
+          .gte('date', histFrom).order('id', { ascending: true }))
+      } catch (e) {
+        console.error('HistoryPage: chargement série/record', e)
+        return
+      }
       if (cancelled) return
       const byDate = {}
       for (const e of (data || [])) byDate[e.date] = (byDate[e.date] || 0) + (e.energie_kcal || 0)
