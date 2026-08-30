@@ -26,16 +26,10 @@ import CyclePhaseBadge from '../components/CyclePhaseBadge'
 import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
-import { useCycle } from '../hooks/useCycle'
 import { useSport } from '../hooks/useSport'
-import { useMeasurements } from '../hooks/useMeasurements'
-import { useProfile } from '../hooks/useProfile'
-import { useSettings } from '../hooks/useSettings'
-import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
-import { useFavorites } from '../hooks/useFavorites'
 import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
-import { useFeed } from '../hooks/useFeed'
 import { saveMealTemplate } from '../hooks/useMealTemplates'
+import { TodayDataProvider, useTodayData } from '../lib/TodayDataContext'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
@@ -67,15 +61,20 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const isToday = dateStr === fmt(new Date())
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
-  const { days: cycleDays, intensiteByDate, symptomesByDate, toggleDay: toggleCycleDay, setDaysIntensite, setDaysSymptomes } = useCycle()
   const { activites: sportActivites, week: sportWeek, pasJour, setPas, add: addSport, update: updateSport, remove: removeSport } = useSport(dateStr)
-  const { entries: measurementEntries } = useMeasurements()
-  const { profile } = useProfile()
-  const { favorites } = useFavorites()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
-  const { settings, update: updateSettings } = useSettings()
-  const { foods: ciqualFoods } = useCiqualCatalog()
-  const { shareJournal, shareSport } = useFeed()
+
+  // Données non datées, montées une seule fois pour les 3 slots (voir
+  // TodayDataContext). Destructuration identique à l'ancien appel direct des
+  // hooks — seul l'endroit de l'appel change.
+  const { cycle, measurements, profile: profileQuery, favorites: favoritesQuery, settings: settingsQuery, ciqual, feed } = useTodayData()
+  const { days: cycleDays, intensiteByDate, symptomesByDate, toggleDay: toggleCycleDay, setDaysIntensite, setDaysSymptomes } = cycle
+  const { entries: measurementEntries } = measurements
+  const { profile } = profileQuery
+  const { favorites } = favoritesQuery
+  const { settings, update: updateSettings } = settingsQuery
+  const { foods: ciqualFoods } = ciqual
+  const { shareJournal, shareSport } = feed
   const [shareTarget, setShareTarget] = useState(null) // { meal: string|null, entries: [...] } | null
   const [shareSportTarget, setShareSportTarget] = useState(null) // { payload, title, subtitle } | null
   const [templateAddMeal, setTemplateAddMeal] = useState(null)    // nom du repas | null — ajout d'un repas type à ce repas
@@ -797,7 +796,7 @@ export default function TodayPage() {
   }, [setHeaderInfo])
 
   return (
-    <>
+    <TodayDataProvider>
       {/* Conteneur masquant les slots latéraux */}
       <div
         ref={wrapperRef}
@@ -877,6 +876,6 @@ export default function TodayPage() {
           />
         )
       )}
-    </>
+    </TodayDataProvider>
   )
 }

@@ -256,6 +256,20 @@ recours est « Recharger » (on perd la date consultée, la saisie en cours).
 
 ### 3.1 — `DaySlot` monte ~15 hooks de données, ×3 slots
 
+> 🟡 **En cours** sur la branche `refacto-today-data` (2026-08-30). Approche
+> retenue : un contexte `TodayDataProvider` (`src/lib/TodayDataContext.jsx`) qui
+> monte **une seule fois** les 7 hooks non datés (`useCycle`, `useMeasurements`,
+> `useProfile`, `useFavorites`, `useSettings`, `useCiqualCatalog`, `useFeed`) ;
+> `DaySlot` les lit via `useTodayData()`. Les hooks eux-mêmes ne sont pas
+> touchés (API, logique optimiste inchangées) — seul l'endroit de l'appel
+> change. Les hooks datés (`useJournal`, `useSport`, `useExcludedDay`,
+> `usePlannedMealsForDate`) restent dans `DaySlot`.
+>
+> Effet de bord assumé : les données non datées ne se rafraîchissent plus à
+> chaque swipe (elles se rafraîchissent au changement d'onglet, qui remonte
+> `TodayPage`). En échange, un changement de cycle / de réglage est désormais
+> visible instantanément sur les 3 slots. À valider en test manuel avant merge.
+
 `TodayPage` affiche toujours 3 jours (`datePrev`, `date`, `dateNext`). Chaque
 `DaySlot` appelle `useJournal`, `useCycle`, `useSport`, `useMeasurements`,
 `useProfile`, `useSettings`, `useCiqualCatalog`, `useFavorites`,
