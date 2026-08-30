@@ -20,6 +20,11 @@ export const SPORT_DEFAULTS = {
   objectif_hebdo_seances: 0,      // 0 = pas d'objectif en nombre de séances
   afficher_page_jour: true,
   afficher_calendrier: true,
+  // Palier 10 — pas quotidiens (carte intégrée au bloc « Activité ») :
+  afficher_pas: false,            // carte des pas sur la page du jour
+  objectif_pas_jour: 8000,        // 0 = pas d'objectif de pas
+  pas_seuil_baseline: 4000,       // pas déjà « inclus » dans le TDEE — on ne compte
+                                  // en énergie que les pas AU-DESSUS de ce seuil
   // Paliers 6/7 (pas branchés au Palier 1) :
   mode_energie: 'aucun',          // 'aucun' | 'bilan' | 'manger_selon_effort'
   depense_max_creditee_kcal: 400,
@@ -45,11 +50,13 @@ export function mergeSportSettings(raw) {
 export const SPORT_TYPES = [
   { key: 'course',   label: 'Course à pied',       emoji: '🏃', met: 9.0, distance: true },
   { key: 'marche',   label: 'Marche',              emoji: '🚶', met: 3.5, distance: true },
+  { key: 'tapis',    label: 'Tapis de marche',     emoji: '🚶', met: 3.5, distance: true },
   { key: 'velo',     label: 'Vélo',                emoji: '🚴', met: 7.0, distance: true },
   { key: 'natation', label: 'Natation',            emoji: '🏊', met: 7.0, distance: true },
   { key: 'rando',    label: 'Randonnée',           emoji: '🥾', met: 6.0, distance: true },
   { key: 'muscu',    label: 'Musculation',         emoji: '🏋️', met: 5.0, distance: false },
   { key: 'hiit',     label: 'Cardio / HIIT',       emoji: '🔥', met: 8.0, distance: false },
+  { key: 'pilates',  label: 'Pilates',             emoji: '🤸', met: 3.0, distance: false },
   { key: 'yoga',     label: 'Yoga / étirements',   emoji: '🧘', met: 3.0, distance: false },
   { key: 'danse',    label: 'Danse',               emoji: '💃', met: 5.0, distance: false },
   { key: 'sport_co', label: 'Sport co / raquette', emoji: '🏐', met: 7.0, distance: false },
@@ -57,6 +64,18 @@ export const SPORT_TYPES = [
 ]
 
 export const SPORT_TYPE_KEYS = SPORT_TYPES.map(t => t.key)
+
+// ── Pas quotidiens (Palier 10) ─────────────────────────────────────────────
+// Types qui génèrent des pas comptés par un téléphone / une montre : si un
+// total de pas est saisi pour le jour, leur énergie recoupe celle des pas.
+export const STEP_GENERATING_TYPES = ['marche', 'tapis', 'rando', 'course']
+// Types pré-cochés « déjà inclus dans mes pas » à la saisie (marche pure). La
+// rando (dénivelé) et la course (intensité) sont mal approchées par la formule
+// des pas → décochées par défaut, l'utilisatrice garde le dernier mot.
+const STEP_COVERED_BY_DEFAULT = ['marche', 'tapis']
+export function defaultCompteDansPas(type) {
+  return STEP_COVERED_BY_DEFAULT.includes(type)
+}
 
 export function sportType(key) {
   return SPORT_TYPES.find(t => t.key === key) || null
@@ -90,6 +109,50 @@ export function estimateKcal({ type, poidsKg, dureeMin, intensite } = {}) {
   if (!t || !w || w <= 0 || !d || d <= 0) return null
   const mult = SPORT_INTENSITES.find(i => i.key === intensite)?.mult ?? 1
   return Math.round((t.met * mult * 3.5 * w / 200) * d)
+}
+
+// ── Énergie des pas quotidiens (Palier 10) ────────────────────────────────
+// On NE crédite QUE les pas au-dessus d'un seuil « déjà dans le TDEE »
+// (pas_seuil_baseline, ~4000/j) : la marche incidente est déjà comptée dans
+// la dépense d'entretien via le multiplicateur `niveau_activite` — même esprit
+// que la soustraction `activityBakedIn` de `sportBaseFrom`. Coefficient
+// volontairement prudent (~marche nette, ±25 %). Renvoie null si on ne peut
+// pas estimer (pas de compteur, poids manquant), 0 si sous le seuil.
+const KCAL_PAR_PAS_PAR_KG = 0.0005
+export function stepKcal({ nbPas, poidsKg, seuil = 4000 } = {}) {
+  const n = Number(nbPas)
+  const w = Number(poidsKg)
+  if (!n || n <= 0 || !w || w <= 0) return null
+  const marginal = Math.max(0, n - (Number(seuil) || 0))
+  return Math.round(marginal * w * KCAL_PAR_PAS_PAR_KG)
+}
+
+// ── Énergie d'activité du jour, DÉDOUBLONNÉE (Palier 10) ───────────────────
+// Un seul nombre, consommé à la fois par le bilan (Palier 6) et par « manger
+// selon l'effort » (Palier 7). Règle anti-doublon : si un total de pas est
+// saisi pour le jour, les séances marquées `compte_dans_pas` (typiquement
+// marche / tapis) ne comptent PAS en plus — leur effort est déjà dans les pas.
+// Sans compteur de pas : comportement d'avant (toutes les séances comptent).
+//   activites : séances du jour (objets `activites_sport`)
+//   nbPas     : total de pas du jour, ou null
+//   ctx       : { poidsKg, seuil }
+export function dayActivityKcal(activites, nbPas, { poidsKg, seuil = 4000 } = {}) {
+  const hasSteps = Number(nbPas) > 0
+  const pas = hasSteps ? (stepKcal({ nbPas, poidsKg, seuil }) || 0) : 0
+  const seances = (activites || []).reduce((s, a) => {
+    if (hasSteps && a.compte_dans_pas) return s
+    return s + (Number(a.energie_kcal) || 0)
+  }, 0)
+  return {
+    total: Math.round(pas + seances),
+    pas: Math.round(pas),
+    seances: Math.round(seances),
+    hasSteps,
+    // séances écartées du total car déjà dans les pas (pour l'affichage)
+    seancesDansPas: hasSteps
+      ? (activites || []).filter(a => a.compte_dans_pas).reduce((s, a) => s + (Number(a.energie_kcal) || 0), 0)
+      : 0,
+  }
 }
 
 // ── Semaine (lundi → dimanche, convention FR) ──────────────────────────────
@@ -196,16 +259,20 @@ export function sportBaseFrom({ goalKcal, profile, weightKg } = {}) {
 }
 
 // Renvoie `settings` avec `goal_kcal` remplacé par l'objectif du jour (base
-// sédentaire + crédit des séances plafonné), + des champs `_sport*` de lecture.
+// sédentaire + crédit d'activité plafonné), + des champs `_sport*` de lecture.
 // `settings` inchangé si le mode n'est pas 'manger_selon_effort' ou si le
-// profil est incomplet. `ctx = { profile, weightKg, sportKcalToday }`.
+// profil est incomplet. `ctx = { profile, weightKg, activityKcalToday }` —
+// `activityKcalToday` = énergie d'activité du jour DÉJÀ dédoublonnée
+// (dayActivityKcal : pas + séances hors pas). `sportKcalToday` accepté en
+// repli pour la compat. Le plafond `cap` est PARTAGÉ pas + séances.
 export function sportAdjustedSettings(settings, ctx = {}) {
   const cfg = settings?.sport
   if (!cfg || cfg.mode_energie !== 'manger_selon_effort') return settings
   const b = sportBaseFrom({ goalKcal: settings.goal_kcal, profile: ctx.profile, weightKg: ctx.weightKg })
   if (!b) return settings
   const cap = Math.max(0, Number(cfg.depense_max_creditee_kcal) || 400)
-  const credit = Math.min(Math.max(0, Math.round(Number(ctx.sportKcalToday) || 0)), cap)
+  const activityKcal = ctx.activityKcalToday ?? ctx.sportKcalToday ?? 0
+  const credit = Math.min(Math.max(0, Math.round(Number(activityKcal) || 0)), cap)
   const dayGoal = b.base + credit
   return {
     ...settings,

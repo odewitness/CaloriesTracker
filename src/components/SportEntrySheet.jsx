@@ -5,6 +5,7 @@ import { useBackButton } from '../hooks/useBackButton'
 import { dateLabel } from '../lib/dates'
 import {
   SPORT_TYPES, SPORT_INTENSITES, sportType, estimateKcal, formatDuree,
+  STEP_GENERATING_TYPES, defaultCompteDansPas,
 } from '../lib/sport'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,6 +28,17 @@ export default function SportEntrySheet({ date, poidsKg, initial = null, onSave,
   const editing = !!initial
 
   const [type, setType] = useState(initial?.type || 'course')
+  // Palier 10 — « déjà compté dans mes pas du jour ». En création : suit le
+  // défaut du type (marche / tapis pré-cochés) tant que l'utilisatrice n'y a
+  // pas touché. En édition : valeur enregistrée.
+  const [compteDansPas, setCompteDansPas] = useState(
+    initial ? !!initial.compte_dans_pas : defaultCompteDansPas(initial?.type || 'course'),
+  )
+  const [flagTouched, setFlagTouched] = useState(!!initial)
+  const handleType = (key) => {
+    setType(key)
+    if (!flagTouched) setCompteDansPas(defaultCompteDansPas(key))
+  }
   const [dureeText, setDureeText] = useState(initial?.duree_min != null ? String(initial.duree_min) : '')
   const [distText, setDistText] = useState(initial?.distance_km != null ? String(initial.distance_km) : '')
   const [intensite, setIntensite] = useState(initial?.intensite || null)
@@ -61,6 +73,7 @@ export default function SportEntrySheet({ date, poidsKg, initial = null, onSave,
       intensite: intensite || null,
       heure_debut: heure || null,
       energie_kcal: kcal,
+      compte_dans_pas: STEP_GENERATING_TYPES.includes(type) ? compteDansPas : false,
       notes: notes.trim() || null,
       source: initial?.source || 'manuel',
     }
@@ -87,7 +100,7 @@ export default function SportEntrySheet({ date, poidsKg, initial = null, onSave,
           {SPORT_TYPES.map((s) => (
             <button
               key={s.key}
-              onClick={() => setType(s.key)}
+              onClick={() => handleType(s.key)}
               className="chip"
               style={s.key === type
                 ? { background: 'var(--green)', color: 'white' }
@@ -200,6 +213,36 @@ export default function SportEntrySheet({ date, poidsKg, initial = null, onSave,
           Estimation à partir du type, de la durée et de ton poids — approximative
           (±20 %). Tu peux la corriger. Sans effet sur tes objectifs de calories.
         </div>
+
+        {/* ── Déjà compté dans les pas du jour (types qui génèrent des pas) ── */}
+        {STEP_GENERATING_TYPES.includes(type) && (
+          <>
+            <button
+              onClick={() => { setCompteDansPas(v => !v); setFlagTouched(true) }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                padding: '10px 12px', borderRadius: 10, background: 'var(--gray-bg)',
+                textAlign: 'left', fontFamily: 'var(--font)', marginBottom: 6,
+              }}
+            >
+              <span style={{
+                width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                border: `2px solid ${compteDansPas ? 'var(--green)' : 'var(--border)'}`,
+                background: compteDansPas ? 'var(--green)' : 'transparent',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 900,
+              }}>
+                {compteDansPas ? '✓' : ''}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Déjà compté dans mes pas du jour</span>
+            </button>
+            <div style={{ fontSize: 10.5, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
+              Coché : si tu renseignes un total de pas ce jour-là, cette séance ne
+              sera pas comptée en plus dans le bilan (pas de doublon). Décoche-la
+              si tu n'avais pas ton téléphone sur toi.
+            </div>
+          </>
+        )}
 
         {/* ── Notes ── */}
         <SheetLabel>Notes <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--text-hint)' }}>· facultatif</span></SheetLabel>

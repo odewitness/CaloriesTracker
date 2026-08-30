@@ -26,6 +26,11 @@
 -- commentaires_sport) — fil social du sport, Palier 8, RLS calquée à
 -- l'identique sur partages_journal & co. (fonction is_friend_with). Voir
 -- supabase/sql/partages_sport_setup.sql.
+-- Complété le 2026-08-30 : table 32 (pas_jour) + colonne
+-- activites_sport.compte_dans_pas + clés settings.sport (afficher_pas,
+-- objectif_pas_jour, pas_seuil_baseline) — chantier « Suivi de l'activité
+-- sportive » Palier 10 (pas quotidiens). Voir supabase/sql/pas_jour_setup.sql
+-- et docs/suivi-sport.md. Pas encore confirmé appliqué en base.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -261,9 +266,11 @@ create table if not exists settings (
   --   afficher_page_jour, afficher_calendrier, mode_energie
   --   ('aucun'|'bilan'|'manger_selon_effort' — sans effet sur les cibles au
   --   Palier 1), depense_max_creditee_kcal, rappels {enabled, jours, heure},
-  --   strava {connected, athlete_nom, derniere_synchro, auto} }. Fusionné côté
+  --   strava {connected, athlete_nom, derniere_synchro, auto},
+  --   afficher_pas, objectif_pas_jour, pas_seuil_baseline (Palier 10, pas
+  --   quotidiens — voir supabase/sql/pas_jour_setup.sql) }. Fusionné côté
   -- client avec SPORT_DEFAULTS (src/lib/sport.js). Défaut = suivi désactivé.
-  sport jsonb not null default '{"enabled":false,"objectif_hebdo_minutes":150,"objectif_hebdo_seances":0,"afficher_page_jour":true,"afficher_calendrier":true,"mode_energie":"aucun","depense_max_creditee_kcal":400,"rappels":{"enabled":false,"jours":[],"heure":18},"strava":{"connected":false,"athlete_nom":null,"derniere_synchro":null,"auto":true}}'
+  sport jsonb not null default '{"enabled":false,"objectif_hebdo_minutes":150,"objectif_hebdo_seances":0,"afficher_page_jour":true,"afficher_calendrier":true,"afficher_pas":false,"objectif_pas_jour":8000,"pas_seuil_baseline":4000,"mode_energie":"aucun","depense_max_creditee_kcal":400,"rappels":{"enabled":false,"jours":[],"heure":18},"strava":{"connected":false,"athlete_nom":null,"derniere_synchro":null,"auto":true}}'
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
@@ -857,7 +864,7 @@ create table if not exists activites_sport (
   user_id uuid not null references auth.users(id),
   date date not null,
   heure_debut time,
-  type text not null, -- clé de SPORT_TYPES (src/lib/sport.js) : 'course' | 'marche' | 'velo' | 'natation' | 'rando' | 'muscu' | 'hiit' | 'yoga' | 'danse' | 'sport_co' | 'autre'
+  type text not null, -- clé de SPORT_TYPES (src/lib/sport.js) : 'course' | 'marche' | 'tapis' | 'velo' | 'natation' | 'rando' | 'muscu' | 'hiit' | 'pilates' | 'yoga' | 'danse' | 'sport_co' | 'autre'
   duree_min numeric not null,
   distance_km numeric,
   intensite text, -- 'faible' | 'moderee' | 'elevee' (nullable)
@@ -867,6 +874,7 @@ create table if not exists activites_sport (
   source text not null default 'manuel', -- 'manuel' | 'strava'
   source_id text, -- id externe (nullable), pour la déduplication des imports
   modifie_manuellement boolean not null default false,
+  compte_dans_pas boolean not null default false, -- Palier 10 : séance déjà incluse dans le total de pas du jour → pas recomptée en énergie (anti-doublon). Voir supabase/sql/pas_jour_setup.sql
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -926,6 +934,22 @@ create table if not exists commentaires_sport (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_commentaires_sport_partage on commentaires_sport (partage_id);
+
+-- 32. TABLE PAS_JOUR (total de pas d'une journée — chantier « Suivi de
+-- l'activité sportive », Palier 10, voir supabase/sql/pas_jour_setup.sql et
+-- docs/suivi-sport.md — écrit le 2026-08-30, pas encore confirmé appliqué en
+-- base). UNE LIGNE = UN JOUR, saisie manuelle. App à deux comptes → RLS
+-- « own » stricte, comme activites_sport.
+create table if not exists pas_jour (
+  user_id uuid not null references auth.users(id),
+  date date not null,
+  nb_pas integer not null,
+  source text not null default 'manuel', -- 'manuel' | (import plus tard)
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, date)
+);
+create index if not exists idx_pas_jour_user_date on pas_jour (user_id, date desc);
 
 -- =============================================
 -- RLS
@@ -1021,6 +1045,12 @@ alter table activites_sport enable row level security;
 alter table partages_sport enable row level security;
 alter table reactions_sport enable row level security;
 alter table commentaires_sport enable row level security;
+
+-- RLS activé sur pas_jour dès sa création (2026-08-30, Palier 10), policies
+-- select/insert/update/delete "own" (auth.uid() = user_id) — voir
+-- supabase/sql/pas_jour_setup.sql. La policy update sert au ré-enregistrement
+-- du total d'un jour (upsert on conflict user_id,date).
+alter table pas_jour enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)
