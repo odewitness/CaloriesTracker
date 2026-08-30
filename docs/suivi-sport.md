@@ -3,10 +3,9 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-08-30.
 
-**État au 2026-08-30 :** Paliers 1–4, 6, 7 déployés. Palier 8 (social) codé sur
-`suivi-sport-p8` (migration `partages_sport_setup.sql` à appliquer). Palier 5
-(Strava) abandonné. Palier 9 (rappels push) en attente — demande un déploiement
-Edge Function + cron Supabase (friction équivalente à Strava).
+**État au 2026-08-30 : chantier terminé.** Paliers 1–4, 6, 7, 8 livrés et
+déployés. Palier 5 (Strava) et Palier 9 (rappels push) abandonnés — friction
+d'infra Supabase jugée non rentable par l'utilisatrice.
 
 ---
 
@@ -436,15 +435,11 @@ Policies RLS du fil social fournies par l'utilisatrice le 2026-08-30
       depuis `TodayPage`.
 - [x] Entrée changelog (2026-08-30 « Partage tes séances avec tes amies »)
 
-### Palier 9 — Rappels push (option) ▸ statut : EN ATTENTE (friction infra)
-Rappel « tu n'as pas bougé aujourd'hui » / « objectif hebdo à X min ».
-**Coût :** nouvelle Edge Function `sport-reminder` (sur le modèle de
-`supabase/functions/water-reminder`) + Cron Job Supabase + colonne
-`settings.sport_last_reminder_at` (migration) — c'est-à-dire **le même type de
-mise en place manuelle côté Supabase que Strava**, que l'utilisatrice a écartée.
-Côté client (léger) : réglages `rappels` dans Profil › Sport.
-- [ ] À faire seulement si l'utilisatrice veut assumer le déploiement Edge
-      Function + cron.
+### Palier 9 — Rappels push ▸ statut : ABANDONNÉ (2026-08-30)
+Décision utilisatrice : « pas besoin de rappel de sport ». Aurait demandé une
+Edge Function `sport-reminder` + cron + migration — même friction que Strava.
+Le bloc `settings.sport.rappels` reste dans `SPORT_DEFAULTS` (inutilisé,
+inoffensif) au cas où.
 
 ---
 
@@ -452,13 +447,14 @@ Côté client (léger) : réglages `rappels` dans Profil › Sport.
 
 - Palier 1 : mergé dans `main` en local (SQL `sport_setup.sql` appliqué par
   l'utilisatrice, testé). Reste : `git push` vers `main` (à confirmer).
-- Paliers 1 → 4, 6, 7 : mergés + poussés sur `main` (déployés Netlify).
-- **Palier 5 (Strava) : abandonné.**
-- **Palier 8 (social)** : codé sur `suivi-sport-p8`. Migration
-  `partages_sport_setup.sql` à appliquer par l'utilisatrice. Reste : test
-  manuel, merge + push.
-- **Palier 9 (rappels push)** : en attente — demande un déploiement Edge Function
-  + cron Supabase (friction équivalente à Strava). À faire sur demande.
+**Chantier terminé (2026-08-30).** Paliers 1–4, 6, 7, 8 mergés + poussés sur
+`main` (déployés Netlify). Migrations à appliquer manuellement dans Supabase :
+`sport_setup.sql` (P1) et `partages_sport_setup.sql` (P8).
+
+- **Palier 5 (Strava) : abandonné** (friction infra).
+- **Palier 9 (rappels push) : abandonné** (« pas besoin de rappel de sport »).
+
+Toute nouvelle idée s'ajoute ici.
 
 ---
 
@@ -494,6 +490,10 @@ Côté client (léger) : réglages `rappels` dans Profil › Sport.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — Palier 8 mergé + poussé (SQL `partages_sport_setup.sql`
+  appliqué + testé). **Palier 9 (rappels push) abandonné** (« pas besoin de
+  rappel de sport »). **Chantier terminé** : Paliers 1–4, 6, 7, 8 livrés ;
+  5 et 9 abandonnés.
 - **2026-08-30** — Palier 8 (social) débloqué : l'utilisatrice a fourni le
   `pg_policies` du trio `journal`. Migration `partages_sport_setup.sql` (RLS
   répliquée à l'identique, `is_friend_with`), + mirroring complet (`useFeed`,
