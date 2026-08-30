@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Calendar, CalendarDays, Plus, Pill, CalendarClock, X } from 'lucide-react'
 import CalendarMonthGrid from '../components/CalendarMonthGrid'
 import CalendarWeekStrip from '../components/CalendarWeekStrip'
@@ -9,6 +10,7 @@ import { useJournalRange } from '../hooks/useJournalRange'
 import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
+import { useRequestTodayDate } from '../lib/TodayHeaderContext'
 import { useCycle } from '../hooks/useCycle'
 import { useSportRange } from '../hooks/useSport'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
@@ -41,6 +43,16 @@ export default function CalendarPage() {
   const [showSeries, setShowSeries] = useState(false)
   const [showPlanChoice, setShowPlanChoice] = useState(false)
   const { settings } = useSettings()
+  const navigate = useNavigate()
+  const { setRequestedDate } = useRequestTodayDate()
+
+  // « Ouvrir cette journée » : mémorise la date puis bascule sur la page du
+  // jour. Naviguer vers /today sans backgroundLocation démonte l'overlay
+  // calendrier ; TodayPage lit `requestedDate` à son (re)montage.
+  const openDayInToday = useCallback(() => {
+    setRequestedDate(fmt(selectedDate))
+    navigate('/today')
+  }, [navigate, selectedDate, setRequestedDate])
 
   // Plage chargée = mois affiché élargi de quelques jours de padding (les
   // cases hors-mois visibles dans la grille), suffisant aussi pour la vue
@@ -242,7 +254,12 @@ export default function CalendarPage() {
         )}
       </div>
 
-      <DayRecapPanel date={selectedDate} onPlannedChange={refetchAll} onExcludedChange={refetchExcluded} />
+      <DayRecapPanel
+        date={selectedDate}
+        onPlannedChange={refetchAll}
+        onExcludedChange={refetchExcluded}
+        onOpenDay={openDayInToday}
+      />
 
       {planModal && (
         <PlanMealModal

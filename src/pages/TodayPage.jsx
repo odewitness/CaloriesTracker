@@ -43,12 +43,18 @@ import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/
 import { sportAdjustedSettings, dayActivityKcal, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { fmt, dateLabel } from '../lib/dates'
-import { useSetTodayHeaderInfo, useTodayShortcuts } from '../lib/TodayHeaderContext'
+import { useSetTodayHeaderInfo, useTodayShortcuts, useRequestTodayDate } from '../lib/TodayHeaderContext'
 
 function dateOffset(base, days) {
   const d = new Date(base)
   d.setDate(d.getDate() + days)
   return d
+}
+
+// 'YYYY-MM-DD' → Date locale (midi, pour éviter tout souci de fuseau).
+function parseYmdLocal(s) {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d, 12, 0, 0, 0)
 }
 
 // ── Contenu d'un slot jour ─────────────────────────────────────────────────
@@ -544,7 +550,16 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
 
 // ── Page principale ────────────────────────────────────────────────────────
 export default function TodayPage() {
-  const [date, setDate] = useState(new Date())
+  // `requestedDate` : posée par le calendrier (« Ouvrir cette journée ») avant
+  // de naviguer ici. Lue à l'init pour éviter un flash « aujourd'hui », puis
+  // consommée (effet ci-dessous) au cas où elle arrive après le montage.
+  const { requestedDate, setRequestedDate } = useRequestTodayDate()
+  const [date, setDate] = useState(() => (requestedDate ? parseYmdLocal(requestedDate) : new Date()))
+  useEffect(() => {
+    if (!requestedDate) return
+    setDate(parseYmdLocal(requestedDate))
+    setRequestedDate(null)
+  }, [requestedDate, setRequestedDate])
   // modal = { meal, addEntry } | null
   const [modal, setModal] = useState(null)
   const [detailEntry, setDetailEntry] = useState(null)
