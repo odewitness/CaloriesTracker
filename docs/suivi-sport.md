@@ -3,6 +3,11 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-08-30.
 
+**État au 2026-08-30 : cœur du chantier livré et déployé** (Paliers 1–4, 6, 7).
+Palier 5 (Strava) abandonné. Paliers 8 (social) et 9 (rappels push) en attente —
+chacun bloqué sur une étape côté Supabase que l'utilisatrice doit fournir /
+faire (voir §6). Le chantier est fonctionnellement complet sans eux.
+
 ---
 
 ## 1. Objectif et périmètre
@@ -404,16 +409,33 @@ où un import (texte, autre) arriverait plus tard.
       désactivable en un geste, jour-page uniquement.
 - [x] Entrée changelog (2026-08-30 « Manger selon l'effort (nouvelle option) »)
 
-### Palier 8 — Social (option) ▸ statut : non tranché
-- [ ] Tables `partages_sport` / `reactions_sport` / `commentaires_sport`
-- [ ] Partage d'une séance ou d'un résumé de semaine
-- [ ] Entrée changelog
+### Palier 8 — Social (option) ▸ statut : EN ATTENTE (bloqué)
+Partager une séance dans le fil (réactions + commentaires), en miroir du type
+`journal` (voir `useFeed.js`, `SocialPage.jsx`, `JournalPartageCard.jsx`).
+**Bloqueur :** les tables du fil social ont des policies RLS de visibilité
+« auteure ou amie acceptée » **non reproduites dans le repo**
+(`supabase_schema.sql` le dit explicitement). Créer `partages_sport` /
+`reactions_sport` / `commentaires_sport` avec une policy *devinée* ferait courir
+un risque de fuite de données perso entre comptes. → À débloquer :
+l'utilisatrice exécute dans Supabase
+`select tablename, policyname, cmd, qual, with_check from pg_policies where tablename in ('partages_journal','reactions_journal','commentaires_journal');`
+et colle le résultat ; on réplique à l'identique pour les tables `_sport`.
+Ensuite : migration + mirroring `useFeed` (maps `*_TABLE`, `shareSport`,
+`deletePartage`, `toggleReaction`), `SocialPage` (`FilTab`, conteneur détail,
+switch `selected._type`), `SportPartageCard`, `SportPartageDetailModal`,
+`useSportPartageDetail`, point d'entrée « Partager » sur `SportSection` /
+`SportEntrySheet`, + `useSocialNotifications` (agrégation cross-tables).
+Changelog. **Gros palier même une fois débloqué.**
 
-### Palier 9 — Rappels push (option) ▸ statut : non tranché
-- [ ] Rappel « tu n'as pas bougé aujourd'hui » / « objectif hebdo à X min » via
-      `push_subscriptions` + Edge Function cron existante
-- [ ] Réglage dans Profil › Sport (`rappels`)
-- [ ] Entrée changelog
+### Palier 9 — Rappels push (option) ▸ statut : EN ATTENTE (friction infra)
+Rappel « tu n'as pas bougé aujourd'hui » / « objectif hebdo à X min ».
+**Coût :** nouvelle Edge Function `sport-reminder` (sur le modèle de
+`supabase/functions/water-reminder`) + Cron Job Supabase + colonne
+`settings.sport_last_reminder_at` (migration) — c'est-à-dire **le même type de
+mise en place manuelle côté Supabase que Strava**, que l'utilisatrice a écartée.
+Côté client (léger) : réglages `rappels` dans Profil › Sport.
+- [ ] À faire seulement si l'utilisatrice veut assumer le déploiement Edge
+      Function + cron.
 
 ---
 
@@ -421,11 +443,15 @@ où un import (texte, autre) arriverait plus tard.
 
 - Palier 1 : mergé dans `main` en local (SQL `sport_setup.sql` appliqué par
   l'utilisatrice, testé). Reste : `git push` vers `main` (à confirmer).
-- Paliers 1 → 4 : mergés + poussés sur `main` (déployés Netlify).
+- Paliers 1 → 4, 6, 7 : mergés + poussés sur `main` (déployés Netlify). **Cœur
+  du chantier terminé.**
 - **Palier 5 (Strava) : abandonné.**
-- Paliers 6 & 7 : codés ensemble sur la branche `suivi-sport-p6`. Aucune
-  migration. Reste : test manuel, merge + push après confirmation.
-- Paliers 8 & 9 (social, rappels push) non tranchés.
+- **Palier 8 (social)** : en attente — bloqué sur les policies RLS du fil social,
+  à extraire de Supabase par l'utilisatrice (voir §6). Gros palier ensuite.
+- **Palier 9 (rappels push)** : en attente — demande un déploiement Edge Function
+  + cron Supabase (friction équivalente à Strava). À faire sur demande.
+
+Rien d'autre de prévu. Le chantier est fonctionnellement complet en l'état.
 
 ---
 
@@ -461,6 +487,12 @@ où un import (texte, autre) arriverait plus tard.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — Paliers 6 & 7 mergés + poussés sur `main`. **Cœur du chantier
+  terminé** (1–4, 6, 7). Palier 8 (social) mis en attente : impossible d'écrire
+  une migration RLS sûre sans les policies réelles du fil social (non versionnées)
+  — à débloquer par un `pg_policies` collé par l'utilisatrice. Palier 9 (rappels
+  push) mis en attente : demande un déploiement Edge Function + cron, même
+  friction que Strava. Le chantier est livrable en l'état.
 - **2026-08-30** — Palier 7 (« manger selon l'effort ») codé avec le Palier 6
   sur `suivi-sport-p6`. Modèle retenu : `base = goal_kcal − (TDEE_actuel −
   TDEE_sédentaire)` planché à `max(1200, BMR)`, `+ min(kcal séances du jour,
