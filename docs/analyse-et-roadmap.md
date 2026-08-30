@@ -256,19 +256,24 @@ recours est « Recharger » (on perd la date consultée, la saisie en cours).
 
 ### 3.1 — `DaySlot` monte ~15 hooks de données, ×3 slots
 
-> 🟡 **En cours** sur la branche `refacto-today-data` (2026-08-30). Approche
-> retenue : un contexte `TodayDataProvider` (`src/lib/TodayDataContext.jsx`) qui
-> monte **une seule fois** les 7 hooks non datés (`useCycle`, `useMeasurements`,
-> `useProfile`, `useFavorites`, `useSettings`, `useCiqualCatalog`, `useFeed`) ;
-> `DaySlot` les lit via `useTodayData()`. Les hooks eux-mêmes ne sont pas
-> touchés (API, logique optimiste inchangées) — seul l'endroit de l'appel
-> change. Les hooks datés (`useJournal`, `useSport`, `useExcludedDay`,
-> `usePlannedMealsForDate`) restent dans `DaySlot`.
+> ✅ **Fait le 2026-08-30** (branche `refacto-today-data`, mergée sur `main`,
+> validée en test manuel). Un contexte `TodayDataProvider`
+> (`src/lib/TodayDataContext.jsx`) monte **une seule fois** les 7 hooks non
+> datés (`useCycle`, `useMeasurements`, `useProfile`, `useFavorites`,
+> `useSettings`, `useCiqualCatalog`, `useFeed`) ; `DaySlot` les lit via
+> `useTodayData()`. Les hooks eux-mêmes sont inchangés (API, logique optimiste)
+> — seul l'endroit de l'appel change. Les hooks datés (`useJournal`, `useSport`,
+> `useExcludedDay`, `usePlannedMealsForDate`) restent dans `DaySlot`.
 >
 > Effet de bord assumé : les données non datées ne se rafraîchissent plus à
 > chaque swipe (elles se rafraîchissent au changement d'onglet, qui remonte
 > `TodayPage`). En échange, un changement de cycle / de réglage est désormais
-> visible instantanément sur les 3 slots. À valider en test manuel avant merge.
+> visible instantanément sur les 3 slots.
+>
+> Reste ouvert : `useFeed` est encore monté en entier (partages + réactions +
+> commentaires) alors que `DaySlot` n'en utilise que `shareJournal` /
+> `shareSport` — on pourrait ne garder que les fonctions de partage sans
+> déclencher le `load()` du fil. Marginal.
 
 `TodayPage` affiche toujours 3 jours (`datePrev`, `date`, `dateNext`). Chaque
 `DaySlot` appelle `useJournal`, `useCycle`, `useSport`, `useMeasurements`,
@@ -520,9 +525,11 @@ de wrapper natif).
 1. ~~**§2.1 RLS**~~ ✅ 2026-08-30 (chapitre clos, 32 tables en `rowsecurity`).
 2. ~~**§2.2 / §2.4 / §2.5 / §2.6**~~ ✅ 2026-08-30 (bloc client, voir §1.5).
    Restent : le RPC atomique de §2.2 (besoin SQL) et §2.3.
-3. **§3.2 `useSupabaseQuery`** puis **§3.1 hisser les hooks non datés** — débloque
-   la perf et la gestion d'erreur (§2.3) pour tout le reste. ← **prochaine étape**
-4. Fonctionnalités **faciles** (F1, F2, F3, F6) — rapport valeur / effort élevé.
-5. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
-6. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
-7. Le reste selon l'envie.
+3. ~~**§3.1 hisser les hooks non datés**~~ ✅ 2026-08-30 (via `TodayDataContext`).
+4. **§2.3** (gestion d'erreur réseau) + **§3.2** (`useSupabaseQuery`) — à faire
+   ensemble, plus tard, sur branche dédiée. Pas bloquant.
+5. Fonctionnalités **faciles** (F1, F2, F3, F6) — rapport valeur / effort élevé.
+   ← **prochaine étape conseillée**
+6. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
+7. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
+8. Le reste selon l'envie.
