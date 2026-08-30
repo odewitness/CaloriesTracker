@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Dumbbell, Trash2 } from 'lucide-react'
+import { Dumbbell, Trash2, Share2 } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { dateLabel } from '../lib/dates'
 import {
@@ -19,9 +19,10 @@ import {
 //   initial   — séance existante à modifier, ou null pour un ajout
 //   onSave(payload)  — insert (ajout) ou patch (édition, mêmes champs)
 //   onDelete(id)     — seulement en édition
+//   onShare(activite) — seulement en édition : partager cette séance sur le fil
 //   onClose()
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SportEntrySheet({ date, poidsKg, initial = null, onSave, onDelete, onClose }) {
+export default function SportEntrySheet({ date, poidsKg, initial = null, onSave, onDelete, onShare, onClose }) {
   useBackButton(onClose)
   const editing = !!initial
 
@@ -214,6 +215,15 @@ export default function SportEntrySheet({ date, poidsKg, initial = null, onSave,
           {editing ? 'Enregistrer' : 'Ajouter la séance'}
         </button>
 
+        {editing && onShare && (
+          <button
+            onClick={() => onShare(initial)}
+            className="btn-ghost"
+            style={{ width: '100%', textAlign: 'center', marginTop: 8, color: 'var(--green)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}
+          >
+            <Share2 size={15} /> Partager avec mes amies
+          </button>
+        )}
         {editing && (
           <button
             onClick={() => onDelete(initial.id)}

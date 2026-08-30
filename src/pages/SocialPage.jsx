@@ -5,6 +5,7 @@ import { useFriends } from '../hooks/useFriends'
 import { useFeed } from '../hooks/useFeed'
 import { usePartageDetail } from '../hooks/usePartageDetail'
 import { useJournalPartageDetail } from '../hooks/useJournalPartageDetail'
+import { useSportPartageDetail } from '../hooks/useSportPartageDetail'
 import { saveRecette } from '../hooks/useRecipes'
 import { scaleFood } from '../lib/nutrients'
 import { supabase } from '../lib/supabase'
@@ -16,6 +17,8 @@ import PartageCard from '../components/PartageCard'
 import PartageDetailModal from '../components/PartageDetailModal'
 import JournalPartageCard from '../components/JournalPartageCard'
 import JournalPartageDetailModal from '../components/JournalPartageDetailModal'
+import SportPartageCard from '../components/SportPartageCard'
+import SportPartageDetailModal from '../components/SportPartageDetailModal'
 import ReactionBar from '../components/ReactionBar'
 import CommentsList from '../components/CommentsList'
 
@@ -342,6 +345,27 @@ function JournalPartageDetailContainer({ partageId, onClose, onDeleted, deletePa
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SportPartageDetailContainer — charge un partage de sport (séance / semaine)
+// ─────────────────────────────────────────────────────────────────────────────
+function SportPartageDetailContainer({ partageId, onClose, onDeleted, deletePartage }) {
+  const { user } = useAuth()
+  const { partage, reactions, comments, loading, toggleReaction, addComment, deleteComment } = useSportPartageDetail(partageId)
+  const isOwn = partage?.auteur_id === user.id
+
+  return (
+    <SportPartageDetailModal
+      partage={partage}
+      loading={loading}
+      isOwn={isOwn}
+      onDelete={async () => { await deletePartage({ id: partageId, _type: 'sport' }); onDeleted() }}
+      onClose={onClose}
+      reactionsSlot={partage && <ReactionBar reactions={reactions} userId={user.id} onToggle={toggleReaction} />}
+      commentsSlot={partage && <CommentsList comments={comments} userId={user.id} onAdd={addComment} onDelete={deleteComment} />}
+    />
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FilTab — liste des recettes partagées par soi-même et ses amies. Reçoit les
 // données de useFeed() en props (chargées une seule fois au niveau
 // SocialPage) pour que l'onglet Activité puisse ouvrir le même détail sans
@@ -357,38 +381,27 @@ function FilTab({ partages, reactionsByPartage, commentCounts, loading, onDelete
       <EmptyState
         icon={<UtensilsCrossed size={40} />}
         title="Ton fil est vide"
-        description="Partage une recette (menu ⋮) ou une journée/un repas (icône de partage) pour que tes amies les voient ici."
+        description="Partage une recette (menu ⋮), une journée/un repas ou une séance de sport pour que tes amies les voient ici."
       />
     )
   }
 
-  return partages.map(p => (
-    p._type === 'recette' ? (
-      <PartageCard
-        key={p.id}
-        partage={p}
-        isOwn={p.auteur_id === user.id}
-        reactions={reactionsByPartage[p.id] || []}
-        userId={user.id}
-        onToggleReaction={toggleReaction}
-        commentCount={commentCounts[p.id] || 0}
-        onOpen={onOpen}
-        onDelete={onDelete}
-      />
-    ) : (
-      <JournalPartageCard
-        key={p.id}
-        partage={p}
-        isOwn={p.auteur_id === user.id}
-        reactions={reactionsByPartage[p.id] || []}
-        userId={user.id}
-        onToggleReaction={toggleReaction}
-        commentCount={commentCounts[p.id] || 0}
-        onOpen={onOpen}
-        onDelete={onDelete}
-      />
-    )
-  ))
+  return partages.map(p => {
+    const common = {
+      key: p.id,
+      partage: p,
+      isOwn: p.auteur_id === user.id,
+      reactions: reactionsByPartage[p.id] || [],
+      userId: user.id,
+      onToggleReaction: toggleReaction,
+      commentCount: commentCounts[p.id] || 0,
+      onOpen,
+      onDelete,
+    }
+    if (p._type === 'recette') return <PartageCard {...common} />
+    if (p._type === 'sport') return <SportPartageCard {...common} />
+    return <JournalPartageCard {...common} />
+  })
 }
 
 const NOTIF_ICON = { reaction: null, comment: <MessageCircle size={14} />, reply: <MessageCircle size={14} /> }
@@ -531,6 +544,14 @@ export default function SocialPage({ hasUnseenActivity, activityItems, activityL
       )}
       {selected?._type === 'journal' && (
         <JournalPartageDetailContainer
+          partageId={selected.id}
+          deletePartage={deletePartage}
+          onClose={() => setSelected(null)}
+          onDeleted={() => { setSelected(null); toast('Partage retiré') }}
+        />
+      )}
+      {selected?._type === 'sport' && (
+        <SportPartageDetailContainer
           partageId={selected.id}
           deletePartage={deletePartage}
           onClose={() => setSelected(null)}

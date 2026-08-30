@@ -3,9 +3,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { computeTotals } from '../lib/nutrients'
 
-const REACTION_TABLE = { recette: 'reactions_partages', journal: 'reactions_journal' }
-const COMMENT_TABLE = { recette: 'commentaires_partages', journal: 'commentaires_journal' }
-const POST_TABLE = { recette: 'partages_recettes', journal: 'partages_journal' }
+const REACTION_TABLE = { recette: 'reactions_partages', journal: 'reactions_journal', sport: 'reactions_sport' }
+const COMMENT_TABLE = { recette: 'commentaires_partages', journal: 'commentaires_journal', sport: 'commentaires_sport' }
+const POST_TABLE = { recette: 'partages_recettes', journal: 'partages_journal', sport: 'partages_sport' }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useFeed — fil des partages (recettes + journées/repas), déjà filtré côté
@@ -25,40 +25,45 @@ export function useFeed() {
   const load = useCallback(async () => {
     if (!user) { setPartages([]); setReactionsByPartage({}); setCommentCounts({}); setLoading(false); return }
     setLoading(true)
-    const [{ data: recettes }, { data: journal }] = await Promise.all([
+    const [{ data: recettes }, { data: journal }, { data: sport }] = await Promise.all([
       supabase.from('partages_recettes').select('*'),
       supabase.from('partages_journal').select('*'),
+      supabase.from('partages_sport').select('*'),
     ])
     const rows = [
       ...(recettes || []).map(p => ({ ...p, _type: 'recette' })),
       ...(journal || []).map(p => ({ ...p, _type: 'journal' })),
+      ...(sport || []).map(p => ({ ...p, _type: 'sport' })),
     ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     setPartages(rows)
 
     const recetteIds = rows.filter(r => r._type === 'recette').map(r => r.id)
     const journalIds = rows.filter(r => r._type === 'journal').map(r => r.id)
+    const sportIds = rows.filter(r => r._type === 'sport').map(r => r.id)
 
-    if (recetteIds.length === 0 && journalIds.length === 0) {
+    if (recetteIds.length === 0 && journalIds.length === 0 && sportIds.length === 0) {
       setReactionsByPartage({})
       setCommentCounts({})
       setLoading(false)
       return
     }
 
-    const [reactRecette, commRecette, reactJournal, commJournal] = await Promise.all([
+    const [reactRecette, commRecette, reactJournal, commJournal, reactSport, commSport] = await Promise.all([
       recetteIds.length > 0 ? supabase.from('reactions_partages').select('*').in('partage_id', recetteIds) : Promise.resolve({ data: [] }),
       recetteIds.length > 0 ? supabase.from('commentaires_partages').select('partage_id').in('partage_id', recetteIds) : Promise.resolve({ data: [] }),
       journalIds.length > 0 ? supabase.from('reactions_journal').select('*').in('partage_id', journalIds) : Promise.resolve({ data: [] }),
       journalIds.length > 0 ? supabase.from('commentaires_journal').select('partage_id').in('partage_id', journalIds) : Promise.resolve({ data: [] }),
+      sportIds.length > 0 ? supabase.from('reactions_sport').select('*').in('partage_id', sportIds) : Promise.resolve({ data: [] }),
+      sportIds.length > 0 ? supabase.from('commentaires_sport').select('partage_id').in('partage_id', sportIds) : Promise.resolve({ data: [] }),
     ])
 
     const rGrouped = {}
-    for (const r of [...(reactRecette.data || []), ...(reactJournal.data || [])]) {
+    for (const r of [...(reactRecette.data || []), ...(reactJournal.data || []), ...(reactSport.data || [])]) {
       if (!rGrouped[r.partage_id]) rGrouped[r.partage_id] = []
       rGrouped[r.partage_id].push(r)
     }
     const cCounts = {}
-    for (const c of [...(commRecette.data || []), ...(commJournal.data || [])]) {
+    for (const c of [...(commRecette.data || []), ...(commJournal.data || []), ...(commSport.data || [])]) {
       cCounts[c.partage_id] = (cCounts[c.partage_id] || 0) + 1
     }
     setReactionsByPartage(rGrouped)
@@ -178,6 +183,28 @@ export function useFeed() {
     return { data: partage, error: null }
   }
 
+  // Partage d'une séance (kind 'seance') ou d'un résumé de semaine (kind
+  // 'semaine'). Snapshot au moment du partage. `payload` fourni par l'appelant
+  // (SportSection / SportEntrySheet) avec les champs déjà mis en forme.
+  const shareSport = async ({ message, ...payload }) => {
+    if (!user) return { error: 'Non connecté' }
+    const { data: myProfile } = await supabase.from('profiles').select('pseudo, prenom').eq('id', user.id).single()
+    const { data: partage, error } = await supabase
+      .from('partages_sport')
+      .insert({
+        auteur_id: user.id,
+        auteur_pseudo: myProfile?.pseudo || null,
+        auteur_prenom: myProfile?.prenom || null,
+        message: message?.trim() || null,
+        ...payload,
+      })
+      .select()
+      .single()
+    if (error) return { error }
+    await load()
+    return { data: partage, error: null }
+  }
+
   // partage = ligne du fil (avec _type) — les deux containers de détail
   // passent { id, _type } directement puisqu'ils connaissent déjà leur type.
   const deletePartage = async (partage) => {
@@ -207,7 +234,7 @@ export function useFeed() {
     }
   }
 
-  return { partages, reactionsByPartage, commentCounts, loading, shareRecette, shareJournal, deletePartage, toggleReaction, refetch: load }
+  return { partages, reactionsByPartage, commentCounts, loading, shareRecette, shareJournal, shareSport, deletePartage, toggleReaction, refetch: load }
 }
 
 export { REACTION_TABLE, COMMENT_TABLE, POST_TABLE }

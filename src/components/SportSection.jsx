@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Dumbbell, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { Dumbbell, Plus, ChevronDown, ChevronRight, Share2 } from 'lucide-react'
 import {
   sportTypeEmoji, sportTypeLabel, sportIntensiteLabel,
   formatDuree, formatHeure, dayEnergyBalance,
@@ -21,8 +21,9 @@ import {
 //   adjust        — mode 'manger_selon_effort' : { delta, base, credit, goal, applied } ou null
 //   onOpenSheet() — ouvre la feuille « Ajouter une séance »
 //   onOpenEntry(activite) — ouvre la feuille en édition
+//   onShareWeek() — partage le résumé de la semaine sur le fil
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SportSection({ activites = [], week, sportCfg, consumedKcal, maintenanceKcal, adjust, onOpenSheet, onOpenEntry }) {
+export default function SportSection({ activites = [], week, sportCfg, consumedKcal, maintenanceKcal, adjust, onOpenSheet, onOpenEntry, onShareWeek }) {
   const goalMin = Number(sportCfg?.objectif_hebdo_minutes) || 0
   const weekMin = Math.round(week?.minutes || 0)
   const pct = goalMin > 0 ? Math.round((weekMin / goalMin) * 100) : 0
@@ -228,15 +229,28 @@ export default function SportSection({ activites = [], week, sportCfg, consumedK
               </div>
             )}
 
-            <button
-              onClick={onOpenSheet}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10,
-                fontSize: 12, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--font)',
-              }}
-            >
-              <Plus size={14} /> Ajouter une séance
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
+              <button
+                onClick={onOpenSheet}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontSize: 12, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--font)',
+                }}
+              >
+                <Plus size={14} /> Ajouter une séance
+              </button>
+              {onShareWeek && week?.seances > 0 && (
+                <button
+                  onClick={onShareWeek}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', fontFamily: 'var(--font)',
+                  }}
+                >
+                  <Share2 size={13} /> Partager ma semaine
+                </button>
+              )}
+            </div>
           </div>
         </>
       )}

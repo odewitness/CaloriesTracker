@@ -22,6 +22,10 @@
 -- chantier « Suivi de l'activité sportive » Palier 1 — voir
 -- supabase/sql/sport_setup.sql et docs/suivi-sport.md. Pas encore confirmé
 -- appliqué en base au moment de l'écriture de ce fichier.
+-- Complété le 2026-08-30 : tables 29-31 (partages_sport, reactions_sport,
+-- commentaires_sport) — fil social du sport, Palier 8, RLS calquée à
+-- l'identique sur partages_journal & co. (fonction is_friend_with). Voir
+-- supabase/sql/partages_sport_setup.sql.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -873,6 +877,56 @@ create unique index if not exists idx_activites_sport_source
 create index if not exists idx_activites_sport_user_date
   on activites_sport (user_id, date desc);
 
+-- 29-31. FIL SOCIAL DU SPORT (Palier 8 du chantier suivi sport) — trio calqué
+-- sur partages_journal / reactions_journal / commentaires_journal, RLS
+-- « auteure ou amie acceptée » (is_friend_with). Voir
+-- supabase/sql/partages_sport_setup.sql. Un partage = SOIT une séance
+-- (kind='seance'), SOIT un résumé de semaine (kind='semaine').
+create table if not exists partages_sport (
+  id uuid default gen_random_uuid() primary key,
+  auteur_id uuid not null references auth.users(id),
+  auteur_pseudo text,
+  auteur_prenom text,
+  kind text not null default 'seance', -- 'seance' | 'semaine'
+  date date,                -- kind='seance'
+  type text,
+  duree_min numeric,
+  distance_km numeric,
+  intensite text,
+  energie_kcal numeric,
+  semaine_debut date,       -- kind='semaine'
+  total_min numeric,
+  nb_seances integer,
+  total_kcal numeric,
+  message text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_partages_sport_auteur on partages_sport (auteur_id);
+create index if not exists idx_partages_sport_created on partages_sport (created_at desc);
+
+create table if not exists reactions_sport (
+  id uuid default gen_random_uuid() primary key,
+  partage_id uuid not null references partages_sport(id) on delete cascade,
+  user_id uuid not null references auth.users(id),
+  emoji text not null,
+  created_at timestamptz not null default now(),
+  user_pseudo text,
+  user_prenom text
+);
+create index if not exists idx_reactions_sport_partage on reactions_sport (partage_id);
+
+create table if not exists commentaires_sport (
+  id uuid default gen_random_uuid() primary key,
+  partage_id uuid not null references partages_sport(id) on delete cascade,
+  parent_id uuid references commentaires_sport(id) on delete cascade,
+  auteur_id uuid not null references auth.users(id),
+  auteur_pseudo text,
+  auteur_prenom text,
+  contenu text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_commentaires_sport_partage on commentaires_sport (partage_id);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -948,6 +1002,15 @@ alter table regles enable row level security;
 -- supabase/sql/sport_setup.sql. La policy update sert à l'édition d'une séance
 -- (contrairement à regles où un jour est simplement présent ou absent).
 alter table activites_sport enable row level security;
+
+-- RLS confirmé ACTIF sur le trio du fil social sport (partages_sport,
+-- reactions_sport, commentaires_sport), policies calquées à l'identique sur
+-- partages_journal & co. : select = auteure OR is_friend_with(auteur) ;
+-- insert/delete réactions & commentaires gardés par la visibilité du partage
+-- parent + propriété. Voir supabase/sql/partages_sport_setup.sql.
+alter table partages_sport enable row level security;
+alter table reactions_sport enable row level security;
+alter table commentaires_sport enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

@@ -9,11 +9,20 @@ const SOCIAL_LAST_SEEN_KEY = 'social_last_seen'
 const PARTAGE_SOURCES = [
   { type: 'recette', partages: 'partages_recettes', reactions: 'reactions_partages', comments: 'commentaires_partages', selectCols: 'id, nom' },
   { type: 'journal', partages: 'partages_journal', reactions: 'reactions_journal', comments: 'commentaires_journal', selectCols: 'id, date, meal' },
+  { type: 'sport', partages: 'partages_sport', reactions: 'reactions_sport', comments: 'commentaires_sport', selectCols: 'id, kind, type, date, semaine_debut' },
 ]
 
 function targetLabel(partage, type) {
   if (!partage) return null
   if (type === 'recette') return partage.nom
+  if (type === 'sport') {
+    if (partage.kind === 'semaine') {
+      const w = partage.semaine_debut ? new Date(`${partage.semaine_debut}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''
+      return `semaine de sport${w ? ` du ${w}` : ''}`
+    }
+    const d = partage.date ? new Date(`${partage.date}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''
+    return `séance${d ? ` du ${d}` : ''}`
+  }
   const d = partage.date
     ? new Date(`${partage.date}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
     : ''
