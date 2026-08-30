@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Le bas de la page du jour n\'est plus coupé',
+    description: "Quand un bloc se retrouvait tout en bas de la page du jour (par exemple « À combler aujourd'hui »), son dernier bouton pouvait passer en partie sous la barre du bas et devenir difficile à toucher. La page laisse maintenant assez de place en dessous pour que tout reste visible et cliquable.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Le calendrier remis au propre',
     description: "La page Calendrier a été revue. En vue Semaine tu vois maintenant aussi ta phase de cycle et tes séances de sport, comme en vue Mois. Les repères sur les jours sont plus lisibles : une place fixe pour chaque info (repas prévu en haut à droite, séance en haut à gauche, phase de cycle en barre sous le chiffre) et une petite « Légende » à déplier si besoin. Un bouton « ↩ Aujourd'hui » apparaît dès que tu t'éloignes du mois en cours pour y revenir d'un geste. Quand tu touches un jour, l'aperçu en dessous est plus court (tes calories, tes repas en résumé, ton cycle et ton activité s'ils sont suivis) ; « Ouvrir cette journée » t'emmène directement sur ce jour dans la page principale pour le détail. Et les deux gros boutons de planification laissent la place à un simple « Planifier… ».",
   },

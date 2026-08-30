@@ -439,7 +439,11 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   width: '33.333%',
   flexShrink: 0,
   boxSizing: 'border-box',
-  padding: '16px 16px 90px',
+  // La bottom-nav est en position: fixed et grandit de env(safe-area-inset-bottom)
+  // (barre de gestes iOS/Android) : sans ce calc, le dernier bloc de la page —
+  // p. ex. le bouton "+" d'une suggestion de "À combler aujourd'hui" quand cette
+  // section est la dernière — se retrouve masqué en partie derrière la nav.
+  padding: '16px 16px calc(112px + env(safe-area-inset-bottom))',
   height: '100%',                       // ← chaque slot = hauteur du viewport
   overflowY: 'auto',                    // ← scroll indépendant par slot
   overscrollBehavior: 'contain',        // ← empêche le rebond/chaînage de scroll en bas de page
