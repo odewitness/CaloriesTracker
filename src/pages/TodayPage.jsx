@@ -38,6 +38,7 @@ import { usePlannedMealsForDate, deletePlannedMeal, deletePlannedMealSeries, mar
 import { computeMealTargets, computeTotals, computeCalorieNeeds, MEALS_ORDER as MEALS } from '../lib/nutrients'
 import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
+import { sportAdjustedSettings } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { fmt, dateLabel } from '../lib/dates'
 import { useSetTodayHeaderInfo, useTodayShortcuts } from '../lib/TodayHeaderContext'
@@ -129,15 +130,26 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
 
   const totals = useMemo(() => computeTotals(entries), [entries])
 
-  // Objectifs du jour éventuellement ajustés selon la phase du cycle
-  // (Palier 3, opt-in) — n'ajoute que des kcal en phase lutéale, sinon
-  // renvoie `settings` inchangé. Utilisé pour tous les calculs d'objectif de
-  // CE jour ; `settings` brut reste la source pour water / réglages.
+  const sportKcalToday = useMemo(
+    () => sportActivites.reduce((s, a) => s + (Number(a.energie_kcal) || 0), 0),
+    [sportActivites],
+  )
+
+  // Objectifs du jour éventuellement ajustés — cycle (delta lutéal, opt-in) PUIS
+  // sport (« manger selon l'effort », opt-in : base sédentaire + crédit des
+  // séances du jour). Chaînés : le sport travaille sur l'objectif déjà ajusté
+  // par le cycle. Chacun renvoie `settings` inchangé si son option est off.
+  // N'affecte QUE la page du jour ; `settings` brut reste la source pour
+  // water / réglages, et HistoryPage / calendrier gardent l'objectif à plat.
   const daySettings = useMemo(
-    () => cycleAdjustedSettings(settings, cycleDays, dateStr),
-    [settings, cycleDays, dateStr],
+    () => sportAdjustedSettings(
+      cycleAdjustedSettings(settings, cycleDays, dateStr),
+      { profile, weightKg: latestWeight, sportKcalToday },
+    ),
+    [settings, cycleDays, dateStr, profile, latestWeight, sportKcalToday],
   )
   const cycleKcalDelta = daySettings._cycleKcalDelta || 0
+  const sportKcalAdjust = daySettings._sportKcalAdjust || 0
 
   const cyclePhase = useMemo(() => (
     settings.cycle?.enabled && cycleDays.length ? phaseForDate(dateStr, cycleDays, settings.cycle) : null
@@ -362,6 +374,9 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         sportCfg={settings.sport}
         consumedKcal={totals.kcal}
         maintenanceKcal={maintenanceKcal}
+        adjust={settings.sport?.mode_energie === 'manger_selon_effort'
+          ? { delta: sportKcalAdjust, base: daySettings._sportBaseGoal, credit: daySettings._sportCredit, goal: daySettings.goal_kcal, applied: daySettings._sportBaseGoal != null }
+          : null}
         onOpenSheet={() => setSportSheet({ initial: null })}
         onOpenEntry={(a) => setSportSheet({ initial: a })}
       />

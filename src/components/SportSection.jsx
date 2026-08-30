@@ -18,10 +18,11 @@ import {
 //   sportCfg      — settings.sport
 //   consumedKcal  — kcal mangées ce jour (pour le bilan, mode_energie 'bilan')
 //   maintenanceKcal — dépense d'entretien estimée (TDEE) ou null
+//   adjust        — mode 'manger_selon_effort' : { delta, base, credit, goal, applied } ou null
 //   onOpenSheet() — ouvre la feuille « Ajouter une séance »
 //   onOpenEntry(activite) — ouvre la feuille en édition
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SportSection({ activites = [], week, sportCfg, consumedKcal, maintenanceKcal, onOpenSheet, onOpenEntry }) {
+export default function SportSection({ activites = [], week, sportCfg, consumedKcal, maintenanceKcal, adjust, onOpenSheet, onOpenEntry }) {
   const goalMin = Number(sportCfg?.objectif_hebdo_minutes) || 0
   const weekMin = Math.round(week?.minutes || 0)
   const pct = goalMin > 0 ? Math.round((weekMin / goalMin) * 100) : 0
@@ -36,6 +37,9 @@ export default function SportSection({ activites = [], week, sportCfg, consumedK
   const bilan = showBilan
     ? dayEnergyBalance({ consumedKcal, maintenanceKcal, sportKcal: sportKcalToday })
     : null
+  // « Manger selon l'effort » (Palier 7) — l'objectif du jour EST déjà ajusté
+  // en amont (daySettings). Ici on explique seulement l'ajustement.
+  const showEffort = sportCfg?.mode_energie === 'manger_selon_effort'
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sport-collapsed')) ?? false }
@@ -126,6 +130,36 @@ export default function SportSection({ activites = [], week, sportCfg, consumedK
             {goalMin === 0 && week?.seances > 0 && (
               <div style={{ fontSize: 11.5, color: 'var(--text-hint)', marginBottom: 10 }}>
                 Cette semaine : {formatDuree(weekMin)} · {week.seances} séance{week.seances > 1 ? 's' : ''}
+              </div>
+            )}
+
+            {showEffort && (
+              <div style={{ background: 'var(--gray-bg)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  Objectif du jour · manger selon l'effort
+                </div>
+                {adjust?.applied ? (
+                  <>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      Base (jour sans séance) <strong>{adjust.base}</strong>
+                      {adjust.credit > 0 ? <> + <strong>{adjust.credit}</strong> de séances</> : null}
+                      {' = '}<strong style={{ color: 'var(--text)' }}>{adjust.goal} kcal</strong>
+                    </div>
+                    {adjust.delta !== 0 && (
+                      <div style={{ fontSize: 11.5, marginTop: 3, color: adjust.delta > 0 ? 'var(--green)' : 'var(--amber)' }}>
+                        {adjust.delta > 0 ? '+' : '−'}{Math.abs(adjust.delta)} kcal vs ton objectif du jour hors sport
+                        {adjust.delta < 0 ? ' (rien de noté aujourd\'hui)' : ''}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    Renseigne ton profil (sexe, âge, taille, poids, niveau d'activité) pour que ce mode s'applique. En attendant, ton objectif habituel est utilisé.
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.5 }}>
+                  Ton objectif de base repasse à un équivalent sédentaire, et tes séances du jour se rajoutent (plafond +{sportCfg?.depense_max_creditee_kcal ?? 400}). Estimation ±25 %. Historique et calendrier gardent ton objectif à plat. Désactivable à tout moment dans Profil › Sport.
+                </div>
               </div>
             )}
 

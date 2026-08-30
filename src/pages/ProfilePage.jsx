@@ -241,6 +241,9 @@ export default function ProfilePage() {
     return (
       <SportSection
         sport={settings.sport}
+        goalKcal={goals.goal_kcal}
+        profile={profile}
+        weightKg={latestWeight}
         onPatch={(patch) => updateSettings({ sport: { ...settings.sport, ...patch } })}
         onBack={back}
       />

@@ -1,18 +1,34 @@
 import React from 'react'
 import { Dumbbell, Info } from 'lucide-react'
 import { Row, ToggleSwitch, Stepper, SectionScreen } from './primitives'
+import { sportBaseFrom } from '../../lib/sport'
+import { ACTIVITY_LEVELS } from '../../lib/nutrients'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Écran de détail « Sport ».
-// Palier 1 : activer/désactiver, objectif hebdomadaire (minutes / séances),
-// affichage sur la page du jour et le calendrier. Le sport n'a AUCUN effet sur
-// les objectifs de calories (ce sera les Paliers 6/7). Voir docs/suivi-sport.md.
+// - Activer/désactiver, objectifs hebdo, affichage (Paliers 1–2).
+// - Calories & sport (Paliers 6–7) : 'aucun' (défaut) | 'bilan' (lecture seule)
+//   | 'manger_selon_effort' (bascule de modèle, très encadrée).
+// Voir docs/suivi-sport.md §3.2 et §8.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SportSection({ sport, onPatch, onBack }) {
+const ENERGY_MODES = [
+  { key: 'aucun', label: 'Aucun' },
+  { key: 'bilan', label: 'Bilan indicatif' },
+  { key: 'manger_selon_effort', label: 'Manger selon l\'effort' },
+]
+
+export default function SportSection({ sport, goalKcal, profile, weightKg, onPatch, onBack }) {
   const cfg = sport || {}
   const enabled = !!cfg.enabled
   const goalMin = Number(cfg.objectif_hebdo_minutes) || 0
   const goalSeances = Number(cfg.objectif_hebdo_seances) || 0
+  const mode = cfg.mode_energie || 'aucun'
+
+  const effortBase = sportBaseFrom({ goalKcal, profile, weightKg })
+  const activityKey = profile?.niveau_activite
+  const activityLabel = ACTIVITY_LEVELS.find(a => a.key === activityKey)?.label
+  const highActivity = activityKey && activityKey !== 'sedentaire' && activityKey !== 'leger'
+  const cap = Number(cfg.depense_max_creditee_kcal) || 400
 
   return (
     <SectionScreen title="Sport" onBack={onBack}>
@@ -80,29 +96,100 @@ export default function SportSection({ sport, onPatch, onBack }) {
             depuis Profil › Page du jour.
           </div>
 
-          <div className="section-title">Bilan énergétique</div>
-          <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>
-            <Row label="Afficher le bilan du jour (indicatif)">
-              <ToggleSwitch
-                checked={cfg.mode_energie === 'bilan'}
-                onClick={() => onPatch({ mode_energie: cfg.mode_energie === 'bilan' ? 'aucun' : 'bilan' })}
-              />
-            </Row>
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
-            Ajoute une ligne « mangé vs dépense estimée » dans le bloc Activité de
-            la page du jour. C'est <strong>uniquement informatif</strong> : ton
-            objectif de calories ne bouge pas, et ta dépense d'entretien inclut
-            déjà une partie de ton activité (à ne pas cumuler avec tes séances).
+          <div className="section-title">Calories &amp; sport</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {ENERGY_MODES.map(m => {
+              const disabled = m.key === 'manger_selon_effort' && !effortBase
+              const active = mode === m.key
+              return (
+                <button
+                  key={m.key}
+                  onClick={() => !disabled && onPatch({ mode_energie: m.key })}
+                  className="chip"
+                  style={{
+                    flex: 1, textAlign: 'center', fontSize: 11, padding: '6px 4px',
+                    background: active ? 'var(--green)' : 'var(--green-light)',
+                    color: active ? 'white' : 'var(--green-dark)',
+                    opacity: disabled ? 0.4 : 1, cursor: disabled ? 'default' : 'pointer',
+                  }}
+                >
+                  {m.label}
+                </button>
+              )
+            })}
           </div>
 
-          <div style={{ display: 'flex', gap: 8, fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.55, marginBottom: 24 }}>
+          {mode === 'aucun' && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
+              Le sport n'a aucun effet sur tes objectifs de calories. Recommandé si
+              tu ne veux pas te prendre la tête avec ça.
+            </div>
+          )}
+
+          {mode === 'bilan' && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
+              Ajoute une ligne « mangé vs dépense estimée » dans le bloc Activité de
+              la page du jour. <strong>Uniquement informatif</strong> : ton objectif
+              de calories ne bouge pas, et ta dépense d'entretien inclut déjà une
+              partie de ton activité (à ne pas cumuler avec tes séances).
+            </div>
+          )}
+
+          {mode === 'manger_selon_effort' && (
+            <>
+              {!effortBase ? (
+                <div style={{ fontSize: 11.5, color: 'var(--coral)', lineHeight: 1.5, marginBottom: 16 }}>
+                  Il manque des infos dans ton profil (sexe, âge, taille, poids,
+                  niveau d'activité) pour calculer ta base. Complète « Mes
+                  informations », ce mode s'appliquera ensuite.
+                </div>
+              ) : (
+                <>
+                  <div className="card" style={{ padding: '12px 14px', marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+                      Les jours <strong>sans séance</strong> : objectif ≈{' '}
+                      <strong style={{ color: 'var(--text)' }}>{effortBase.base} kcal</strong>{' '}
+                      <span style={{ color: 'var(--text-hint)' }}>(au lieu de {goalKcal})</span>.<br />
+                      Les jours <strong>de séance</strong> : {effortBase.base} + tes calories
+                      dépensées, plafonné à <strong>+{cap}</strong>.
+                    </div>
+                  </div>
+                  <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>
+                    <Row label="Plafond crédité par jour">
+                      <Stepper
+                        value={cap}
+                        display={`+${cap} kcal`}
+                        min={100} max={700} wide
+                        onDec={() => onPatch({ depense_max_creditee_kcal: Math.max(100, cap - 50) })}
+                        onInc={() => onPatch({ depense_max_creditee_kcal: Math.min(700, cap + 50) })}
+                      />
+                    </Row>
+                  </div>
+                  {highActivity && (
+                    <div style={{ fontSize: 11.5, color: 'var(--amber)', lineHeight: 1.5, marginBottom: 8, background: 'var(--amber-light, #fef3c7)', borderRadius: 8, padding: '8px 10px' }}>
+                      Ton niveau d'activité «&nbsp;{activityLabel}&nbsp;» suppose déjà
+                      plusieurs séances par semaine : les jours sans sport, ton
+                      objectif baisse nettement (−{effortBase.activityBakedIn} kcal).
+                      Si ça te paraît trop, choisis un niveau d'activité plus bas dans
+                      le calculateur de besoins.
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.5, marginBottom: 16 }}>
+                    Base scientifique modeste, estimation des calories ±25 %. Ne
+                    s'applique <strong>que sur la page du jour</strong> — l'Historique
+                    et le calendrier gardent ton objectif à plat. Ton objectif ne
+                    descend jamais sous {effortBase.floor} kcal. Désactivable en un geste.
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.55, marginTop: 8, marginBottom: 24 }}>
             <Info size={26} style={{ flexShrink: 0, marginTop: 1 }} />
             <span>
               Les calories d'une séance sont estimées à partir du type, de la durée
-              et de ton poids (±20 % environ) — tu peux les corriger. Elles ne
-              modifient pas tes objectifs de calories. La connexion à Strava
-              arrivera plus tard.
+              et de ton poids (±20 % environ) — tu peux les corriger à la saisie.
             </span>
           </div>
         </>

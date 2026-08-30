@@ -379,17 +379,30 @@ où un import (texte, autre) arriverait plus tard.
 - [x] `goal_kcal` strictement inchangé — aucune écriture, aucun recalcul de cible.
 - [x] Entrée changelog (2026-08-30 « Un bilan énergétique du jour, si tu veux »)
 
-### Palier 7 — « Manger selon l'effort » (option, à décider plus tard) ▸ statut : non tranché
-- [ ] `mode_energie: 'manger_selon_effort'` : cible de base recalculée sur
-      `niveau_activite = sédentaire`, crédit des séances du jour, plafonné à
-      `depense_max_creditee_kcal`, jamais sous le minimum
-- [ ] Écran de réglage avec **avant / après chiffré** + libellé « base
-      scientifique modeste, estimation ±25 % »
-- [ ] Avertissement si `niveau_activite` ≠ sédentaire / léger (risque de double
-      comptage)
-- [ ] Appliqué **uniquement à la page du jour** (comme le delta lutéal) ;
-      `HistoryPage` / calendrier gardent l'objectif à plat
-- [ ] Entrée changelog
+### Palier 7 — « Manger selon l'effort » ▸ statut : codé (branche `suivi-sport-p6`, avec le Palier 6)
+- [x] `sport.js` : `sportBaseFrom({ goalKcal, profile, weightKg })` (équivalent
+      sédentaire = `goalKcal − (TDEE actuel − TDEE sédentaire)`, planché à
+      `max(1200, BMR)`) et `sportAdjustedSettings(settings, { profile, weightKg,
+      sportKcalToday })` (renvoie `settings` inchangé si mode ≠
+      `manger_selon_effort` ou profil incomplet).
+- [x] Chaîné dans `TodayPage` **après** `cycleAdjustedSettings` : le sport
+      travaille sur l'objectif déjà ajusté par le cycle. `_sportKcalAdjust` /
+      `_sportBaseGoal` / `_sportCredit` exposés pour l'affichage. `computeMealTargets`,
+      gaps, `remainingKcal`, `TodayOverviewCard` suivent `daySettings.goal_kcal`.
+- [x] `HistoryPage` / calendrier : **rien** — gardent `settings.goal_kcal` à plat.
+- [x] Profil › Sport : sélecteur 3 modes (`Aucun` / `Bilan indicatif` /
+      `Manger selon l'effort`). Mode 3 **désactivé si profil incomplet**. Aperçu
+      chiffré avant/après (base jour sans séance vs objectif habituel), stepper
+      du plafond `depense_max_creditee_kcal` (100–700), avertissement ambré si
+      `niveau_activite` ∉ {sédentaire, léger} (baisse marquée les jours off),
+      mention « base scientifique modeste, ±25 %, page du jour seulement, plancher
+      {floor} kcal, désactivable ».
+- [x] Bloc explicatif « Objectif du jour · manger selon l'effort » dans
+      `SportSection` (page du jour) : base + crédit = objectif, delta vs habituel.
+- [x] Garde-fous §8 pt 3–4 respectés : opt-in, plafond, plancher `max(1200, BMR)`,
+      soustraction de la part d'activité (jamais les deux modèles en même temps),
+      désactivable en un geste, jour-page uniquement.
+- [x] Entrée changelog (2026-08-30 « Manger selon l'effort (nouvelle option) »)
 
 ### Palier 8 — Social (option) ▸ statut : non tranché
 - [ ] Tables `partages_sport` / `reactions_sport` / `commentaires_sport`
@@ -410,9 +423,9 @@ où un import (texte, autre) arriverait plus tard.
   l'utilisatrice, testé). Reste : `git push` vers `main` (à confirmer).
 - Paliers 1 → 4 : mergés + poussés sur `main` (déployés Netlify).
 - **Palier 5 (Strava) : abandonné.**
-- Palier 6 : codé sur la branche `suivi-sport-p6`. Aucune migration. Reste :
-  test manuel, merge + push après confirmation.
-- Paliers 7 → 9 non tranchés. Aucun ne dépend de Strava.
+- Paliers 6 & 7 : codés ensemble sur la branche `suivi-sport-p6`. Aucune
+  migration. Reste : test manuel, merge + push après confirmation.
+- Paliers 8 & 9 (social, rappels push) non tranchés.
 
 ---
 
@@ -448,6 +461,13 @@ où un import (texte, autre) arriverait plus tard.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — Palier 7 (« manger selon l'effort ») codé avec le Palier 6
+  sur `suivi-sport-p6`. Modèle retenu : `base = goal_kcal − (TDEE_actuel −
+  TDEE_sédentaire)` planché à `max(1200, BMR)`, `+ min(kcal séances du jour,
+  plafond)`. Chaîné après le cycle. Page du jour uniquement. Sélecteur 3 modes
+  + aperçu chiffré + avertissement si niveau d'activité élevé. `goal_kcal` en
+  base jamais modifié. `npm run build` OK. En attente : test manuel + merge/push
+  (avec le Palier 6).
 - **2026-08-30** — Palier 4 mergé + poussé. Palier 6 codé sur la branche
   `suivi-sport-p6` : toggle `mode_energie` `aucun`/`bilan` dans Profil › Sport,
   `dayEnergyBalance` (pur), bloc « Bilan du jour · approximatif » dans
