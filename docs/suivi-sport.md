@@ -309,12 +309,22 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
       d'affichage + `NavRow` dans le hub Profil
 - [x] Entrée changelog (2026-08-30 « Note tes séances de sport »)
 
-### Palier 2 — Objectifs & historique ▸ statut : à faire
-- [ ] Anneau « minutes actives cette semaine » vs `objectif_hebdo_minutes` +
-      série discrète (pas de dramatisation)
-- [ ] Vue Historique : minutes & nombre de séances par semaine et par mois,
-      courbe
-- [ ] Entrée changelog
+### Palier 2 — Objectifs & historique ▸ statut : codé (branche `suivi-sport-p2`)
+- [x] Anneau « minutes actives cette semaine » vs `objectif_hebdo_minutes` dans
+      `SportSection` (composant `WeekRing`, SVG inline) + reste à faire / objectif
+      atteint. `sport.js` : `statsByWeek`, `streakWeeks` (semaines consécutives
+      dans l'objectif — sobre, aucun message de « série cassée »), `addWeeks`.
+- [x] `useSport.js` : `useSportStreak(weeks)` (charge ~16 semaines pour la série).
+- [x] Section « Sport » dans la page Historique
+      (`src/components/history/SportHistorySection.jsx`) : tuiles temps total /
+      séances / moy. par séance / semaines de suite, + histogramme des minutes
+      actives (par jour en vue Semaine, par semaine en vue Mois, par mois en vue
+      Année). Gardée par `settings.sport.enabled`.
+      **Limite connue** : rendue à l'intérieur du bloc « il y a des données
+      journal » de `HistoryPage` — une période avec du sport mais aucun repas
+      loggé n'affiche pas encore la section (hoisting hors de ce bloc = Palier
+      ultérieur si besoin).
+- [x] Entrée changelog (2026-08-30 « Ton sport, semaine après semaine »)
 
 ### Palier 3 — Corrélations ▸ statut : à faire
 - [ ] Encart « Ton sport sur cette période » dans `HistoryPage` (énergie / poids
@@ -375,12 +385,12 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
 
 ## 7. Reste à faire (vue rapide)
 
-Palier 1 codé sur la branche `suivi-sport` — en attente : application de
-`supabase/sql/sport_setup.sql` dans Supabase par l'utilisatrice, test manuel sur
-`localhost:5173`, puis merge + push vers `main` après confirmation.
-
-Paliers 2 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
-(Palier 5). Paliers 7 → 9 non tranchés — à confirmer au moment venu.
+- Palier 1 : mergé dans `main` en local (SQL `sport_setup.sql` appliqué par
+  l'utilisatrice, testé). Reste : `git push` vers `main` (à confirmer).
+- Palier 2 : codé sur la branche `suivi-sport-p2`. Aucune migration. Reste :
+  test manuel, merge + push après confirmation.
+- Paliers 3 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
+  (Palier 5). Paliers 7 → 9 non tranchés.
 
 ---
 
@@ -416,6 +426,13 @@ Paliers 2 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — Palier 1 mergé dans `main` (local, SQL appliqué + testé par
+  l'utilisatrice, push en attente). Palier 2 codé sur la branche
+  `suivi-sport-p2` : anneau minutes/semaine (`WeekRing` dans `SportSection`),
+  `statsByWeek` / `streakWeeks` / `addWeeks` dans `sport.js`, `useSportStreak`,
+  section « Sport » dans `HistoryPage` (`SportHistorySection` : tuiles +
+  histogramme par jour/semaine/mois). Streak volontairement sobre. `npm run
+  build` OK. En attente : test manuel + merge/push.
 - **2026-08-30** — Palier 1 codé sur la branche `suivi-sport` : migration
   `sport_setup.sql` (table `activites_sport` RLS « own », colonne
   `settings.sport`, défaut `ordre_sections_jour` élargi à `sport`),

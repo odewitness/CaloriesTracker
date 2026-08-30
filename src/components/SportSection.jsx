@@ -8,9 +8,9 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // SportSection — carte « Activité » de la page du jour. Même esprit que
 // WaterSection : section repliable (état mémorisé en localStorage), un appui
-// pour ajouter. Au Palier 1 : liste des séances du jour + total de la semaine
-// (facultativement comparé à un objectif hebdo de minutes). Aucun effet sur les
-// objectifs de calories.
+// pour ajouter. Liste des séances du jour + anneau « minutes actives cette
+// semaine » vs objectif hebdo (Palier 2). Aucun effet sur les objectifs de
+// calories.
 //
 // Props :
 //   activites     — séances du jour (déjà triées)
@@ -97,6 +97,28 @@ export default function SportSection({ activites = [], week, sportCfg, onOpenShe
         <>
           <div className="divider" />
           <div style={{ padding: '10px 14px 12px' }}>
+            {goalMin > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <WeekRing pct={pct} reached={reached} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{weekMin} / {goalMin} min</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {reached ? 'Objectif de la semaine atteint 🎉' : `Encore ${goalMin - weekMin} min cette semaine`}
+                  </div>
+                  {week?.seances ? (
+                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2 }}>
+                      {week.seances} séance{week.seances > 1 ? 's' : ''}{week.kcal ? ` · ≈ ${Math.round(week.kcal)} kcal` : ''}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
+            {goalMin === 0 && week?.seances > 0 && (
+              <div style={{ fontSize: 11.5, color: 'var(--text-hint)', marginBottom: 10 }}>
+                Cette semaine : {formatDuree(weekMin)} · {week.seances} séance{week.seances > 1 ? 's' : ''}
+              </div>
+            )}
+
             {hasEntries ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {activites.map((a) => (
@@ -145,5 +167,31 @@ export default function SportSection({ activites = [], week, sportCfg, onOpenShe
         </>
       )}
     </div>
+  )
+}
+
+// Petit anneau de progression (minutes de la semaine vs objectif).
+function WeekRing({ pct, reached }) {
+  const size = 52, sw = 6
+  const r = (size - sw) / 2
+  const c = 2 * Math.PI * r
+  const off = c * (1 - Math.min(100, Math.max(0, pct)) / 100)
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }} aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border)" strokeWidth={sw} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke="var(--green)" strokeWidth={sw} strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={off}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: 'stroke-dashoffset .4s', opacity: reached ? 1 : 0.9 }}
+      />
+      <text
+        x="50%" y="50%" dominantBaseline="central" textAnchor="middle"
+        style={{ fontSize: 12, fontWeight: 700, fill: 'var(--green-dark)' }}
+      >
+        {Math.round(pct)}%
+      </text>
+    </svg>
   )
 }

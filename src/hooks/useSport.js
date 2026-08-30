@@ -86,6 +86,39 @@ export function useSport(dateStr) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// useSportStreak(weeks) — charge les ~N dernières semaines de séances (peu de
+// lignes) pour calculer la série de semaines consécutives dans l'objectif
+// (streakWeeks, src/lib/sport.js). Utilisé par la page Historique.
+// ─────────────────────────────────────────────────────────────────────────────
+export function useSportStreak(weeks = 16) {
+  const { user } = useAuth()
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const from = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - weeks * 7)
+    return fmt(d)
+  }, [weeks])
+
+  const load = useCallback(async () => {
+    if (!user?.id) { setRows([]); setLoading(false); return }
+    setLoading(true)
+    const { data } = await supabase
+      .from('activites_sport')
+      .select('date, duree_min')
+      .eq('user_id', user.id)
+      .gte('date', from)
+    setRows(data || [])
+    setLoading(false)
+  }, [user?.id, from])
+
+  useEffect(() => { load() }, [load])
+
+  return { rows, loading, refetch: load }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // useSportRange(start, end) — séances sur une plage, regroupées par date (vue
 // calendrier). Même forme que useJournalRange.
 // ─────────────────────────────────────────────────────────────────────────────

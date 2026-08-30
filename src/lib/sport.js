@@ -113,6 +113,40 @@ export function isInWeek(dateStr, anyDateInWeek) {
   const x = fmt(dateStr)
   return x >= s && x <= e
 }
+export function addWeeks(weekStartStr, k) {
+  const d = parseYMD(fmt(weekStartStr))
+  d.setDate(d.getDate() + k * 7)
+  return fmt(d)
+}
+
+// Regroupe les séances par semaine (clé = lundi 'YYYY-MM-DD').
+export function statsByWeek(activites) {
+  const out = {}
+  for (const a of activites || []) {
+    const ws = weekStart(a.date)
+    if (!out[ws]) out[ws] = { minutes: 0, seances: 0, kcal: 0 }
+    out[ws].minutes += Number(a.duree_min) || 0
+    out[ws].seances += 1
+    out[ws].kcal += Number(a.energie_kcal) || 0
+  }
+  return out
+}
+
+// Nombre de semaines complètes consécutives où l'objectif de minutes est
+// atteint, en terminant par la semaine EN COURS si elle l'atteint déjà, sinon
+// par la semaine précédente (une semaine en cours pas encore bouclée ne casse
+// pas la série). 0 si pas d'objectif. Volontairement sobre — aucun message de
+// « série cassée » (voir docs/suivi-sport.md §8).
+export function streakWeeks(activites, todayDateStr, goalMin) {
+  const g = Number(goalMin) || 0
+  if (g <= 0) return 0
+  const byWeek = statsByWeek(activites)
+  let ws = weekStart(todayDateStr)
+  if ((byWeek[ws]?.minutes || 0) < g) ws = addWeeks(ws, -1)
+  let n = 0
+  while ((byWeek[ws]?.minutes || 0) >= g) { n++; ws = addWeeks(ws, -1) }
+  return n
+}
 
 // Agrège une liste de séances (chacune { date, duree_min, energie_kcal }) sur
 // la semaine contenant `anyDateInWeek`.

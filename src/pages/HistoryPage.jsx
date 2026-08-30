@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useMeasurements } from '../hooks/useMeasurements'
 import { useCycle } from '../hooks/useCycle'
+import { useSportRange, useSportStreak } from '../hooks/useSport'
 import { phaseForDate } from '../lib/cycle'
 import { TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import MacroBar from '../components/MacroBar'
@@ -23,6 +24,7 @@ import WeekdayProfile from '../components/history/WeekdayProfile'
 import TopFoods from '../components/history/TopFoods'
 import DayCard from '../components/history/DayCard'
 import MonthCard from '../components/history/MonthCard'
+import SportHistorySection from '../components/history/SportHistorySection'
 
 const TABS = [
   { key: 'semaine', label: 'Semaine' },
@@ -40,6 +42,7 @@ export default function HistoryPage() {
   const { user } = useAuth()
   const { entries: measurementEntries } = useMeasurements()
   const { days: cycleDays } = useCycle()
+  const { rows: sportStreakRows } = useSportStreak(16)
 
   const [tab, setTab] = useState('semaine')
   const [anchor, setAnchor] = useState(todayStr())
@@ -59,6 +62,10 @@ export default function HistoryPage() {
   // Jours exclus des stats — période affichée + période précédente (delta).
   const { excludedDates } = useExcludedDaysRange(bounds.start, bounds.end)
   const { excludedDates: prevExcluded } = useExcludedDaysRange(prevBounds.start, prevBounds.end)
+
+  // Séances de sport de la période affichée (récap dédié, indépendant du journal).
+  const { byDate: sportByDate } = useSportRange(bounds.start, bounds.end)
+  const sportActs = useMemo(() => Object.values(sportByDate).flat(), [sportByDate])
 
   // ── Chargement du journal (période affichée + précédente) ─────────────────
   useEffect(() => {
@@ -373,6 +380,16 @@ export default function HistoryPage() {
           <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '8px 2px 16px' }}>
             Moyennes calculées sur les {daysCounted} jour{daysCounted > 1 ? 's' : ''} loggé{daysCounted > 1 ? 's' : ''} de la période{daysWithData > daysCounted ? ` (${daysWithData - daysCounted} exclu${daysWithData - daysCounted > 1 ? 's' : ''})` : ''} — comparées aux repères Anses pour un adulte.
           </div>
+
+          {settings.sport?.enabled && (
+            <SportHistorySection
+              activites={sportActs}
+              streakRows={sportStreakRows}
+              tab={tab}
+              bounds={bounds}
+              goalMin={Number(settings.sport?.objectif_hebdo_minutes) || 0}
+            />
+          )}
 
           {/* Régularité */}
           {(tab === 'mois' || tab === 'annee') && (
