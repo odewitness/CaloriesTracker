@@ -19,6 +19,11 @@ const DEFAULT_INFO = { active: false, date: null, onNavigate: null }
 export function TodayHeaderProvider({ children }) {
   const [info, setInfo] = useState(DEFAULT_INFO)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  // Date ('YYYY-MM-DD') vers laquelle la page du jour doit sauter au prochain
+  // affichage — posée depuis le calendrier (« Ouvrir cette journée »), lue puis
+  // remise à null par TodayPage. Le Provider est au-dessus des routes dans
+  // AppShell, donc la valeur survit au remontage de TodayPage.
+  const [requestedDate, setRequestedDate] = useState(null)
 
   // Quitter la page du jour (changement d'onglet) referme la barre.
   useEffect(() => {
@@ -26,7 +31,7 @@ export function TodayHeaderProvider({ children }) {
   }, [info.active, shortcutsOpen])
 
   return (
-    <TodayHeaderContext.Provider value={{ info, setInfo, shortcutsOpen, setShortcutsOpen }}>
+    <TodayHeaderContext.Provider value={{ info, setInfo, shortcutsOpen, setShortcutsOpen, requestedDate, setRequestedDate }}>
       {children}
     </TodayHeaderContext.Provider>
   )
@@ -43,6 +48,16 @@ export function useTodayHeaderInfo() {
 export function useSetTodayHeaderInfo() {
   const ctx = useContext(TodayHeaderContext)
   return ctx ? ctx.setInfo : () => {}
+}
+
+// Pose / lit la date vers laquelle la page du jour doit sauter (depuis le
+// calendrier). `setRequestedDate('YYYY-MM-DD')` puis navigation vers /today.
+export function useRequestTodayDate() {
+  const ctx = useContext(TodayHeaderContext)
+  return {
+    requestedDate: ctx ? ctx.requestedDate : null,
+    setRequestedDate: ctx ? ctx.setRequestedDate : () => {},
+  }
 }
 
 // Bascule + lecture de l'état "barre de raccourcis dépliée".

@@ -1,13 +1,9 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { fmt } from '../lib/dates'
 import { PHASES } from '../lib/cycle'
+import CalendarDayMarkers, { CalendarLegend } from './CalendarDayMarkers'
 
-const STATUS_COLOR = {
-  ok:   'var(--green)',
-  off:  'var(--coral)',
-  none: 'var(--border-md)',
-}
 const STATUS_BG = {
   ok:   'var(--green-light)',
   off:  'var(--coral-light)',
@@ -62,12 +58,13 @@ export default function CalendarMonthGrid({
   monthDate, onChangeMonth, selectedDate, onSelectDate,
   dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
   selectedDates, onToggleDate, minDate,
-  cycleByDate, sportByDate,
+  cycleByDate, sportByDate, legend = false, onGoToday,
 }) {
   const cells = useMemo(() => buildMonthCells(monthDate), [monthDate.getFullYear(), monthDate.getMonth()])
   const todayStr = fmt(new Date())
   const isMulti = !!selectedDates
   const selectedStr = isMulti ? null : fmt(selectedDate)
+  const [showLegend, setShowLegend] = useState(false)
 
   return (
     <div className="card" style={{ padding: '14px 12px', marginBottom: 12 }}>
@@ -75,8 +72,18 @@ export default function CalendarMonthGrid({
         <button className="btn-icon" onClick={() => onChangeMonth(-1)}>
           <ChevronLeft size={18} color="var(--text-muted)" />
         </button>
-        <div style={{ fontWeight: 700, fontSize: 14, textTransform: 'capitalize' }}>
-          {monthDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, textTransform: 'capitalize' }}>
+            {monthDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+          </div>
+          {onGoToday && (
+            <button
+              onClick={onGoToday}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--font)' }}
+            >
+              ↩ Aujourd'hui
+            </button>
+          )}
         </div>
         <button className="btn-icon" onClick={() => onChangeMonth(1)}>
           <ChevronRight size={18} color="var(--text-muted)" />
@@ -98,8 +105,6 @@ export default function CalendarMonthGrid({
           const isToday = dStr === todayStr
           const isSelected = isMulti ? selectedDates.has(dStr) : dStr === selectedStr
           const plannedStatus = hasPlannedByDate[dStr]
-          const hasPlanned = !!plannedStatus
-          const isMissed = plannedStatus === 'missed'
           const disabled = minDate ? dStr < minDate : false
           const isExcluded = !!excludedDates?.has(dStr)
           const cyc = cycleByDate?.[dStr]
@@ -130,62 +135,23 @@ export default function CalendarMonthGrid({
               }}>
                 {date.getDate()}
               </span>
-              {status !== 'none' && !isSelected && !isExcluded && (
-                <span style={{
-                  width: 4, height: 4, borderRadius: '50%',
-                  background: STATUS_COLOR[status], marginTop: 2,
-                }} />
-              )}
-              {hasPlanned && (
-                <span style={{
-                  position: 'absolute', top: 3, right: 3,
-                  width: 5, height: 5, borderRadius: '50%',
-                  background: isSelected ? 'white' : (isMissed ? 'var(--coral)' : 'var(--purple)'),
-                }} />
-              )}
-              {isPeriodDay && (
-                <span style={{
-                  position: 'absolute', top: 3, left: 3,
-                  width: 5, height: 5, borderRadius: '50%',
-                  background: isSelected ? 'white' : 'var(--coral)',
-                }} />
-              )}
-              {phaseColor && !isSelected && (
-                <span style={{
-                  position: 'absolute', left: 4, right: 4, bottom: 2,
-                  height: 2, borderRadius: 1, background: phaseColor, opacity: 0.55,
-                }} />
-              )}
-              {hasSport && (
-                <span style={{
-                  position: 'absolute', bottom: 3, right: 3,
-                  width: 5, height: 5, borderRadius: '50%',
-                  background: isSelected ? 'white' : 'var(--green)',
-                }} />
-              )}
+              <CalendarDayMarkers marks={{
+                planned: plannedStatus, hasSport, phaseColor,
+                isPeriod: isPeriodDay, isSelected, compact: true,
+              }} />
             </button>
           )
         })}
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-        <Legend color="var(--green)" label="Objectifs atteints" />
-        <Legend color="var(--coral)" label="Trop / pas assez" />
-        <Legend color="var(--purple)" label="Repas planifié" dot />
-        <Legend color="var(--text-hint)" label="Jour exclu des stats" />
-        {cycleByDate && <Legend color="var(--coral)" label="Règles" dot />}
-        {cycleByDate && <Legend color="var(--purple)" label="Phase lutéale" />}
-        {sportByDate && <Legend color="var(--green)" label="Séance de sport" dot />}
-      </div>
-    </div>
-  )
-}
-
-function Legend({ color, label, dot }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
-      <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>{label}</span>
+      {legend && (
+        <CalendarLegend
+          showCycle={!!cycleByDate}
+          showSport={!!sportByDate}
+          open={showLegend}
+          onToggle={() => setShowLegend(o => !o)}
+        />
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { Calendar, CalendarDays, Plus, Pill, CalendarClock } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Calendar, CalendarDays, Plus, Pill, CalendarClock, X } from 'lucide-react'
 import CalendarMonthGrid from '../components/CalendarMonthGrid'
 import CalendarWeekStrip from '../components/CalendarWeekStrip'
 import DayRecapPanel from '../components/DayRecapPanel'
@@ -9,10 +10,12 @@ import { useJournalRange } from '../hooks/useJournalRange'
 import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useSettings } from '../hooks/useSettings'
+import { useRequestTodayDate } from '../lib/TodayHeaderContext'
 import { useCycle } from '../hooks/useCycle'
 import { useSportRange } from '../hooks/useSport'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
 import { phasesForRange } from '../lib/cycle'
+import { isWaterEntry } from '../lib/water'
 import { fmt } from '../lib/dates'
 
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
@@ -39,7 +42,18 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [planModal, setPlanModal] = useState(null) // 'repas' | 'complement' | null
   const [showSeries, setShowSeries] = useState(false)
+  const [showPlanChoice, setShowPlanChoice] = useState(false)
   const { settings } = useSettings()
+  const navigate = useNavigate()
+  const { setRequestedDate } = useRequestTodayDate()
+
+  // « Ouvrir cette journée » : mémorise la date puis bascule sur la page du
+  // jour. Naviguer vers /today sans backgroundLocation démonte l'overlay
+  // calendrier ; TodayPage lit `requestedDate` à son (re)montage.
+  const openDayInToday = useCallback(() => {
+    setRequestedDate(fmt(selectedDate))
+    navigate('/today')
+  }, [navigate, selectedDate, setRequestedDate])
 
   // Plage chargée = mois affiché élargi de quelques jours de padding (les
   // cases hors-mois visibles dans la grille), suffisant aussi pour la vue
@@ -73,12 +87,15 @@ export default function CalendarPage() {
     return sportByDateRaw
   }, [settings.sport, sportByDateRaw])
 
+  // Un jour ne se colore (vert / corail) que s'il contient de vrais aliments :
+  // l'eau seule (ou rien) reste neutre, sinon une journée où seule l'eau est
+  // notée ressortait en corail « pas assez ».
   const dayStatusByDate = useMemo(() => {
     const result = {}
     for (const dateStr of Object.keys(journalByDate)) {
-      const entries = journalByDate[dateStr]
-      const totals = computeTotals(entries)
-      result[dateStr] = getDayStatus(totals, settings, entries.length > 0)
+      const foodEntries = journalByDate[dateStr].filter(e => !isWaterEntry(e))
+      if (foodEntries.length === 0) continue
+      result[dateStr] = getDayStatus(computeTotals(foodEntries), settings, true)
     }
     return result
   }, [journalByDate, settings])
@@ -102,13 +119,28 @@ export default function CalendarPage() {
   const changeWeek = (dir) => {
     setAnchorDate(d => { const n = new Date(d); n.setDate(n.getDate() + dir * 7); return n })
   }
+  const goToday = useCallback(() => {
+    const now = new Date()
+    setAnchorDate(now)
+    setSelectedDate(now)
+  }, [])
+
+  // Le bouton « ↩ Aujourd'hui » n'apparaît que quand le mois / la semaine
+  // affiché n'est pas celui du jour.
+  const isCurrentPeriod = useMemo(() => {
+    const now = new Date()
+    if (view === 'month') {
+      return anchorDate.getFullYear() === now.getFullYear() && anchorDate.getMonth() === now.getMonth()
+    }
+    return fmt(startOfWeek(anchorDate)) === fmt(startOfWeek(now))
+  }, [anchorDate, view])
 
   return (
     <div className="page-content">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 20 }}>Calendrier</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Suivi et repas planifiés</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Ta régularité et tes repas prévus</div>
         </div>
         <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
           {[
@@ -133,47 +165,11 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <button
-          onClick={() => setPlanModal('repas')}
-          style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            background: 'var(--green-light)', color: 'var(--green-dark)',
-            border: 'none', borderRadius: 10, padding: '10px 12px',
-            fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
-          }}
-        >
-          <Plus size={14} /> Planifier un repas
-        </button>
-        <button
-          onClick={() => setPlanModal('complement')}
-          style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            background: 'var(--purple-light, #ede9fe)', color: 'var(--purple, #8b5cf6)',
-            border: 'none', borderRadius: 10, padding: '10px 12px',
-            fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
-          }}
-        >
-          <Pill size={14} /> Planifier des compléments
-        </button>
-        <button
-          onClick={() => setShowSeries(true)}
-          aria-label="Mes programmations"
-          title="Mes programmations"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--gray-bg)', color: 'var(--text-muted)',
-            border: 'none', borderRadius: 10, padding: '0 12px', flexShrink: 0,
-          }}
-        >
-          <CalendarClock size={16} />
-        </button>
-      </div>
-
       {view === 'month' ? (
         <CalendarMonthGrid
           monthDate={anchorDate}
           onChangeMonth={changeMonth}
+          onGoToday={isCurrentPeriod ? undefined : goToday}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           dayStatusByDate={dayStatusByDate}
@@ -181,20 +177,93 @@ export default function CalendarPage() {
           excludedDates={excludedDates}
           cycleByDate={cycleByDate}
           sportByDate={sportByDate}
+          legend
         />
       ) : (
         <CalendarWeekStrip
           weekDate={anchorDate}
           onChangeWeek={changeWeek}
+          onGoToday={isCurrentPeriod ? undefined : goToday}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           dayStatusByDate={dayStatusByDate}
           hasPlannedByDate={hasPlannedByDate}
           excludedDates={excludedDates}
+          cycleByDate={cycleByDate}
+          sportByDate={sportByDate}
+          legend
         />
       )}
 
-      <DayRecapPanel date={selectedDate} onPlannedChange={refetchAll} onExcludedChange={refetchExcluded} />
+      {/* Planifier : action secondaire, démotée sous le calendrier (consulter
+          d'abord). « Planifier… » déplie le choix repas / complément. */}
+      <div style={{ margin: '6px 0 18px' }}>
+        {showPlanChoice ? (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => { setPlanModal('repas'); setShowPlanChoice(false) }}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: 'var(--green-light)', color: 'var(--green-dark)',
+                border: 'none', borderRadius: 10, padding: '9px 12px',
+                fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+              }}
+            >
+              <Plus size={14} /> Un repas
+            </button>
+            <button
+              onClick={() => { setPlanModal('complement'); setShowPlanChoice(false) }}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: 'var(--purple-light)', color: 'var(--purple)',
+                border: 'none', borderRadius: 10, padding: '9px 12px',
+                fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+              }}
+            >
+              <Pill size={14} /> Des compléments
+            </button>
+            <button
+              onClick={() => setShowPlanChoice(false)}
+              aria-label="Annuler"
+              className="btn-icon"
+              style={{ color: 'var(--text-hint)', flexShrink: 0 }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button
+              onClick={() => setShowPlanChoice(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'var(--gray-bg)', color: 'var(--text-muted)',
+                border: 'none', borderRadius: 10, padding: '9px 14px',
+                fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+              }}
+            >
+              <Plus size={14} /> Planifier…
+            </button>
+            <button
+              onClick={() => setShowSeries(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', color: 'var(--text-hint)',
+                fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', flexShrink: 0,
+              }}
+            >
+              <CalendarClock size={15} /> Mes programmations
+            </button>
+          </div>
+        )}
+      </div>
+
+      <DayRecapPanel
+        date={selectedDate}
+        onPlannedChange={refetchAll}
+        onExcludedChange={refetchExcluded}
+        onOpenDay={openDayInToday}
+      />
 
       {planModal && (
         <PlanMealModal
