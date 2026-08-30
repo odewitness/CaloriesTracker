@@ -176,7 +176,7 @@ export function scaleFood(food, qty_g) {
 // settings.meal_overrides = { [nomDuRepas]: { kcal?, prot?, gluc?, lip? } }.
 // Une valeur absente (null/undefined) dans l'override retombe sur le calcul auto.
 
-export const MEALS_ORDER = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
+export const MEALS_ORDER = ['Petit-déjeuner', 'Déjeuner', 'Collation', 'Dîner']
 
 // Part calorique de base de chaque repas (repères PNNS/ANSES).
 // Sert de poids RELATIF pour redistribuer le budget restant entre les repas

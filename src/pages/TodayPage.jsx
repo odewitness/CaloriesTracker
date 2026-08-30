@@ -436,7 +436,16 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     repas: (
       <div>
         <div className="section-title">Repas du jour</div>
-        {MEALS.map(m => (
+        {MEALS
+          // Repas désactivé : on le retire complètement de la page du jour,
+          // SAUF s'il contient déjà des aliments enregistrés ou planifiés
+          // (sinon ils deviendraient invisibles tout en comptant dans les
+          // totaux) — dans ce cas MealSection affiche sa carte grisée
+          // « Désactivé ».
+          .filter(m => mealTargets[m]?.enabled !== false
+            || entries.some(e => e.meal === m)
+            || nonMangesPlanifies.some(r => r.meal === m))
+          .map(m => (
           <MealSection
             key={m}
             name={m}

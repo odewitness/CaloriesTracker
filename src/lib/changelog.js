@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'La collation se place avant le dîner',
+    description: "Dans tes repas du jour, la collation apparaît maintenant entre le déjeuner et le dîner, comme dans une vraie journée. Et si tu ne l'as pas activée (depuis Profil), elle ne s'affiche plus du tout sur la page du jour : plus de carte grisée qui traîne. Pareil pour un autre repas que tu désactiverais. Un repas désactivé qui contient encore des aliments reste visible pour que tu puisses les retrouver.",
+  },
+  {
+    date: '2026-08-30',
     title: 'La partie « Activité » allégée',
     description: "La carte Activité de ta page du jour était trop chargée. Elle ne garde plus que l'essentiel : ta progression de la semaine en haut, tes pas du jour sur une seule ligne, et tes séances. Le petit bilan d'énergie (ce que tu manges face à ce que tu dépenses, ou ton objectif ajusté si tu as choisi « manger selon l'effort ») s'affiche maintenant en une ligne juste sous ton cercle de calories ; touche-la pour voir le détail.",
   },
