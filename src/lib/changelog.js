@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Ton sport, semaine après semaine',
+    description: "Le bloc « Activité » affiche maintenant un anneau : tes minutes actives de la semaine par rapport à ton objectif (réglable dans Profil › Sport, ou « Aucun » si tu préfères sans). Et dans l'Historique, une section « Sport » récapitule tes minutes et tes séances sur la période choisie, avec un petit graphique par jour, par semaine ou par mois, et le nombre de semaines d'affilée où tu as tenu ton objectif.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Note tes séances de sport',
     description: "Un nouveau bloc « Activité » arrive sur ta page du jour (à activer dans Profil › Sport). Tu y ajoutes tes séances en quelques secondes : type (course, muscu, yoga, vélo…), durée, ressenti, et l'app estime les calories dépensées — tu peux les corriger. Tu vois tes minutes actives de la semaine, avec un objectif si tu en veux un, et les jours où tu as bougé sont marqués d'un point vert sur le calendrier. Ça ne change rien à tes objectifs de calories.",
   },
