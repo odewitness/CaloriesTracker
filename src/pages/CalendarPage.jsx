@@ -15,6 +15,7 @@ import { useCycle } from '../hooks/useCycle'
 import { useSportRange } from '../hooks/useSport'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
 import { phasesForRange } from '../lib/cycle'
+import { isWaterEntry } from '../lib/water'
 import { fmt } from '../lib/dates'
 
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1) }
@@ -86,12 +87,15 @@ export default function CalendarPage() {
     return sportByDateRaw
   }, [settings.sport, sportByDateRaw])
 
+  // Un jour ne se colore (vert / corail) que s'il contient de vrais aliments :
+  // l'eau seule (ou rien) reste neutre, sinon une journée où seule l'eau est
+  // notée ressortait en corail « pas assez ».
   const dayStatusByDate = useMemo(() => {
     const result = {}
     for (const dateStr of Object.keys(journalByDate)) {
-      const entries = journalByDate[dateStr]
-      const totals = computeTotals(entries)
-      result[dateStr] = getDayStatus(totals, settings, entries.length > 0)
+      const foodEntries = journalByDate[dateStr].filter(e => !isWaterEntry(e))
+      if (foodEntries.length === 0) continue
+      result[dateStr] = getDayStatus(computeTotals(foodEntries), settings, true)
     }
     return result
   }, [journalByDate, settings])
