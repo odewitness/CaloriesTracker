@@ -50,7 +50,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const isToday = dateStr === fmt(new Date())
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
-  const { days: cycleDays, intensiteByDate } = useCycle()
+  const { days: cycleDays, intensiteByDate, symptomesByDate, toggleDay: toggleCycleDay, setDaysIntensite, setDaysSymptomes } = useCycle()
   const { favorites } = useFavorites()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
   const { settings, update: updateSettings } = useSettings()
@@ -229,7 +229,18 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             canShare={entries.length > 0}
           />
         )}
-        <CyclePhaseBadge dateStr={dateStr} days={cycleDays} cycleSettings={settings.cycle} kcalDelta={cycleKcalDelta} favorites={favorites} intensiteByDate={intensiteByDate} />
+        <CyclePhaseBadge
+          dateStr={dateStr}
+          days={cycleDays}
+          cycleSettings={settings.cycle}
+          kcalDelta={cycleKcalDelta}
+          favorites={favorites}
+          intensiteByDate={intensiteByDate}
+          symptomesByDate={symptomesByDate}
+          onToggleDay={toggleCycleDay}
+          onSetIntensite={(d, level) => setDaysIntensite([d], level)}
+          onSetSymptomes={(d, arr) => setDaysSymptomes([d], arr)}
+        />
         <TodayOverviewCard
           consumed={totals.kcal}
           goal={daySettings.goal_kcal}

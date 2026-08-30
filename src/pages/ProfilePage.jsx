@@ -41,7 +41,10 @@ export default function ProfilePage() {
   // section === null → le hub. Sinon on affiche l'écran correspondant.
   // Le bouton retour Android/navigateur est géré par useBackButton dans
   // SectionScreen : il ramène au hub avant de fermer l'overlay Profil.
-  const [section, setSection] = useState(null)
+  // `location.state.section` permet d'ouvrir directement un écran depuis
+  // l'extérieur (ex. raccourci "Cycle" de DayShortcutsBar), sans passer par le
+  // hub — lu une seule fois à l'ouverture de l'overlay.
+  const [section, setSection] = useState(() => location.state?.section || null)
 
   const openMeasurements = () => navigate('/mensurations', { state: { backgroundLocation: location.state?.backgroundLocation || location } })
   const latestWeight = measurementEntries.find(e => e.poids_kg != null)?.poids_kg

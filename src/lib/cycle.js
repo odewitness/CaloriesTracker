@@ -228,6 +228,47 @@ export const PHASE_GUIDANCE = {
   },
 }
 
+// Conseils sport par phase (Palier 8), même prudence que PHASE_GUIDANCE :
+// informatif, jamais prescriptif, ampleur/portée variables selon les
+// personnes. Affiché dans la pastille de phase de la page du jour.
+export const PHASE_SPORT_GUIDANCE = {
+  menstruelle: {
+    notes: 'Le sport reste possible, et peut même soulager certaines douleurs. Marche, étirements, yoga ou une séance plus légère selon l\'énergie du jour — baisse l\'intensité sans culpabiliser si la fatigue ou les douleurs sont là.',
+  },
+  folliculaire: {
+    notes: 'Bon moment pour monter en intensité : renforcement, cardio soutenu, séances plus exigeantes. L\'énergie et la récupération sont en général meilleures.',
+  },
+  ovulatoire: {
+    notes: 'Souvent une sensation de forme, mais aussi une période où les ligaments seraient un peu plus laxes : un échauffement soigné avant les mouvements explosifs ou les sports avec changements de direction peut aider.',
+  },
+  luteale: {
+    notes: 'L\'endurance et le cardio modéré restent confortables. La récupération peut être un peu plus longue et la fatigue plus présente en fin de phase — ajuste l\'intensité selon comment tu te sens, rien d\'obligatoire à changer.',
+  },
+  inconnue: { notes: '' },
+}
+
+// ── Palier 8 : symptômes par jour de règles ─────────────────────────────────
+// Liste prédéfinie + entrées libres (texte saisi à la main), stockées ensemble
+// dans `regles.symptomes` (text[]). Une entrée libre qui ne correspond à aucune
+// clé prédéfinie s'affiche telle quelle. Données privées (RLS "own", comme le
+// reste de la table `regles`) — visibles seulement par l'utilisatrice.
+export const PERIOD_SYMPTOMS = [
+  { key: 'crampes', label: 'Crampes / douleurs' },
+  { key: 'maux_tete', label: 'Maux de tête' },
+  { key: 'fatigue', label: 'Fatigue' },
+  { key: 'ballonnements', label: 'Ballonnements' },
+  { key: 'seins_sensibles', label: 'Seins sensibles' },
+  { key: 'irritabilite', label: 'Irritabilité / sautes d\'humeur' },
+  { key: 'sommeil', label: 'Sommeil perturbé' },
+  { key: 'nausees', label: 'Nausées' },
+  { key: 'dos', label: 'Douleurs de dos' },
+  { key: 'acne', label: 'Acné' },
+]
+export const PERIOD_SYMPTOM_LABEL = Object.fromEntries(PERIOD_SYMPTOMS.map(s => [s.key, s.label]))
+export function symptomLabel(key) {
+  return PERIOD_SYMPTOM_LABEL[key] || key
+}
+
 // ── Calcul principal ───────────────────────────────────────────────────────
 // dateStr : jour pour lequel on veut la phase ('YYYY-MM-DD').
 // days    : tous les jours de règles connus.
