@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Les raccourcis du jour plus compacts',
+    description: "Quand tu ouvres le menu « … » en haut de la page du jour, les raccourcis (exclure ce jour, relevé de poids, planifier un repas, cycle, partager) s'affichent maintenant en petites pastilles rondes avec juste l'icône, sans le texte. Ça prend beaucoup moins de place. Le nom de chaque raccourci apparaît si tu restes appuyée dessus.",
+  },
+  {
+    date: '2026-08-30',
     title: 'La collation se place avant le dîner',
     description: "Dans tes repas du jour, la collation apparaît maintenant entre le déjeuner et le dîner, comme dans une vraie journée. Et si tu ne l'as pas activée (depuis Profil), elle ne s'affiche plus du tout sur la page du jour : plus de carte grisée qui traîne. Pareil pour un autre repas que tu désactiverais. Un repas désactivé qui contient encore des aliments reste visible pour que tu puisses les retrouver.",
   },

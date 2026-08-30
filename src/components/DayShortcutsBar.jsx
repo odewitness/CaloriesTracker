@@ -48,16 +48,17 @@ export default function DayShortcutsBar({ excluded, onToggleExcluded, onPlanMeal
         <button
           key={key}
           onClick={onClick}
+          aria-label={label}
+          title={label}
           style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '6px 10px', borderRadius: 999, border: 'none', cursor: 'pointer',
-            fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 32, height: 32,
+            padding: 0, borderRadius: 999, border: 'none', cursor: 'pointer',
             background: active ? 'var(--green-light)' : 'var(--gray-bg)',
             color: active ? 'var(--green-dark)' : 'var(--text-muted)',
           }}
         >
-          <Icon size={14} />
-          {label}
+          <Icon size={16} />
         </button>
       ))}
     </div>
