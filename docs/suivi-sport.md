@@ -22,14 +22,11 @@ cibles caloriques.
 - **Saisie manuelle = source de vérité** (Palier 1), comme pour la table
   `regles`. La base est conçue pour qu'un import (Strava, plus tard autre chose)
   alimente **la même table `activites_sport`** sans refonte.
-- **Strava en option** (Palier 5), branché via des **Edge Functions Supabase**
-  (le secret client et le rafraîchissement de token restent côté serveur).
-  - Couvre **proprement** la montre **Garmin** de la 2ᵉ utilisatrice (auto-sync
-    natif Garmin Connect → Strava, à activer une fois).
-  - Couvre **partiellement** la montre **Xiaomi** de la 1ʳᵉ utilisatrice :
-    Mi Fitness → Strava ne remonte que les **sports avec GPS** (+ pas / calories
-    / distance), pas la muscu ni le yoga en salle, et la sync a été instable
-    courant 2026. La saisie manuelle reste le filet de sécurité.
+- ~~**Strava en option** (Palier 5)~~ — **abandonné** (décision utilisatrice,
+  2026-08-30) : trop de plomberie à mettre en place côté Strava + Supabase
+  (création d'une app Strava, déploiement d'Edge Functions, secret, cron). La
+  saisie manuelle couvre le besoin. §4.4 conservée pour référence si on y
+  revient un jour. **Aucun autre palier ne dépendait de Strava.**
 - **« Manger selon l'effort » visé à terme, mais reconnu comme un piège.** Le
   `goal_kcal` actuel **intègre déjà** l'activité sportive (multiplicateur
   `ACTIVITY_LEVELS` ×1.2 → ×1.9 dans `computeCalorieNeeds`). Ajouter les séances
@@ -168,8 +165,8 @@ alter table activites_sport enable row level security;
 }
 ```
 
-**Table `connexions_sport`** (Palier 5) — tokens OAuth, **jamais lus par le
-client**.
+**Table `connexions_sport`** — ~~Palier 5, tokens OAuth~~ — **non créée**
+(Strava abandonné). Schéma conservé pour référence :
 
 ```sql
 create table if not exists connexions_sport (
@@ -223,13 +220,17 @@ seulement au Palier 8, calquées sur `partages_journal` & co.
 | Historique : minutes & séances par semaine / mois, courbe | `HistoryPage.jsx` + composant graphe | 2 |
 | Corrélations sport ↔ poids / énergie + annotation des graphes les jours de séance | `HistoryPage.jsx`, `MetricChart.jsx` | 3 |
 | Boucle cycle : rattacher chaque séance à sa phase, rétrospectif « ton sport selon ta phase » face à `PHASE_SPORT_GUIDANCE` | `src/lib/cycle.js`, `CyclePhaseBadge.jsx`, `HistoryPage.jsx` | 4 |
-| Connexion Strava : écran « Connexions » dans le Profil, bouton connecter / déconnecter, dernière synchro | `SportSection.jsx` + Edge Functions | 5 |
+| ~~Connexion Strava~~ | — | ~~5~~ abandonné |
 | Bilan énergétique lecture seule (`mode_energie: 'bilan'`) | `SportSection.jsx` / `TodayOverviewCard.jsx` | 6 |
 | « Manger selon l'effort » : base recalculée sur sédentaire + crédit séances, plafonné | `nutrients.js` (`computeCalorieNeeds` base sédentaire), `TodayPage` `daySettings`, `computeMealTargets`, gaps | 7 (option) |
 | Partage social d'une séance / résumé hebdo | tables sociales + `useFeed.js` + `SocialPage.jsx` | 8 (option) |
 | Rappels push « tu n'as pas bougé » / objectif hebdo | `push_subscriptions` + Edge Function cron | 9 (option) |
 
-### 4.4 Intégration Strava (Palier 5)
+### 4.4 Intégration Strava — ABANDONNÉE (2026-08-30)
+
+> Décision utilisatrice : trop de mise en place (app Strava, Edge Functions,
+> secret Supabase, cron). La saisie manuelle suffit. Section conservée telle
+> quelle au cas où on y reviendrait — rien n'en dépend ailleurs.
 
 **Pré-requis (une fois) :** créer une application sur
 `https://www.strava.com/settings/api` → `Client ID`, `Client Secret`, domaine de
@@ -338,24 +339,30 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
       `MeasurementsPage` charge `useSportRange` sur la fenêtre des relevés.
 - [x] Entrée changelog (2026-08-30 « Tes jours de sport sur tes courbes »)
 
-### Palier 4 — Boucle cycle ▸ statut : à faire
-- [ ] `cycle.js` : rattacher chaque séance à la phase où elle tombe
-- [ ] Rétrospectif « ton sport selon ta phase » face à `PHASE_SPORT_GUIDANCE`
-      (déjà écrit au Palier 8 du chantier cycle) — informatif, jamais prescriptif
-- [ ] Comparaison volume par phase dans `HistoryPage`
-- [ ] Entrée changelog
+### Palier 4 — Boucle cycle ▸ statut : codé (branche `suivi-sport-p4`)
+- [x] Rattachement séance → phase via `phaseForDate` (cycle.js, déjà existant —
+      pas de nouveau helper nécessaire)
+- [x] `src/components/history/SportPhaseSection.jsx` : rétrospectif « Ton sport
+      selon ta phase » dans `HistoryPage` — minutes / séances par phase (règles,
+      folliculaire, ovulation, lutéale) + mini-barre + note `PHASE_SPORT_GUIDANCE`
+      par phase. Hors vue Année. Ne s'affiche que si cycle actif (hors
+      contraception) + sport actif + ≥ 3 séances rattachables sur la période.
+      Note de bas de bloc « pas un programme à suivre ».
+- [x] Entrée changelog (2026-08-30 « Ton sport, phase par phase »)
+- Pas de modif de la pastille de phase (`CyclePhaseBadge`) au Palier 4 : le
+  rétrospectif vit dans l'Historique, la pastille du jour garde le cadrage
+  cycle existant (Palier 8 du chantier cycle).
 
-### Palier 5 — Connexion Strava ▸ statut : à faire
-- [ ] `supabase/sql/connexions_sport_setup.sql` (table `connexions_sport`, RLS
-      sans policy client) + MAJ `supabase_schema.sql`
-- [ ] Edge Functions `strava-oauth` (échange de code) et `strava-sync` (refresh +
-      pull + mapping + dédup)
-- [ ] Cron `pg_cron` de synchro
-- [ ] Écran « Connexions » dans Profil › Sport (connecter / déconnecter, dernière
-      synchro, bascule `auto`)
-- [ ] Badge « importé de Strava » sur les séances concernées ;
-      `modifie_manuellement` posé dès qu'on édite une séance importée
-- [ ] Entrée changelog (« Connecte ta montre via Strava »)
+### Palier 5 — Connexion Strava ▸ statut : ABANDONNÉ (2026-08-30)
+Décision utilisatrice : trop de mise en place (app Strava, Edge Functions,
+secret Supabase, cron) pour le gain. La saisie manuelle (Palier 1) couvre le
+besoin. Voir §4.4 (conservée pour référence). La table `connexions_sport` n'est
+pas créée. Aucun autre palier n'en dépendait. Les artefacts prévus
+(`modifie_manuellement` sur `activites_sport`, `source`/`source_id`, valeur
+`'strava'` de `mode_energie`… non, `mode_energie` n'a rien à voir) restent en
+base : `activites_sport.source` vaut toujours `'manuel'`, `source_id` /
+`modifie_manuellement` sont simplement inutilisés — inoffensifs, gardés au cas
+où un import (texte, autre) arriverait plus tard.
 
 ### Palier 6 — Bilan énergétique (lecture seule) ▸ statut : à faire
 - [ ] `mode_energie: 'bilan'` dans Profil › Sport
@@ -377,8 +384,7 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
 
 ### Palier 8 — Social (option) ▸ statut : non tranché
 - [ ] Tables `partages_sport` / `reactions_sport` / `commentaires_sport`
-- [ ] Partage d'une séance manuelle ou d'un résumé hebdo agrégé (pas de
-      rediffusion brute de données Strava — voir §4.4)
+- [ ] Partage d'une séance ou d'un résumé de semaine
 - [ ] Entrée changelog
 
 ### Palier 9 — Rappels push (option) ▸ statut : non tranché
@@ -393,11 +399,12 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
 
 - Palier 1 : mergé dans `main` en local (SQL `sport_setup.sql` appliqué par
   l'utilisatrice, testé). Reste : `git push` vers `main` (à confirmer).
-- Paliers 1 & 2 : mergés + poussés sur `main` (déployés Netlify).
-- Palier 3 : codé sur la branche `suivi-sport-p3`. Aucune migration. Reste :
+- Paliers 1 → 3 : mergés + poussés sur `main` (déployés Netlify).
+- Palier 4 : codé sur la branche `suivi-sport-p4`. Aucune migration. Reste :
   test manuel, merge + push après confirmation.
-- Paliers 4 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
-  (Palier 5). Paliers 7 → 9 non tranchés.
+- **Palier 5 (Strava) : abandonné.** Aucune migration restante pour le chantier.
+- Palier 6 (bilan lecture seule) à faire. Paliers 7 → 9 non tranchés. Aucun ne
+  dépend de Strava.
 
 ---
 
@@ -433,6 +440,17 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — **Palier 5 (Strava) abandonné** (décision utilisatrice) :
+  trop de plomberie (app Strava + Edge Functions + secret + cron) pour le gain.
+  §4.4 conservée pour référence. Aucun autre palier n'en dépendait ; la table
+  `connexions_sport` n'est pas créée. Suite envisageable : Palier 6 (bilan
+  énergétique en lecture seule).
+- **2026-08-30** — Palier 3 mergé + poussé. Palier 4 codé sur la branche
+  `suivi-sport-p4` : `SportPhaseSection` dans `HistoryPage` (répartition
+  minutes/séances par phase du cycle + repère `PHASE_SPORT_GUIDANCE` par phase,
+  ≥ 3 séances rattachables, hors Année). Pas de modif de `CyclePhaseBadge` — le
+  rétrospectif reste dans l'Historique. `npm run build` OK. En attente : test
+  manuel + merge/push.
 - **2026-08-30** — Paliers 1 & 2 mergés + poussés sur `main` (déployés). Palier 3
   codé sur la branche `suivi-sport-p3` : encart « Sport & calories sur cette
   période » (jours avec séance vs sans, kcal + poids moy.) dans `HistoryPage`,

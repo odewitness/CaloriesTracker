@@ -25,6 +25,7 @@ import TopFoods from '../components/history/TopFoods'
 import DayCard from '../components/history/DayCard'
 import MonthCard from '../components/history/MonthCard'
 import SportHistorySection from '../components/history/SportHistorySection'
+import SportPhaseSection from '../components/history/SportPhaseSection'
 
 const TABS = [
   { key: 'semaine', label: 'Semaine' },
@@ -438,6 +439,14 @@ export default function HistoryPage() {
                 Simple observation, pas une relation de cause à effet. Sur {sportPeriodStats.nWith} + {sportPeriodStats.nWithout} jours notés.
               </div>
             </div>
+          )}
+
+          {tab !== 'annee' && settings.sport?.enabled && settings.cycle?.enabled && (
+            <SportPhaseSection
+              activites={sportActs}
+              cycleDays={cycleDays}
+              cycleSettings={settings.cycle}
+            />
           )}
 
           {/* Régularité */}
