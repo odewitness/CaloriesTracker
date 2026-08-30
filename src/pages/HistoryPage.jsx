@@ -33,6 +33,15 @@ const TABS = [
   { key: 'annee', label: 'Année' },
 ]
 
+// Onglets thématiques (2ᵉ rangée, sous le sélecteur de période). `need` masque
+// l'onglet tant que le suivi correspondant n'est pas activé.
+const VIEWS = [
+  { key: 'resume', label: 'Résumé' },
+  { key: 'nutrition', label: 'Nutrition' },
+  { key: 'activite', label: 'Activité', need: 'sport' },
+  { key: 'cycle', label: 'Cycle', need: 'cycle' },
+]
+
 const HIST_WINDOW = 365 // jours remontés pour la série en cours + le record
 
 // Somme kcal d'une liste d'entrées journal
@@ -46,6 +55,7 @@ export default function HistoryPage() {
   const { rows: sportStreakRows } = useSportStreak(16)
 
   const [tab, setTab] = useState('semaine')
+  const [view, setView] = useState('resume')
   const [anchor, setAnchor] = useState(todayStr())
   const [entries, setEntries] = useState([])
   const [prevEntries, setPrevEntries] = useState([])
@@ -316,6 +326,30 @@ export default function HistoryPage() {
     handleJump._t = window.setTimeout(() => setHighlightKey(null), 1400)
   }, [tab])
 
+  // ── Onglets thématiques : masqués tant que le suivi correspondant est off ─
+  const cycleView = !!settings.cycle?.enabled && !settings.cycle?.sous_contraception
+  const availableViews = useMemo(
+    () => VIEWS.filter(v =>
+      v.need === 'sport' ? !!settings.sport?.enabled
+        : v.need === 'cycle' ? cycleView
+        : true,
+    ),
+    [settings.sport?.enabled, cycleView],
+  )
+  const activeView = availableViews.some(v => v.key === view) ? view : 'resume'
+
+  // L'onglet courant a disparu (suivi désactivé) → retour sur Résumé.
+  useEffect(() => {
+    if (!availableViews.some(v => v.key === view)) setView('resume')
+  }, [availableViews, view])
+
+  // Période sans repas mais avec de l'activité → on ouvre d'emblée sur Activité.
+  useEffect(() => {
+    if (!loading && !hasEntries && hasSport && (view === 'resume' || view === 'nutrition')) {
+      setView('activite')
+    }
+  }, [loading, hasEntries, hasSport]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="page-content">
       <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 16 }}>Historique</div>
@@ -366,51 +400,170 @@ export default function HistoryPage() {
         <EmptyState icon={<TrendingDown size={40} />} title="Aucune donnée sur cette période" description="Logge tes repas pour voir tes stats ici" />
       )}
 
-      {/* Période sans repas loggé mais avec des séances / des pas : on affiche
-          quand même le récap d'activité (indépendant du journal). */}
-      {!loading && !hasEntries && hasSport && (
+      {!loading && (hasEntries || hasSport) && (
         <>
-          <SportHistorySection
-            activites={sportActs}
-            pasByDate={pasByDate}
-            streakRows={sportStreakRows}
-            tab={tab}
-            bounds={bounds}
-            goalMin={Number(settings.sport?.objectif_hebdo_minutes) || 0}
-            weightPoints={weightPoints}
-            cycleDays={cycleDays}
-            cycleSettings={settings.cycle}
-          />
-          {tab !== 'annee' && settings.cycle?.enabled && (
-            <SportPhaseSection activites={sportActs} cycleDays={cycleDays} cycleSettings={settings.cycle} />
-          )}
-          <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '8px 2px 16px' }}>
-            Aucun repas loggé sur cette période — seules tes données d'activité s'affichent.
+          {/* Onglets thématiques (2ᵉ rangée) — un seul thème visible à la fois. */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
+            {availableViews.map(v => (
+              <button
+                key={v.key}
+                onClick={() => setView(v.key)}
+                className="chip"
+                style={{
+                  flex: '1 0 auto', textAlign: 'center', whiteSpace: 'nowrap',
+                  background: activeView === v.key ? 'var(--green-light)' : 'transparent',
+                  color: activeView === v.key ? 'var(--green-dark)' : 'var(--text-muted)',
+                  fontWeight: activeView === v.key ? 700 : 500,
+                }}
+              >
+                {v.label}
+              </button>
+            ))}
           </div>
-        </>
-      )}
 
-      {!loading && hasEntries && (
-        <>
-          {/* Tendance */}
-          <CalorieTrendChart
-            tab={tab}
-            bounds={bounds}
-            days={days}
-            goalKcal={settings.goal_kcal}
-            excludedDates={excludedDates}
-            monthSummaries={monthSummaries}
-            avgKcal={avg.kcal}
-            weightPoints={weightPoints}
-            showWeight={showWeight}
-            onToggleWeight={() => setShowWeight(v => !v)}
-            onJumpToDetail={handleJump}
-            cycleDays={cycleDays}
-            cycleSettings={settings.cycle}
-            sportDates={settings.sport?.enabled ? sportDates : undefined}
-          />
+          {/* ── Résumé : tendance, stats clés, régularité, détail jour/mois ── */}
+          {activeView === 'resume' && (!hasEntries ? (
+            <div style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 2px 16px' }}>
+              Aucun repas loggé sur cette période. Va dans l'onglet <strong>Activité</strong> pour voir tes séances et tes pas.
+            </div>
+          ) : (
+            <>
+              <CalorieTrendChart
+                tab={tab}
+                bounds={bounds}
+                days={days}
+                goalKcal={settings.goal_kcal}
+                excludedDates={excludedDates}
+                monthSummaries={monthSummaries}
+                avgKcal={avg.kcal}
+                weightPoints={weightPoints}
+                showWeight={showWeight}
+                onToggleWeight={() => setShowWeight(w => !w)}
+                onJumpToDetail={handleJump}
+                cycleDays={cycleDays}
+                cycleSettings={settings.cycle}
+                sportDates={settings.sport?.enabled ? sportDates : undefined}
+              />
 
-          {cyclePhaseStats && (
+              <HistoryStatGrid
+                avgKcal={avg.kcal}
+                deltaPrev={deltaPrev}
+                daysObjectif={daysObjectif}
+                daysCounted={daysCounted}
+                daysWithData={daysWithData}
+                periodDays={periodDays}
+                energyBalance={energyBalance}
+                streak={streak}
+                recordStreak={recordStreak}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '8px 2px 16px' }}>
+                Moyennes calculées sur les {daysCounted} jour{daysCounted > 1 ? 's' : ''} loggé{daysCounted > 1 ? 's' : ''} de la période{daysWithData > daysCounted ? ` (${daysWithData - daysCounted} exclu${daysWithData - daysCounted > 1 ? 's' : ''})` : ''} — comparées aux repères Anses pour un adulte.
+              </div>
+
+              {(tab === 'mois' || tab === 'annee') && (
+                <>
+                  <div className="section-title">Régularité</div>
+                  <ConsistencyGrid
+                    layout={tab === 'annee' ? 'year' : 'month'}
+                    statusByDate={statusByDate}
+                    excludedDates={excludedDates}
+                    monthDate={new Date(anchor + 'T12:00:00')}
+                    year={Number(bounds.start.slice(0, 4))}
+                    onSelectDate={handleJump}
+                  />
+                </>
+              )}
+
+              <div className="section-title">{tab === 'annee' ? 'Détail par mois' : 'Détail par jour'}</div>
+              {tab === 'annee'
+                ? monthSummaries.map(m => (
+                    <MonthCard
+                      key={m.key} monthKey={m.key} monthLabel={m.label}
+                      avgKcal={m.avgKcal} daysLogged={m.daysLogged}
+                      goalKcal={settings.goal_kcal} highlight={highlightKey === m.key}
+                    />
+                  ))
+                : dateKeys.map(d => (
+                    <DayCard
+                      key={d} dateStr={d} entries={days[d]} goalKcal={settings.goal_kcal}
+                      excluded={excludedDates.has(d)} highlight={highlightKey === d}
+                    />
+                  ))}
+            </>
+          ))}
+
+          {/* ── Nutrition : moyennes, micro-nutriments, repas, profils ────── */}
+          {activeView === 'nutrition' && (!hasEntries ? (
+            <div style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 2px 16px' }}>
+              Aucun repas loggé sur cette période.
+            </div>
+          ) : (
+            <>
+              <div className="section-title">Moyennes de la période</div>
+              <CalorieRing consumed={avg.kcal} goal={settings.goal_kcal} />
+              <MacroBar prot={avg.prot} gluc={avg.gluc} lip={avg.lip} fib={avg.fib} goals={settings} />
+
+              <div className="section-title">Détail nutritionnel</div>
+              <NutrientPanel totals={avg} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
+
+              <div className="section-title">Répartition par repas</div>
+              <MealSplitBar entries={entries} daysCounted={daysCounted} excludedDates={excludedDates} />
+
+              <div className="section-title">Profil par jour de semaine</div>
+              <WeekdayProfile days={days} excludedDates={excludedDates} goalKcal={settings.goal_kcal} />
+
+              <div className="section-title">Aliments les plus fréquents</div>
+              <TopFoods entries={entries} />
+            </>
+          ))}
+
+          {/* ── Activité : sport & pas, sport vs calories, sport par phase ── */}
+          {activeView === 'activite' && (
+            <>
+              <SportHistorySection
+                activites={sportActs}
+                pasByDate={pasByDate}
+                streakRows={sportStreakRows}
+                tab={tab}
+                bounds={bounds}
+                goalMin={Number(settings.sport?.objectif_hebdo_minutes) || 0}
+                weightPoints={weightPoints}
+                cycleDays={cycleDays}
+                cycleSettings={settings.cycle}
+              />
+
+              {sportPeriodStats && (
+                <div className="card" style={{ padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--green)' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>Sport &amp; calories sur cette période</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    Calories moy. : <strong>{sportPeriodStats.kWith}</strong> les jours avec séance vs{' '}
+                    <strong>{sportPeriodStats.kWithout}</strong> les jours sans{' '}
+                    (<span style={{ color: sportPeriodStats.kDelta >= 0 ? 'var(--amber)' : 'var(--green)', fontWeight: 700 }}>
+                      {sportPeriodStats.kDelta >= 0 ? '+' : ''}{sportPeriodStats.kDelta}
+                    </span>).
+                    {sportPeriodStats.wDelta != null && (
+                      <> Poids moy. : <strong>{sportPeriodStats.wWith}</strong> vs <strong>{sportPeriodStats.wWithout}</strong> kg{' '}
+                      ({sportPeriodStats.wDelta >= 0 ? '+' : ''}{sportPeriodStats.wDelta}).</>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.4 }}>
+                    Simple observation, pas une relation de cause à effet. Sur {sportPeriodStats.nWith} + {sportPeriodStats.nWithout} jours notés.
+                  </div>
+                </div>
+              )}
+
+              {tab !== 'annee' && settings.cycle?.enabled && (
+                <SportPhaseSection
+                  activites={sportActs}
+                  cycleDays={cycleDays}
+                  cycleSettings={settings.cycle}
+                />
+              )}
+            </>
+          )}
+
+          {/* ── Cycle : calories / poids / pas / dépense selon la phase ───── */}
+          {activeView === 'cycle' && (cyclePhaseStats ? (
             <div className="card" style={{ padding: '12px 14px', marginBottom: 12, borderLeft: '3px solid var(--purple)' }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>Ton cycle sur cette période</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -443,116 +596,13 @@ export default function HistoryPage() {
                 Un petit écart est attendu ; côté poids c'est surtout de l'eau. Sur {cyclePhaseStats.nLut} + {cyclePhaseStats.nRest} jours notés.
               </div>
             </div>
-          )}
-
-          {/* Détail nutritionnel (vitamines, minéraux, sucres, acides gras) */}
-          <div className="section-title">Détail nutritionnel</div>
-          <NutrientPanel totals={avg} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
-
-          {/* Stats clés */}
-          <HistoryStatGrid
-            avgKcal={avg.kcal}
-            deltaPrev={deltaPrev}
-            daysObjectif={daysObjectif}
-            daysCounted={daysCounted}
-            daysWithData={daysWithData}
-            periodDays={periodDays}
-            energyBalance={energyBalance}
-            streak={streak}
-            recordStreak={recordStreak}
-          />
-          <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '8px 2px 16px' }}>
-            Moyennes calculées sur les {daysCounted} jour{daysCounted > 1 ? 's' : ''} loggé{daysCounted > 1 ? 's' : ''} de la période{daysWithData > daysCounted ? ` (${daysWithData - daysCounted} exclu${daysWithData - daysCounted > 1 ? 's' : ''})` : ''} — comparées aux repères Anses pour un adulte.
-          </div>
-
-          {settings.sport?.enabled && (
-            <SportHistorySection
-              activites={sportActs}
-              pasByDate={pasByDate}
-              streakRows={sportStreakRows}
-              tab={tab}
-              bounds={bounds}
-              goalMin={Number(settings.sport?.objectif_hebdo_minutes) || 0}
-              weightPoints={weightPoints}
-              cycleDays={cycleDays}
-              cycleSettings={settings.cycle}
-            />
-          )}
-
-          {sportPeriodStats && (
-            <div className="card" style={{ padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--green)' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>Sport &amp; calories sur cette période</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                Calories moy. : <strong>{sportPeriodStats.kWith}</strong> les jours avec séance vs{' '}
-                <strong>{sportPeriodStats.kWithout}</strong> les jours sans{' '}
-                (<span style={{ color: sportPeriodStats.kDelta >= 0 ? 'var(--amber)' : 'var(--green)', fontWeight: 700 }}>
-                  {sportPeriodStats.kDelta >= 0 ? '+' : ''}{sportPeriodStats.kDelta}
-                </span>).
-                {sportPeriodStats.wDelta != null && (
-                  <> Poids moy. : <strong>{sportPeriodStats.wWith}</strong> vs <strong>{sportPeriodStats.wWithout}</strong> kg{' '}
-                  ({sportPeriodStats.wDelta >= 0 ? '+' : ''}{sportPeriodStats.wDelta}).</>
-                )}
-              </div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.4 }}>
-                Simple observation, pas une relation de cause à effet. Sur {sportPeriodStats.nWith} + {sportPeriodStats.nWithout} jours notés.
-              </div>
+          ) : (
+            <div style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 2px 16px' }}>
+              {tab === 'annee'
+                ? "La comparaison par phase du cycle n'est pas disponible sur la vue Année — passe en Semaine ou Mois."
+                : "Pas encore assez de jours notés sur cette période pour comparer ta phase lutéale au reste du cycle."}
             </div>
-          )}
-
-          {tab !== 'annee' && settings.sport?.enabled && settings.cycle?.enabled && (
-            <SportPhaseSection
-              activites={sportActs}
-              cycleDays={cycleDays}
-              cycleSettings={settings.cycle}
-            />
-          )}
-
-          {/* Régularité */}
-          {(tab === 'mois' || tab === 'annee') && (
-            <>
-              <div className="section-title">Régularité</div>
-              <ConsistencyGrid
-                layout={tab === 'annee' ? 'year' : 'month'}
-                statusByDate={statusByDate}
-                excludedDates={excludedDates}
-                monthDate={new Date(anchor + 'T12:00:00')}
-                year={Number(bounds.start.slice(0, 4))}
-                onSelectDate={handleJump}
-              />
-            </>
-          )}
-
-          {/* Moyennes */}
-          <div className="section-title">Moyennes de la période</div>
-          <CalorieRing consumed={avg.kcal} goal={settings.goal_kcal} />
-          <MacroBar prot={avg.prot} gluc={avg.gluc} lip={avg.lip} fib={avg.fib} goals={settings} />
-
-          {/* Tops & profils */}
-          <div className="section-title">Répartition par repas</div>
-          <MealSplitBar entries={entries} daysCounted={daysCounted} excludedDates={excludedDates} />
-
-          <div className="section-title">Profil par jour de semaine</div>
-          <WeekdayProfile days={days} excludedDates={excludedDates} goalKcal={settings.goal_kcal} />
-
-          <div className="section-title">Aliments les plus fréquents</div>
-          <TopFoods entries={entries} />
-
-          {/* Détail */}
-          <div className="section-title">{tab === 'annee' ? 'Détail par mois' : 'Détail par jour'}</div>
-          {tab === 'annee'
-            ? monthSummaries.map(m => (
-                <MonthCard
-                  key={m.key} monthKey={m.key} monthLabel={m.label}
-                  avgKcal={m.avgKcal} daysLogged={m.daysLogged}
-                  goalKcal={settings.goal_kcal} highlight={highlightKey === m.key}
-                />
-              ))
-            : dateKeys.map(d => (
-                <DayCard
-                  key={d} dateStr={d} entries={days[d]} goalKcal={settings.goal_kcal}
-                  excluded={excludedDates.has(d)} highlight={highlightKey === d}
-                />
-              ))}
+          ))}
         </>
       )}
     </div>

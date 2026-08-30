@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: "L'Historique est rangé en onglets",
+    description: "La page Historique devenait longue à faire défiler. Elle est maintenant découpée en onglets, sous le choix Semaine / Mois / Année : « Résumé » (ta courbe de calories, tes stats clés, le calendrier et le détail jour par jour), « Nutrition » (tes moyennes, le détail des vitamines et minéraux, la répartition par repas, ton profil par jour de semaine, tes aliments les plus fréquents), « Activité » (ton sport et tes pas) et « Cycle » (tes calories et ton poids selon ta phase). Les onglets Activité et Cycle n'apparaissent que si tu suis le sport ou ton cycle. Rien n'a disparu, tout est juste mieux rangé. Au passage, les barres du « profil par jour de semaine » qui restaient toutes minuscules sont réparées.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Le calendrier de régularité montre aussi les jours en dessous',
     description: "Dans l'Historique, le calendrier des couleurs ne distinguait que les jours dans l'objectif et ceux au-dessus. Maintenant tu vois aussi les jours où tu es passée en dessous : bleu clair quand c'est un peu en dessous (jusqu'à 600 kcal sous ton objectif), bleu foncé quand c'est nettement en dessous. Pratique pour repérer les journées où tu n'as pas assez mangé.",
   },

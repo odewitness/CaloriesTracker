@@ -26,7 +26,7 @@ export default function WeekdayProfile({ days, excludedDates, goalKcal }) {
     <div className="card" style={{ padding: '14px 16px', marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90 }}>
         {avgByWeekday.map((v, i) => (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+          <div key={i} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
             <span style={{ fontSize: 9, color: 'var(--text-hint)', fontWeight: 600 }}>{v ? Math.round(v) : '—'}</span>
             <div style={{ width: '100%', flex: 1, display: 'flex', alignItems: 'flex-end' }}>
               <div style={{
