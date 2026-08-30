@@ -21,7 +21,10 @@ function MacroRow({ label, val, goal, color, unit }) {
 // gagner la place qu'occupaient l'ancien bandeau de date et l'encart macros
 // séparé. Le swipe reste le moyen principal de changer de jour ; les flèches
 // ici en sont juste une alternative tactile.
-export default function TodayOverviewCard({ consumed, goal, prot, gluc, lip, fib, goals, onNavigate }) {
+// `energyFooter` (optionnel) : nœud rendu dans une bande basse — utilisé par la
+// page du jour pour la ligne « bilan d'énergie » / « objectif ajusté » quand le
+// suivi sport le prévoit.
+export default function TodayOverviewCard({ consumed, goal, prot, gluc, lip, fib, goals, onNavigate, energyFooter = null }) {
   const pct = Math.min(consumed / goal, 1)
   const R = 44
   const circ = 2 * Math.PI * R
@@ -37,41 +40,49 @@ export default function TodayOverviewCard({ consumed, goal, prot, gluc, lip, fib
   ]
 
   return (
-    <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '14px 6px', marginBottom: 12 }}>
-      <button className="btn-icon" onClick={() => onNavigate(-1)} aria-label="Jour précédent" style={{ flexShrink: 0 }}>
-        <ChevronLeft size={20} color="var(--text-muted)" />
-      </button>
+    <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '14px 6px' }}>
+        <button className="btn-icon" onClick={() => onNavigate(-1)} aria-label="Jour précédent" style={{ flexShrink: 0 }}>
+          <ChevronLeft size={20} color="var(--text-muted)" />
+        </button>
 
-      <div style={{ flexShrink: 0, textAlign: 'center', padding: '0 4px' }}>
-        <div style={{ position: 'relative', width: 108, height: 108, margin: '0 auto' }}>
-          <svg width="108" height="108" viewBox="0 0 108 108" style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx="54" cy="54" r={R} fill="none" stroke="var(--green-light)" strokeWidth="9" />
-            <circle
-              cx="54" cy="54" r={R} fill="none"
-              stroke={over ? 'var(--coral)' : 'var(--green)'}
-              strokeWidth="9" strokeLinecap="round"
-              strokeDasharray={circ}
-              strokeDashoffset={offset}
-              style={{ transition: 'stroke-dashoffset .5s ease' }}
-            />
-          </svg>
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{Math.round(consumed)}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>kcal</div>
+        <div style={{ flexShrink: 0, textAlign: 'center', padding: '0 4px' }}>
+          <div style={{ position: 'relative', width: 108, height: 108, margin: '0 auto' }}>
+            <svg width="108" height="108" viewBox="0 0 108 108" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="54" cy="54" r={R} fill="none" stroke="var(--green-light)" strokeWidth="9" />
+              <circle
+                cx="54" cy="54" r={R} fill="none"
+                stroke={over ? 'var(--coral)' : 'var(--green)'}
+                strokeWidth="9" strokeLinecap="round"
+                strokeDasharray={circ}
+                strokeDashoffset={offset}
+                style={{ transition: 'stroke-dashoffset .5s ease' }}
+              />
+            </svg>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
+              <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{Math.round(consumed)}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>kcal</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: over ? 'var(--coral)' : 'var(--green)', marginTop: 6, whiteSpace: 'nowrap' }}>
+            {over ? `+${Math.round(consumed - goal)} au-dessus` : `${Math.round(remain)} restantes`}
           </div>
         </div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: over ? 'var(--coral)' : 'var(--green)', marginTop: 6, whiteSpace: 'nowrap' }}>
-          {over ? `+${Math.round(consumed - goal)} au-dessus` : `${Math.round(remain)} restantes`}
+
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7, padding: '0 8px 0 4px' }}>
+          {macros.map(m => <MacroRow key={m.label} {...m} />)}
         </div>
+
+        <button className="btn-icon" onClick={() => onNavigate(1)} aria-label="Jour suivant" style={{ flexShrink: 0 }}>
+          <ChevronRight size={20} color="var(--text-muted)" />
+        </button>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7, padding: '0 8px 0 4px' }}>
-        {macros.map(m => <MacroRow key={m.label} {...m} />)}
-      </div>
-
-      <button className="btn-icon" onClick={() => onNavigate(1)} aria-label="Jour suivant" style={{ flexShrink: 0 }}>
-        <ChevronRight size={20} color="var(--text-muted)" />
-      </button>
+      {energyFooter && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '8px 14px' }}>
+          {energyFooter}
+        </div>
+      )}
     </div>
   )
 }
