@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useId } from 'react'
 import { phaseForDate } from '../lib/cycle'
+import { fmt } from '../lib/dates'
 
 const WIDTH = 320
 const HEIGHT = 170
@@ -26,7 +27,10 @@ function formatDateLong(dateStr) {
 function cutoffDate(months) {
   const d = new Date()
   d.setMonth(d.getMonth() - months)
-  return d.toISOString().slice(0, 10)
+  // fmt() = date en fuseau LOCAL. toISOString().slice(0,10) renverrait la date
+  // UTC : entre minuit et ~2h du matin en France, la coupure sautait d'un jour
+  // et un releve de poids pouvait disparaitre du graphe (cf. lib/dates.js).
+  return fmt(d)
 }
 
 // Lisse la ligne avec des courbes de Bézier (Catmull-Rom → cubique) plutôt que

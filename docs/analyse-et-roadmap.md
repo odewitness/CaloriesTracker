@@ -1,0 +1,488 @@
+# Analyse de l'app & feuille de route
+
+Revue complète du code (pages, hooks, `lib/`, schéma SQL, config PWA) faite le
+**2026-08-30**. Sert de fil conducteur : bugs à corriger, dette technique, et
+idées de fonctionnalités classées de la plus simple à la plus complexe.
+
+À faire évoluer : cocher / dater ce qui est livré, ajouter les décisions prises
+avec l'utilisatrice, comme pour `docs/cycle-menstruel.md` et
+`docs/suivi-sport.md`.
+
+---
+
+## 0. Ce qui est déjà solide (pour mémoire)
+
+Le code est mûr et soigné. Les pièges classiques sont déjà traités :
+
+- Fuseaux horaires centralisés dans `lib/dates.js` (`fmt`, `todayStr`), avec le
+  bon raisonnement documenté (`toISOString()` = UTC → mauvais jour la nuit).
+- Pattern portal documenté pour les modales montées dans `TodayPage` (slider
+  avec `translateX` → un enfant `position: fixed` se cale sur le conteneur
+  transformé). Voir le bloc « Notes utiles » de `CLAUDE.md`.
+- Mitigation du clignotement du header au scroll (`AppShell.handleScroll`,
+  fenêtre de neutralisation de direction).
+- Déduplication pas / séances pour l'énergie d'activité (`dayActivityKcal`).
+- Retry sur Open Food Facts (`fetchOFFWithRetry`), cache module-level de la base
+  Ciqual (`useCiqualCatalog`), pagination `range()` pour contourner le plafond
+  PostgREST (`fetchAllRows`).
+- RLS déjà activé sur `mensurations` (données sensibles) et `ciqual`.
+- `AuthContext` stabilise la référence `user` sur l'`id` pour éviter des
+  remontages d'écran à chaque `TOKEN_REFRESHED`.
+
+---
+
+## 1. Correctifs appliqués le 2026-08-30
+
+Petits changements mécaniques, faits directement.
+
+### 1.1 — Bug de fuseau dans le graphe des mensurations ✅
+
+`src/components/MetricChart.jsx`, `cutoffDate()` utilisait
+`d.toISOString().slice(0, 10)` → date **UTC**. Entre minuit et ~2 h du matin en
+France, la date de coupure de période sautait d'un jour : un relevé de poids
+pouvait apparaître / disparaître du graphe selon l'heure de consultation.
+Remplacé par `fmt(d)` (fuseau local), cohérent avec le reste de l'app.
+
+### 1.2 — Clés de liste par index dans `FoodPicker` ✅
+
+Les listes « Suggestions pour <repas> » et « Récents » utilisaient `key={i}`.
+Quand la liste change (filtre, tri, pagination), React réassocie les lignes par
+position → état interne et animations qui sautent. Passées à
+`key={foodIdentity(food).key}` (collision impossible : ces listes sont déjà
+dédupliquées par cette même clé dans `useMealSuggestions` / `useRecentFoods`).
+
+### 1.3 — Recherche d'aliments parallélisée ✅
+
+`FoodPicker.doSearch` (branche Ciqual) enchaînait **3 requêtes en série**
+(`search_ciqual` → `aliments_custom` → `recettes`), soit 3 allers-retours
+réseau à chaque frappe. Regroupées en `Promise.all` → ~3× plus rapide.
+
+### 1.4 — RLS activé sur les tables de données perso ✅
+
+Voir §2.1. SQL exécuté par l'utilisatrice dans l'éditeur Supabase le
+2026-08-30 : `journal`, `settings`, `aliments_custom`, `repas_types`, `marques`
+passent en RLS activé + policy « own ». `supabase_schema.sql` mis à jour.
+**Reste à faire** : vérifier le statut RLS de `profiles`, `recettes`,
+`recette_ingredients`, `favoris`, `listes_courses`, `liste_courses_items`,
+`repas_planifies`, `suggestions_manques` (voir fin de §2.1).
+
+---
+
+## 2. Bugs & fragilités restants
+
+Classés par gravité. Rien ici n'a encore été traité.
+
+### 2.1 — 🔴 CRITIQUE : RLS désactivé sur des tables contenant des données perso
+
+> ✅ **Traité le 2026-08-30** pour `journal`, `settings`, `aliments_custom`,
+> `repas_types`, `marques` (SQL ci-dessous exécuté par l'utilisatrice,
+> `supabase_schema.sql` mis à jour). Il reste la vérification des autres tables
+> listées en fin de section.
+
+`supabase_schema.sql`, section RLS (état d'avant le correctif) :
+
+```sql
+alter table journal            disable row level security;
+alter table settings           disable row level security;
+alter table aliments_custom    disable row level security;
+alter table repas_types        disable row level security;
+alter table marques            disable row level security;
+```
+
+**Problème.** La clé `anon` est publique (en clair dans `src/lib/supabase.js`,
+donc dans le bundle JS livré sur Netlify). RLS désactivé = n'importe qui, même
+**sans compte**, peut faire :
+
+```
+GET https://<projet>.supabase.co/rest/v1/journal?select=*
+apikey: <clé anon publique>
+```
+
+et récupérer **le journal alimentaire de tous les comptes**, tous les réglages,
+tous les aliments persos. Avec la fonctionnalité « Amies », plusieurs personnes
+réelles sont concernées. C'est exactement la faille déjà corrigée pour
+`mensurations` le 2026-08-17 (« accessibles sans authentification via la Data
+API tant que le RLS était désactivé »), encore ouverte sur des tables au moins
+aussi sensibles.
+
+**Correctif** (éditeur SQL Supabase — risque de régression quasi nul : le
+client filtre déjà partout par `user_id`) :
+
+```sql
+alter table journal enable row level security;
+create policy "journal_own" on journal for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table settings enable row level security;
+create policy "settings_own" on settings for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table aliments_custom enable row level security;
+create policy "aliments_custom_own" on aliments_custom for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table repas_types enable row level security;
+create policy "repas_types_own" on repas_types for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table marques enable row level security;
+create policy "marques_own" on marques for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+```
+
+**À vérifier aussi** (le schéma indique « statut RLS non vérifié ») :
+`profiles`, `recettes`, `recette_ingredients`, `favoris`, `listes_courses`,
+`liste_courses_items`, `repas_planifies`, `suggestions_manques`.
+
+**Après** : mettre `supabase_schema.sql` à jour, et si l'app reste à quelques
+personnes, désactiver l'inscription publique dans Supabase (Auth → Providers)
+et créer les comptes à la main.
+
+### 2.2 — 🟠 `markAsEaten` n'est pas atomique → doublons possibles
+
+`src/hooks/usePlannedMeals.js`. La fonction insère les aliments dans `journal`
+**puis** marque `repas_planifies.mange = true`, en deux requêtes. Si la 2ᵉ
+échoue (réseau), les aliments sont au journal mais le repas reste « à faire » →
+l'utilisatrice reclique « marquer mangé » → tout est ajouté une 2ᵉ fois.
+
+*Correctif :* une fonction SQL (RPC) qui fait les deux dans une transaction.
+À défaut : relire `mange` juste avant d'insérer, et ne rien faire si déjà vrai.
+
+### 2.3 — 🟠 Aucune gestion d'erreur réseau dans les hooks de données
+
+`useJournal`, `useProfile`, `useSettings`, `useFavorites`, `usePlannedMeals`,
+`useRecentFoods`, `useMealSuggestions`… font tous :
+
+```js
+const { data } = await supabase.from(...).select(...)
+setEntries(data || [])
+```
+
+L'erreur est ignorée. Sur mobile avec un réseau instable, l'utilisatrice voit
+une **journée vide** au lieu d'un « hors ligne » — et risque de re-saisir des
+aliments déjà là → doublons.
+
+*Correctif :* ajouter `error` au state de ces hooks + un bandeau discret
+« connexion perdue, tire pour recharger » (idéalement via le hook générique
+proposé en §3.2).
+
+### 2.4 — 🟡 `useSettings.update` : écrasement concurrent
+
+```js
+const update = async (patch) => {
+  const next = { ...settings, ...patch }        // settings = closure figée
+  setSettings(next)
+  await supabase.from('settings').upsert({ ...next, user_id, updated_at })
+}
+```
+
+Deux `update()` rapprochés (ex. régler l'eau puis l'ordre des sections) : le 2ᵉ
+part avec un `settings` périmé et **réécrit l'objet entier**, annulant le 1ᵉ. En
+plus l'`upsert` renvoie l'objet defaults-mergé → on persiste des clés jamais
+touchées volontairement.
+
+*Correctif :* `setSettings(s => { const next = { ...s, ...patch }; persist(next);
+return next })`, et ne persister que le patch si possible.
+
+### 2.5 — 🟡 Course de requêtes dans la recherche d'aliments
+
+`FoodPicker.doSearch` : pas d'`AbortController` ni de garde « dernière requête
+gagne ». On tape vite → la réponse de `"pou"` peut revenir après celle de
+`"poulet"` et écraser l'affichage. Le debounce 250 ms réduit sans supprimer.
+
+*Correctif :* un compteur de requête (`reqId` incrémenté à chaque `doSearch`,
+on ignore la réponse si `reqId` a changé), ou un `AbortController`.
+
+### 2.6 — 🟡 Rotation d'écran → slider décalé
+
+`src/pages/TodayPage.jsx` lit `window.innerWidth` pendant le rendu (calcul du
+swipe) sans écouteur `resize` / `orientationchange`. Le manifest force le
+portrait sur mobile, donc c'est surtout visible sur tablette / desktop : après
+rotation, le slider est mal positionné jusqu'au swipe suivant.
+
+*Correctif :* stocker la largeur dans un state mis à jour sur `resize`.
+
+### 2.7 — 🟡 `ErrorBoundary` unique et tout en haut
+
+`CLAUDE.md` dit « pas d'ErrorBoundary » — c'est faux depuis peu (`src/components/
+ErrorBoundary.jsx`, monté dans `App.jsx`). Mais il est seul au sommet : une
+erreur dans une petite modale fait un **écran d'erreur plein page** dont le seul
+recours est « Recharger » (on perd la date consultée, la saisie en cours).
+
+*Correctif :* des boundaries par onglet / par page-modal, et mettre `CLAUDE.md`
+à jour.
+
+### 2.8 — Broutilles
+
+- `useBackButton` laisse une entrée d'historique orpheline si on ferme par la
+  croix ; empilées sur plusieurs modales, le bouton retour Android demande
+  plusieurs appuis pour vraiment sortir.
+- `public/push-sw.js` : `existing.navigate(url)` peut lever une exception sans
+  `catch`.
+- `dateLabel` (`lib/dates.js`) fait `new Date('YYYY-MM-DD')` → minuit UTC ; OK
+  en France (décalage positif), latent ailleurs.
+- Bundle JS unique de **1,49 Mo** (396 Ko gzip), aucun code-splitting → premier
+  chargement lent sur 3G. Voir §3.1.
+
+---
+
+## 3. Dette technique / refactors
+
+### 3.1 — `DaySlot` monte ~15 hooks de données, ×3 slots
+
+`TodayPage` affiche toujours 3 jours (`datePrev`, `date`, `dateNext`). Chaque
+`DaySlot` appelle `useJournal`, `useCycle`, `useSport`, `useMeasurements`,
+`useProfile`, `useSettings`, `useCiqualCatalog`, `useFavorites`,
+`usePlannedMealsForDate`, `useFeed`, `useExcludedDay`… À chaque swipe, un
+nouveau slot se monte et relance tout ce paquet.
+
+Or **la moitié de ces hooks renvoient des données non datées** (`useProfile`,
+`useSettings`, `useCiqualCatalog`, `useMeasurements`, `useFavorites`,
+`useCycle`). À hisser dans `TodayPage` (ou un contexte `TodayDataProvider`) et
+passer en props aux 3 slots. Gros gain de réactivité et de requêtes.
+
+### 3.2 — Un hook générique `useSupabaseQuery`
+
+Le motif `useState + useCallback(fetch) + useEffect(load)` est copié-collé ~20
+fois, **chaque fois sans `error`**. Un seul hook donnerait `data` / `loading` /
+`error` / `refetch` partout et supprimerait ~300 lignes. Base idéale pour régler
+la §2.3 d'un coup.
+
+### 3.3 — Styles inline massifs
+
+`src/index.css` fait ~500 lignes, mais les composants sont bourrés de
+`style={{…}}` de 10-15 propriétés. Dur à lire, alourdit le bundle, empêche un
+thème sombre propre. À migrer progressivement vers des classes (prérequis de
+fait pour le **mode sombre**, §4.2).
+
+### 3.4 — Formes d'objet « aliment » incohérentes
+
+`alim_nom` vs `food_name`, `_source` vs `food_source`, `alim_code` vs `id` vs
+`food_ref_id` : géré par des `||` défensifs dans `scaleFood`, `foodIdentity`,
+`mapOFFProduct`, `entryToFood`… Source de bugs. Pistes : une fonction
+`normalizeFood()` unique en entrée de `FoodPicker`, un `types.d.ts` + JSDoc, ou
+`foodIdentity` centralisé (réimplémenté à la main dans `useFavorites`,
+`FoodPicker`, etc.).
+
+### 3.5 — Petit ménage
+
+- `App.jsx` : 7 blocs `<Route element={<div className="page-modal">…}>`
+  quasi identiques → un composant `<ModalRoute title=…>`.
+- `changelog.js` : 467 lignes de données dans le bundle → un `.json` chargé à
+  la demande (page Nouveautés rarement ouverte).
+- `withWater` (`useSettings`) : nom trompeur (fusionne *tous* les blocs de
+  réglages) → renommer `mergeSettings`.
+- `useFeed` refait un `select('pseudo, prenom')` sur `profiles` à chaque
+  réaction / partage → mémoïser une fois.
+
+---
+
+## 4. Feuille de route fonctionnelle
+
+Chaque fiche : **Quoi / Pourquoi / Esquisse technique / Effort / PWA**.
+L'app reste une **PWA** (décision reconduite des chantiers cycle et sport : pas
+de wrapper natif).
+
+### 4.1 — Faciles (quelques dizaines de lignes, aucune infra)
+
+#### F1 — « J'ai mangé comme hier »
+- **Quoi.** Bouton dans la barre de raccourcis du jour : duplique le journal
+  d'une date choisie (souvent la veille) vers le jour courant.
+- **Pourquoi.** Cas ultra-fréquent (petit-déj identique tous les jours).
+- **Esquisse.** Lire `journal` de la date source, `map` pour nettoyer
+  (`id`, `date`, `created_at`), ré-insérer avec la nouvelle `date`. La logique
+  de nettoyage existe déjà dans `markAsEaten` (`JOURNAL_FIELDS`).
+- **Effort.** ~30 lignes.
+- **PWA.** RAS.
+
+#### F2 — Retour haptique
+- **Quoi.** `navigator.vibrate(10)` sur ajout / suppression / objectif atteint.
+- **Pourquoi.** L'app fait immédiatement « native » sur Android.
+- **Esquisse.** Un helper `haptic()` appelé dans les `handleAdd` / `handleDelete`
+  de `TodayPage` (garde `if ('vibrate' in navigator)`).
+- **Effort.** ~10 lignes. (iOS ne supporte pas `vibrate` — dégradation propre.)
+
+#### F3 — Bouton « Installer l'app » maison
+- **Quoi.** Capter `beforeinstallprompt`, afficher une bannière discrète tant
+  que l'app n'est pas installée.
+- **Pourquoi.** Beaucoup d'utilisateurs ne connaissent pas « Ajouter à l'écran
+  d'accueil » — c'est le point d'entrée d'une PWA.
+- **Esquisse.** `window.addEventListener('beforeinstallprompt', e => { e.preventDefault();
+  stash(e) })`, bouton → `e.prompt()`. Masquer si `matchMedia('(display-mode:
+  standalone)').matches`.
+- **Effort.** ~40 lignes + un composant bannière.
+- **PWA.** Cœur du sujet.
+
+#### F4 — Note du jour (humeur, faim, digestion, sommeil, énergie)
+- **Quoi.** Un petit encart sur la page du jour : texte libre + quelques tags
+  rapides.
+- **Pourquoi.** Très parlant croisé avec le cycle et l'historique (« je grignote
+  toujours les jours où j'ai mal dormi »).
+- **Esquisse.** Table `notes_jour (user_id, date, texte, tags text[])`, RLS
+  « own », upsert par `(user_id, date)`. Un hook `useDayNote(dateStr)`.
+- **Effort.** Moyen-bas (nouvelle table + 1 section + 1 hook).
+
+#### F5 — Série d'hydratation
+- **Quoi.** Objectif d'eau atteint → petite animation + compteur « X jours
+  d'affilée ».
+- **Esquisse.** Calcul côté client à partir de `WaterSection` / historique eau.
+- **Effort.** ~50 lignes.
+
+#### F6 — Pré-remplir un repas avec les habitudes
+- **Quoi.** Bouton « ajouter mes 3 habituels » sur un repas vide.
+- **Esquisse.** `useMealSuggestions` calcule déjà le classement par fréquence ;
+  il suffit d'un bouton qui ajoute les N premiers avec leur dernière quantité.
+- **Effort.** ~20 lignes.
+
+#### F7 — Carte « ma journée » partageable en image
+- **Quoi.** Générer une carte récap (calories, macros, anneau) en PNG à
+  screenshoter / partager.
+- **Esquisse.** Rendu `<canvas>` côté client (ou `html-to-image`). Aucune API.
+- **Effort.** Moyen-bas.
+
+#### F8 — Recherche + tri dans les aliments perso
+- **Quoi.** `CustomFoodsSection` (820 lignes) n'a pas de recherche.
+- **Esquisse.** Filtre `useMemo` sur le nom + un `SortModal` (déjà un pattern
+  dans l'app).
+- **Effort.** ~40 lignes.
+
+#### F9 — Rappels contextuels
+- **Quoi.** « Il est 15 h, rien noté au déjeuner. »
+- **Esquisse.** Le cron push existe déjà (`push_notifications_setup.sql`).
+  Ajouter une condition dans l'Edge Function d'envoi : comparer l'heure locale
+  de l'utilisatrice et l'existence d'entrées pour le repas attendu.
+- **Effort.** Moyen (logique côté Edge Function).
+- **PWA.** Push déjà en place.
+
+### 4.2 — Mode sombre (facile en théorie, moyen en pratique)
+
+- **Quoi.** Thème sombre suivant `prefers-color-scheme` + un toggle manuel.
+- **État.** Les tokens CSS existent (`var(--text)`, `var(--green)`, `var(--bg)`…).
+- **Frein réel.** Les couleurs en dur dans les `style={{…}}` inline (§3.3).
+- **Esquisse.** 1) migrer les couleurs inline vers des tokens ; 2) bloc
+  `@media (prefers-color-scheme: dark)` (+ `[data-theme="dark"]`) qui redéfinit
+  les tokens ; 3) toggle dans Profil, persisté dans `settings` ou `localStorage`.
+- **Effort.** Moyen (surtout du travail de migration CSS).
+
+### 4.3 — Moyennes
+
+#### M1 — Vrai support hors-ligne *(le chantier PWA)*
+- **Quoi.** Aujourd'hui `vite.config.js` ne pré-cache que le shell (JS/CSS/HTML).
+  Sans réseau, l'app s'ouvre mais **toutes les pages sont vides**.
+- **Esquisse.**
+  - `runtimeCaching` Workbox : `CacheFirst` sur la table `ciqual` (référence
+    statique volumineuse), `NetworkFirst` sur le `journal` du jour et les
+    `settings`.
+  - File d'attente d'écritures (Workbox Background Sync ou file maison en
+    IndexedDB) pour les ajouts faits hors ligne, rejoués au retour du réseau.
+  - Indicateur d'état réseau dans l'UI (lié à la §2.3).
+- **Effort.** Élevé (passage probable en `injectManifest` pour maîtriser le SW).
+- **PWA.** C'est *le* sujet : ce qui rend l'app utilisable dans le métro.
+
+#### M2 — Photo de repas
+- **Quoi.** `<input type="file" accept="image/*" capture>` → Supabase Storage →
+  vignette dans le journal.
+- **Pourquoi.** Mémo visuel ; base pour une future estimation de portion.
+- **Esquisse.** Bucket Storage + RLS, colonne `journal.photo_path` (ou table
+  `journal_photos`), compression client avant upload.
+- **Effort.** Moyen.
+
+#### M3 — Objectifs adaptatifs
+- **Quoi.** Chaque semaine, comparer la tendance réelle du poids
+  (`mensurations`) à l'objectif et corriger `goal_kcal` de ±50–100 kcal.
+- **Esquisse.** Fonction hebdo (client au chargement, ou cron) : régression
+  simple sur les relevés des 2-3 dernières semaines vs `paceKgPerWeek` visé
+  (déjà calculé dans `computeCalorieNeeds`). Proposer l'ajustement, ne pas
+  l'imposer.
+- **Effort.** Moyen. **Attention** : même piège de double comptage que « manger
+  selon l'effort » (cf. `docs/suivi-sport.md` §8) — cadrer avec l'utilisatrice.
+
+#### M4 — Statistiques nutriments sur la durée
+- **Quoi.** « Apport moyen en fer sur 30 j vs RNP », pas seulement le jour.
+- **Esquisse.** `fetchAllRows` sur `journal` + `computeTotals` par jour +
+  moyenne. Réutiliser les jauges de `NutrientPanel`. Ajouter un onglet dans
+  `HistoryPage`.
+- **Effort.** Moyen.
+
+#### M5 — Planificateur de menus + liste de courses générée
+- **Quoi.** Vue « semaine » éditable des `repas_planifies`, puis bouton
+  « générer la liste de courses » à partir des repas planifiés.
+- **Esquisse.** `usePlannedMealsRange` existe déjà. Agréger les `items` des
+  repas planifiés d'une plage → regrouper par aliment → insérer dans
+  `liste_courses_items`.
+- **Effort.** Moyen-élevé (surtout l'UI semaine).
+
+#### M6 — Import / export JSON de toutes ses données
+- **Quoi.** Un bouton « exporter mes données » (télécharge un JSON) et
+  « importer ».
+- **Pourquoi.** Sauvegarde, tranquillité, sain vis-à-vis du RGPD.
+- **Esquisse.** Export : `select *` sur les tables de l'utilisatrice → `Blob`
+  → download. Import : validation + upsert.
+- **Effort.** Moyen.
+
+#### M7 — Jeûne intermittent
+- **Quoi.** Fenêtre alimentaire, minuteur, badge « 16:8 » sur la page du jour.
+- **Esquisse.** Réglage `settings.fasting = { enabled, start, window_h }` ;
+  calcul d'état côté client à partir de l'heure de la 1ʳᵉ / dernière entrée.
+- **Effort.** Moyen.
+
+#### M8 — Défis entre amies
+- **Quoi.** Classement doux « jours dans l'objectif cette semaine », défi hebdo.
+- **Esquisse.** Le social existe (`amities`, `partages_*`). Ajouter une vue
+  agrégée par amie sur `getDayStatus` (déjà dans `lib/nutrients.js`).
+- **Effort.** Moyen (dépend de ce qu'on accepte de partager entre comptes —
+  cadrer RLS).
+
+### 4.4 — Complexes
+
+#### C1 — Suggestion de repas qui « bouclent » la journée
+- **Quoi.** Sous contrainte des calories restantes + macros restantes +
+  `top10Gaps`, proposer une combinaison d'aliments favoris.
+- **Esquisse.** Petit problème de sac à dos ; heuristique gloutonne suffisante.
+  Les briques existent dans `TodayPage` : `remainingKcal`, `top10Gaps`,
+  `getGapAmount`, la liste des favoris.
+- **Effort.** Élevé (algo + UI de présentation des combinaisons).
+
+#### C2 — Saisie en langage naturel (API Claude)
+- **Quoi.** « ce midi steak-frites salade » → analysé en aliments Ciqual +
+  grammages estimés.
+- **Esquisse.** Edge Function Supabase (clé API Claude côté serveur, jamais
+  client) qui reçoit le texte + un extrait du catalogue Ciqual et renvoie des
+  lignes `{ alim_code, qty_g }`. L'utilisatrice valide / ajuste avant d'ajouter.
+- **Effort.** Élevé. **Gain de friction le plus important** possible sur ce type
+  d'app.
+- **PWA.** Marche hors ligne = non (dégrader vers la saisie manuelle).
+
+#### C3 — Intégration Strava / Apple Santé / Google Fit
+- **Quoi.** Import automatique des séances.
+- **État.** Déjà cadré et **abandonné** au chantier sport (Palier 5) : trop de
+  plomberie Strava + Supabase pour le besoin. `activites_sport.source` /
+  `source_id` sont prêts si on y revient. Voir `docs/suivi-sport.md` §4.4.
+- **Effort.** Élevé.
+
+#### C4 — Prédiction de poids
+- **Quoi.** « À ce rythme, 62 kg vers le 15 novembre. »
+- **Esquisse.** Régression sur la tendance `mensurations` + bilan énergétique
+  cumulé (apports vs dépense estimée). Afficher un intervalle, pas un point sec.
+- **Effort.** Élevé (et sensible : cadrer le ton avec l'utilisatrice).
+
+#### C5 — Synchro temps réel multi-appareil
+- **Quoi.** Ce qu'on saisit sur le téléphone apparaît sur l'ordi sans
+  rafraîchir.
+- **Esquisse.** Supabase Realtime sur `journal` et `settings` ; fusionner les
+  events dans les hooks concernés. Prérequis : RLS actif (§2.1).
+- **Effort.** Élevé (gestion des conflits, du cycle de vie des abonnements).
+
+---
+
+## 5. Ordre suggéré
+
+1. ~~**§2.1 RLS**~~ ✅ fait le 2026-08-30 (reste la vérif des tables secondaires).
+2. **§2.2 / §2.3 / §2.4** — bugs qui produisent des doublons ou des pertes
+   silencieuses.
+3. **§3.2 `useSupabaseQuery`** puis **§3.1 hisser les hooks non datés** — débloque
+   la perf et la gestion d'erreur pour tout le reste.
+4. Fonctionnalités **faciles** (F1, F2, F3, F6) — rapport valeur / effort élevé.
+5. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
+6. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
+7. Le reste selon l'envie.

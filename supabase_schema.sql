@@ -954,13 +954,32 @@ create index if not exists idx_pas_jour_user_date on pas_jour (user_id, date des
 -- =============================================
 -- RLS
 -- =============================================
--- Désactivé sur les tables historiques mono-utilisateur (app personnelle,
--- pas de séparation dev/prod — voir CLAUDE.md).
-alter table journal disable row level security;
-alter table repas_types disable row level security;
-alter table settings disable row level security;
-alter table aliments_custom disable row level security;
-alter table marques disable row level security;
+-- RLS activé sur journal / settings / aliments_custom / repas_types / marques
+-- le 2026-08-30. Ces tables portent des données personnelles (alimentation
+-- quotidienne, objectifs, poids-objectif, compléments) et étaient lisibles par
+-- n'importe qui via la Data API avec la clé anon publique tant que le RLS était
+-- désactivé (même faille que mensurations, corrigée le 2026-08-17). Policies
+-- "own" (select/insert/update/delete pour auth.uid() = user_id), exécutées
+-- manuellement dans le SQL editor Supabase.
+alter table journal enable row level security;
+create policy "journal_own" on journal for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table settings enable row level security;
+create policy "settings_own" on settings for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table aliments_custom enable row level security;
+create policy "aliments_custom_own" on aliments_custom for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table repas_types enable row level security;
+create policy "repas_types_own" on repas_types for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table marques enable row level security;
+create policy "marques_own" on marques for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- RLS activé sur mensurations le 2026-08-17 (données sensibles - poids et
 -- mesures corporelles - accessibles sans authentification via la Data API

@@ -224,17 +224,30 @@ export default function FoodPicker({
       return
     }
 
-    // Ciqual + aliments custom (+ recettes si autorisées)
-    const { data, error } = await supabase.rpc('search_ciqual', { query: q, lim: 25 })
-    if (error) console.error('search_ciqual error:', error)
+    // Ciqual + aliments custom (+ recettes si autorisées). Les trois requêtes
+    // sont indépendantes : on les lance en parallèle (avant, elles étaient
+    // enchaînées en 3 allers-retours réseau successifs à chaque frappe).
+    const [ciqualRes, customRes, recettesRes] = await Promise.all([
+      supabase.rpc('search_ciqual', { query: q, lim: 25 }),
+      supabase
+        .from('aliments_custom')
+        .select('*')
+        .eq('user_id', user.id)
+        .ilike('nom', `%${q}%`)
+        .limit(5),
+      includeRecipes
+        ? supabase
+            .from('recettes')
+            .select('*')
+            .eq('user_id', user.id)
+            .ilike('nom', `%${q}%`)
+            .limit(5)
+        : Promise.resolve({ data: [] }),
+    ])
 
-    const { data: custom } = await supabase
-      .from('aliments_custom')
-      .select('*')
-      .eq('user_id', user.id)
-      .ilike('nom', `%${q}%`)
-      .limit(5)
-    const customMapped = (custom || []).map(c => ({
+    if (ciqualRes.error) console.error('search_ciqual error:', ciqualRes.error)
+
+    const customMapped = (customRes.data || []).map(c => ({
       ...c,
       alim_nom: c.nom,
       categorie: c.categorie || 'Personnalisé',
@@ -242,30 +255,21 @@ export default function FoodPicker({
       _fresh: true, // déjà lu en direct depuis aliments_custom — pas besoin de re-fetch dans selectFood
     }))
 
-    let recettesMapped = []
-    if (includeRecipes) {
-      const { data: recettes } = await supabase
-        .from('recettes')
-        .select('*')
-        .eq('user_id', user.id)
-        .ilike('nom', `%${q}%`)
-        .limit(5)
-      recettesMapped = (recettes || []).map(r => ({
-        ...r,
-        id:        r.id,
-        alim_nom:  r.nom,
-        categorie: `Recette · ${r.portions || 1} portion${r.portions > 1 ? 's' : ''}`,
-        portions: r.poids_cuit_g || r.poids_cru_g
-          ? [{
-              label: `1 portion (${Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1))} g)`,
-              g: Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1)),
-            }]
-          : [],
-        _source: 'recette',
-      }))
-    }
+    const recettesMapped = (recettesRes.data || []).map(r => ({
+      ...r,
+      id:        r.id,
+      alim_nom:  r.nom,
+      categorie: `Recette · ${r.portions || 1} portion${r.portions > 1 ? 's' : ''}`,
+      portions: r.poids_cuit_g || r.poids_cru_g
+        ? [{
+            label: `1 portion (${Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1))} g)`,
+            g: Math.round((r.poids_cuit_g || r.poids_cru_g) / (r.portions || 1)),
+          }]
+        : [],
+      _source: 'recette',
+    }))
 
-    const ciqualResults = data || []
+    const ciqualResults = ciqualRes.data || []
     setResults([...ciqualResults, ...customMapped, ...recettesMapped])
     setSearching(false)
   }, [user, searchSource, includeRecipes])
@@ -729,7 +733,7 @@ const setDoseCount = (text) => {
                       </button>
                       {!suggestionsCollapsed && mealSuggestions.map((food, i) => (
                         <FoodRow
-                          key={i}
+                          key={foodIdentity(food).key}
                           food={food}
                           isFav={isFavorite(food)}
                           onSelect={selectFood}
@@ -743,9 +747,9 @@ const setDoseCount = (text) => {
                   {searchSource === 'ciqual' && recentsMerged.length > 0 && (
                     <>
                       <div className="section-title" style={{ marginTop: (favorites.length > 0 || (meal && mealSuggestions.length > 0)) ? 16 : 4 }}>Récents (100 dernières entrées)</div>
-                      {recentsMerged.map((food, i) => (
+                      {recentsMerged.map((food) => (
                         <FoodRow
-                          key={i}
+                          key={foodIdentity(food).key}
                           food={food}
                           isFav={isFavorite(food)}
                           onSelect={selectFood}
