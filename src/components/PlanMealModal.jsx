@@ -147,7 +147,7 @@ function addDays(dateStr, n) {
 // cas), puis choix du repas (sauté si forcedMeal est fourni — cas des
 // compléments), puis création en une seule requête batch (createPlannedMeals).
 // ─────────────────────────────────────────────────────────────────────────────
-function ScheduleStep({ source, defaultDate, forcedMeal, onBack, onClose, onPlanned }) {
+function ScheduleStep({ source, defaultDate, defaultMeal, forcedMeal, onBack, onClose, onPlanned }) {
   useBackButton(onClose)
   const { user } = useAuth()
   const toast = useToast()
@@ -160,7 +160,7 @@ function ScheduleStep({ source, defaultDate, forcedMeal, onBack, onClose, onPlan
   const [endDate, setEndDate] = useState(addDays(startStr, 30))
   const [selectedDates, setSelectedDates] = useState(() => new Set([startStr]))
   const [anchorMonth, setAnchorMonth] = useState(() => new Date(startStr + 'T00:00:00'))
-  const [meal, setMeal] = useState(forcedMeal || MEALS[0])
+  const [meal, setMeal] = useState(forcedMeal || (defaultMeal && MEALS.includes(defaultMeal) ? defaultMeal : MEALS[0]))
   const [saving, setSaving] = useState(false)
 
   // Motif/fin/jours changés → régénère intégralement la sélection. Les clics
@@ -341,10 +341,16 @@ function ScheduleStep({ source, defaultDate, forcedMeal, onBack, onClose, onPlan
 //   presetSource — optionnel : { nom, items, sourceType, sourceId } déjà
 //                  connu (ouverture depuis RecipeDetailModal ou MealTemplateCard) →
 //                  saute directement à l'étape "jour(s) + repas".
+//   defaultDate  — optionnel : Date pré-sélectionnée dans la grille de l'étape
+//                  finale (ouverture depuis une case précise du calendrier /
+//                  du plateau de menus).
+//   defaultMeal  — optionnel : repas pré-sélectionné dans l'étape finale
+//                  (ex. "+" sur la ligne "Déjeuner" du plateau de menus).
+//                  Ignoré pour un complément (repas verrouillé).
 //   onClose()
 //   onPlanned()  — appelé après une planification réussie (refresh calendrier)
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PlanMealModal({ kind = 'repas', presetSource, defaultDate, onClose, onPlanned }) {
+export default function PlanMealModal({ kind = 'repas', presetSource, defaultDate, defaultMeal, onClose, onPlanned }) {
   const isComplement = kind === 'complement'
   const [step, setStep] = useState(presetSource ? 'schedule' : (isComplement ? 'libre' : 'source'))
   const [source, setSource] = useState(presetSource || null)
@@ -414,6 +420,7 @@ export default function PlanMealModal({ kind = 'repas', presetSource, defaultDat
     <ScheduleStep
       source={source}
       defaultDate={defaultDate}
+      defaultMeal={defaultMeal}
       forcedMeal={isComplement ? SUPPLEMENT_MEAL : undefined}
       onBack={presetSource ? null : () => setStep(isComplement ? 'libre' : 'source')}
       onClose={onClose}

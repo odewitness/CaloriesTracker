@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, CalendarDays, Plus, Pill, CalendarClock, X } from 'lucide-react'
+import { Calendar, CalendarDays, Plus, Pill, CalendarClock, X, UtensilsCrossed } from 'lucide-react'
 import CalendarMonthGrid from '../components/CalendarMonthGrid'
 import CalendarWeekStrip from '../components/CalendarWeekStrip'
 import DayRecapPanel from '../components/DayRecapPanel'
 import PlanMealModal from '../components/PlanMealModal'
 import PlannedSeriesModal from '../components/PlannedSeriesModal'
+import WeekMenuBoard from '../components/WeekMenuBoard'
 import { useJournalRange } from '../hooks/useJournalRange'
 import { usePlannedMealsRange } from '../hooks/usePlannedMeals'
 import { useExcludedDaysRange } from '../hooks/useExcludedDays'
@@ -37,7 +38,7 @@ function endOfWeek(d) {
 // CalendarPage — vue Mois/Semaine + récap du jour sélectionné en dessous.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CalendarPage() {
-  const [view, setView] = useState('month') // 'month' | 'week'
+  const [view, setView] = useState('month') // 'month' | 'week' | 'planner'
   const [anchorDate, setAnchorDate] = useState(new Date()) // mois ou semaine affiché
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [planModal, setPlanModal] = useState(null) // 'repas' | 'complement' | null
@@ -146,6 +147,7 @@ export default function CalendarPage() {
           {[
             { key: 'month', label: 'Mois', icon: <Calendar size={14} /> },
             { key: 'week',  label: 'Semaine', icon: <CalendarDays size={14} /> },
+            { key: 'planner', label: 'Menus', icon: <UtensilsCrossed size={14} /> },
           ].map(t => (
             <button
               key={t.key}
@@ -165,7 +167,16 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {view === 'month' ? (
+      {view === 'planner' ? (
+        <WeekMenuBoard
+          anchorDate={anchorDate}
+          plannedByDate={planifiesByDate}
+          settings={settings}
+          onChangeWeek={changeWeek}
+          onGoToday={isCurrentPeriod ? undefined : goToday}
+          onRefetch={refetchAll}
+        />
+      ) : view === 'month' ? (
         <CalendarMonthGrid
           monthDate={anchorDate}
           onChangeMonth={changeMonth}
@@ -195,6 +206,10 @@ export default function CalendarPage() {
         />
       )}
 
+      {/* Planifier + récap du jour : masqués en vue « Menus » (le plateau a
+          son propre "+" par case et n'a pas de jour sélectionné). */}
+      {view !== 'planner' && (
+      <>
       {/* Planifier : action secondaire, démotée sous le calendrier (consulter
           d'abord). « Planifier… » déplie le choix repas / complément. */}
       <div style={{ margin: '6px 0 18px' }}>
@@ -264,6 +279,8 @@ export default function CalendarPage() {
         onExcludedChange={refetchExcluded}
         onOpenDay={openDayInToday}
       />
+      </>
+      )}
 
       {planModal && (
         <PlanMealModal

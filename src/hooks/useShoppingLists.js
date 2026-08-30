@@ -210,6 +210,34 @@ export function useShoppingListItems(listeId) {
     return addItems(toAdd)
   }
 
+  // ── Ajoute tous les aliments d'un lot de repas planifiés (repas_planifies)
+  // sur une plage de dates — cœur du "générer la liste de courses depuis mes
+  // menus de la semaine" (roadmap §M5). On aplatit les `items` de chaque repas
+  // planifié, on résout la catégorie comme pour une recette / un repas type,
+  // puis addItems() fait la fusion : un même aliment présent dans plusieurs
+  // repas de la plage devient UNE ligne, grammages additionnés, avec le nom de
+  // chaque repas d'origine listé dessous. plannedMeals : lignes repas_planifies
+  // ({ nom, items }). ───────────────────────────────────────────────────────
+  const addPlannedItems = async (plannedMeals) => {
+    const flat = []
+    for (const repas of plannedMeals || []) {
+      for (const it of (repas.items || [])) {
+        flat.push({ ...it, _repasNom: repas.nom })
+      }
+    }
+    if (flat.length === 0) return { error: null }
+    const withCategories = await resolveCategories(flat)
+    const toAdd = withCategories.map(i => ({
+      nom: i.food_name,
+      categorie: i.categorie,
+      qty_g: i.qty_g,
+      food_source: i.food_source,
+      food_ref_id: i.food_ref_id,
+      recetteNom: i._repasNom,
+    }))
+    return addItems(toAdd)
+  }
+
   // ── Ajoute un aliment suggéré (voir useGroceriesSuggestions), en résolvant
   // sa catégorie au préalable — même logique que pour les ingrédients de
   // recette/repas type. suggestion : { food_source, food_ref_id, food_name }.
@@ -261,5 +289,5 @@ export function useShoppingListItems(listeId) {
     return { error }
   }
 
-  return { items, loading, addItems, addRecetteIngredients, addRepasItems, addSuggestedItem, toggleChecked, deleteItem, clearChecked, refetch: load }
+  return { items, loading, addItems, addRecetteIngredients, addRepasItems, addPlannedItems, addSuggestedItem, toggleChecked, deleteItem, clearChecked, refetch: load }
 }

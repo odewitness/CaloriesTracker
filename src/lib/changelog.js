@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Planifie tes menus de la semaine',
+    description: "Dans le Calendrier, un nouveau bouton « Menus » (à côté de Mois et Semaine) affiche ta semaine jour par jour avec une ligne par repas. Touche le « + » d'une case pour prévoir un repas ce jour-là, à cet horaire précis (le jour et le repas sont déjà choisis pour toi). Touche un repas prévu pour le retirer ou le marquer mangé.",
+  },
+  {
+    date: '2026-08-30',
+    title: 'Ta liste de courses à partir de tes repas prévus',
+    description: "Dans Mes courses, ouvre une liste, touche le « + » puis « Depuis mes repas prévus ». Choisis une période (deux semaines par défaut) et tous les aliments des repas que tu as planifiés partent dans la liste d'un coup. Si un aliment revient dans plusieurs repas, il n'apparaît qu'une fois avec les quantités additionnées.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Une projection de ton poids',
     description: "Dans Mensurations, sous la courbe de poids, une nouvelle carte « Projection » prolonge la tendance de tes dernières semaines : « ≈ 62,3 kg dans 2 mois », avec une fourchette (parce que le poids bouge chaque jour selon l'eau, le sel, le cycle…) et ton rythme en kg par semaine et par mois. Il faut au moins quatre relevés répartis sur deux semaines pour qu'elle apparaisse. Si ton poids est stable, elle te le dit simplement, sans sortir de chiffre. C'est une indication de cap, pas une prédiction.",
   },
