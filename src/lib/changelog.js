@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Une projection de ton poids',
+    description: "Dans Mensurations, sous la courbe de poids, une nouvelle carte « Projection » prolonge la tendance de tes dernières semaines : « ≈ 62,3 kg dans 2 mois », avec une fourchette (parce que le poids bouge chaque jour selon l'eau, le sel, le cycle…) et ton rythme en kg par semaine et par mois. Il faut au moins quatre relevés répartis sur deux semaines pour qu'elle apparaisse. Si ton poids est stable, elle te le dit simplement, sans sortir de chiffre. C'est une indication de cap, pas une prédiction.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Ouvre un jour depuis l\'historique',
     description: "Dans l'Historique, onglet Résumé, la liste « Détail par jour » est maintenant cliquable : touche une journée et tu arrives directement dessus dans la page principale, avec tous tes repas et le détail. Une petite flèche à droite de chaque ligne te montre qu'elle est cliquable.",
   },

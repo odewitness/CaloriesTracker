@@ -512,11 +512,21 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
   `source_id` sont prêts si on y revient. Voir `docs/suivi-sport.md` §4.4.
 - **Effort.** Élevé.
 
-#### C4 — Prédiction de poids
+#### C4 — Prédiction de poids — ✅ fait le 2026-08-30 (branche `feat-c4-weight-projection`)
 - **Quoi.** « À ce rythme, 62 kg vers le 15 novembre. »
 - **Esquisse.** Régression sur la tendance `mensurations` + bilan énergétique
   cumulé (apports vs dépense estimée). Afficher un intervalle, pas un point sec.
 - **Effort.** Élevé (et sensible : cadrer le ton avec l'utilisatrice).
+- **Livré.** `src/hooks/useWeightProjection.js` : régression linéaire (moindres
+  carrés) sur les relevés de poids des ~6 dernières semaines (≥ 4 relevés sur
+  ≥ 14 j), prolongée à +56 j. Renvoie **toujours une fourchette** (intervalle
+  de prédiction de la régression : erreur résiduelle × t de Student propagée à
+  l'horizon), jamais un point sec. Pente sous ~60 g/sem → `stable`, aucun
+  chiffre projeté. `src/components/WeightProjectionCard.jsx` sous le graphe de
+  poids dans la page Mensurations (uniquement métrique « Poids ») : valeur
+  projetée ≈, date cible, fourchette, rythme kg/sem et kg/mois, et un rappel
+  « une projection n'est pas une prédiction ». Pas de bilan énergétique cumulé
+  dans cette V1 (la tendance des relevés suffit et évite un double modèle).
 
 #### C5 — Synchro temps réel multi-appareil
 - **Quoi.** Ce qu'on saisit sur le téléphone apparaît sur l'ordi sans
@@ -539,6 +549,8 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
    en place ; F3, F4, F6 écartées ; C2 abandonnée, coût API). Reste **F8**
    (recherche aliments perso) si envie.
 6. **M3 objectifs adaptatifs** ✅ (2026-08-30).
-7. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
-8. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
-9. Le reste selon l'envie.
+7. **C4 prédiction de poids** ✅ (2026-08-30) — projection de tendance (pas de
+   bilan énergétique cumulé), fourchette + rappel « pas une prédiction ».
+8. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
+9. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
+10. Le reste selon l'envie.
