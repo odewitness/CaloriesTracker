@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { fmt } from '../lib/dates'
+import { PHASES } from '../lib/cycle'
+import CalendarDayMarkers, { CalendarLegend } from './CalendarDayMarkers'
 
 const STATUS_COLOR = {
   ok:   'var(--green)',
@@ -25,10 +27,15 @@ function startOfWeek(date) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CalendarWeekStrip
-// Props : mêmes conventions que CalendarMonthGrid, mais `weekDate` = une
-// date quelconque de la semaine affichée, onChangeWeek(dir) = -1 | 1.
+// Props : mêmes conventions que CalendarMonthGrid (dont cycleByDate / sportByDate
+// pour la parité des repères), mais `weekDate` = une date quelconque de la
+// semaine affichée, onChangeWeek(dir) = -1 | 1.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate, onSelectDate, dayStatusByDate, hasPlannedByDate, excludedDates }) {
+export default function CalendarWeekStrip({
+  weekDate, onChangeWeek, selectedDate, onSelectDate,
+  dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
+  cycleByDate, sportByDate, legend = false,
+}) {
   const days = useMemo(() => {
     const start = startOfWeek(weekDate)
     return Array.from({ length: 7 }, (_, i) => {
@@ -43,6 +50,7 @@ export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate
   const start = days[0]
   const end = days[6]
   const sameMonth = start.getMonth() === end.getMonth()
+  const [showLegend, setShowLegend] = useState(false)
 
   return (
     <div className="card" style={{ padding: '14px 12px', marginBottom: 12 }}>
@@ -67,9 +75,11 @@ export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate
           const isToday = dStr === todayStr
           const isSelected = dStr === selectedStr
           const plannedStatus = hasPlannedByDate[dStr]
-          const hasPlanned = !!plannedStatus
-          const isMissed = plannedStatus === 'missed'
           const isExcluded = !!excludedDates?.has(dStr)
+          const cyc = cycleByDate?.[dStr]
+          const isPeriodDay = !!cyc?.isPeriod
+          const phaseColor = cyc && cyc.phase !== 'inconnue' && !isPeriodDay ? PHASES[cyc.phase]?.color : null
+          const hasSport = !!(sportByDate?.[dStr]?.length)
 
           return (
             <button
@@ -77,7 +87,7 @@ export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate
               onClick={() => onSelectDate(date)}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 3, padding: '8px 2px', borderRadius: 10,
+                gap: 3, padding: '8px 2px 10px', borderRadius: 10,
                 background: isSelected ? 'var(--green)' : STATUS_BG[status],
                 border: isToday && !isSelected ? '1.5px solid var(--green)' : '1.5px solid transparent',
                 position: 'relative',
@@ -96,17 +106,23 @@ export default function CalendarWeekStrip({ weekDate, onChangeWeek, selectedDate
               {status !== 'none' && !isSelected && !isExcluded && (
                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: STATUS_COLOR[status] }} />
               )}
-              {hasPlanned && (
-                <span style={{
-                  position: 'absolute', top: 4, right: 4,
-                  width: 5, height: 5, borderRadius: '50%',
-                  background: isSelected ? 'white' : (isMissed ? 'var(--coral)' : 'var(--purple)'),
-                }} />
-              )}
+              <CalendarDayMarkers marks={{
+                planned: plannedStatus, hasSport, phaseColor,
+                isPeriod: isPeriodDay, isSelected, compact: false,
+              }} />
             </button>
           )
         })}
       </div>
+
+      {legend && (
+        <CalendarLegend
+          showCycle={!!cycleByDate}
+          showSport={!!sportByDate}
+          open={showLegend}
+          onToggle={() => setShowLegend(o => !o)}
+        />
+      )}
     </div>
   )
 }

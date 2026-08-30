@@ -181,6 +181,7 @@ export default function CalendarPage() {
           excludedDates={excludedDates}
           cycleByDate={cycleByDate}
           sportByDate={sportByDate}
+          legend
         />
       ) : (
         <CalendarWeekStrip
@@ -191,6 +192,9 @@ export default function CalendarPage() {
           dayStatusByDate={dayStatusByDate}
           hasPlannedByDate={hasPlannedByDate}
           excludedDates={excludedDates}
+          cycleByDate={cycleByDate}
+          sportByDate={sportByDate}
+          legend
         />
       )}
 
