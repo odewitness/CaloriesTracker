@@ -8,8 +8,8 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
-    title: 'Le bas de la page du jour n\'est plus coupé',
-    description: "Quand un bloc se retrouvait tout en bas de la page du jour (par exemple « À combler aujourd'hui »), son dernier bouton pouvait passer en partie sous la barre du bas et devenir difficile à toucher. La page laisse maintenant assez de place en dessous pour que tout reste visible et cliquable.",
+    title: 'Ajout rapide depuis « À combler aujourd\'hui » réparé',
+    description: "Depuis la page du jour, quand tu touchais le « + » d'une suggestion de « À combler aujourd'hui » (ou le bouton « … » pour voir tous tes manques), la petite fenêtre qui s'ouvrait était décalée et rognée sur les côtés : le bouton « Ajouter » se retrouvait hors de l'écran. Elle s'affiche de nouveau correctement, bien centrée.",
   },
   {
     date: '2026-08-30',

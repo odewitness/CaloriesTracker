@@ -57,10 +57,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* +env(safe-area-inset-bottom) : la bottom-nav (position: fixed) grandit de
-     l'inset de la barre de gestes ; sans ça le dernier élément de la page passe
-     en partie sous la nav. */
-  padding: 16px 16px calc(112px + env(safe-area-inset-bottom));
+  padding: 16px 16px 90px;
   -webkit-overflow-scrolling: touch;
 }
 

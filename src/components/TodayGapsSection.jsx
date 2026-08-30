@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Lightbulb, Plus, ChevronDown, Settings, Shuffle } from 'lucide-react'
 import { useFavorites, foodIdentity } from '../hooks/useFavorites'
 import { useJournalFoodHistory } from '../hooks/useJournalFoodHistory'
@@ -469,16 +470,22 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
         )}
       </div>
 
-      {gapsSheetOpen && (
+      {/* Portals obligatoires : cette section vit dans le slider de jours de
+          TodayPage (conteneur en transform: translateX). Une feuille en
+          position: fixed rendue ici se calerait sur ce conteneur transformé
+          (3x large, décalée) au lieu du viewport — feuille coupée sur les
+          côtés, bouton hors écran. Voir CLAUDE.md. */}
+      {gapsSheetOpen && createPortal(
         <AllGapsSheet
           gaps={allGaps}
           activeClaims={selectedGapKeys}
           onPick={toggleGapKey}
           onClose={() => setGapsSheetOpen(false)}
-        />
+        />,
+        document.body,
       )}
 
-      {quickAdd && (
+      {quickAdd && createPortal(
         <AddToJournalSheet
           nom={quickAdd.food.alim_nom}
           qty={quickAdd.qty}
@@ -489,7 +496,8 @@ export default function TodayGapsSection({ dateStr, gaps, allGaps, top10Gaps, en
           onMealChange={v => setQuickAdd(q => ({ ...q, meal: v }))}
           onConfirm={quickAdd.saving ? () => {} : confirmQuickAdd}
           onClose={() => setQuickAdd(null)}
-        />
+        />,
+        document.body,
       )}
     </>
   )
