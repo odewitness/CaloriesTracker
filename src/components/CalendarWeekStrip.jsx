@@ -34,7 +34,7 @@ function startOfWeek(date) {
 export default function CalendarWeekStrip({
   weekDate, onChangeWeek, selectedDate, onSelectDate,
   dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
-  cycleByDate, sportByDate, legend = false,
+  cycleByDate, sportByDate, legend = false, onGoToday,
 }) {
   const days = useMemo(() => {
     const start = startOfWeek(weekDate)
@@ -58,10 +58,20 @@ export default function CalendarWeekStrip({
         <button className="btn-icon" onClick={() => onChangeWeek(-1)}>
           <ChevronLeft size={18} color="var(--text-muted)" />
         </button>
-        <div style={{ fontWeight: 700, fontSize: 13 }}>
-          {sameMonth
-            ? `${start.getDate()} – ${end.getDate()} ${end.toLocaleDateString('fr-FR', { month: 'long' })}`
-            : `${start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>
+            {sameMonth
+              ? `${start.getDate()} – ${end.getDate()} ${end.toLocaleDateString('fr-FR', { month: 'long' })}`
+              : `${start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}
+          </div>
+          {onGoToday && (
+            <button
+              onClick={onGoToday}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--font)' }}
+            >
+              ↩ Aujourd'hui
+            </button>
+          )}
         </div>
         <button className="btn-icon" onClick={() => onChangeWeek(1)}>
           <ChevronRight size={18} color="var(--text-muted)" />

@@ -63,7 +63,7 @@ export default function CalendarMonthGrid({
   monthDate, onChangeMonth, selectedDate, onSelectDate,
   dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
   selectedDates, onToggleDate, minDate,
-  cycleByDate, sportByDate, legend = false,
+  cycleByDate, sportByDate, legend = false, onGoToday,
 }) {
   const cells = useMemo(() => buildMonthCells(monthDate), [monthDate.getFullYear(), monthDate.getMonth()])
   const todayStr = fmt(new Date())
@@ -77,8 +77,18 @@ export default function CalendarMonthGrid({
         <button className="btn-icon" onClick={() => onChangeMonth(-1)}>
           <ChevronLeft size={18} color="var(--text-muted)" />
         </button>
-        <div style={{ fontWeight: 700, fontSize: 14, textTransform: 'capitalize' }}>
-          {monthDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, textTransform: 'capitalize' }}>
+            {monthDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+          </div>
+          {onGoToday && (
+            <button
+              onClick={onGoToday}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--font)' }}
+            >
+              ↩ Aujourd'hui
+            </button>
+          )}
         </div>
         <button className="btn-icon" onClick={() => onChangeMonth(1)}>
           <ChevronRight size={18} color="var(--text-muted)" />
