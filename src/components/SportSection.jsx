@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Dumbbell, Plus, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   sportTypeEmoji, sportTypeLabel, sportIntensiteLabel,
-  formatDuree, formatHeure,
+  formatDuree, formatHeure, dayEnergyBalance,
 } from '../lib/sport'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,16 +16,30 @@ import {
 //   activites     — séances du jour (déjà triées)
 //   week          — { minutes, seances, kcal } sur la semaine en cours
 //   sportCfg      — settings.sport
+//   consumedKcal  — kcal mangées ce jour (pour le bilan, mode_energie 'bilan')
+//   maintenanceKcal — dépense d'entretien estimée (TDEE) ou null
+//   adjust        — mode 'manger_selon_effort' : { delta, base, credit, goal, applied } ou null
 //   onOpenSheet() — ouvre la feuille « Ajouter une séance »
 //   onOpenEntry(activite) — ouvre la feuille en édition
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SportSection({ activites = [], week, sportCfg, onOpenSheet, onOpenEntry }) {
+export default function SportSection({ activites = [], week, sportCfg, consumedKcal, maintenanceKcal, adjust, onOpenSheet, onOpenEntry }) {
   const goalMin = Number(sportCfg?.objectif_hebdo_minutes) || 0
   const weekMin = Math.round(week?.minutes || 0)
   const pct = goalMin > 0 ? Math.round((weekMin / goalMin) * 100) : 0
   const fillPct = Math.min(100, pct)
   const reached = goalMin > 0 && weekMin >= goalMin
   const hasEntries = activites.length > 0
+
+  // Bilan énergétique du jour (Palier 6) — lecture seule, n'affecte pas les
+  // objectifs. Affiché uniquement si l'utilisatrice a activé mode_energie 'bilan'.
+  const sportKcalToday = activites.reduce((s, a) => s + (Number(a.energie_kcal) || 0), 0)
+  const showBilan = sportCfg?.mode_energie === 'bilan'
+  const bilan = showBilan
+    ? dayEnergyBalance({ consumedKcal, maintenanceKcal, sportKcal: sportKcalToday })
+    : null
+  // « Manger selon l'effort » (Palier 7) — l'objectif du jour EST déjà ajusté
+  // en amont (daySettings). Ici on explique seulement l'ajustement.
+  const showEffort = sportCfg?.mode_energie === 'manger_selon_effort'
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sport-collapsed')) ?? false }
@@ -116,6 +130,66 @@ export default function SportSection({ activites = [], week, sportCfg, onOpenShe
             {goalMin === 0 && week?.seances > 0 && (
               <div style={{ fontSize: 11.5, color: 'var(--text-hint)', marginBottom: 10 }}>
                 Cette semaine : {formatDuree(weekMin)} · {week.seances} séance{week.seances > 1 ? 's' : ''}
+              </div>
+            )}
+
+            {showEffort && (
+              <div style={{ background: 'var(--gray-bg)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  Objectif du jour · manger selon l'effort
+                </div>
+                {adjust?.applied ? (
+                  <>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      Base (jour sans séance) <strong>{adjust.base}</strong>
+                      {adjust.credit > 0 ? <> + <strong>{adjust.credit}</strong> de séances</> : null}
+                      {' = '}<strong style={{ color: 'var(--text)' }}>{adjust.goal} kcal</strong>
+                    </div>
+                    {adjust.delta !== 0 && (
+                      <div style={{ fontSize: 11.5, marginTop: 3, color: adjust.delta > 0 ? 'var(--green)' : 'var(--amber)' }}>
+                        {adjust.delta > 0 ? '+' : '−'}{Math.abs(adjust.delta)} kcal vs ton objectif du jour hors sport
+                        {adjust.delta < 0 ? ' (rien de noté aujourd\'hui)' : ''}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    Renseigne ton profil (sexe, âge, taille, poids, niveau d'activité) pour que ce mode s'applique. En attendant, ton objectif habituel est utilisé.
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.5 }}>
+                  Ton objectif de base repasse à un équivalent sédentaire, et tes séances du jour se rajoutent (plafond +{sportCfg?.depense_max_creditee_kcal ?? 400}). Estimation ±25 %. Historique et calendrier gardent ton objectif à plat. Désactivable à tout moment dans Profil › Sport.
+                </div>
+              </div>
+            )}
+
+            {showBilan && (
+              <div style={{ background: 'var(--gray-bg)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  Bilan du jour · approximatif
+                </div>
+                {bilan ? (
+                  <>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      Mangé <strong>{Math.round(consumedKcal || 0)}</strong> · dépense estimée ≈{' '}
+                      <strong>{bilan.depense}</strong> ({bilan.maintenance} entretien
+                      {bilan.sport > 0 ? ` + ${bilan.sport} sport` : ''})
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 3, color: bilan.bilan > 0 ? 'var(--amber)' : 'var(--green)' }}>
+                      {bilan.bilan >= 0 ? 'Surplus' : 'Déficit'} ≈ {Math.abs(bilan.bilan)} kcal
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    {sportKcalToday > 0
+                      ? <>Dépense sport du jour ≈ <strong>{Math.round(sportKcalToday)}</strong> kcal.</>
+                      : 'Pas encore de séance aujourd\'hui.'}
+                    {' '}Renseigne ton profil (sexe, âge, taille, poids, niveau d'activité) pour un bilan complet.
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.5 }}>
+                  Indicatif. Ta dépense d'entretien intègre déjà une part d'activité — ne cumule pas les deux dans ta tête. Ton objectif de calories ne change pas.
+                </div>
               </div>
             )}
 

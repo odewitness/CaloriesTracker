@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fmt } from './dates'
+import { computeCalorieNeeds } from './nutrients'
 
 // Bloc `settings.sport` — même principe que `settings.water` : fusionné côté
 // client avec ces défauts (mergeSportSettings), robuste si la colonne est
@@ -146,6 +147,74 @@ export function streakWeeks(activites, todayDateStr, goalMin) {
   let n = 0
   while ((byWeek[ws]?.minutes || 0) >= g) { n++; ws = addWeeks(ws, -1) }
   return n
+}
+
+// ── Bilan énergétique du jour (Palier 6 — LECTURE SEULE) ───────────────────
+// Ne modifie AUCUN objectif. `maintenanceKcal` = dépense d'entretien estimée
+// (TDEE), qui intègre déjà une part d'activité habituelle : d'où le garde-fou
+// d'affichage « ne pas cumuler » côté UI. Renvoie null si on n'a pas de
+// maintenance estimée (profil incomplet).
+export function dayEnergyBalance({ consumedKcal, maintenanceKcal, sportKcal } = {}) {
+  const maint = Number(maintenanceKcal) || 0
+  if (maint <= 0) return null
+  const cons = Number(consumedKcal) || 0
+  const sport = Math.max(0, Number(sportKcal) || 0)
+  const depense = maint + sport
+  return {
+    maintenance: Math.round(maint),
+    sport: Math.round(sport),
+    depense: Math.round(depense),
+    bilan: Math.round(cons - depense), // > 0 = surplus, < 0 = déficit
+  }
+}
+
+// ── Palier 7 — « Manger selon l'effort » (BASCULE DE MODÈLE) ───────────────
+// Modèle B du doc §2.2 : l'objectif de base repasse à un équivalent SÉDENTAIRE
+// (on retire la part d'activité que le multiplicateur `niveau_activite` a
+// intégrée dans `goal_kcal`), puis on CRÉDITE les calories des séances DU JOUR,
+// plafonnées. À n'appliquer QUE sur la page du jour (comme le delta lutéal).
+// Opt-in, désactivable en un geste. Ne jamais faire tourner les deux modèles
+// (activité incluse + eat-back) en même temps — d'où la soustraction.
+
+// Équivalent sédentaire de `goalKcal` : goalKcal − (TDEE actuel − TDEE
+// sédentaire), planché au max(1200, BMR). Renvoie null si le profil ne permet
+// pas le calcul (sexe / âge / taille / poids manquants).
+export function sportBaseFrom({ goalKcal, profile, weightKg } = {}) {
+  if (!goalKcal) return null
+  const poids = weightKg ?? profile?.poids_kg
+  const common = { sexe: profile?.sexe, age: profile?.age, tailleCm: profile?.taille_cm, poidsKg: poids }
+  const cur = computeCalorieNeeds({ ...common, activityKey: profile?.niveau_activite })
+  const sed = computeCalorieNeeds({ ...common, activityKey: 'sedentaire' })
+  if (!cur || !sed) return null
+  const activityBakedIn = Math.max(0, cur.tdee - sed.tdee)
+  const floor = Math.max(1200, Math.round(cur.bmr))
+  return {
+    base: Math.max(floor, Math.round(goalKcal - activityBakedIn)),
+    activityBakedIn: Math.round(activityBakedIn),
+    floor,
+  }
+}
+
+// Renvoie `settings` avec `goal_kcal` remplacé par l'objectif du jour (base
+// sédentaire + crédit des séances plafonné), + des champs `_sport*` de lecture.
+// `settings` inchangé si le mode n'est pas 'manger_selon_effort' ou si le
+// profil est incomplet. `ctx = { profile, weightKg, sportKcalToday }`.
+export function sportAdjustedSettings(settings, ctx = {}) {
+  const cfg = settings?.sport
+  if (!cfg || cfg.mode_energie !== 'manger_selon_effort') return settings
+  const b = sportBaseFrom({ goalKcal: settings.goal_kcal, profile: ctx.profile, weightKg: ctx.weightKg })
+  if (!b) return settings
+  const cap = Math.max(0, Number(cfg.depense_max_creditee_kcal) || 400)
+  const credit = Math.min(Math.max(0, Math.round(Number(ctx.sportKcalToday) || 0)), cap)
+  const dayGoal = b.base + credit
+  return {
+    ...settings,
+    goal_kcal: dayGoal,
+    _sportKcalAdjust: dayGoal - settings.goal_kcal, // < 0 jour calme, > 0 grosse journée
+    _sportBaseGoal: b.base,
+    _sportCredit: credit,
+    _sportCap: cap,
+  }
 }
 
 // Agrège une liste de séances (chacune { date, duree_min, energie_kcal }) sur

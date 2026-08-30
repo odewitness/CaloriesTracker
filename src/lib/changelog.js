@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Manger selon l\'effort (nouvelle option)',
+    description: "Dans Profil › Sport, un 3ᵉ choix pour les calories : « Manger selon l'effort ». Ton objectif de base repasse à un équivalent sédentaire (ce que tu dépenses sans sport), et tes séances du jour viennent s'ajouter, dans une limite que tu règles. Résultat : les jours sans séance ton objectif est plus bas, les jours chargés plus haut. Ça ne s'applique que sur la page du jour — ton historique et ton calendrier gardent ton objectif habituel. Opt-in, désactivable en un geste, et l'écran te montre les chiffres avant / après.",
+  },
+  {
+    date: '2026-08-30',
+    title: 'Un bilan énergétique du jour, si tu veux',
+    description: "Dans Profil › Sport, tu peux activer une ligne « bilan » sur le bloc Activité : ce que tu as mangé face à ta dépense estimée (métabolisme + séances du jour). C'est purement indicatif — ton objectif de calories ne change pas, et comme ta dépense de base intègre déjà une part d'activité, mieux vaut ne pas cumuler les deux dans ta tête. Désactivé par défaut.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Ton sport, phase par phase',
     description: "Si tu suis à la fois ton cycle et ton sport, l'Historique montre maintenant comment tes séances se répartissent entre tes phases (règles, folliculaire, ovulation, lutéale), avec pour chacune un petit repère sur l'activité à ce moment du cycle. C'est indicatif, pas un programme à suivre — écoute d'abord tes sensations.",
   },
