@@ -30,7 +30,7 @@
 -- activites_sport.compte_dans_pas + clés settings.sport (afficher_pas,
 -- objectif_pas_jour, pas_seuil_baseline) — chantier « Suivi de l'activité
 -- sportive » Palier 10 (pas quotidiens). Voir supabase/sql/pas_jour_setup.sql
--- et docs/suivi-sport.md. Pas encore confirmé appliqué en base.
+-- et docs/suivi-sport.md. SQL appliqué + testé par l'utilisatrice le 2026-08-30.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -937,9 +937,9 @@ create index if not exists idx_commentaires_sport_partage on commentaires_sport 
 
 -- 32. TABLE PAS_JOUR (total de pas d'une journée — chantier « Suivi de
 -- l'activité sportive », Palier 10, voir supabase/sql/pas_jour_setup.sql et
--- docs/suivi-sport.md — écrit le 2026-08-30, pas encore confirmé appliqué en
--- base). UNE LIGNE = UN JOUR, saisie manuelle. App à deux comptes → RLS
--- « own » stricte, comme activites_sport.
+-- docs/suivi-sport.md — écrit le 2026-08-30, appliqué + testé le 2026-08-30).
+-- UNE LIGNE = UN JOUR, saisie manuelle. App à deux comptes → RLS « own »
+-- stricte, comme activites_sport.
 create table if not exists pas_jour (
   user_id uuid not null references auth.users(id),
   date date not null,

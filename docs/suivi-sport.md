@@ -3,11 +3,10 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-08-30.
 
-**État au 2026-08-30 : chantier terminé, avec un Palier 10 en cours.** Paliers
-1–4, 6, 7, 8 livrés et déployés. Palier 5 (Strava) et Palier 9 (rappels push)
-abandonnés — friction d'infra Supabase jugée non rentable par l'utilisatrice.
-**Palier 10 (pas quotidiens + pilates / tapis de marche)** codé sur la branche
-`suivi-sport-p10-pas`, en attente d'application SQL + test manuel + merge.
+**État au 2026-08-30 : chantier terminé.** Paliers 1–4, 6, 7, 8 et 10 livrés et
+déployés. Palier 5 (Strava) et Palier 9 (rappels push) abandonnés — friction
+d'infra Supabase jugée non rentable par l'utilisatrice. Sous-palier 10b (pas
+dans l'Historique) différé.
 
 ---
 
@@ -472,7 +471,7 @@ Edge Function `sport-reminder` + cron + migration — même friction que Strava.
 Le bloc `settings.sport.rappels` reste dans `SPORT_DEFAULTS` (inutilisé,
 inoffensif) au cas où.
 
-### Palier 10 — Pas quotidiens + pilates / tapis de marche ▸ statut : codé (branche `suivi-sport-p10-pas`)
+### Palier 10 — Pas quotidiens + pilates / tapis de marche ▸ statut : mergé + poussé sur `main` (2026-08-30), SQL `pas_jour_setup.sql` appliqué + testé par l'utilisatrice
 Décisions utilisatrice (2026-08-30) : carte des pas **intégrée** au bloc
 « Activité » (pas de section séparée) ; objectif de pas **journalier** ;
 anti-doublon par **flag par séance** « déjà compté dans mes pas ».
@@ -513,9 +512,9 @@ anti-doublon par **flag par séance** « déjà compté dans mes pas ».
 
 - **Palier 5 (Strava) : abandonné** (friction infra).
 - **Palier 9 (rappels push) : abandonné** (« pas besoin de rappel de sport »).
-- **Palier 10 (pas quotidiens + pilates / tapis) : codé** (branche
-  `suivi-sport-p10-pas`). Reste : appliquer `pas_jour_setup.sql` dans Supabase,
-  test manuel, merge + push. Sous-palier 10b (pas dans l'Historique) différé.
+- **Palier 10 (pas quotidiens + pilates / tapis) : mergé + poussé** sur `main`
+  le 2026-08-30 (SQL `pas_jour_setup.sql` appliqué + testé). Sous-palier 10b
+  (pas dans l'Historique) différé.
 
 Toute nouvelle idée s'ajoute ici.
 
@@ -553,8 +552,9 @@ Toute nouvelle idée s'ajoute ici.
 
 ## 9. Journal des décisions
 
-- **2026-08-30** — **Palier 10 (pas quotidiens)** ouvert et codé sur
-  `suivi-sport-p10-pas`. Décisions utilisatrice : carte des pas **intégrée** au
+- **2026-08-30** — **Palier 10 (pas quotidiens)** mergé + poussé sur `main`
+  (SQL `pas_jour_setup.sql` appliqué + testé par l'utilisatrice). Décisions
+  utilisatrice : carte des pas **intégrée** au
   bloc « Activité » (pas de section `todaySections` dédiée) ; objectif de pas
   **journalier** (jauge du jour) ; anti-doublon pas ↔ séance de marche géré par
   un **flag par séance** `compte_dans_pas` (pré-coché marche / tapis), pas par
