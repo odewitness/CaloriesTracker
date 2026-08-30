@@ -6,6 +6,7 @@ import { useFavorites } from '../hooks/useFavorites'
 import { useSettings } from '../hooks/useSettings'
 import { useCiqualCatalog } from '../hooks/useCiqualCatalog'
 import { useFeed } from '../hooks/useFeed'
+import { useWaterStreak } from '../hooks/useWaterStreak'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TodayDataContext — regroupe les données de la page du jour qui NE dépendent
@@ -35,8 +36,9 @@ export function TodayDataProvider({ children }) {
   const settings = useSettings()
   const ciqual = useCiqualCatalog()
   const feed = useFeed()
+  const waterStreak = useWaterStreak(settings.settings?.water?.goal_ml)
 
-  const value = { cycle, measurements, profile, favorites, settings, ciqual, feed }
+  const value = { cycle, measurements, profile, favorites, settings, ciqual, feed, waterStreak }
 
   return <TodayDataContext.Provider value={value}>{children}</TodayDataContext.Provider>
 }

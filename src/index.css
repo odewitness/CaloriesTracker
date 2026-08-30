@@ -507,7 +507,35 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
   70%  { opacity: 1; }
   100% { transform: translateY(-32px); opacity: 0; }
 }
+
+/* Célébration au franchissement de l'objectif d'eau (WaterSection). */
+.water-celebrate {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 6px;
+  font-size: 22px;
+  pointer-events: none;
+  z-index: 2;
+}
+.water-celebrate span {
+  animation: waterCelebrate 1.5s ease-out forwards;
+}
+.water-celebrate span:nth-child(2) { animation-delay: .08s; }
+.water-celebrate span:nth-child(3) { animation-delay: .16s; }
+@keyframes waterCelebrate {
+  0%   { transform: translateY(6px) scale(.6); opacity: 0; }
+  25%  { transform: translateY(0) scale(1.1); opacity: 1; }
+  60%  { transform: translateY(-6px) scale(1); opacity: 1; }
+  100% { transform: translateY(-26px) scale(.9); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .water-wave, .water-bubble, .water-float span { animation: none; }
   .water-fill { transition: none; }
+  .water-celebrate { display: none; }
 }

@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { EyeOff, Eye, Scale, CalendarPlus, Share2, HeartPulse } from 'lucide-react'
+import { EyeOff, Eye, Scale, CalendarPlus, Share2, HeartPulse, ImageDown } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DayShortcutsBar — rangée d'actions rapides rattachées au jour affiché,
@@ -13,10 +13,12 @@ import { EyeOff, Eye, Scale, CalendarPlus, Share2, HeartPulse } from 'lucide-rea
 //   • Planifier un repas sur ce jour (PlanMealModal, rendu en portal côté DaySlot)
 //   • Ouvrir Profil › Cycle & alimentation (state.section, lu par ProfilePage)
 //   • Partager la journée avec ses amies (masqué si aucun aliment saisi)
+//   • Générer une image récap de la journée à partager (masquée si aucun
+//     aliment saisi)
 // Ce ne sont que des <button> : pas de position:fixed ici, la rangée peut
 // vivre dans le slider de swipe sans souci.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DayShortcutsBar({ excluded, onToggleExcluded, onPlanMeal, onShare, canShare }) {
+export default function DayShortcutsBar({ excluded, onToggleExcluded, onPlanMeal, onShare, onShareImage, canShare }) {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -40,6 +42,7 @@ export default function DayShortcutsBar({ excluded, onToggleExcluded, onPlanMeal
     { key: 'plan', icon: CalendarPlus, label: 'Planifier', onClick: onPlanMeal },
     { key: 'cycle', icon: HeartPulse, label: 'Cycle', onClick: openCycle },
     ...(canShare ? [{ key: 'share', icon: Share2, label: 'Partager', onClick: onShare }] : []),
+    ...(canShare && onShareImage ? [{ key: 'image', icon: ImageDown, label: 'Image', onClick: onShareImage }] : []),
   ]
 
   return (

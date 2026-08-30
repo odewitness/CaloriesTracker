@@ -361,11 +361,12 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
   « own », upsert par `(user_id, date)`. Un hook `useDayNote(dateStr)`.
 - **Effort.** Moyen-bas (nouvelle table + 1 section + 1 hook).
 
-#### F5 — Série d'hydratation
-- **Quoi.** Objectif d'eau atteint → petite animation + compteur « X jours
-  d'affilée ».
-- **Esquisse.** Calcul côté client à partir de `WaterSection` / historique eau.
-- **Effort.** ~50 lignes.
+#### F5 — Série d'hydratation — ✅ fait le 2026-08-30 (branche `feat-hydratation-partage`)
+- `src/hooks/useWaterStreak.js` : jours consécutifs (jusqu'à hier) avec
+  objectif d'eau atteint, monté 1× dans `TodayDataContext`.
+- `WaterSection` : badge « 🔥 N j » (dès 2 jours, aujourd'hui compté en direct),
+  + célébration (emoji + `hapticSuccess` + toast) au franchissement, une fois,
+  sur le slot « aujourd'hui » seulement.
 
 #### F6 — Pré-remplir un repas avec les habitudes — écartée par l'utilisatrice (2026-08-30)
 - **Quoi.** Bouton « ajouter mes 3 habituels » sur un repas vide.
@@ -373,11 +374,13 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
   il suffit d'un bouton qui ajoute les N premiers avec leur dernière quantité.
 - **Effort.** ~20 lignes.
 
-#### F7 — Carte « ma journée » partageable en image
-- **Quoi.** Générer une carte récap (calories, macros, anneau) en PNG à
-  screenshoter / partager.
-- **Esquisse.** Rendu `<canvas>` côté client (ou `html-to-image`). Aucune API.
-- **Effort.** Moyen-bas.
+#### F7 — Carte « ma journée » partageable en image — ✅ fait le 2026-08-30 (branche `feat-hydratation-partage`)
+- `src/components/ShareImageModal.jsx` : rendu `<canvas>` 1080×1080 (calories +
+  barre + 4 macros + nb d'aliments), aucune dépendance. Partage via Web Share
+  (`navigator.share` avec le fichier) si dispo, sinon bouton « Enregistrer »
+  (`<a download>`). Monté en portal sur `document.body`.
+- Entrée : nouveau raccourci « Image » dans `DayShortcutsBar` (visible dès
+  qu'il y a au moins un aliment ce jour-là).
 
 #### F8 — Recherche + tri dans les aliments perso
 - **Quoi.** `CustomFoodsSection` (820 lignes) n'a pas de recherche.
@@ -522,11 +525,9 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
 3. ~~**§3.1 hisser les hooks non datés**~~ ✅ 2026-08-30 (via `TodayDataContext`).
 4. **§2.3** (gestion d'erreur réseau) + **§3.2** (`useSupabaseQuery`) — à faire
    ensemble, plus tard, sur branche dédiée. Pas bloquant.
-5. Fonctionnalités **faciles** restantes après tri du 2026-08-30 (F1 déjà en
-   place ; F3, F4, F6 écartées) : **F2** (haptique), **F5** (série
-   d'hydratation), **F7** (carte partageable), **F8** (recherche aliments
-   perso), **F9** (rappels contextuels, besoin Edge Function).
-   ← **prochaine étape**
+5. Fonctionnalités **faciles** : F2 ✅, F5 ✅, F7 ✅ (2026-08-30 ; F1 déjà en
+   place ; F3, F4, F6 écartées). Restent **F8** (recherche aliments perso) et
+   **F9** (rappels contextuels, besoin Edge Function) si envie.
 6. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
 7. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
 8. Le reste selon l'envie.
