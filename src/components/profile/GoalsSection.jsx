@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { Flame, Dumbbell, Wheat, Droplets, Leaf, Calculator, ChevronRight, ChevronDown } from 'lucide-react'
+import { Flame, Dumbbell, Wheat, Droplets, Leaf, Calculator, ChevronRight, ChevronDown, TrendingDown } from 'lucide-react'
 import { computeCalorieNeeds, ACTIVITY_LEVELS, CALORIE_OBJECTIVES } from '../../lib/nutrients'
-import { GoalField, SectionScreen, SaveBar } from './primitives'
+import { GoalField, SectionScreen, SaveBar, Row, ToggleSwitch } from './primitives'
 
 // ── Calculateur de besoins caloriques ────────────────────────────────────────
 // Déplié à la demande depuis l'écran Objectifs (bouton « Calculer mes besoins »).
@@ -150,6 +150,7 @@ function CalorieCalculatorCard({ sexe, tailleCm, niveauActivite, onActivite, obj
 // Écran de détail « Objectifs nutritionnels ».
 export default function GoalsSection({
   goals, setGoal, dirty, saving, onSave, onBack,
+  autoAdjustEnabled = false, onToggleAutoAdjust,
   calc, // { sexe, tailleCm, niveauActivite, onActivite, objective, onObjective, targetWeight, onTargetWeight, weeks, onWeeks, poidsKg, age, onOpenMeasurements, onApply }
 }) {
   const [showCalc, setShowCalc] = useState(false)
@@ -165,6 +166,17 @@ export default function GoalsSection({
       </div>
 
       <SaveBar visible={dirty} onSave={onSave} saving={saving} label="Enregistrer les objectifs" />
+
+      {onToggleAutoAdjust && (
+        <div className="card" style={{ marginTop: dirty ? 0 : 4, marginBottom: 16, overflow: 'hidden' }}>
+          <Row icon={<TrendingDown size={18} />} label="Ajuster selon mon poids">
+            <ToggleSwitch checked={autoAdjustEnabled} onClick={onToggleAutoAdjust} />
+          </Row>
+          <div style={{ padding: '0 16px 12px', fontSize: 12, color: 'var(--text-hint)', lineHeight: 1.5 }}>
+            Une fois par semaine, si ta tendance de poids s'éloigne de ce que ton objectif calorique vise, l'app te proposera un petit ajustement (±100 kcal max). Tu valides toujours — rien ne change tout seul.
+          </div>
+        </div>
+      )}
 
       <button
         onClick={() => setShowCalc(s => !s)}
