@@ -7,17 +7,19 @@ import { periodBlocks, periodStarts } from '../lib/cycle'
 // ─────────────────────────────────────────────────────────────────────────────
 // useCycle — jours de règles saisis à la main (table `regles`). UNE LIGNE =
 // UN JOUR, avec une `intensite` optionnelle ('leger'|'moyen'|'abondant',
-// Palier 7). Le calcul de phase se fait côté client à partir de la liste
-// complète (voir src/lib/cycle.js).
+// Palier 7) et des `symptomes` optionnels (Palier 8, voir PERIOD_SYMPTOMS
+// dans src/lib/cycle.js). Le calcul de phase se fait côté client à partir de
+// la liste complète (voir src/lib/cycle.js).
 //
 // toggleDay(date)          : ajoute/retire un jour (insert/delete).
 // addManyDays(arr)         : import en lot (insert).
 // removeDays(arr)          : retire un lot (delete).
 // setDaysIntensite(arr, l) : met l'intensité sur un lot de jours (update).
+// setDaysSymptomes(arr, s) : met la liste de symptômes sur un lot de jours (update).
 // ─────────────────────────────────────────────────────────────────────────────
 export function useCycle() {
   const { user } = useAuth()
-  const [rows, setRows] = useState([]) // [{ date:'YYYY-MM-DD', intensite:string|null }]
+  const [rows, setRows] = useState([]) // [{ date:'YYYY-MM-DD', intensite:string|null, symptomes:string[]|null }]
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -25,7 +27,7 @@ export function useCycle() {
     setLoading(true)
     const { data } = await supabase
       .from('regles')
-      .select('date, intensite')
+      .select('date, intensite, symptomes')
       .eq('user_id', user.id)
       .order('date', { ascending: true })
     setRows(data || [])
@@ -44,6 +46,10 @@ export function useCycle() {
   const days = useMemo(() => rows.map(r => r.date), [rows])
   const intensiteByDate = useMemo(
     () => Object.fromEntries(rows.map(r => [r.date, r.intensite || null])),
+    [rows],
+  )
+  const symptomesByDate = useMemo(
+    () => Object.fromEntries(rows.map(r => [r.date, r.symptomes || []])),
     [rows],
   )
   const blocks = useMemo(() => periodBlocks(days), [days])
@@ -115,14 +121,29 @@ export function useCycle() {
     return { error }
   }
 
+  const setDaysSymptomes = async (dateArr, symptomsArr) => {
+    if (!user) return { error: 'Non connecté' }
+    const set = new Set(dateArr.map(fmt))
+    const clean = [...new Set((symptomsArr || []).map(s => s.trim()).filter(Boolean))]
+    const prev = rows
+    setRows(r => r.map(x => (set.has(x.date) ? { ...x, symptomes: clean } : x)))
+    const { error } = await supabase
+      .from('regles')
+      .update({ symptomes: clean.length ? clean : null })
+      .eq('user_id', user.id)
+      .in('date', [...set])
+    if (error) setRows(prev)
+    return { error }
+  }
+
   const toggleDay = (date) => {
     const dateStr = fmt(date)
     return days.includes(dateStr) ? removeDay(dateStr) : addDay(dateStr)
   }
 
   return {
-    days, blocks, starts, intensiteByDate, loading,
-    addDay, removeDay, removeDays, addManyDays, setDaysIntensite, toggleDay,
+    days, blocks, starts, intensiteByDate, symptomesByDate, loading,
+    addDay, removeDay, removeDays, addManyDays, setDaysIntensite, setDaysSymptomes, toggleDay,
     refetch: load,
   }
 }

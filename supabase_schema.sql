@@ -801,11 +801,15 @@ create index if not exists idx_jours_exclus_user_date on jours_exclus (user_id, 
 -- chaque bloc sert de repère de cycle. Toggle côté client = insert/delete.
 -- `intensite` (nullable) ajoutée le 2026-08-29 (Palier 7) : 'leger' | 'moyen'
 -- | 'abondant', saisie par bloc côté client — voir supabase/sql/regles_intensite_setup.sql.
+-- `symptomes` (nullable, text[]) ajoutée le 2026-08-30 (Palier 8) : clés
+-- prédéfinies (PERIOD_SYMPTOMS dans src/lib/cycle.js) et/ou texte libre,
+-- saisie par jour depuis la page du jour — voir supabase/sql/regles_symptomes_setup.sql.
 create table if not exists regles (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
   date date not null,
   intensite text,
+  symptomes text[],
   created_at timestamptz not null default now(),
   unique (user_id, date)
 );
@@ -878,7 +882,8 @@ alter table jours_exclus enable row level security;
 -- select/insert/delete "own" (voir supabase/sql/regles_setup.sql). Policy
 -- update "own" ajoutée le 2026-08-29 (Palier 7) pour l'intensité du flux
 -- (voir supabase/sql/regles_intensite_setup.sql) — le reste (présence d'un
--- jour) se fait toujours par insert/delete.
+-- jour) se fait toujours par insert/delete. Colonne `symptomes` (Palier 8)
+-- réutilise cette même policy update, aucune policy supplémentaire.
 alter table regles enable row level security;
 
 -- =============================================

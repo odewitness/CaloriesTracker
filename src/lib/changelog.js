@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-30',
+    title: 'Sport et symptômes selon ta phase',
+    description: "Sur la page du jour, la pastille de phase (« Règles », « Phase lutéale »…) se déplie maintenant en un clic : tu y trouves une explication de la phase et des repères sport adaptés. Pendant tes règles, tu peux aussi marquer ou retirer le jour, noter l'intensité de ton flux et cocher tes symptômes (crampes, fatigue, maux de tête…) — avec la possibilité d'en ajouter d'autres à la main. Ces notes ne sont visibles que par toi.",
+  },
+  {
     date: '2026-08-29',
     title: 'Note l\'intensité de tes règles',
     description: "Dans la liste de tes règles (Profil › Cycle & alimentation), chaque épisode a maintenant trois petits boutons : Léger, Moyen, Abondant. C'est facultatif. Si tu les renseignes, l'app estime la quantité de fer que tu perds en moyenne par cycle et te le rappelle, pour que tu penses aux aliments riches en fer au bon moment.",

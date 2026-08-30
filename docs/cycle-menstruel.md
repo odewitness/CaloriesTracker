@@ -232,6 +232,7 @@ même table (Palier 5).
 | Nudge macros lutéal | **Indicatif seulement** (page d'info + tagline de phase). Pas de recalcul numérique des macros en Palier 3 | 3 ✅ |
 | Suggestions « aliments à privilégier » par phase, **limitées aux favoris** | ✅ `CyclePhaseBadge` dépliable + `CycleNutrientTips`, données de `useFavorites` | 4 ✅ |
 | Suivi fer / calcium / magnésium mis en avant selon la phase | ✅ `NutrientPanel.jsx` prop `highlightKeys` (point violet), alimenté par `TodayPage.jsx` | 4 ✅ |
+| Repères sport par phase + saisie quotidienne (jour de règles, intensité, symptômes) dans la pastille de phase | ✅ `CyclePhaseBadge.jsx` (dépli général) + `CyclePeriodDayLog.jsx` (saisie du jour) | 8 ✅ |
 
 ---
 
@@ -350,15 +351,39 @@ ne parte en prod. Toujours demander confirmation avant `git push`.
       phrase ajoutée dans `CycleInfoPage`.
 - [x] Entrée changelog
 
+### Palier 8 — Sport par phase + suivi quotidien (règles)  ▸ statut : codé (branche `cycle-sport-symptomes`)
+- [x] `cycle.js` : `PHASE_SPORT_GUIDANCE` (repères sport par phase, même
+      prudence que `PHASE_GUIDANCE` — informatif, jamais prescriptif) et
+      `PERIOD_SYMPTOMS` (liste prédéfinie de symptômes + `symptomLabel`)
+- [x] Colonne `symptomes` (`text[]`) sur `regles` —
+      `supabase/sql/regles_symptomes_setup.sql`, à appliquer manuellement ;
+      `supabase_schema.sql` mis à jour. Réutilise la policy `update` existante
+      (Palier 7), aucune nouvelle policy.
+- [x] `useCycle` charge `symptomes`, expose `symptomesByDate` et
+      `setDaysSymptomes(arr, symptomsArr)` (update en lot, même pattern que
+      `setDaysIntensite`)
+- [x] `CyclePhaseBadge` (page du jour) devient dépliable dès qu'une phase est
+      déterminée (plus seulement quand des favoris matchent) : affiche la
+      description de la phase (`PHASE_GUIDANCE`) + les repères sport
+      (`PHASE_SPORT_GUIDANCE`) + les conseils nutriments (si favoris)
+- [x] En phase de règles, le dépli affiche `CyclePeriodDayLog` :
+      marquer/retirer CE jour comme jour de règles (`toggleDay`), son
+      intensité de flux (chips Léger/Moyen/Abondant, un seul jour à la fois —
+      différent de la saisie par bloc de `CycleSection` dans Profil), et ses
+      symptômes (chips prédéfinis + champ texte libre). Tout est privé (RLS
+      "own" de `regles`)
+- [x] Entrée changelog (2026-08-30 « Sport et symptômes selon ta phase »)
+
 ---
 
 ## 7. Reste à faire (vue rapide)
 
-**Chantier terminé.** Paliers 1 → 7 tous livrés et mergés sur `main`, migrations
-`regles_setup.sql` et `regles_intensite_setup.sql` appliquées.
+Paliers 1 → 8 livrés (Palier 8 sur la branche `cycle-sport-symptomes`, en
+attente d'application SQL + test manuel + merge). Migrations `regles_setup.sql`,
+`regles_intensite_setup.sql` et `regles_symptomes_setup.sql`.
 
-Rien de prévu au-delà. Le wrapper natif (Health Connect / Apple Santé) est
-abandonné. Toute nouvelle idée s'ajoute ici.
+Rien d'autre de prévu au-delà. Le wrapper natif (Health Connect / Apple Santé)
+est abandonné. Toute nouvelle idée s'ajoute ici.
 
 ---
 
@@ -390,6 +415,15 @@ abandonné. Toute nouvelle idée s'ajoute ici.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — Retour utilisatrice après la fin annoncée du chantier :
+  ajout du sport par phase + suivi quotidien en phase de règles. Palier 8 codé
+  sur la branche `cycle-sport-symptomes` : `PHASE_SPORT_GUIDANCE` (repères
+  sport, même prudence que le reste), colonne `regles.symptomes` (`text[]`,
+  migration `regles_symptomes_setup.sql`), `CyclePeriodDayLog` (marquer le
+  jour + intensité + symptômes, un jour à la fois, depuis la page du jour) et
+  `CyclePhaseBadge` rendu dépliable pour toute phase connue (description +
+  sport + nutriments). `npm run build` OK. En attente : application SQL par
+  l'utilisatrice, test manuel, merge + push après confirmation.
 - **2026-08-29** — Palier 6 mergé sur `main` + poussé ; wrapper natif abandonné
   (décision utilisatrice). Palier 7 codé sur la branche `cycle-flux` : colonne
   `regles.intensite` + policy `update` (migration `regles_intensite_setup.sql`),
