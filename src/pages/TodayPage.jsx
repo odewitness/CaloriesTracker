@@ -39,7 +39,7 @@ import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/
 import { sportAdjustedSettings, dayActivityKcal, dayEnergyBalance, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { fmt, dateLabel } from '../lib/dates'
-import { hapticTap, hapticRemove, hapticNav } from '../lib/haptics'
+import { hapticTap, hapticRemove, hapticNav, hapticSuccess } from '../lib/haptics'
 import { useSetTodayHeaderInfo, useTodayShortcuts, useRequestTodayDate } from '../lib/TodayHeaderContext'
 
 function dateOffset(base, days) {
@@ -68,7 +68,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   // Données non datées, montées une seule fois pour les 3 slots (voir
   // TodayDataContext). Destructuration identique à l'ancien appel direct des
   // hooks — seul l'endroit de l'appel change.
-  const { cycle, measurements, profile: profileQuery, favorites: favoritesQuery, settings: settingsQuery, ciqual, feed } = useTodayData()
+  const { cycle, measurements, profile: profileQuery, favorites: favoritesQuery, settings: settingsQuery, ciqual, feed, waterStreak } = useTodayData()
   const { days: cycleDays, intensiteByDate, symptomesByDate, toggleDay: toggleCycleDay, setDaysIntensite, setDaysSymptomes } = cycle
   const { entries: measurementEntries } = measurements
   const { profile } = profileQuery
@@ -104,6 +104,12 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     const last = waterEntries[waterEntries.length - 1]
     if (last) await deleteEntry(last.id)
   }
+  // Franchissement de l'objectif d'eau du jour (transition détectée par
+  // WaterSection, déclenché une seule fois). Réservé au slot "aujourd'hui".
+  const handleWaterGoalReached = useCallback(() => {
+    hapticSuccess()
+    toast('💧 Objectif d’eau atteint, bravo !')
+  }, [toast])
   const handleUpdateWater = (patch) => updateSettings({ water: { ...waterCfg, ...patch } })
 
   // Poids courant (dernier relevé de mensurations) — sert à l'estimation des
@@ -487,6 +493,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         entries={waterEntries}
         water={waterCfg}
         beverageName={defaultBeverage?.alim_nom}
+        streakBeforeToday={isToday ? waterStreak.streakBeforeToday : null}
+        onGoalReached={isToday ? handleWaterGoalReached : undefined}
         onQuickAdd={handleWaterQuickAdd}
         onUndo={handleWaterUndo}
         onOpenSheet={() => setWaterSheetOpen(true)}

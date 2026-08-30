@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Droplet, Plus, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Droplet, Plus, ChevronDown, ChevronRight, RotateCcw, Flame } from 'lucide-react'
 import { WATER_DEFAULTS, waterTotalMl, litres } from '../lib/water'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,8 +16,14 @@ import { WATER_DEFAULTS, waterTotalMl, litres } from '../lib/water'
 //   onQuickAdd(ml)  — ajoute `ml` de la boisson par défaut au journal
 //   onUndo()        — retire la dernière entrée d'hydratation
 //   onOpenSheet()   — ouvre la feuille "Ajouter de l'eau" (choix boisson/portions)
+//   streakBeforeToday — nb de jours consécutifs (jusqu'à hier) où l'objectif a
+//                       été atteint. null = ne pas afficher de série (slot ≠
+//                       aujourd'hui). On y ajoute +1 en direct si l'objectif
+//                       est atteint aujourd'hui.
+//   onGoalReached()   — appelé UNE fois quand le total franchit l'objectif
+//                       pendant la session (retour haptique + toast côté page).
 // ─────────────────────────────────────────────────────────────────────────────
-export default function WaterSection({ entries = [], water, beverageName, onQuickAdd, onUndo, onOpenSheet }) {
+export default function WaterSection({ entries = [], water, beverageName, streakBeforeToday = null, onGoalReached, onQuickAdd, onUndo, onOpenSheet }) {
   const cfg = water || WATER_DEFAULTS
   const goalMl = cfg.goal_ml || WATER_DEFAULTS.goal_ml
   const portions = (cfg.portions && cfg.portions.length ? cfg.portions : WATER_DEFAULTS.portions).slice(0, 3)
@@ -28,6 +34,22 @@ export default function WaterSection({ entries = [], water, beverageName, onQuic
   const reached = totalMl >= goalMl && goalMl > 0
   const remainMl = Math.max(0, goalMl - totalMl)
   const hasEntries = entries.length > 0
+
+  // Série d'hydratation : jours consécutifs avec objectif atteint, aujourd'hui
+  // inclus s'il est déjà atteint. Affichée à partir de 2 jours.
+  const streak = streakBeforeToday == null ? null : streakBeforeToday + (reached ? 1 : 0)
+
+  // Célébration au franchissement de l'objectif (false → true) pendant la
+  // session — jamais au montage (prevReached initialisé à l'état courant).
+  const prevReached = useRef(reached)
+  const [burst, setBurst] = useState(0)
+  useEffect(() => {
+    if (reached && !prevReached.current) {
+      setBurst((b) => b + 1)
+      onGoalReached?.()
+    }
+    prevReached.current = reached
+  }, [reached, onGoalReached])
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('water-collapsed')) ?? false }
@@ -47,7 +69,12 @@ export default function WaterSection({ entries = [], water, beverageName, onQuic
   }
 
   return (
-    <div className="card" style={{ marginTop: 20, overflow: 'hidden' }}>
+    <div className="card" style={{ marginTop: 20, overflow: 'hidden', position: 'relative' }}>
+      {burst > 0 && (
+        <div key={burst} className="water-celebrate" aria-hidden="true">
+          <span>🎉</span><span>💧</span><span>✨</span>
+        </div>
+      )}
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '12px 14px' }}>
         <button
@@ -60,7 +87,7 @@ export default function WaterSection({ entries = [], water, beverageName, onQuic
             style={{ flexShrink: 0, transition: 'transform .2s', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Droplet size={14} color="var(--blue)" />
               <span style={{ fontWeight: 700, fontSize: 14 }}>Eau</span>
               {hasEntries && (
@@ -70,6 +97,19 @@ export default function WaterSection({ entries = [], water, beverageName, onQuic
                   borderRadius: 10, padding: '1px 7px',
                 }}>
                   {entries.length}
+                </span>
+              )}
+              {streak != null && streak >= 2 && (
+                <span
+                  title={`${streak} jours d'affilée avec l'objectif atteint`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 3,
+                    fontSize: 11, fontWeight: 700,
+                    background: 'var(--amber-light)', color: 'var(--amber)',
+                    borderRadius: 10, padding: '1px 7px',
+                  }}
+                >
+                  <Flame size={11} /> {streak} j
                 </span>
               )}
             </div>
