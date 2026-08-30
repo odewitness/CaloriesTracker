@@ -456,13 +456,35 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
   `HistoryPage`.
 - **Effort.** Moyen.
 
-#### M5 — Planificateur de menus + liste de courses générée
+#### M5 — Planificateur de menus + liste de courses générée — ✅ fait le 2026-08-30 (branche `feat-m5-menu-planner`)
 - **Quoi.** Vue « semaine » éditable des `repas_planifies`, puis bouton
   « générer la liste de courses » à partir des repas planifiés.
 - **Esquisse.** `usePlannedMealsRange` existe déjà. Agréger les `items` des
   repas planifiés d'une plage → regrouper par aliment → insérer dans
   `liste_courses_items`.
 - **Effort.** Moyen-élevé (surtout l'UI semaine).
+- **Livré — deux moitiés :**
+  1. **Plateau de menus** : nouvelle vue « Menus » dans le Calendrier (3ᵉ
+     bouton à côté de Mois / Semaine). `src/components/WeekMenuBoard.jsx` —
+     7 jours empilés (lisible sur mobile, pas une grille 7×4), une ligne par
+     repas activé (`meal_enabled`). « + » sur une case → `PlanMealModal` avec
+     le jour ET le repas pré-remplis (nouveau prop `defaultMeal`). Chaque
+     repas planifié = une pastille : appui → petit menu « Marquer mangé »
+     (→ `mark_planned_meal_eaten`, comme ailleurs) / « Retirer ». Réutilise
+     `usePlannedMealsRange` + `refetchAll` déjà chargés par `CalendarPage` ;
+     aucune donnée en plus.
+  2. **Liste de courses depuis les repas prévus** :
+     `useShoppingListItems.addPlannedItems(plannedMeals)` aplatit les `items`
+     de tous les repas planifiés retenus, résout la catégorie (même chemin que
+     recette / repas type), et `addItems()` fusionne : un aliment présent dans
+     plusieurs repas = une ligne, grammages additionnés, noms des repas
+     d'origine listés. `src/components/AddFromPlannedModal.jsx` — choix d'une
+     plage de dates (défaut : 2 semaines), aperçu des repas non mangés,
+     bouton « Ajouter à la liste ». Nouvelle entrée « Depuis mes repas
+     prévus » dans le menu « + » de `ShoppingListPage`.
+- Aucun changement de schéma (tables `repas_planifies` / `liste_courses_items`
+  déjà en place). « Mes programmations » (séries récurrentes) reste accessible
+  depuis les vues Mois / Semaine, pas dupliqué dans le plateau.
 
 #### M6 — Import / export JSON de toutes ses données
 - **Quoi.** Un bouton « exporter mes données » (télécharge un JSON) et
@@ -551,6 +573,8 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
 6. **M3 objectifs adaptatifs** ✅ (2026-08-30).
 7. **C4 prédiction de poids** ✅ (2026-08-30) — projection de tendance (pas de
    bilan énergétique cumulé), fourchette + rappel « pas une prédiction ».
-8. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
-9. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
-10. Le reste selon l'envie.
+8. **M5 plateau de menus + liste de courses générée** ✅ (2026-08-30) — vue
+   « Menus » du calendrier + « Depuis mes repas prévus » dans les courses.
+9. **§4.2 mode sombre** en parallèle de la migration CSS (§3.3).
+10. **M1 hors-ligne** quand on veut resserrer l'identité PWA.
+11. Le reste selon l'envie.

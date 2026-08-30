@@ -6,6 +6,7 @@ import { useGroceriesSuggestions } from '../hooks/useGroceriesSuggestions'
 import { findField } from '../lib/ciqualExplorer'
 import AddFromRecipeModal from '../components/AddFromRecipeModal'
 import AddFromMealModal from '../components/AddFromMealModal'
+import AddFromPlannedModal from '../components/AddFromPlannedModal'
 import FoodPicker from '../components/FoodPicker'
 import Loader from '../components/Loader'
 import FieldLabel from '../components/FieldLabel'
@@ -100,7 +101,7 @@ function QuickAddForm({ onAdd, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // AddMenu — feuille du bas : 3 façons d'ajouter
 // ─────────────────────────────────────────────────────────────────────────────
-function AddMenu({ onClose, onQuickAdd, onFromFood, onFromRecipe, onFromMeal }) {
+function AddMenu({ onClose, onQuickAdd, onFromFood, onFromRecipe, onFromMeal, onFromPlanned }) {
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-end' }}
@@ -112,6 +113,7 @@ function AddMenu({ onClose, onQuickAdd, onFromFood, onFromRecipe, onFromMeal }) 
       >
         {[
           { label: 'Chercher un aliment', action: onFromFood },
+          { label: 'Depuis mes repas prévus', action: onFromPlanned },
           { label: 'Depuis une recette', action: onFromRecipe },
           { label: 'Depuis un repas type', action: onFromMeal },
           { label: 'Article libre (non alimentaire...)', action: onQuickAdd },
@@ -229,12 +231,13 @@ function SuggestionsSection({ existingKeys, onAdd }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function ListeDetail({ liste, onBack }) {
   const toast = useToast()
-  const { items, loading, addItems, addRecetteIngredients, addRepasItems, addSuggestedItem, toggleChecked, deleteItem, clearChecked } = useShoppingListItems(liste.id)
+  const { items, loading, addItems, addRecetteIngredients, addRepasItems, addPlannedItems, addSuggestedItem, toggleChecked, deleteItem, clearChecked } = useShoppingListItems(liste.id)
   const [menuOpen, setMenuOpen] = useState(false)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [foodPickerOpen, setFoodPickerOpen] = useState(false)
   const [recipeModalOpen, setRecipeModalOpen] = useState(false)
   const [mealModalOpen, setMealModalOpen] = useState(false)
+  const [plannedModalOpen, setPlannedModalOpen] = useState(false)
 
   const grouped = useMemo(() => {
     const map = new Map()
@@ -334,6 +337,17 @@ function ListeDetail({ liste, onBack }) {
           onFromFood={() => setFoodPickerOpen(true)}
           onFromRecipe={() => setRecipeModalOpen(true)}
           onFromMeal={() => setMealModalOpen(true)}
+          onFromPlanned={() => setPlannedModalOpen(true)}
+        />
+      )}
+
+      {plannedModalOpen && (
+        <AddFromPlannedModal
+          onAdd={async (plannedMeals) => {
+            const { error } = await addPlannedItems(plannedMeals)
+            toast(error ? "Erreur lors de l'ajout" : '✓ Aliments ajoutés')
+          }}
+          onClose={() => setPlannedModalOpen(false)}
         />
       )}
 
