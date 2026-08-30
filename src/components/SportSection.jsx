@@ -183,30 +183,25 @@ export default function SportSection({ activites = [], week, sportCfg, consumedK
 
             {showEffort && (
               <div style={{ background: 'var(--gray-bg)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>
-                  Objectif du jour · manger selon l'effort
-                </div>
                 {adjust?.applied ? (
                   <>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      Base (jour sans séance) <strong>{adjust.base}</strong>
-                      {adjust.credit > 0 ? <> + <strong>{adjust.credit}</strong> de séances</> : null}
-                      {' = '}<strong style={{ color: 'var(--text)' }}>{adjust.goal} kcal</strong>
+                    <div style={{ fontSize: 13 }}>
+                      <strong style={{ fontSize: 15 }}>{adjust.goal.toLocaleString('fr-FR')} kcal</strong>
+                      <span style={{ color: 'var(--text-muted)' }}> visés aujourd'hui</span>
                     </div>
-                    {adjust.delta !== 0 && (
-                      <div style={{ fontSize: 11.5, marginTop: 3, color: adjust.delta > 0 ? 'var(--green)' : 'var(--amber)' }}>
-                        {adjust.delta > 0 ? '+' : '−'}{Math.abs(adjust.delta)} kcal vs ton objectif du jour hors sport
-                        {adjust.delta < 0 ? ' (rien de noté aujourd\'hui)' : ''}
-                      </div>
-                    )}
+                    <div style={{ fontSize: 11.5, marginTop: 3, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      {adjust.delta > 0 && <>+{adjust.delta} de plus que d'habitude, grâce à tes pas et séances du jour.</>}
+                      {adjust.delta < 0 && <>{Math.abs(adjust.delta)} de moins que d'habitude — journée sans activité notée pour l'instant.</>}
+                      {adjust.delta === 0 && <>Comme ton objectif habituel pour le moment ; il montera avec tes pas et séances.</>}
+                    </div>
                   </>
                 ) : (
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    Renseigne ton profil (sexe, âge, taille, poids, niveau d'activité) pour que ce mode s'applique. En attendant, ton objectif habituel est utilisé.
+                    Complète ton profil dans Profil › Sport pour activer ce mode. En attendant, ton objectif habituel est utilisé.
                   </div>
                 )}
                 <div style={{ fontSize: 10, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.5 }}>
-                  Ton objectif de base repasse à un équivalent sédentaire, et tes pas et tes séances du jour se rajoutent (plafond commun +{sportCfg?.depense_max_creditee_kcal ?? 400}). Estimation ±25 %. Historique et calendrier gardent ton objectif à plat. Désactivable à tout moment dans Profil › Sport.
+                  Réglé dans Profil › Sport. N'affecte que la page du jour.
                 </div>
               </div>
             )}
