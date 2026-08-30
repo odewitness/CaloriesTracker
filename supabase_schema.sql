@@ -932,7 +932,6 @@ create index if not exists idx_commentaires_sport_partage on commentaires_sport 
 -- =============================================
 -- Désactivé sur les tables historiques mono-utilisateur (app personnelle,
 -- pas de séparation dev/prod — voir CLAUDE.md).
-alter table ciqual disable row level security;
 alter table journal disable row level security;
 alter table repas_types disable row level security;
 alter table settings disable row level security;
@@ -944,6 +943,17 @@ alter table marques disable row level security;
 -- tant que le RLS était désactivé). Policies exécutées manuellement dans le
 -- SQL editor Supabase (pas d'accès direct à la base depuis cette session).
 alter table mensurations enable row level security;
+
+-- `ciqual` : RLS ACTIVÉ, seule policy = lecture publique. Base de référence
+-- ANSES partagée, pas de user_id — l'écriture des "portions courantes" depuis
+-- l'app (fiche Explorer + ajout au journal) passe par la fonction security
+-- definer `set_ciqual_portions` (voir supabase/sql/ciqual_portions_setup.sql),
+-- pas par un UPDATE direct : aucune policy UPDATE, donc un
+-- `update ciqual ...` via la Data API touche 0 ligne sans lever d'erreur.
+alter table ciqual enable row level security;
+
+create policy "Anyone can read ciqual" on ciqual
+  for select using (true);
 
 create policy "mensurations_select_own" on mensurations
   for select using (auth.uid() = user_id);
@@ -1154,6 +1164,35 @@ returns setof ciqual language sql stable as $$
     alim_nom
   limit lim;
 $$;
+
+-- =============================================
+-- FUNCTION : set_ciqual_portions
+-- =============================================
+-- Appelée via supabase.rpc('set_ciqual_portions', { p_alim_code, p_portions })
+-- depuis FoodPicker.jsx et ExplorerFoodModal.jsx pour écrire les "portions
+-- courantes" d'un aliment ANSES. `ciqual` a RLS activé sans policy UPDATE :
+-- security definer pour pouvoir écrire, execute réservé à `authenticated`.
+-- Retourne le nombre de lignes modifiées (0 = alim_code inconnu).
+-- Voir supabase/sql/ciqual_portions_setup.sql.
+create or replace function set_ciqual_portions(p_alim_code text, p_portions jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  affected integer;
+begin
+  update ciqual
+     set portions = coalesce(p_portions, '[]'::jsonb)
+   where alim_code = p_alim_code;
+  get diagnostics affected = row_count;
+  return affected;
+end;
+$$;
+
+revoke all on function set_ciqual_portions(text, jsonb) from public, anon;
+grant execute on function set_ciqual_portions(text, jsonb) to authenticated;
 
 -- =============================================
 -- FUNCTION : find_profile_by_pseudo

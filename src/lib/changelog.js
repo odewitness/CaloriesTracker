@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Tes portions personnalisées sont bien gardées',
+    description: "Quand tu ajoutais une portion à un aliment (par exemple « 1 tranche · 30 g ») au moment de l'ajouter à ton journal, ou depuis sa fiche, elle s'affichait sur le moment mais repartait au rechargement suivant. C'est corrigé : les portions que tu crées sont maintenant vraiment enregistrées et te seront reproposées la prochaine fois.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Partage tes séances avec tes amies',
     description: "Tu peux maintenant partager une séance sur le fil : ouvre-la (bloc Activité de la page du jour) et touche « Partager avec mes amies ». Ou partage un résumé de ta semaine (temps total, nombre de séances) avec « Partager ma semaine » sous le bloc Activité. Tes amies peuvent réagir et commenter, comme pour un repas ou une recette.",
   },

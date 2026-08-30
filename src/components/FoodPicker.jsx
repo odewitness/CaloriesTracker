@@ -450,9 +450,15 @@ const savePortions = async () => {
     .filter(p => p.label.trim() && parseFloat(p.g) > 0)
     .map(p => ({ label: p.label.trim(), g: parseFloat(p.g) }))
   setSavingPortions(true)
-  const { error } = await supabase.from('ciqual').update({ portions: clean }).eq('alim_code', selected.alim_code)
+  // `ciqual` a RLS activé sans policy UPDATE : on passe par une fonction
+  // security definer (voir supabase/sql/ciqual_portions_setup.sql). `affected`
+  // = nombre de lignes modifiées → 0 signifie alim_code inconnu, vraie erreur.
+  const { data: affected, error } = await supabase.rpc('set_ciqual_portions', {
+    p_alim_code: selected.alim_code,
+    p_portions: clean,
+  })
   setSavingPortions(false)
-  if (error) { toast('Erreur lors de la sauvegarde des portions'); return }
+  if (error || !affected) { toast('Erreur lors de la sauvegarde des portions'); return }
   setSelected(s => ({ ...s, portions: clean }))
   patchCachedPortions(selected.alim_code, clean)
   setEditingPortions(false)

@@ -51,9 +51,9 @@ export default function ExplorerFoodModal({ food, onClose, foods, gaps, onPickFo
   // Édition des portions courantes de l'aliment CIQUAL — la base ANSES n'en
   // renseigne que pour une minorité d'aliments (voir `portions` dans
   // supabase_schema.sql), d'où la possibilité de les compléter à la main
-  // depuis la fiche. `ciqual` n'a pas de RLS (table de référence partagée,
-  // pas de user_id) : l'écriture se fait donc directement sur la ligne,
-  // sans filtre supplémentaire.
+  // depuis la fiche. `ciqual` a RLS activé (policy SELECT seule) : l'écriture
+  // passe par la fonction security definer set_ciqual_portions (voir
+  // supabase/sql/ciqual_portions_setup.sql), pas par un UPDATE direct.
   const [editingPortions, setEditingPortions] = useState(false)
   const [portionsDraft, setPortionsDraft] = useState([{ label: '', g: '' }])
   const [savingPortions, setSavingPortions] = useState(false)
@@ -122,9 +122,15 @@ export default function ExplorerFoodModal({ food, onClose, foods, gaps, onPickFo
       .filter(p => p.label.trim() && parseFloat(p.g) > 0)
       .map(p => ({ label: p.label.trim(), g: parseFloat(p.g) }))
     setSavingPortions(true)
-    const { error } = await supabase.from('ciqual').update({ portions: clean }).eq('alim_code', food.alim_code)
+    // `ciqual` a RLS activé sans policy UPDATE : on passe par une fonction
+    // security definer (voir supabase/sql/ciqual_portions_setup.sql). `affected`
+    // = nombre de lignes modifiées → 0 signifie alim_code inconnu, vraie erreur.
+    const { data: affected, error } = await supabase.rpc('set_ciqual_portions', {
+      p_alim_code: food.alim_code,
+      p_portions: clean,
+    })
     setSavingPortions(false)
-    if (error) { toast('Erreur lors de la sauvegarde des portions'); return }
+    if (error || !affected) { toast('Erreur lors de la sauvegarde des portions'); return }
     setFull(f => ({ ...f, portions: clean }))
     patchCachedPortions(food.alim_code, clean)
     setEditingPortions(false)
