@@ -326,11 +326,17 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
       ultérieur si besoin).
 - [x] Entrée changelog (2026-08-30 « Ton sport, semaine après semaine »)
 
-### Palier 3 — Corrélations ▸ statut : à faire
-- [ ] Encart « Ton sport sur cette période » dans `HistoryPage` (énergie / poids
-      les semaines chargées vs légères)
-- [ ] Annotation des graphes de poids / calories les jours de séance
-- [ ] Entrée changelog
+### Palier 3 — Corrélations ▸ statut : codé (branche `suivi-sport-p3`)
+- [x] Encart « Sport & calories sur cette période » dans `HistoryPage` : compare
+      les kcal moy. (et le poids moy.) des **jours avec séance** vs **jours
+      sans**, hors vue Année, min. 2 + 2 jours notés. Formulation « simple
+      observation, pas une cause à effet ».
+- [x] Annotation `CalorieTrendChart` : prop `sportDates` (Set) → tiret vert sous
+      les barres des jours de séance (vues Semaine / Mois) + légende.
+- [x] Annotation `MetricChart` (courbe de poids uniquement) : prop `sportDates`
+      → tiret vert sous les relevés faits un jour de séance + légende.
+      `MeasurementsPage` charge `useSportRange` sur la fenêtre des relevés.
+- [x] Entrée changelog (2026-08-30 « Tes jours de sport sur tes courbes »)
 
 ### Palier 4 — Boucle cycle ▸ statut : à faire
 - [ ] `cycle.js` : rattacher chaque séance à la phase où elle tombe
@@ -387,9 +393,10 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
 
 - Palier 1 : mergé dans `main` en local (SQL `sport_setup.sql` appliqué par
   l'utilisatrice, testé). Reste : `git push` vers `main` (à confirmer).
-- Palier 2 : codé sur la branche `suivi-sport-p2`. Aucune migration. Reste :
+- Paliers 1 & 2 : mergés + poussés sur `main` (déployés Netlify).
+- Palier 3 : codé sur la branche `suivi-sport-p3`. Aucune migration. Reste :
   test manuel, merge + push après confirmation.
-- Paliers 3 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
+- Paliers 4 → 6 à faire. Migration à venir : `connexions_sport_setup.sql`
   (Palier 5). Paliers 7 → 9 non tranchés.
 
 ---
@@ -426,6 +433,13 @@ dépend ne parte en prod. Toujours demander confirmation avant `git push`.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — Paliers 1 & 2 mergés + poussés sur `main` (déployés). Palier 3
+  codé sur la branche `suivi-sport-p3` : encart « Sport & calories sur cette
+  période » (jours avec séance vs sans, kcal + poids moy.) dans `HistoryPage`,
+  tiret vert sous les jours de séance sur `CalorieTrendChart` (prop `sportDates`)
+  et sur la courbe de poids de `MetricChart`. Choix : corrélation au niveau
+  **jour** (séance vs repos), pas semaine — plus lisible et fonctionne dès une
+  seule semaine. `npm run build` OK. En attente : test manuel + merge/push.
 - **2026-08-30** — Palier 1 mergé dans `main` (local, SQL appliqué + testé par
   l'utilisatrice, push en attente). Palier 2 codé sur la branche
   `suivi-sport-p2` : anneau minutes/semaine (`WeekRing` dans `SportSection`),

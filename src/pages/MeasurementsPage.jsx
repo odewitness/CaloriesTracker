@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Scale, Ruler, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { useMeasurements } from '../hooks/useMeasurements'
 import { useCycle } from '../hooks/useCycle'
 import { useSettings } from '../hooks/useSettings'
+import { useSportRange } from '../hooks/useSport'
 import { useToast } from '../lib/toast'
 import { todayStr } from '../lib/dates'
 import Loader from '../components/Loader'
@@ -111,6 +112,17 @@ export default function MeasurementsPage() {
   const { entries, loading, save, deleteEntry } = useMeasurements()
   const { days: cycleDays } = useCycle()
   const { settings } = useSettings()
+  // Jours de séance, sur la fenêtre couverte par les relevés — pour annoter la
+  // courbe de poids (tiret vert). Chargé seulement si le suivi sport est actif.
+  const sportFrom = entries.length ? entries[entries.length - 1].date : todayStr()
+  const { byDate: sportByDate } = useSportRange(
+    settings.sport?.enabled ? sportFrom : todayStr(),
+    todayStr(),
+  )
+  const sportDates = useMemo(
+    () => (settings.sport?.enabled ? new Set(Object.keys(sportByDate)) : undefined),
+    [settings.sport, sportByDate],
+  )
   const [form, setForm] = useState(() => emptyForm(todayStr()))
   const [saving, setSaving] = useState(false)
   const formTopRef = useRef(null)
@@ -246,6 +258,7 @@ export default function MeasurementsPage() {
                 showCyclePhases={m.key === 'poids_kg'}
                 cycleDays={cycleDays}
                 cycleSettings={settings.cycle}
+                sportDates={m.key === 'poids_kg' ? sportDates : undefined}
               />
             )
           })()}
