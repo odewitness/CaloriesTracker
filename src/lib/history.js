@@ -10,27 +10,42 @@ export const EST_KCAL_PER_G = 7.7
 
 // ── Statut d'un jour selon ses kcal vs objectif ─────────────────────────────
 // Source unique de la couleur d'un jour : barre du graphe, case de la heatmap,
-// carte jour/mois du détail. Reprend le seuil historique de DayCard
-// (<= objectif = vert, moins de 200 au-dessus = orange, sinon rouge).
+// carte jour/mois du détail. Écarts par rapport à l'objectif :
+//   off       : ≥ 200 au-dessus            (bien au-dessus)   — coral
+//   over      : 1 à 199 au-dessus          (un peu au-dessus) — amber
+//   ok        : de l'objectif à 300 sous   (dans l'objectif)  — vert
+//   under     : 301 à 600 sous             (un peu en dessous) — bleu
+//   way_under : > 600 sous                 (bien en dessous)   — bleu foncé
+// Chaud = au-dessus, froid = en dessous, vert = dans la cible.
 export const STATUS_COLOR = {
-  none: 'var(--border-md)',
-  ok:   'var(--green)',
-  over: 'var(--amber)',
-  off:  'var(--coral)',
+  none:      'var(--border-md)',
+  ok:        'var(--green)',
+  over:      'var(--amber)',
+  off:       'var(--coral)',
+  under:     'var(--blue)',
+  way_under: 'var(--blue-dark)',
 }
 export const STATUS_BG = {
-  none: 'transparent',
-  ok:   'var(--green-light)',
-  over: 'var(--amber-light)',
-  off:  'var(--coral-light)',
+  none:      'transparent',
+  ok:        'var(--green-light)',
+  over:      'var(--amber-light)',
+  off:       'var(--coral-light)',
+  under:     'var(--blue-light)',
+  way_under: 'rgba(24, 95, 165, 0.16)',
 }
+
+// Seuils (kcal) sous l'objectif — modifiables si besoin.
+export const UNDER_OK = 300      // jusqu'ici sous l'objectif = encore "dans l'objectif"
+export const UNDER_A_LOT = 600   // au-delà = "bien en dessous"
 
 export function dayStatus(kcal, goalKcal) {
   if (!kcal) return 'none'
   const diff = kcal - goalKcal
-  if (diff <= 0) return 'ok'
-  if (diff < 200) return 'over'
-  return 'off'
+  if (diff >= 200) return 'off'
+  if (diff > 0) return 'over'
+  if (diff >= -UNDER_OK) return 'ok'
+  if (diff >= -UNDER_A_LOT) return 'under'
+  return 'way_under'
 }
 
 // ── Bornes [start, end] (inclus, 'YYYY-MM-DD') de la période + libellé FR ────

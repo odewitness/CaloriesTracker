@@ -4,8 +4,8 @@ import { STATUS_COLOR, STATUS_BG } from '../../lib/history'
 import { fmt, todayStr } from '../../lib/dates'
 
 // Calendrier de régularité en lecture seule : chaque jour teinté selon son
-// statut (non loggé / dans l'objectif / un peu au-dessus / bien au-dessus /
-// exclu). `layout='month'` → grille calendaire du mois, cases tapables.
+// statut (non loggé / bien ou un peu en dessous / dans l'objectif / un peu ou
+// bien au-dessus / exclu). `layout='month'` → grille calendaire, cases tapables.
 // `layout='year'` → 12 lignes (une par mois) × jusqu'à 31 cases, non tapable.
 export default function ConsistencyGrid({ layout, statusByDate, excludedDates, monthDate, year, onSelectDate }) {
   if (layout === 'year') return <YearStrip year={year} statusByDate={statusByDate} excludedDates={excludedDates} />
@@ -106,6 +106,8 @@ function YearStrip({ year, statusByDate, excludedDates }) {
 
 function Legend() {
   const items = [
+    { color: 'var(--blue-dark)', label: 'Bien en dessous' },
+    { color: 'var(--blue)', label: 'Un peu en dessous' },
     { color: 'var(--green)', label: 'Dans l’objectif' },
     { color: 'var(--amber)', label: 'Un peu au-dessus' },
     { color: 'var(--coral)', label: 'Bien au-dessus' },

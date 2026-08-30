@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-30',
+    title: 'Le calendrier de régularité montre aussi les jours en dessous',
+    description: "Dans l'Historique, le calendrier des couleurs ne distinguait que les jours dans l'objectif et ceux au-dessus. Maintenant tu vois aussi les jours où tu es passée en dessous : bleu clair quand c'est un peu en dessous (jusqu'à 600 kcal sous ton objectif), bleu foncé quand c'est nettement en dessous. Pratique pour repérer les journées où tu n'as pas assez mangé.",
+  },
+  {
+    date: '2026-08-30',
     title: 'Tes pas et ton sport dans l\'Historique',
     description: "Dans l'Historique, la partie sport a un vrai graphique : tu choisis ce que tu veux voir — minutes actives, nombre de pas, ou calories dépensées — par jour, par semaine ou par mois. Tu peux poser ta courbe de poids par-dessus pour repérer un lien, avec les périodes de ta phase lutéale grisées en fond. Et le résumé « ton cycle sur cette période » indique maintenant aussi tes pas et tes calories dépensées selon la phase. Bonus : ces stats s'affichent même sur une période où tu n'as pas noté tes repas.",
   },
