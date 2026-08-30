@@ -6,12 +6,14 @@ import { useExcludedDaysRange } from '../hooks/useExcludedDays'
 import { useMeasurements } from '../hooks/useMeasurements'
 import { useCycle } from '../hooks/useCycle'
 import { useSportRange, useSportStreak } from '../hooks/useSport'
+import { useProfile } from '../hooks/useProfile'
+import { dayActivityKcal } from '../lib/sport'
 import { phaseForDate } from '../lib/cycle'
 import { TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
 import NutrientPanel from '../components/NutrientPanel'
-import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { ALL_NUTRIENT_KEYS, computeCalorieNeeds } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getPeriodBounds, shiftAnchor, dayStatus, eachDay } from '../lib/history'
 import { fetchAllRows } from '../lib/fetchAllRows'
@@ -54,6 +56,7 @@ export default function HistoryPage() {
   const { entries: measurementEntries } = useMeasurements()
   const { days: cycleDays } = useCycle()
   const { rows: sportStreakRows } = useSportStreak(16)
+  const { profile } = useProfile()
 
   const [tab, setTab] = useState('semaine')
   const [view, setView] = useState('resume')
@@ -65,6 +68,7 @@ export default function HistoryPage() {
   const [recordStreak, setRecordStreak] = useState(0)
   const [highlightKey, setHighlightKey] = useState(null)
   const [showWeight, setShowWeight] = useState(false)
+  const [showExpenditure, setShowExpenditure] = useState(false)
 
   const bounds = useMemo(() => getPeriodBounds(tab, anchor), [tab, anchor])
   const prevBounds = useMemo(() => getPeriodBounds(tab, shiftAnchor(tab, anchor, -1)), [tab, anchor])
@@ -325,6 +329,62 @@ export default function HistoryPage() {
     return Object.entries(byMonth).map(([key, value]) => ({ key, value }))
   }, [measurementEntries, bounds.start, bounds.end, tab])
 
+  // ── Dépense estimée (option B) : base sédentaire (métabolisme + vie
+  // courante, hors sport) + énergie d'activité réelle (pas + séances,
+  // dédoublonnée). Superposée au graphe des apports pour lire d'un coup les
+  // jours / mois mangé > dépensé ou l'inverse. Lecture seule, ne touche jamais
+  // goal_kcal. En vue Semaine/Mois : un point par jour. En vue Année : un
+  // point par mois = base + moyenne/j de l'énergie d'activité du mois (les
+  // barres y sont aussi des moyennes kcal/j).
+  const periodWeightKg = useMemo(() => {
+    const withW = measurementEntries.filter(e => e.poids_kg != null)
+    if (withW.length) {
+      const midTs = (new Date(bounds.start + 'T12:00:00').getTime()
+        + new Date(bounds.end + 'T12:00:00').getTime()) / 2
+      let best = null, bd = Infinity
+      for (const e of withW) {
+        const d = Math.abs(new Date(e.date + 'T12:00:00').getTime() - midTs)
+        if (d < bd) { bd = d; best = e }
+      }
+      if (best) return best.poids_kg
+    }
+    return profile?.poids_kg ?? null
+  }, [measurementEntries, bounds.start, bounds.end, profile])
+
+  const sedBaseKcal = useMemo(() => {
+    const n = computeCalorieNeeds({
+      sexe: profile?.sexe, age: profile?.age, tailleCm: profile?.taille_cm,
+      poidsKg: periodWeightKg, activityKey: 'sedentaire',
+    })
+    return n?.tdee ?? null
+  }, [profile, periodWeightKg])
+
+  const canExpenditure = sedBaseKcal != null
+  const expenditurePoints = useMemo(() => {
+    if (sedBaseKcal == null) return []
+    const seuil = settings.sport?.pas_seuil_baseline
+    const activityFor = (d) =>
+      dayActivityKcal(sportByDate[d] || [], pasByDate[d], { poidsKg: periodWeightKg, seuil }).total || 0
+    if (tab === 'annee') {
+      const lastDay = bounds.end < today ? bounds.end : today
+      const byMonth = {}
+      for (const d of eachDay(bounds.start, lastDay)) {
+        const m = d.slice(0, 7)
+        if (!byMonth[m]) byMonth[m] = { sum: 0, days: 0 }
+        byMonth[m].sum += activityFor(d)
+        byMonth[m].days += 1
+      }
+      return Object.entries(byMonth).map(([key, v]) => ({
+        key,
+        value: Math.round(sedBaseKcal + (v.days ? v.sum / v.days : 0)),
+      }))
+    }
+    return eachDay(bounds.start, bounds.end).map(d => ({
+      key: d,
+      value: Math.round(sedBaseKcal + activityFor(d)),
+    }))
+  }, [tab, sedBaseKcal, bounds.start, bounds.end, today, sportByDate, pasByDate, periodWeightKg, settings.sport?.pas_seuil_baseline])
+
   const goPrev = () => setAnchor(a => shiftAnchor(tab, a, -1))
   const goNext = () => setAnchor(a => shiftAnchor(tab, a, 1))
   const changeTab = (t) => { setTab(t); setAnchor(todayStr()); setHighlightKey(null) }
@@ -458,6 +518,10 @@ export default function HistoryPage() {
                 cycleDays={cycleDays}
                 cycleSettings={settings.cycle}
                 sportDates={settings.sport?.enabled ? sportDates : undefined}
+                expenditurePoints={expenditurePoints}
+                showExpenditure={showExpenditure}
+                onToggleExpenditure={settings.sport?.enabled ? () => setShowExpenditure(v => !v) : undefined}
+                canExpenditure={canExpenditure}
               />
 
               <HistoryStatGrid

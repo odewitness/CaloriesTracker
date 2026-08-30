@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useId } from 'react'
-import { Scale } from 'lucide-react'
+import { Scale, Flame } from 'lucide-react'
 import { dayStatus, STATUS_COLOR, smoothPath, eachDay } from '../../lib/history'
 import { todayStr } from '../../lib/dates'
 import { phaseForDate } from '../../lib/cycle'
@@ -32,6 +32,7 @@ export default function CalorieTrendChart({
   weightPoints = [], showWeight, onToggleWeight, onJumpToDetail,
   cycleDays, cycleSettings,
   sportDates,
+  expenditurePoints = [], showExpenditure, onToggleExpenditure, canExpenditure = false,
 }) {
   const gradId = useId()
   const isYear = tab === 'annee'
@@ -72,7 +73,13 @@ export default function CalorieTrendChart({
   }, [isYear, bounds.start, bounds.end, days, excludedDates, monthSummaries, today])
 
   const withData = points.filter(p => p.value > 0)
-  const maxVal = Math.max(goalKcal, ...points.map(p => p.value), 1) * 1.12
+  const showExp = showExpenditure && canExpenditure
+  const maxVal = Math.max(
+    goalKcal,
+    ...points.map(p => p.value),
+    ...(showExp ? expenditurePoints.map(p => p.value) : []),
+    1,
+  ) * 1.12
   const yFor = (v) => PAD_TOP + (1 - v / maxVal) * PLOT_H
   const goalY = yFor(goalKcal)
   const slotW = PLOT_W / points.length
@@ -126,6 +133,22 @@ export default function CalorieTrendChart({
   }, [showWeight, canWeight, points, weightByKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const weightPath = smoothPath(weightCoords)
 
+  // ── Superposition dépense estimée (même axe kcal que les barres) ─────────
+  const expByKey = useMemo(
+    () => new Map(expenditurePoints.map(p => [p.key, p.value])),
+    [expenditurePoints],
+  )
+  const expCoords = useMemo(() => {
+    if (!showExp) return []
+    return points
+      .map((p, i) => {
+        const v = expByKey.get(p.key)
+        return v == null ? null : { x: xFor(i), y: yFor(v) }
+      })
+      .filter(Boolean)
+  }, [showExp, points, expByKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const expPath = smoothPath(expCoords)
+
   const untrackedCount = points.filter(p => p.untracked && !p.excluded).length
   const hasChart = withData.length >= 1
 
@@ -139,7 +162,7 @@ export default function CalorieTrendChart({
   // Bandes de phase lutéale en arrière-plan, uniquement quand la courbe de
   // poids est superposée (contexte : rétention d'eau ≠ prise de gras) et hors
   // vue Année (barres mensuelles, la phase n'y a pas de sens).
-  const showLutealBands = showWeight && canWeight && !isYear
+  const showLutealBands = ((showWeight && canWeight) || showExp) && !isYear
     && !!cycleSettings?.enabled && !cycleSettings?.sous_contraception
     && Array.isArray(cycleDays) && cycleDays.length > 0
   const lutealBands = useMemo(() => {
@@ -158,27 +181,46 @@ export default function CalorieTrendChart({
     : sel.future ? 'à venir' : 'non tracké'
   const selKcalColor = sel && sel.value > 0 ? STATUS_COLOR[dayStatus(sel.value, goalKcal)] : 'var(--text-hint)'
   const selWeight = sel ? weightNear(sel.key) : null
+  const selExp = showExp && sel ? expByKey.get(sel.key) : null
+  const selBalance = (selExp != null && sel && sel.value > 0) ? Math.round(sel.value - selExp) : null
 
   return (
     <div className="card" style={{ padding: '16px 14px 12px', marginBottom: 12 }}>
       {/* Moyenne de la période + bascule superposition du poids */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 4, gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.1 }}>
           {Math.round(avgKcal || 0)} <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>kcal/j en moyenne</span>
         </div>
-        <button
-          onClick={canWeight ? onToggleWeight : undefined}
-          className="chip"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11,
-            background: showWeight && canWeight ? 'var(--purple)' : 'var(--green-light)',
-            color: showWeight && canWeight ? 'white' : 'var(--green-dark)',
-            opacity: canWeight ? 1 : 0.4, cursor: canWeight ? 'pointer' : 'default',
-          }}
-          title={canWeight ? 'Superposer la courbe de poids' : 'Pas assez de relevés de poids sur cette période'}
-        >
-          <Scale size={12} /> Poids
-        </button>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          {onToggleExpenditure && (
+            <button
+              onClick={canExpenditure ? onToggleExpenditure : undefined}
+              className="chip"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11,
+                background: showExpenditure && canExpenditure ? 'var(--amber)' : 'var(--green-light)',
+                color: showExpenditure && canExpenditure ? 'white' : 'var(--green-dark)',
+                opacity: canExpenditure ? 1 : 0.4, cursor: canExpenditure ? 'pointer' : 'default',
+              }}
+              title={canExpenditure ? 'Superposer ta dépense estimée' : 'Complète ton profil (sexe, âge, taille) pour estimer ta dépense'}
+            >
+              <Flame size={12} /> Dépense
+            </button>
+          )}
+          <button
+            onClick={canWeight ? onToggleWeight : undefined}
+            className="chip"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11,
+              background: showWeight && canWeight ? 'var(--purple)' : 'var(--green-light)',
+              color: showWeight && canWeight ? 'white' : 'var(--green-dark)',
+              opacity: canWeight ? 1 : 0.4, cursor: canWeight ? 'pointer' : 'default',
+            }}
+            title={canWeight ? 'Superposer la courbe de poids' : 'Pas assez de relevés de poids sur cette période'}
+          >
+            <Scale size={12} /> Poids
+          </button>
+        </div>
       </div>
 
       {/* Lecture du point sélectionné */}
@@ -196,6 +238,14 @@ export default function CalorieTrendChart({
                     : new Date(selWeight.key + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})
                 </span>
               )}
+            </span>
+          )}
+          {selExp != null && (
+            <span style={{ color: 'var(--amber)', fontWeight: 600 }}>≈ {Math.round(selExp)} dépensées</span>
+          )}
+          {selBalance != null && (
+            <span style={{ fontWeight: 700, color: selBalance >= 0 ? 'var(--coral)' : 'var(--green)' }}>
+              {selBalance >= 0 ? '+' : '−'}{Math.abs(selBalance)} kcal{isYear ? '/j' : ''}
             </span>
           )}
           {onJumpToDetail && (
@@ -274,6 +324,16 @@ export default function CalorieTrendChart({
             />
           ))}
 
+          {/* Superposition dépense estimée (ligne ambre, axe kcal) */}
+          {showExp && expCoords.length >= 2 && (
+            <>
+              <path d={expPath} fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              {points.length <= 12 && expCoords.map((c, i) => (
+                <circle key={`ex${i}`} cx={c.x} cy={c.y} r={1.7} fill="var(--amber)" />
+              ))}
+            </>
+          )}
+
           {/* Superposition poids */}
           {showWeight && canWeight && weightCoords.length >= 2 && (
             <>
@@ -307,10 +367,18 @@ export default function CalorieTrendChart({
           {showWeight ? ' — tes calories réelles étaient sûrement plus élevées.' : '.'}
         </div>
       )}
+      {showExp && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginTop: 4, color: 'var(--text-hint)', lineHeight: 1.4 }}>
+          <span style={{ width: 16, height: 2, borderRadius: 1, background: 'var(--amber)', flexShrink: 0 }} />
+          Ligne ambre = dépense estimée (métabolisme de base + tes pas et séances{isYear ? ', moyenne par jour du mois' : ' du jour'}). Approximatif, ±20 % — à ne pas cumuler avec ton objectif.
+        </div>
+      )}
       {showLutealBands && lutealBands.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginTop: 4, color: 'var(--text-hint)' }}>
           <span style={{ width: 16, height: 9, borderRadius: 2, background: 'var(--purple)', opacity: 0.16, flexShrink: 0 }} />
-          Bandes = phase lutéale : le poids peut monter de 0,5 à 2 kg d'eau.
+          {showWeight
+            ? "Bandes = phase lutéale : le poids peut monter de 0,5 à 2 kg d'eau."
+            : 'Bandes = phase lutéale.'}
         </div>
       )}
       {sportBarIdx.length > 0 && (

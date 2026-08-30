@@ -536,6 +536,11 @@ verrou « repas loggés »**.
   le 2026-08-30 (SQL `pas_jour_setup.sql` appliqué + testé).
 - **Sous-palier 10b (pas + sport dans l'Historique) : codé** (branche
   `suivi-sport-p10b-historique`). Reste : test manuel + merge/push. Pas de SQL.
+- **Overlay « Dépense » sur le graphe des apports (Historique › Résumé) : codé**
+  (branche `historique-depense-vs-apports`). Ligne base sédentaire +
+  `dayActivityKcal`, même axe que les barres, bandes lutéales incluses en
+  Semaine/Mois ; en Année, un point par mois (moyenne/j). Reste : test manuel +
+  merge/push. Pas de SQL.
 
 Toute nouvelle idée s'ajoute ici.
 
@@ -573,6 +578,27 @@ Toute nouvelle idée s'ajoute ici.
 
 ## 9. Journal des décisions
 
+- **2026-08-30** — **Overlay « Dépense » sur le graphe des apports** (Historique
+  › Résumé, `CalorieTrendChart`), branche `historique-depense-vs-apports`.
+  Demande utilisatrice : « voir le lien entre kcal mangées et kcal dépensées +
+  cycle ». Option retenue (**B**) : la ligne = **base sédentaire**
+  (`computeCalorieNeeds` activité `sedentaire`, poids = relevé le plus proche du
+  milieu de période sinon `profile.poids_kg`) **+ `dayActivityKcal` du jour**
+  (pas au-dessus du seuil + séances hors `compte_dans_pas`) — donc elle *monte*
+  les jours de sport / gros pas, sans double comptage. Même axe kcal que les
+  barres (pas d'échelle secondaire). Bouton « Dépense » (ambre) à côté de
+  « Poids », affiché seulement si `settings.sport.enabled`, grisé si profil
+  incomplet. **Semaine / Mois** : un point par jour ; activer « Dépense »
+  révèle aussi les **bandes de phase lutéale** (réutilisées de la superposition
+  poids). **Année** : un point par mois = base + moyenne/j de l'énergie
+  d'activité du mois (les barres y sont déjà des moyennes kcal/j), pas de
+  bandes cycle (la phase n'a pas de sens sur des barres mensuelles, comme pour
+  le poids). Lecture de la barre sélectionnée : ajoute « ≈ N dépensées » +
+  écart mangé−dépensé (coral si surplus, vert si déficit). `goal_kcal` jamais
+  touché ; `HistoryPage` gagne `useProfile`. Garde-fou d'affichage « ±20 %, ne
+  pas cumuler avec ton objectif ». Entrée changelog (2026-08-30 « Vois ce que
+  tu manges face à ce que tu dépenses »). `npm run build` OK. Reste : test
+  manuel + merge/push.
 - **2026-08-30** — **Sous-palier 10b (Historique)** codé sur
   `suivi-sport-p10b-historique`. Décisions : graphe multi-séries (Minutes / Pas
   / Kcal dépensées) **dans la section Sport** de l'Historique, pas de
