@@ -335,13 +335,21 @@ function ConfigView({ planner, onGenerate }) {
         recettes différentes sur la période (2× = deux recettes qui tournent sur les jours ;
         une même catégorie partagée entre déjeuner et dîner compte une seule fois).
       </div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
         <input
           type="checkbox"
           checked={config.includeRepasTypes !== false}
           onChange={e => setConfig({ includeRepasTypes: e.target.checked })}
         />
         Piocher aussi dans mes repas types (en plus des recettes)
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+        <input
+          type="checkbox"
+          checked={config.fillMicros !== false}
+          onChange={e => setConfig({ fillMicros: e.target.checked })}
+        />
+        Compléter aussi les manques en vitamines et minéraux
       </label>
       {Object.keys(baseMealConfig).length === 0 && (
         <div className="card" style={{ padding: 14, fontSize: 12.5, color: 'var(--text-hint)', textAlign: 'center', marginBottom: 8 }}>
@@ -526,6 +534,7 @@ function PreviewView({
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {it.kind === 'ajout' ? '+ ' : ''}{it.nom}
                       {it.kind === 'ajout' && <span style={{ color: 'var(--text-hint)' }}> · {r0(it.qty_g)} g</span>}
+                      {it.micro && <span style={{ color: 'var(--text-hint)' }}> · {String(it.micro).toLowerCase()}</span>}
                       {it.kind === 'recette' && it.portionG && <span style={{ color: 'var(--text-hint)' }}> · 1 portion</span>}
                       {it.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · 1 part</span>}
                     </span>

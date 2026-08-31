@@ -45,6 +45,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     seasonMode: 'bonus', // 'bonus' | 'filter'
     includeRepasTypes: true, // inclure les repas types dans les viviers
     maxCookMinutes: null, // temps prépa + cuisson max (min) ; null = pas de filtre
+    fillMicros: true,     // compléter les manques vitamines / minéraux du jour
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
   }))
@@ -141,6 +142,8 @@ export function useMealPlanner({ defaultStartDate } = {}) {
         goalFibres: settings?.goal_fibres || 0,
         includeRepasTypes: config.includeRepasTypes !== false,
         maxCookMinutes: config.maxCookMinutes || null,
+        fillMicros: config.fillMicros !== false,
+        settings,
         options: { seasonMode: config.seasonMode, seed },
         locked,
       })
@@ -149,7 +152,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     } finally {
       setGenerating(false)
     }
-  }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings?.goal_fibres, plan, lockedKeys])
+  }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings, plan, lockedKeys])
 
   // Première génération : seed aléatoire.
   const generate = useCallback(() => runGenerate((Math.random() * 2 ** 31) >>> 0), [runGenerate])
