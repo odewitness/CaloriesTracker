@@ -423,6 +423,73 @@ function ItemEditor({ item, candidates, onSwap, onRemove }) {
   )
 }
 
+// Sélecteur de liste de courses cible : choisir une liste existante OU en
+// créer une nouvelle sans quitter le planificateur. Repli automatique sur la
+// création quand aucune liste n'existe encore.
+function ShoppingListPicker({ lists, valueId, onChange, onCreate, creating }) {
+  const [mode, setMode] = useState(lists.length ? 'pick' : 'new')
+  const [name, setName] = useState('')
+  useEffect(() => { if (!lists.length) setMode('new') }, [lists.length])
+
+  const submit = async () => {
+    if (creating) return
+    const created = await onCreate(name)
+    if (created) { setName(''); setMode('pick') }
+  }
+
+  if (mode === 'new') {
+    return (
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input
+            className="input"
+            placeholder="Nom de la nouvelle liste"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') submit() }}
+            style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
+            autoFocus
+          />
+          <button
+            onClick={submit}
+            disabled={creating}
+            style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 8, padding: '6px 12px', fontFamily: 'var(--font)', opacity: creating ? 0.6 : 1 }}
+          >
+            {creating ? 'Création…' : 'Créer'}
+          </button>
+        </div>
+        {lists.length > 0 && (
+          <button
+            onClick={() => setMode('pick')}
+            style={{ marginTop: 5, fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', fontFamily: 'var(--font)' }}
+          >
+            ← Choisir une liste existante
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+      <select
+        className="input"
+        value={valueId || ''}
+        onChange={e => onChange(e.target.value)}
+        style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
+      >
+        {lists.map(l => <option key={l.id} value={l.id}>{l.nom}</option>)}
+      </select>
+      <button
+        onClick={() => setMode('new')}
+        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 8, padding: '6px 10px', fontFamily: 'var(--font)' }}
+      >
+        <Plus size={13} /> Nouvelle
+      </button>
+    </div>
+  )
+}
+
 // ── Vue aperçu ────────────────────────────────────────────────────────────
 function PreviewView({
   plan, startDateStr, recettesById, templatesById, people,
@@ -598,16 +665,13 @@ function PreviewView({
 
           {/* Liste de courses */}
           <div style={{ marginTop: 10 }}>
-            {applied.shoppingLists.length > 1 && (
-              <select
-                className="input"
-                value={applied.shoppingListId || ''}
-                onChange={e => applied.setShoppingListId(e.target.value)}
-                style={{ fontSize: 12.5, padding: '6px 8px', marginBottom: 6, width: '100%' }}
-              >
-                {applied.shoppingLists.map(l => <option key={l.id} value={l.id}>{l.nom}</option>)}
-              </select>
-            )}
+            <ShoppingListPicker
+              lists={applied.shoppingLists}
+              valueId={applied.shoppingListId}
+              onChange={applied.setShoppingListId}
+              onCreate={applied.onCreateList}
+              creating={applied.creatingList}
+            />
             <button
               className="btn-primary"
               onClick={applied.onGenerateShopping}
@@ -619,11 +683,6 @@ function PreviewView({
                 : applied.shoppingState === 'done' ? '✓ Ajouté à la liste'
                 : 'Générer la liste de courses'}
             </button>
-            {!applied.shoppingListId && (
-              <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 5 }}>
-                Crée d'abord une liste dans l'onglet « Mes courses ».
-              </div>
-            )}
           </div>
 
           {/* Retirer tout le plan */}
@@ -695,9 +754,10 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
   const [applyResult, setApplyResult] = useState(null)
   const [shoppingState, setShoppingState] = useState('idle') // 'idle' | 'busy' | 'done'
   const [removing, setRemoving] = useState(false)
+  const [creatingList, setCreatingList] = useState(false)
 
   // Liste de courses cible (la plus récente par défaut).
-  const { listes: shoppingLists } = useShoppingLists()
+  const { listes: shoppingLists, createListe } = useShoppingLists()
   const [shoppingListId, setShoppingListId] = useState(null)
   useEffect(() => {
     if (!shoppingListId && shoppingLists.length) setShoppingListId(shoppingLists[0].id)
@@ -712,6 +772,16 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
     () => Object.fromEntries(planner.repasTypes.map(t => [t.id, t])),
     [planner.repasTypes],
   )
+
+  // Crée une liste de courses à la volée et la sélectionne comme cible.
+  const handleCreateList = async (name) => {
+    setCreatingList(true)
+    const { data, error } = await createListe((name || '').trim() || 'Plan de repas')
+    setCreatingList(false)
+    if (error || !data) { toast('Erreur à la création de la liste'); return null }
+    setShoppingListId(data.id)
+    return data
+  }
 
   const resetApply = () => { setApplyResult(null); setShoppingState('idle') }
   const handleGenerate = () => { planner.generate(); resetApply(); setStep('preview') }
@@ -804,6 +874,8 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
               shoppingLists,
               shoppingListId,
               setShoppingListId,
+              onCreateList: handleCreateList,
+              creatingList,
               onGenerateShopping: handleGenerateShopping,
               shoppingState,
               onRemovePlan: handleRemovePlan,

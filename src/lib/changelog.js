@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-31',
+    title: 'Plan de repas : liste de courses dans une nouvelle liste',
+    description: "Au moment de générer la liste de courses depuis ton plan de repas, tu peux maintenant créer une nouvelle liste sur place (avec le nom que tu veux) au lieu de devoir choisir parmi tes listes existantes.",
+  },
+  {
+    date: '2026-08-31',
     title: 'Une recette prévue au menu = une seule ligne',
     description: "Quand tu coches « mangé » sur une recette prévue par le plan de repas, elle arrive maintenant dans ta journée comme une seule ligne (le nom de la recette et son grammage), comme quand tu ajoutes une recette à la main — fini la longue liste de chaque ingrédient. La liste de courses, elle, continue de détailler tous les ingrédients à acheter.",
   },
