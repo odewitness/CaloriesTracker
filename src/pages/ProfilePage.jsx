@@ -18,6 +18,7 @@ import GoalsSection from '../components/profile/GoalsSection'
 import MealSplitSection from '../components/profile/MealSplitSection'
 import HydrationSection from '../components/profile/HydrationSection'
 import NotificationsSection from '../components/profile/NotificationsSection'
+import ComplementRemindersSection from '../components/profile/ComplementRemindersSection'
 import TodaySection from '../components/profile/TodaySection'
 import CycleSection from '../components/profile/CycleSection'
 import SportSection from '../components/profile/SportSection'
@@ -213,7 +214,20 @@ export default function ProfilePage() {
         socialEnabled={settings.notif_social_enabled !== false}
         onToggleReminder={() => updateSettings({ notif_reminder_enabled: !(settings.notif_reminder_enabled !== false) })}
         onToggleSocial={() => updateSettings({ notif_social_enabled: !(settings.notif_social_enabled !== false) })}
+        complementsSummary={settings.notif_complements_enabled === false ? 'Désactivés' : 'Un ou plusieurs par complément'}
+        onOpenComplementReminders={() => setSection('complements-rappels')}
         onBack={back}
+      />
+    )
+  }
+
+  if (section === 'complements-rappels') {
+    return (
+      <ComplementRemindersSection
+        enabled={settings.notif_complements_enabled !== false}
+        onToggleEnabled={() => updateSettings({ notif_complements_enabled: !(settings.notif_complements_enabled !== false) })}
+        pushGranted={pushPermission === 'granted'}
+        onBack={() => setSection('notifications')}
       />
     )
   }

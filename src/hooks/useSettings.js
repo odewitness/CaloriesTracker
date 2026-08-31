@@ -16,6 +16,7 @@ const DEFAULTS = {
   meal_enabled: { ...MEAL_ENABLED_DEFAULTS },
   notif_reminder_enabled: true,
   notif_social_enabled: true,
+  notif_complements_enabled: true,
   afficher_manques_jour: true,
   ordre_sections_jour: [...DEFAULT_TODAY_SECTIONS_ORDER],
   goal_auto_adjust: { ...GOAL_AUTO_ADJUST_DEFAULTS },
