@@ -56,9 +56,20 @@ Sorties :
   catégorie de recette. Exemples : petit-déjeuner = 1 recette catégorie
   `Petit-déjeuner` ; déjeuner = 1 `Plat` + 1 `Dessert` ; dîner = 1 `Plat` +
   1 `Accompagnement` ; etc. Voir §3.1.
-- **Aliments « en + » : d'abord parmi les favoris** (moteur déjà écrit et testé,
-  voir `TodayGapsSection` / `portionGapCoverage`). Élargir à toute la base Ciqual
-  est une **option de palier ultérieur** — à trancher (voir §6, zone d'ombre C).
+- **Aliments « en + » : favoris uniquement.** Décidé le 2026-08-31 — on n'ouvre
+  pas à toute la base Ciqual (zone d'ombre C close). Moteur `TodayGapsSection` /
+  `portionGapCoverage`.
+- **Saison = préférence, pas filtre strict.** Décidé le 2026-08-31 (zone d'ombre B
+  close) : bonus de score, les recettes sans saison restent utilisables. Une
+  option « filtre strict » existe dans l'écran de config pour qui veut.
+- **Pas de recette mise à l'échelle par fractions.** Décidé le 2026-08-31 (zone
+  d'ombre A) : l'app n'incrémente les portions que de +1 et une recette fait un
+  nombre fixe de portions. Plutôt que d'étirer une recette, on affiche un
+  **récap « À préparer »** (batch cooking) : pour chaque recette du plan, le
+  nombre de **fournées entières** à cuisiner (`ceil(portionsNeeded /
+  recette.portions)`), les portions utilisées et le reste. Une **page batch
+  cooking dédiée** (recettes du plan regroupées, quantités, cases à cocher au
+  fur et à mesure) est une piste Palier 3.
 - **On avance par paliers** (voir §7). Palier 1 = macros seulement.
 - **Le plan s'écrit dans `repas_planifies`** (pas de nouvelle table de « plans »
   au palier 1), après un écran d'aperçu et validation. Voir §4.4.
@@ -219,25 +230,19 @@ appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
 
 ---
 
-## 6. Zones d'ombre — à trancher
+## 6. Zones d'ombre
 
-- **A. Nombre de portions comme levier.** Strictement 1 portion → les recettes
-  tombent rarement sur la cible et les aliments en + portent tout l'ajustement
-  (et ne peuvent qu'ajouter). Autoriser 0,5 / 1,5 / 2 portions donne un levier
-  intermédiaire réaliste (surtout pour le batch-cooking : « 1 plat, 2 portions au
-  dîner »). *Penchant : autoriser un petit jeu de multiples, désactivable.*
-- **B. Saison : filtre dur ou bonus ?** `filterBySeasons` exclut les recettes
-  sans saison renseignée. Si peu de recettes sont taguées (le tagging saison est
-  tout récent, branche `feat-saisons-recettes-repas`), un filtre dur vide le
-  vivier. *Penchant : bonus de score au palier 1, filtre dur en option.*
-- **C. Aliments en + : favoris ou toute la base Ciqual ?**
-  - *Favoris* (palier 1) : moteur déjà écrit, espace de recherche petit, ce sont
-    les aliments réellement consommés / achetés.
-  - *Ciqual entier* : bien meilleure couverture des manques en vitamines /
-    minéraux, mais peut suggérer des aliments jamais achetés, et alourdit le
-    calcul. *Penchant : favoris au palier 1 ; Ciqual en option au palier 2, avec
-    un garde-fou « aliments courants » (catégories usuelles, exclure additifs /
-    ingrédients techniques).*
+- **A. Nombre de portions comme levier — TRANCHÉ (2026-08-31) : non.** L'app
+  n'incrémente les portions que de +1 et une recette fait un nombre fixe de
+  portions ; une mise à l'échelle fractionnaire serait pénible à présenter. À la
+  place : **récap « À préparer »** (batch cooking) dans l'aperçu — nombre de
+  fournées entières par recette, portions utilisées, reste. Page batch cooking
+  dédiée = piste Palier 3.
+- **B. Saison : filtre dur ou bonus ? — TRANCHÉ (2026-08-31) : bonus.** Bonus de
+  score, recettes sans saison utilisables. Case « filtre strict » dispo dans la
+  config.
+- **C. Aliments en + : favoris ou toute la base Ciqual ? — TRANCHÉ (2026-08-31) :
+  favoris uniquement.** Pas d'ouverture à Ciqual.
 - **D. Micros (vitamines / minéraux).** Pas de cible en base (seulement kcal +
   4 macros + fibres). Les recettes n'ont **pas** les colonnes micro : il faut
   agréger `recette_ingredients`. *Décision : palier 1 = macros seulement. Micros
@@ -262,30 +267,39 @@ appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
 
 ### Palier 1 — Plan macro, portions fixes
 
-- Écran de config : jours (1–7), personnes, saison, repas, composition par slots,
+- ✅ Écran de config : jours (1–7), **date de début**, personnes, saison (+ case
+  filtre strict), composition par briques (catégorie de recette / repas type) +
   nb de recettes différentes par repas.
-- Vivier recettes + repas types, filtre catégorie + valeurs nutritionnelles,
-  saison en bonus.
-- Heuristique gloutonne + recherche locale sur les macros (§4).
-- Aliments en + parmi les **favoris** (moteur existant), sur le reste à cibler.
-- Aperçu 3 niveaux (repas / jour / période) + feu tricolore.
-- Régénérer / verrouiller / épingler / éditer.
-- « Appliquer au calendrier » → `repas_planifies` avec `recurrence_group_id`,
-  gestion des conflits + jours exclus.
-- « Ajouter à la liste de courses » → chemin M5 existant, × personnes.
+- ✅ Vivier recettes + repas types, filtre catégorie + valeurs nutritionnelles +
+  portion dimensionnable ; saison en bonus.
+- ✅ Heuristique gloutonne + recherche locale sur les macros (§4), RNG
+  déterministe. Anti-répétition : pas deux fois la même brique dans une journée.
+- ✅ Aliments en + parmi les **favoris**, sur le reste à cibler, dédupliqués sur
+  la journée.
+- ✅ Aperçu 3 niveaux (repas / jour / période) + feu tricolore + récap
+  « À préparer » (fournées).
+- ✅ Régénérer.
+- ✅ « Appliquer au calendrier » → `repas_planifies` avec `recurrence_group_id`,
+  conflits (skip / add, jamais d'écrasement) + jours exclus.
+- ✅ « Générer la liste de courses » inline (× personnes) + « Retirer tout le
+  plan » en un clic.
+- ⏳ **Reste** : verrouiller un jour / repas, épingler une recette avant
+  régénération ; édition manuelle d'une brique dans l'aperçu.
 
-### Palier 2 — Micros + Ciqual + confort
+### Palier 2 — Micros + confort
 
 - Manques vitamines / minéraux pris en compte pour les aliments en + (agrégation
   `recette_ingredients` pour les recettes ; `items` déjà OK pour les repas types).
-- Option « élargir les aliments en + à la base Ciqual » (garde-fou aliments
-  courants).
-- Portions à multiples (0,5 / 1,5 / 2) comme levier.
+- Solveur : autoriser **2 portions/jour** d'un même plat (portions entières) pour
+  mieux coller aux cibles.
 - Filtre temps de cuisine (`temps_preparation_min` + `temps_cuisson_min`).
 
-### Palier 3 — Historique & reconduction
+### Palier 3 — Historique, reconduction & batch cooking
 
 - Plusieurs plans conservés, « reconduire / repartir de la semaine dernière ».
+- **Page batch cooking** : recettes du plan regroupées, quantités à préparer,
+  cases à cocher au fur et à mesure (nécessite un stockage — table ou
+  `localStorage`).
 - Contraintes alimentaires (tags simples).
 
 ---

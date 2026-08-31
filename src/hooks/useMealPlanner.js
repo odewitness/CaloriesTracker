@@ -147,19 +147,35 @@ export function useMealPlanner() {
       : rows
 
     if (!finalRows.length) {
-      return { inserted: 0, skippedExcluded, skippedConflict, error: null }
+      return { inserted: 0, rows: [], skippedExcluded, skippedConflict, error: null }
     }
 
     const groupId = crypto.randomUUID()
     const payload = finalRows.map(r => ({ ...r, user_id: user.id, recurrence_group_id: groupId }))
     const { error } = await supabase.from('repas_planifies').insert(payload)
     if (error) return { error }
-    return { inserted: finalRows.length, skippedExcluded, skippedConflict, groupId, error: null }
+    // `rows` = lignes insérées, items d'ingrédients déjà développés → prêtes
+    // pour addPlannedItems (liste de courses).
+    return { inserted: finalRows.length, rows: finalRows, skippedExcluded, skippedConflict, groupId, error: null }
   }, [plan, user?.id, recettes, repasTypes])
+
+  // Retire d'un coup toutes les lignes d'un plan appliqué (même
+  // recurrence_group_id).
+  const removePlan = useCallback(async (groupId) => {
+    if (!groupId || !user?.id) return { error: 'no-group' }
+    const { error } = await supabase
+      .from('repas_planifies')
+      .delete()
+      .eq('recurrence_group_id', groupId)
+      .eq('user_id', user.id)
+    return { error }
+  }, [user?.id])
 
   return {
     // données
     dataLoading,
+    recettes,
+    repasTypes,
     recipeCount: recettes.length,
     templateCount: repasTypes.length,
     favoriteCount: favorites.length,
@@ -176,5 +192,6 @@ export function useMealPlanner() {
     regenerate,
     reset,
     applyToCalendar,
+    removePlan,
   }
 }

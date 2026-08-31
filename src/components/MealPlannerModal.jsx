@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
-import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
+import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
 import { useToast } from '../lib/toast'
-import { deviationLevel } from '../lib/mealPlanner'
+import { deviationLevel, batchSummary } from '../lib/mealPlanner'
 import { addDaysStr } from '../lib/mealPlannerApply'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
@@ -227,8 +228,15 @@ function ConfigView({ planner, onGenerate }) {
 }
 
 // ── Vue aperçu ────────────────────────────────────────────────────────────
-function PreviewView({ plan, startDateStr, onBack, onRegenerate, generating, onApply, applying, result }) {
+function PreviewView({
+  plan, startDateStr, recettesById, templatesById, people,
+  onBack, onRegenerate, generating, onApply, applying, result, applied,
+}) {
   const [allowConflicts, setAllowConflicts] = useState(false)
+  const batches = useMemo(
+    () => batchSummary(plan, { recettesById, templatesById }),
+    [plan, recettesById, templatesById],
+  )
 
   return (
     <>
@@ -297,10 +305,35 @@ function PreviewView({ plan, startDateStr, onBack, onRegenerate, generating, onA
         </div>
       ))}
 
+      {/* Batch cooking : quoi préparer, en quelle quantité */}
+      {batches.length > 0 && (
+        <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <ChefHat size={14} color="var(--green-dark)" />
+            <SectionLabel>À préparer</SectionLabel>
+          </div>
+          {batches.map(b => (
+            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{b.nom}</span>
+              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+                {b.batches === 1 ? '1 fournée' : `${b.batches} fournées`}
+                {b.perBatch > 1 && <span style={{ color: 'var(--text-hint)' }}> · {b.portionsNeeded}/{b.batches * b.perBatch} portions</span>}
+                {b.leftover > 0 && <span style={{ color: 'var(--text-hint)' }}> · {b.leftover} en rab</span>}
+              </span>
+            </div>
+          ))}
+          {people > 1 && (
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 5 }}>
+              Portions pour 1 personne. Pour {people}, multiplie les fournées.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Appliquer au calendrier */}
       {result?.inserted > 0 ? (
         <div className="card" style={{ padding: '14px', marginTop: 4, background: 'var(--green-light)', border: 'none' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 700, color: 'var(--green-dark)', marginBottom: result.skippedConflict?.length || result.skippedExcluded?.length ? 6 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 700, color: 'var(--green-dark)', marginBottom: 6 }}>
             <Check size={15} /> {result.inserted} repas ajouté{result.inserted > 1 ? 's' : ''} au calendrier
           </div>
           {result.skippedConflict?.length > 0 && (
@@ -313,9 +346,45 @@ function PreviewView({ plan, startDateStr, onBack, onRegenerate, generating, onA
               {result.skippedExcluded.length} jour{result.skippedExcluded.length > 1 ? 's' : ''} exclu{result.skippedExcluded.length > 1 ? 's' : ''} — sauté{result.skippedExcluded.length > 1 ? 's' : ''}.
             </div>
           )}
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 6 }}>
-            Pour la liste de courses : « Depuis mes repas prévus » dans tes courses, sur cette période.
+
+          {/* Liste de courses */}
+          <div style={{ marginTop: 10 }}>
+            {applied.shoppingLists.length > 1 && (
+              <select
+                className="input"
+                value={applied.shoppingListId || ''}
+                onChange={e => applied.setShoppingListId(e.target.value)}
+                style={{ fontSize: 12.5, padding: '6px 8px', marginBottom: 6, width: '100%' }}
+              >
+                {applied.shoppingLists.map(l => <option key={l.id} value={l.id}>{l.nom}</option>)}
+              </select>
+            )}
+            <button
+              className="btn-primary"
+              onClick={applied.onGenerateShopping}
+              disabled={applied.shoppingState === 'busy' || !applied.shoppingListId || applied.shoppingState === 'done'}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: (!applied.shoppingListId || applied.shoppingState === 'done') ? 0.6 : 1 }}
+            >
+              <ShoppingCart size={15} />
+              {applied.shoppingState === 'busy' ? 'Ajout…'
+                : applied.shoppingState === 'done' ? '✓ Ajouté à la liste'
+                : 'Générer la liste de courses'}
+            </button>
+            {!applied.shoppingListId && (
+              <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 5 }}>
+                Crée d'abord une liste dans l'onglet « Mes courses ».
+              </div>
+            )}
           </div>
+
+          {/* Retirer tout le plan */}
+          <button
+            onClick={applied.onRemovePlan}
+            disabled={applied.removing}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 12, fontWeight: 700, color: 'var(--coral)', background: 'none', border: 'none', fontFamily: 'var(--font)' }}
+          >
+            <Trash2 size={13} /> {applied.removing ? 'Retrait…' : 'Retirer tout le plan du calendrier'}
+          </button>
         </div>
       ) : (
         <div className="card" style={{ padding: '12px 14px', marginTop: 4 }}>
@@ -342,8 +411,8 @@ function PreviewView({ plan, startDateStr, onBack, onRegenerate, generating, onA
             <CalendarPlus size={16} /> {applying ? 'Ajout…' : 'Appliquer au calendrier'}
           </button>
           <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8, lineHeight: 1.5 }}>
-            Crée un repas prévu par jour et par repas. Rien n'est écrasé ni supprimé. Tu pourras
-            retirer tout le plan d'un coup depuis « Mes programmations ».
+            Crée un repas prévu par jour et par repas. Rien n'est écrasé ni supprimé. Ensuite tu
+            pourras générer la liste de courses, ou retirer tout le plan d'un coup.
           </div>
         </div>
       )}
@@ -375,9 +444,29 @@ export default function MealPlannerModal({ onClose, onApplied }) {
   const [step, setStep] = useState('config')
   const [applying, setApplying] = useState(false)
   const [applyResult, setApplyResult] = useState(null)
+  const [shoppingState, setShoppingState] = useState('idle') // 'idle' | 'busy' | 'done'
+  const [removing, setRemoving] = useState(false)
 
-  const handleGenerate = () => { planner.generate(); setApplyResult(null); setStep('preview') }
-  const handleRegenerate = () => { planner.regenerate(); setApplyResult(null) }
+  // Liste de courses cible (la plus récente par défaut).
+  const { listes: shoppingLists } = useShoppingLists()
+  const [shoppingListId, setShoppingListId] = useState(null)
+  useEffect(() => {
+    if (!shoppingListId && shoppingLists.length) setShoppingListId(shoppingLists[0].id)
+  }, [shoppingLists, shoppingListId])
+  const { addPlannedItems } = useShoppingListItems(shoppingListId)
+
+  const recettesById = useMemo(
+    () => Object.fromEntries(planner.recettes.map(r => [r.id, r])),
+    [planner.recettes],
+  )
+  const templatesById = useMemo(
+    () => Object.fromEntries(planner.repasTypes.map(t => [t.id, t])),
+    [planner.repasTypes],
+  )
+
+  const resetApply = () => { setApplyResult(null); setShoppingState('idle') }
+  const handleGenerate = () => { planner.generate(); resetApply(); setStep('preview') }
+  const handleRegenerate = () => { planner.regenerate(); resetApply() }
 
   const handleApply = async ({ startDateStr, conflictStrategy }) => {
     setApplying(true)
@@ -386,7 +475,27 @@ export default function MealPlannerModal({ onClose, onApplied }) {
     if (res.error) { toast('Erreur à l\'enregistrement'); return }
     if (res.inserted === 0) { toast('Rien à ajouter (créneaux occupés ou jours exclus)'); return }
     setApplyResult(res)
+    setShoppingState('idle')
     toast(`✓ ${res.inserted} repas ajoutés`)
+    onApplied?.()
+  }
+
+  const handleGenerateShopping = async () => {
+    if (!applyResult?.rows?.length || !shoppingListId) return
+    setShoppingState('busy')
+    const { error } = await addPlannedItems(applyResult.rows, { multiplier: planner.config.people })
+    setShoppingState(error ? 'idle' : 'done')
+    toast(error ? 'Erreur liste de courses' : '✓ Ajouté à la liste de courses')
+  }
+
+  const handleRemovePlan = async () => {
+    if (!applyResult?.groupId) return
+    setRemoving(true)
+    const { error } = await planner.removePlan(applyResult.groupId)
+    setRemoving(false)
+    if (error) { toast('Erreur au retrait'); return }
+    resetApply()
+    toast('Plan retiré du calendrier')
     onApplied?.()
   }
 
@@ -406,12 +515,24 @@ export default function MealPlannerModal({ onClose, onApplied }) {
           <PreviewView
             plan={planner.plan}
             startDateStr={planner.config.startDateStr}
+            recettesById={recettesById}
+            templatesById={templatesById}
+            people={planner.config.people}
             generating={planner.generating}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
             onApply={handleApply}
             applying={applying}
             result={applyResult}
+            applied={{
+              shoppingLists,
+              shoppingListId,
+              setShoppingListId,
+              onGenerateShopping: handleGenerateShopping,
+              shoppingState,
+              onRemovePlan: handleRemovePlan,
+              removing,
+            }}
           />
         )}
       </div>

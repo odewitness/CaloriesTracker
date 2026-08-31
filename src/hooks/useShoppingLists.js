@@ -218,7 +218,9 @@ export function useShoppingListItems(listeId) {
   // repas de la plage devient UNE ligne, grammages additionnés, avec le nom de
   // chaque repas d'origine listé dessous. plannedMeals : lignes repas_planifies
   // ({ nom, items }). ───────────────────────────────────────────────────────
-  const addPlannedItems = async (plannedMeals) => {
+  // `multiplier` : facteur appliqué aux grammages (ex. nombre de personnes du
+  // planificateur de repas — les repas planifiés sont stockés pour 1 portion).
+  const addPlannedItems = async (plannedMeals, { multiplier = 1 } = {}) => {
     const flat = []
     for (const repas of plannedMeals || []) {
       for (const it of (repas.items || [])) {
@@ -230,7 +232,7 @@ export function useShoppingListItems(listeId) {
     const toAdd = withCategories.map(i => ({
       nom: i.food_name,
       categorie: i.categorie,
-      qty_g: i.qty_g,
+      qty_g: i.qty_g != null ? i.qty_g * multiplier : null,
       food_source: i.food_source,
       food_ref_id: i.food_ref_id,
       recetteNom: i._repasNom,

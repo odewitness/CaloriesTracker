@@ -501,6 +501,34 @@ export function buildMealPlan(p) {
   }
 }
 
+// Récapitulatif « batch cooking » : pour chaque recette / repas type du plan,
+// combien de portions il consomme sur la période et combien de fournées cela
+// représente (une fournée = recette.portions, ou repasType.nb_portions).
+// Répond à la question « je prépare quoi, en quelle quantité » sans avoir à
+// mettre une recette à l'échelle : on cuisine N fournées entières.
+export function batchSummary(plan, { recettesById = {}, templatesById = {} } = {}) {
+  const map = new Map()
+  for (const day of plan.days) {
+    for (const meal of day.meals) {
+      for (const it of meal.items) {
+        if (it.kind !== 'recette' && it.kind !== 'repas_type') continue
+        const cur = map.get(it.id) || { id: it.id, nom: it.nom, kind: it.kind, portionsNeeded: 0 }
+        cur.portionsNeeded += it.portions || 1
+        map.set(it.id, cur)
+      }
+    }
+  }
+  return [...map.values()]
+    .map(e => {
+      const perBatch = e.kind === 'recette'
+        ? (recettesById[e.id]?.portions || 1)
+        : (templatesById[e.id]?.nb_portions || 1)
+      const batches = Math.max(1, Math.ceil(e.portionsNeeded / perBatch))
+      return { ...e, perBatch, batches, leftover: batches * perBatch - e.portionsNeeded }
+    })
+    .sort((a, b) => b.portionsNeeded - a.portionsNeeded)
+}
+
 // Config de repas par défaut : une brique par repas actif, catégorie déduite
 // du nom du repas. À présenter pré-remplie dans l'écran de configuration.
 export function defaultMealConfig(mealTargets) {
