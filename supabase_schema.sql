@@ -39,11 +39,15 @@
 -- settings.notif_complements_enabled / settings.complements_reminder_state +
 -- cron 'complements-reminder-hourly' (rappels programmables de compléments —
 -- Edge Function complements-reminder). Voir
--- supabase/sql/complements_rappels_setup.sql. Pas encore confirmé appliqué.
+-- supabase/sql/complements_rappels_setup.sql.
 -- Complété le 2026-08-31 : colonne `saisons text[]` sur recettes, repas_types
 -- et partages_recettes (multi-sélection de saison(s), même modèle que
--- `categories`). Voir supabase/sql/saisons_setup.sql. Pas encore confirmé
--- appliqué en base au moment de l'écriture de ce fichier.
+-- `categories`). Voir supabase/sql/saisons_setup.sql.
+-- Confirmé appliqué le 2026-08-31 : colonnes settings.goal_auto_adjust (M3,
+-- supabase/sql/goal_auto_adjust_setup.sql — manquait en base, tous les upserts
+-- `settings` échouaient en PGRST204), settings.notif_complements_enabled et
+-- settings.complements_reminder_state, ainsi que recettes/repas_types/
+-- partages_recettes.saisons.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
