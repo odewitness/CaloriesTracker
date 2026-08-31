@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen } from 'lucide-react'
+import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
 import { useToast } from '../lib/toast'
-import { deviationLevel, batchSummary, slotGroupKey } from '../lib/mealPlanner'
+import { deviationLevel, batchSummary, slotGroupKey, buildVivier } from '../lib/mealPlanner'
 import { addDaysStr, stashAppliedPlan, removeAppliedPlan } from '../lib/mealPlannerApply'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
@@ -83,8 +83,67 @@ function MacroRow({ totals, target }) {
   )
 }
 
+// Sélecteur de recettes imposées pour une brique (slot.pinnedIds). Une recette
+// imposée est forcément dans le pool de sa catégorie à la génération, et n'est
+// jamais remplacée par la recherche locale ni par « Régénérer ».
+function PinPicker({ options, pinnedIds, onChange }) {
+  const [open, setOpen] = useState(false)
+  const pinned = new Set(pinnedIds || [])
+  const toggle = (id) => {
+    const next = new Set(pinned)
+    next.has(id) ? next.delete(id) : next.add(id)
+    onChange([...next])
+  }
+  const count = pinned.size
+  return (
+    <div style={{ marginTop: 2 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: count ? 'var(--green-dark)' : 'var(--text-hint)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '2px 0' }}
+      >
+        <Pin size={11} />
+        {count ? `${count} recette${count > 1 ? 's' : ''} imposée${count > 1 ? 's' : ''}` : 'Imposer une recette'}
+        <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {count > 0 && !open && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+          {[...pinned].map(id => {
+            const o = options.find(x => x.id === id)
+            return (
+              <button
+                key={id}
+                onClick={() => toggle(id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 6, padding: '3px 7px', fontFamily: 'var(--font)' }}
+              >
+                {o?.nom || 'recette supprimée'} <X size={10} />
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {open && (
+        <div style={{ maxHeight: 168, overflowY: 'auto', margin: '4px 0 2px', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px' }}>
+          {options.length === 0 ? (
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', padding: '4px 2px' }}>
+              Aucune recette dans cette catégorie.
+            </div>
+          ) : options.map(o => (
+            <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, padding: '4px 2px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={pinned.has(o.id)} onChange={() => toggle(o.id)} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {o.nom}
+                {o.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · repas type</span>}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Éditeur de composition d'un repas ──────────────────────────────────────
-function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange }) {
+function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange, pinOptionsFor }) {
   const setSlot = (i, patch) => onChange(slots.map((s, si) => si === i ? { ...s, ...patch } : s))
   const removeSlot = (i) => onChange(slots.filter((_, si) => si !== i))
   const addSlot = () => onChange([...slots, { categorie: 'Plat', nbDifferentes: 2 }])
@@ -98,30 +157,44 @@ function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange }) 
       </label>
       {included && (
         <>
-          {slots.map((slot, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <select
-                className="input"
-                value={slot.categorie}
-                onChange={e => setSlot(i, { categorie: e.target.value })}
-                style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
-              >
-                {RECIPE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.max(1, (slot.nbDifferentes || 1) - 1) })} aria-label="Moins">−</button>
-                <span style={{ fontSize: 12.5, fontWeight: 700, width: 46, textAlign: 'center' }} title="recettes différentes sur la période">
-                  {slot.nbDifferentes || 1}×
-                </span>
-                <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.min(7, (slot.nbDifferentes || 1) + 1) })} aria-label="Plus">+</button>
+          {slots.map((slot, i) => {
+            const pinCount = (slot.pinnedIds || []).length
+            return (
+            <div key={i} style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <select
+                  className="input"
+                  value={slot.categorie}
+                  onChange={e => setSlot(i, { categorie: e.target.value, pinnedIds: [] })}
+                  style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
+                >
+                  {RECIPE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.max(1, (slot.nbDifferentes || 1) - 1) })} aria-label="Moins">−</button>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, width: 46, textAlign: 'center' }} title="recettes différentes sur la période">
+                    {slot.nbDifferentes || 1}×
+                  </span>
+                  <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.min(7, (slot.nbDifferentes || 1) + 1) })} aria-label="Plus">+</button>
+                </div>
+                {slots.length > 1 && (
+                  <button className="btn-icon" style={{ width: 26, height: 26, color: 'var(--coral)' }} onClick={() => removeSlot(i)} aria-label="Retirer la brique">
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
-              {slots.length > 1 && (
-                <button className="btn-icon" style={{ width: 26, height: 26, color: 'var(--coral)' }} onClick={() => removeSlot(i)} aria-label="Retirer la brique">
-                  <Trash2 size={13} />
-                </button>
+              <PinPicker
+                options={pinOptionsFor(slot.categorie)}
+                pinnedIds={slot.pinnedIds}
+                onChange={ids => setSlot(i, { pinnedIds: ids })}
+              />
+              {pinCount > (slot.nbDifferentes || 1) && (
+                <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 2 }}>
+                  {pinCount} recettes imposées → au moins {pinCount}× sur la période.
+                </div>
               )}
             </div>
-          ))}
+          )})}
           <button
             onClick={addSlot}
             style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--green-dark)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '2px 0' }}
@@ -138,18 +211,38 @@ function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange }) 
 function ConfigView({ planner, onGenerate }) {
   const {
     config, mealConfig, baseMealConfig, excludedMeals, setConfig, setMealConfig, toggleMeal,
-    recipeCount, templateCount, favoriteCount,
+    recipeCount, templateCount, favoriteCount, recettes, repasTypes,
   } = planner
   const excluded = new Set(excludedMeals)
 
-  // Change les slots d'un repas ET synchronise le « N× » entre tous les slots
-  // qui partagent la même clé de groupe (ex. « Plat » au déjeuner et au dîner).
+  // Options d'épinglage par catégorie : toutes les recettes (+ repas types si
+  // l'option est active) de la catégorie, sans filtre saison/temps — une
+  // recette imposée l'emporte même hors saison. Mémoïsé par catégorie.
+  const pinOptionsCache = useMemo(() => new Map(), [recettes, repasTypes, config.includeRepasTypes])
+  const pinOptionsFor = (categorie) => {
+    if (pinOptionsCache.has(categorie)) return pinOptionsCache.get(categorie)
+    const list = buildVivier(categorie, {
+      recettes, repasTypes, season: null, seasonMode: 'bonus',
+      includeRepasTypes: config.includeRepasTypes !== false,
+    })
+      .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+    pinOptionsCache.set(categorie, list)
+    return list
+  }
+
+  // Change les slots d'un repas ET synchronise « N× » + recettes imposées entre
+  // tous les slots qui partagent la même clé de groupe (ex. « Plat » au déjeuner
+  // et au dîner — un seul vivier, un seul pool).
   const changeMealSlots = (meal, nextSlots) => setMealConfig(mc => {
     const updated = { ...mc, [meal]: nextSlots }
-    const nByKey = {}
-    for (const s of nextSlots) nByKey[slotGroupKey(s)] = s.nbDifferentes
+    const byKey = {}
+    for (const s of nextSlots) byKey[slotGroupKey(s)] = { nbDifferentes: s.nbDifferentes, pinnedIds: s.pinnedIds }
     for (const [mn, slots] of Object.entries(updated)) {
-      updated[mn] = slots.map(s => nByKey[slotGroupKey(s)] != null ? { ...s, nbDifferentes: nByKey[slotGroupKey(s)] } : s)
+      updated[mn] = slots.map(s => {
+        const shared = byKey[slotGroupKey(s)]
+        return shared ? { ...s, nbDifferentes: shared.nbDifferentes, pinnedIds: shared.pinnedIds } : s
+      })
     }
     return updated
   })
@@ -245,6 +338,7 @@ function ConfigView({ planner, onGenerate }) {
           included={!excluded.has(meal)}
           onToggleIncluded={() => toggleMeal(meal)}
           onChange={next => changeMealSlots(meal, next)}
+          pinOptionsFor={pinOptionsFor}
         />
       ))}
 

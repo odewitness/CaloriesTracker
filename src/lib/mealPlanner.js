@@ -259,6 +259,24 @@ export function buildVivier(categorie, { recettes, repasTypes, season, seasonMod
     : recs
 }
 
+// Candidat construit à partir d'un id de recette / repas type — sert aux
+// recettes ÉPINGLÉES (slot.pinnedIds) : une recette imposée doit entrer dans le
+// pool même si elle est écartée du vivier par le filtre saison strict ou le
+// filtre temps de cuisine (choix explicite de l'utilisatrice → il l'emporte).
+function candidateFromId(id, { recettes = [], repasTypes = [] }) {
+  const r = recettes.find(x => x.id === id)
+  if (r) {
+    const macros = recipePortionMacros(r)
+    if (macros) return { kind: 'recette', id: r.id, nom: r.nom, entity: r, macros }
+  }
+  const t = repasTypes.find(x => x.id === id)
+  if (t) {
+    const macros = templateServingMacros(t)
+    if (macros && macros.kcal > 0) return { kind: 'repas_type', id: t.id, nom: t.nom, entity: t, macros }
+  }
+  return null
+}
+
 function averageTargets(list) {
   const n = list.length || 1
   const acc = { ...EMPTY_MACROS }
@@ -375,7 +393,8 @@ function foodKey(f) {
  * @param {number} p.days            1..7
  * @param {number} [p.people=1]      nombre de personnes (liste de courses)
  * @param {string|null} [p.season]   'Printemps'|'Été'|'Automne'|'Hiver'|null
- * @param {object} p.mealConfig      { [meal]: [{ categorie, nbDifferentes }] }
+ * @param {object} p.mealConfig      { [meal]: [{ categorie, nbDifferentes, pinnedIds? }] }
+ *                                   pinnedIds : recettes / repas types imposés dans le pool de la catégorie.
  * @param {Array}  p.recettes        useRecipes().recettes
  * @param {Array}  p.repasTypes      liste des repas_types
  * @param {Array}  p.favorites       useFavorites().favorites
@@ -414,12 +433,25 @@ export function buildMealPlan(p) {
   }
 
   // 1. Vivier + pool de recettes tirées, par catégorie.
-  const viviers = {} // categorie -> [candidate,...]
-  const picks = {}   // categorie -> [candidate,...] (pool partagé par les slots de la catégorie)
+  const viviers = {}    // categorie -> [candidate,...]
+  const picks = {}      // categorie -> [candidate,...] (pool partagé par les slots de la catégorie)
+  const pinnedByKey = {} // categorie -> Set d'ids épinglés (jamais remplacés en recherche locale)
   for (const [key, entries] of Object.entries(groupSlots)) {
     const viv = buildVivier(key, vivierCtx)
     viviers[key] = viv
-    if (!viv.length) {
+
+    // Recettes imposées pour ce groupe (une ou plusieurs briques de même
+    // catégorie mutualisent leur pinnedIds), reprises même si le vivier les a
+    // écartées (saison stricte / temps de cuisine).
+    const wantPinned = new Set(entries.flatMap(e => e.slot.pinnedIds || []))
+    const chosen = []
+    for (const id of wantPinned) {
+      const fc = viv.find(c => c.id === id) || candidateFromId(id, vivierCtx)
+      if (fc && !chosen.some(x => x.id === fc.id)) chosen.push(fc)
+    }
+    pinnedByKey[key] = new Set(chosen.map(c => c.id))
+
+    if (!viv.length && !chosen.length) {
       warnings.push(`Aucune recette disponible pour « ${key} ».`)
       picks[key] = []
       continue
@@ -428,15 +460,11 @@ export function buildMealPlan(p) {
     const scored = viv
       .map(c => ({ c, dist: macroDistance(c.macros, avgTarget) - seasonBonus(c.entity, season) }))
       .sort((a, b) => a.dist - b.dist)
+    // Il faut au moins autant de recettes différentes que d'imposées.
     const nWanted = Math.max(...entries.map(e => e.slot.nbDifferentes || 1))
-    const n = Math.max(1, Math.min(nWanted, scored.length))
-    const chosen = []
-    for (const id of new Set(entries.flatMap(e => e.slot.pinnedIds || []))) {
-      const fc = viv.find(c => c.id === id)
-      if (fc && chosen.length < n && !chosen.some(x => x.id === fc.id)) chosen.push(fc)
-    }
+    const n = Math.max(1, nWanted, chosen.length)
     const poolSize = Math.min(scored.length, Math.max(n + 3, Math.ceil(scored.length * 0.5)))
-    const cpool = scored.slice(0, poolSize).map(x => x.c)
+    const cpool = scored.slice(0, poolSize).map(x => x.c).filter(c => !chosen.some(x => x.id === c.id))
     while (chosen.length < n && cpool.length) {
       const cand = pickWeighted(
         cpool.filter(c => !chosen.some(x => x.id === c.id)),
@@ -542,14 +570,20 @@ export function buildMealPlan(p) {
   let bestScore = dayList.reduce((s, d) => s + d.score, 0)
 
   // 3. Recherche locale : on tente de remplacer une recette d'un pool de groupe
-  //    par une autre de son vivier ; on garde si le score total baisse.
-  const swappableKeys = Object.keys(picks).filter(k => picks[k].length && (viviers[k] || []).length > picks[k].length)
+  //    par une autre de son vivier ; on garde si le score total baisse. Les
+  //    recettes épinglées ne sont jamais remplacées.
+  const swappableKeys = Object.keys(picks).filter(k => {
+    const free = picks[k].filter(c => !pinnedByKey[k]?.has(c.id)).length
+    return free > 0 && (viviers[k] || []).length > picks[k].length
+  })
   for (let round = 0; round < LOCAL_SEARCH_ROUNDS && swappableKeys.length; round++) {
     const key = swappableKeys[Math.floor(rng() * swappableKeys.length)]
     const pool = picks[key]
     const alt = (viviers[key] || []).find(c => !pool.some(x => x.id === c.id))
     if (!alt) continue
-    const replaceIdx = Math.floor(rng() * pool.length)
+    const freeIdx = pool.map((c, i) => i).filter(i => !pinnedByKey[key]?.has(pool[i].id))
+    if (!freeIdx.length) continue
+    const replaceIdx = freeIdx[Math.floor(rng() * freeIdx.length)]
     const prev = pool[replaceIdx]
     pool[replaceIdx] = alt
     const trial = build()
