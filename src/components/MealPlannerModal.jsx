@@ -83,25 +83,11 @@ function MacroRow({ totals, target }) {
   )
 }
 
-const MIXTE_PLAT = '__mixte_plat__'
-const REPAS_TYPE = '__repas_type__'
-
-function slotSelectValue(slot) {
-  if (slot.type === 'repas_type') return REPAS_TYPE
-  if (slot.type === 'mixte') return MIXTE_PLAT
-  return slot.categorie
-}
-function slotFromSelectValue(v) {
-  if (v === REPAS_TYPE) return { type: 'repas_type', categorie: undefined }
-  if (v === MIXTE_PLAT) return { type: 'mixte', categorie: 'Plat' }
-  return { type: 'recette', categorie: v }
-}
-
 // ── Éditeur de composition d'un repas ──────────────────────────────────────
 function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange }) {
   const setSlot = (i, patch) => onChange(slots.map((s, si) => si === i ? { ...s, ...patch } : s))
   const removeSlot = (i) => onChange(slots.filter((_, si) => si !== i))
-  const addSlot = () => onChange([...slots, { type: 'recette', categorie: 'Plat', nbDifferentes: 2 }])
+  const addSlot = () => onChange([...slots, { categorie: 'Plat', nbDifferentes: 2 }])
 
   return (
     <div className="card" style={{ padding: '10px 12px', marginBottom: 8, opacity: included ? 1 : 0.55 }}>
@@ -116,13 +102,11 @@ function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange }) 
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <select
                 className="input"
-                value={slotSelectValue(slot)}
-                onChange={e => setSlot(i, slotFromSelectValue(e.target.value))}
+                value={slot.categorie}
+                onChange={e => setSlot(i, { categorie: e.target.value })}
                 style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
               >
-                <option value={MIXTE_PLAT}>Plat ou repas type</option>
                 {RECIPE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                <option value={REPAS_TYPE}>Un repas type</option>
               </select>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                 <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.max(1, (slot.nbDifferentes || 1) - 1) })} aria-label="Moins">−</button>
@@ -238,8 +222,16 @@ function ConfigView({ planner, onGenerate }) {
       <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '2px 0 8px' }}>
         Décoche un repas pour ne pas l'inclure. Pour chaque repas, les briques et le nombre de
         recettes différentes sur la période (2× = deux recettes qui tournent sur les jours ;
-        « Plat » partagé entre déjeuner et dîner compte une seule fois).
+        une même catégorie partagée entre déjeuner et dîner compte une seule fois).
       </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+        <input
+          type="checkbox"
+          checked={config.includeRepasTypes !== false}
+          onChange={e => setConfig({ includeRepasTypes: e.target.checked })}
+        />
+        Piocher aussi dans mes repas types (en plus des recettes)
+      </label>
       {Object.keys(baseMealConfig).length === 0 && (
         <div className="card" style={{ padding: 14, fontSize: 12.5, color: 'var(--text-hint)', textAlign: 'center', marginBottom: 8 }}>
           Aucun repas activé. Active des repas depuis Profil.

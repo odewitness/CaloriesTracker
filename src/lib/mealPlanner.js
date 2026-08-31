@@ -223,21 +223,16 @@ function seasonBonus(entity, season) {
   return (entity.saisons || []).includes(season) ? 0.15 : 0
 }
 
-// Clé de regroupement d'un slot : les slots de même clé partagent UN vivier et
-// UN pool de recettes tirées sur la période (ex. « Plat » au déjeuner et au
-// dîner = les mêmes N recettes qui tournent, pas N + N).
-//   'repas_type'        → un repas type entier
-//   'mixte:<categorie>' → recette de cette catégorie OU repas type
-//   'recette:<categorie>'
+// Clé de regroupement d'un slot = sa catégorie : les slots de même catégorie
+// (« Plat » au déjeuner et au dîner) partagent UN vivier et UN pool de recettes
+// tirées sur la période (pas N + N).
 export function slotGroupKey(slot) {
-  if (slot.type === 'repas_type') return 'repas_type'
-  if (slot.type === 'mixte') return `mixte:${slot.categorie}`
-  return `recette:${slot.categorie}`
+  return slot.categorie
 }
 
-function repasTypeCandidates(repasTypes, season, seasonMode, categorie = null) {
+function repasTypeCandidates(repasTypes, categorie, season, seasonMode) {
   return (repasTypes || [])
-    .filter(rt => !categorie || (rt.categories || []).includes(categorie))
+    .filter(rt => (rt.categories || []).includes(categorie))
     .filter(rt => matchesSeason(rt, season, seasonMode))
     .map(rt => ({ kind: 'repas_type', id: rt.id, nom: rt.nom, entity: rt, macros: templateServingMacros(rt) }))
     .filter(c => c.macros && c.macros.kcal > 0)
@@ -253,33 +248,15 @@ function recetteCandidates(recettes, categorie, season, seasonMode) {
     .filter(c => c.macros)
 }
 
-// Candidats d'un slot, avec des valeurs nutritionnelles exploitables et une
-// portion dimensionnable. Exporté : réutilisé par useMealPlanner pour proposer
-// un remplacement de brique dans l'aperçu.
-export function buildVivier(slot, { recettes, repasTypes, season, seasonMode }) {
-  // 'repas_type' = n'importe quel repas type entier (pas de catégorie imposée).
-  if (slot.type === 'repas_type') return repasTypeCandidates(repasTypes, season, seasonMode)
-  const recs = recetteCandidates(recettes, slot.categorie, season, seasonMode)
-  // 'mixte' = recette de la catégorie OU repas type DE LA MÊME catégorie.
-  if (slot.type === 'mixte') {
-    return [...recs, ...repasTypeCandidates(repasTypes, season, seasonMode, slot.categorie)]
-  }
-  return recs
-}
-
-// Vivier reconstruit depuis une clé de groupe (voir slotGroupKey) — pour le
-// remplacement de brique dans l'aperçu, qui ne connaît que la clé.
-export function vivierForGroupKey(key, ctx) {
-  if (key === 'repas_type') return buildVivier({ type: 'repas_type' }, ctx)
-  if (key.startsWith('mixte:')) return buildVivier({ type: 'mixte', categorie: key.slice(6) }, ctx)
-  if (key.startsWith('recette:')) return buildVivier({ type: 'recette', categorie: key.slice(8) }, ctx)
-  return []
-}
-
-function describeGroup(slot) {
-  if (slot.type === 'repas_type') return 'un repas type'
-  if (slot.type === 'mixte') return `« ${slot.categorie} » ou repas type`
-  return `« ${slot.categorie} »`
+// Candidats d'une catégorie : recettes de cette catégorie (+ repas types de la
+// même catégorie si `includeRepasTypes`), avec valeurs nutritionnelles
+// exploitables et portion dimensionnable. Exporté : réutilisé par
+// useMealPlanner pour proposer un remplacement de brique dans l'aperçu.
+export function buildVivier(categorie, { recettes, repasTypes, season, seasonMode, includeRepasTypes = true }) {
+  const recs = recetteCandidates(recettes, categorie, season, seasonMode)
+  return includeRepasTypes
+    ? [...recs, ...repasTypeCandidates(repasTypes, categorie, season, seasonMode)]
+    : recs
 }
 
 function averageTargets(list) {
@@ -398,12 +375,13 @@ function foodKey(f) {
  * @param {number} p.days            1..7
  * @param {number} [p.people=1]      nombre de personnes (liste de courses)
  * @param {string|null} [p.season]   'Printemps'|'Été'|'Automne'|'Hiver'|null
- * @param {object} p.mealConfig      { [meal]: [{ type:'recette', categorie, nbDifferentes } | { type:'repas_type', nbDifferentes }] }
+ * @param {object} p.mealConfig      { [meal]: [{ categorie, nbDifferentes }] }
  * @param {Array}  p.recettes        useRecipes().recettes
  * @param {Array}  p.repasTypes      liste des repas_types
  * @param {Array}  p.favorites       useFavorites().favorites
  * @param {object} p.mealTargets     computeMealTargets(settings)
  * @param {number} [p.goalFibres=0]  settings.goal_fibres
+ * @param {boolean} [p.includeRepasTypes=true]  inclure les repas types dans les viviers
  * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number }
  * @param {object} [p.locked]        { `${dayIndex}|${meal}`: <objet repas figé de l'aperçu> }
  *                                   — repas verrouillés, repris tels quels à la régénération.
@@ -412,19 +390,20 @@ function foodKey(f) {
 export function buildMealPlan(p) {
   const {
     days, people = 1, season = null, mealConfig, recettes = [], repasTypes = [],
-    favorites = [], mealTargets = {}, goalFibres = 0, options = {}, locked = {},
+    favorites = [], mealTargets = {}, goalFibres = 0, includeRepasTypes = true,
+    options = {}, locked = {},
   } = p
   const seasonMode = options.seasonMode === 'filter' ? 'filter' : 'bonus'
+  const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes }
   const rng = makeRng(options.seed || 1)
   const warnings = []
   const foods = favoriteFoods(favorites)
 
   const meals = Object.keys(mealConfig || {})
 
-  // Slots regroupés par clé (voir slotGroupKey) : ceux de même clé — « Plat »
-  // au déjeuner et au dîner par ex. — partagent UN vivier et UN pool de
-  // recettes tirées sur la période (pas N + N).
-  const groupSlots = {} // key -> [{ meal, si, slot, target }]
+  // Slots regroupés par catégorie : « Plat » au déjeuner et au dîner partagent
+  // UN vivier et UN pool de recettes tirées sur la période (pas N + N).
+  const groupSlots = {} // categorie -> [{ meal, si, slot, target }]
   for (const meal of meals) {
     const slots = mealConfig[meal] || []
     const slotTargets = splitMealTarget(mealTargetWithFibres(mealTargets, meal, goalFibres), slots)
@@ -434,15 +413,14 @@ export function buildMealPlan(p) {
     })
   }
 
-  // 1. Vivier + pool de recettes tirées, par groupe.
-  const viviers = {} // key -> [candidate,...]
-  const picks = {}   // key -> [candidate,...] (pool partagé par les slots du groupe)
+  // 1. Vivier + pool de recettes tirées, par catégorie.
+  const viviers = {} // categorie -> [candidate,...]
+  const picks = {}   // categorie -> [candidate,...] (pool partagé par les slots de la catégorie)
   for (const [key, entries] of Object.entries(groupSlots)) {
-    const refSlot = entries[0].slot
-    const viv = buildVivier(refSlot, { recettes, repasTypes, season, seasonMode })
+    const viv = buildVivier(key, vivierCtx)
     viviers[key] = viv
     if (!viv.length) {
-      warnings.push(`Aucune recette disponible pour ${describeGroup(refSlot)}.`)
+      warnings.push(`Aucune recette disponible pour « ${key} ».`)
       picks[key] = []
       continue
     }
@@ -520,8 +498,7 @@ export function buildMealPlan(p) {
           usedRecipeIds.add(cand.id)
           items.push({
             kind: cand.kind, id: cand.id, nom: cand.nom,
-            groupKey: key,
-            categorie: cand.kind === 'repas_type' ? null : (slot.categorie || null),
+            categorie: key, // = catégorie du slot, sert au remplacement de brique
             portions: 1,
             portionG: cand.macros._portionG || null,
             macros: { ...cand.macros },
@@ -630,15 +607,15 @@ export function batchSummary(plan, { recettesById = {}, templatesById = {} } = {
     .sort((a, b) => b.portionsNeeded - a.portionsNeeded)
 }
 
-// Config de repas par défaut : une brique par repas actif. Déjeuner et dîner
-// tirent dans « Plat » OU les repas types (type 'mixte') ; petit-déj et
-// collation dans leur catégorie de recette.
+// Config de repas par défaut : une brique par repas actif, catégorie déduite du
+// repas. Les repas types de chaque catégorie sont inclus par défaut dans les
+// viviers (interrupteur `includeRepasTypes`).
 export function defaultMealConfig(mealTargets) {
   const map = {
-    'Petit-déjeuner': { type: 'recette', categorie: 'Petit-déjeuner', nbDifferentes: 2 },
-    'Déjeuner': { type: 'mixte', categorie: 'Plat', nbDifferentes: 2 },
-    'Dîner': { type: 'mixte', categorie: 'Plat', nbDifferentes: 2 },
-    'Collation': { type: 'recette', categorie: 'Collation', nbDifferentes: 1 },
+    'Petit-déjeuner': { categorie: 'Petit-déjeuner', nbDifferentes: 2 },
+    'Déjeuner': { categorie: 'Plat', nbDifferentes: 2 },
+    'Dîner': { categorie: 'Plat', nbDifferentes: 2 },
+    'Collation': { categorie: 'Collation', nbDifferentes: 1 },
   }
   const cfg = {}
   for (const [meal, slot] of Object.entries(map)) {

@@ -9,7 +9,7 @@ import { computeMealTargets } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getCurrentSeason } from '../lib/seasons'
 import {
-  buildMealPlan, defaultMealConfig, vivierForGroupKey, recomputePlanAggregates,
+  buildMealPlan, defaultMealConfig, buildVivier, recomputePlanAggregates,
   recipePortionMacros, templateServingMacros,
 } from '../lib/mealPlanner'
 import { planToPlannedRows, addDaysStr } from '../lib/mealPlannerApply'
@@ -43,6 +43,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     startDateStr: defaultStartDate || todayStr(),
     season: getCurrentSeason(),
     seasonMode: 'bonus', // 'bonus' | 'filter'
+    includeRepasTypes: true, // inclure les repas types dans les viviers
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
   }))
@@ -137,6 +138,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
         favorites,
         mealTargets,
         goalFibres: settings?.goal_fibres || 0,
+        includeRepasTypes: config.includeRepasTypes !== false,
         options: { seasonMode: config.seasonMode, seed },
         locked,
       })
@@ -175,25 +177,25 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   }, [])
 
   // Recettes / repas types de remplacement possibles pour une brique donnée
-  // (même groupe : catégorie, ou « Plat ou repas type »), hors brique courante
-  // et hors briques déjà utilisées ce jour-là.
+  // (même catégorie), hors brique courante et hors briques déjà utilisées ce
+  // jour-là.
   const swapCandidates = useCallback((dayIndex, meal, itemIndex) => {
     const mi = findMealIdx(plan, dayIndex, meal)
     if (mi < 0) return []
     const day = plan.days[dayIndex]
     const it = day.meals[mi].items[itemIndex]
-    if (!it || (it.kind !== 'recette' && it.kind !== 'repas_type')) return []
+    if (!it || (it.kind !== 'recette' && it.kind !== 'repas_type') || !it.categorie) return []
     const usedToday = new Set(
       day.meals.flatMap(m => m.items.filter(x => x.kind !== 'ajout').map(x => x.id)),
     )
-    const key = it.groupKey || (it.kind === 'repas_type' ? 'repas_type' : `recette:${it.categorie}`)
-    return vivierForGroupKey(key, {
+    return buildVivier(it.categorie, {
       recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
+      includeRepasTypes: config.includeRepasTypes !== false,
     })
       .filter(c => c.id !== it.id && !usedToday.has(c.id))
       .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-  }, [plan, recettes, repasTypes, config.season, config.seasonMode])
+  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes])
 
   const swapItem = useCallback((dayIndex, meal, itemIndex, candidateId) => {
     const rec = recettes.find(r => r.id === candidateId)
@@ -205,7 +207,9 @@ export function useMealPlanner({ defaultStartDate } = {}) {
       kind: rec ? 'recette' : 'repas_type',
       id: candidateId,
       nom: rec ? rec.nom : tpl.nom,
-      categorie: rec ? (x.categorie || rec.categories?.[0] || null) : null,
+      // on garde la catégorie du slot (identité de groupe) pour pouvoir
+      // re-remplacer ensuite
+      categorie: x.categorie || (rec ? rec.categories?.[0] : tpl.categories?.[0]) || null,
       portions: 1,
       portionG: macros._portionG || null,
       macros: { ...macros },
