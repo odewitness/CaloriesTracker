@@ -27,6 +27,22 @@ export function addDaysStr(dateStr, n) {
   return fmt(d)
 }
 
+// ── Dernier plan appliqué (localStorage) ──────────────────────────────────
+// Sert au bouton « Retirer le plan généré » de la vue Menus, qui doit
+// fonctionner après fermeture de la modale. On ne stocke que de quoi cibler la
+// suppression : le recurrence_group_id partagé par toutes les lignes du plan.
+const LAST_PLAN_KEY = 'meal-planner:last-applied'
+
+export function stashAppliedPlan(info) {
+  try { localStorage.setItem(LAST_PLAN_KEY, JSON.stringify(info)) } catch { /* quota / privé */ }
+}
+export function readAppliedPlan() {
+  try { return JSON.parse(localStorage.getItem(LAST_PLAN_KEY)) || null } catch { return null }
+}
+export function clearAppliedPlan() {
+  try { localStorage.removeItem(LAST_PLAN_KEY) } catch { /* ignore */ }
+}
+
 // Remet à l'échelle un item DÉJÀ en valeurs absolues (ligne recette_ingredients
 // ou item de repas type) par un facteur — garde uniquement les champs utiles à
 // une entrée de `journal` / `repas_planifies`.
@@ -100,13 +116,16 @@ export function planToPlannedRows(plan, ctx) {
         }
       }
 
-      if (!items.length) continue
+      // Filet de sécurité : pas d'item sans nom (colonnes NOT NULL côté
+      // `journal` / `liste_courses_items` si ces lignes y sont recopiées).
+      const cleanItems = items.filter(it => it && it.food_name)
+      if (!cleanItems.length) continue
       const useSolo = briqueCount === 1 && addonCount === 0 && soloSource
       rows.push({
         date: dateStr,
         meal: meal.meal,
         nom: briqueNames.join(' + ') || meal.meal,
-        items,
+        items: cleanItems,
         source_type: useSolo ? soloSource.source_type : 'libre',
         source_id: useSolo ? soloSource.source_id : null,
       })

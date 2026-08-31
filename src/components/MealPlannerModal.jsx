@@ -5,7 +5,7 @@ import { useMealPlanner } from '../hooks/useMealPlanner'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
 import { useToast } from '../lib/toast'
 import { deviationLevel, batchSummary } from '../lib/mealPlanner'
-import { addDaysStr } from '../lib/mealPlannerApply'
+import { addDaysStr, stashAppliedPlan, clearAppliedPlan } from '../lib/mealPlannerApply'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import Loader from './Loader'
@@ -476,6 +476,14 @@ export default function MealPlannerModal({ onClose, onApplied }) {
     if (res.inserted === 0) { toast('Rien à ajouter (créneaux occupés ou jours exclus)'); return }
     setApplyResult(res)
     setShoppingState('idle')
+    if (res.groupId) {
+      stashAppliedPlan({
+        groupId: res.groupId,
+        startDateStr,
+        days: planner.plan?.days.length || 0,
+        appliedAt: Date.now(),
+      })
+    }
     toast(`✓ ${res.inserted} repas ajoutés`)
     onApplied?.()
   }
@@ -483,9 +491,21 @@ export default function MealPlannerModal({ onClose, onApplied }) {
   const handleGenerateShopping = async () => {
     if (!applyResult?.rows?.length || !shoppingListId) return
     setShoppingState('busy')
-    const { error } = await addPlannedItems(applyResult.rows, { multiplier: planner.config.people })
-    setShoppingState(error ? 'idle' : 'done')
-    toast(error ? 'Erreur liste de courses' : '✓ Ajouté à la liste de courses')
+    try {
+      const { error } = await addPlannedItems(applyResult.rows, { multiplier: planner.config.people })
+      if (error) {
+        console.error('[planificateur] liste de courses :', error)
+        setShoppingState('idle')
+        toast(`Erreur liste de courses : ${error.message || error.code || 'inconnue'}`)
+        return
+      }
+      setShoppingState('done')
+      toast('✓ Ajouté à la liste de courses')
+    } catch (e) {
+      console.error('[planificateur] liste de courses (exception) :', e)
+      setShoppingState('idle')
+      toast(`Erreur liste de courses : ${e?.message || e}`)
+    }
   }
 
   const handleRemovePlan = async () => {
@@ -494,6 +514,7 @@ export default function MealPlannerModal({ onClose, onApplied }) {
     const { error } = await planner.removePlan(applyResult.groupId)
     setRemoving(false)
     if (error) { toast('Erreur au retrait'); return }
+    clearAppliedPlan()
     resetApply()
     toast('Plan retiré du calendrier')
     onApplied?.()

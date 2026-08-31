@@ -223,11 +223,19 @@ function buildVivier(slot, { recettes, repasTypes, season, seasonMode }) {
 
 // ── Aliments « en + » (favoris) ────────────────────────────────────────────
 
-// Objet favori → forme « aliment » exploitable par rawValue/getPortion.
-function favoriteFoods(favorites) {
+// Lignes de `favoris` → objets « aliment » exploitables par rawValue /
+// getPortion / scaleFood. On écarte les recettes mises en favori (source
+// 'recette' : pas un ingrédient à mettre en liste de courses), et on garantit
+// un `alim_nom` non vide (sinon scaleFood produirait un item sans nom →
+// insertion `journal` / `liste_courses_items` en échec).
+export function favoriteFoods(favorites) {
   return (favorites || [])
-    .map(f => f.food_data)
-    .filter(f => f && (f.energie_kcal || 0) > 0)
+    .filter(f => f && f.food_source !== 'recette')
+    .map(f => {
+      const d = f.food_data || {}
+      return { ...d, alim_nom: d.alim_nom || d.food_name || f.food_name || d.nom || null }
+    })
+    .filter(d => d.alim_nom && (d.energie_kcal || 0) > 0)
 }
 
 // Comble le résidu macro d'un repas avec 0 à MAX_ADDONS_PER_MEAL favoris.

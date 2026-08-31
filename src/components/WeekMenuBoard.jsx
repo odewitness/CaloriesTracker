@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER } from '../lib/nutrients'
-import { deletePlannedMeal, markAsEaten } from '../hooks/usePlannedMeals'
+import { deletePlannedMeal, deletePlannedMealSeries, markAsEaten } from '../hooks/usePlannedMeals'
 import { fmt } from '../lib/dates'
+import { readAppliedPlan, clearAppliedPlan } from '../lib/mealPlannerApply'
 import PlanMealModal from './PlanMealModal'
 import MealPlannerModal from './MealPlannerModal'
 
@@ -48,6 +49,26 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
   const [menuFor, setMenuFor] = useState(null)     // repas.id dont le petit menu d'actions est ouvert
   const [busyId, setBusyId] = useState(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
+  const [appliedPlan, setAppliedPlan] = useState(() => readAppliedPlan())
+  const [removingPlan, setRemovingPlan] = useState(false)
+
+  // Re-lit le dernier plan appliqué (stashé dans localStorage par
+  // MealPlannerModal) à la fermeture de la modale.
+  useEffect(() => {
+    if (!plannerOpen) setAppliedPlan(readAppliedPlan())
+  }, [plannerOpen])
+
+  const handleRemovePlan = async () => {
+    if (!appliedPlan?.groupId) return
+    setRemovingPlan(true)
+    const { error } = await deletePlannedMealSeries(appliedPlan.groupId, user.id)
+    setRemovingPlan(false)
+    if (error) { toast('Erreur'); return }
+    clearAppliedPlan()
+    setAppliedPlan(null)
+    toast('Plan retiré du calendrier')
+    onRefetch()
+  }
 
   const todayStr = fmt(new Date())
 
@@ -113,13 +134,29 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
         onClick={() => setPlannerOpen(true)}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
-          padding: '10px 12px', marginBottom: 12, borderRadius: 'var(--radius-sm)',
+          padding: '10px 12px', marginBottom: appliedPlan ? 6 : 12, borderRadius: 'var(--radius-sm)',
           background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
           fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
         }}
       >
         <Wand2 size={15} /> Générer un plan de repas
       </button>
+
+      {appliedPlan && (
+        <button
+          onClick={handleRemovePlan}
+          disabled={removingPlan}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+            padding: '8px 12px', marginBottom: 12, borderRadius: 'var(--radius-sm)',
+            background: 'none', color: 'var(--coral)', border: '1px solid var(--coral-light)',
+            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+          }}
+        >
+          <Trash2 size={13} />
+          {removingPlan ? 'Retrait…' : `Retirer le plan généré (dès le ${new Date(appliedPlan.startDateStr + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})`}
+        </button>
+      )}
 
       {enabledMeals.length === 0 && (
         <div className="card" style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--text-hint)' }}>
