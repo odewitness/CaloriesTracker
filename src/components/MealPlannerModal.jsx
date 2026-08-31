@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
-import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
+import { useToast } from '../lib/toast'
+import { todayStr } from '../lib/dates'
 import { deviationLevel } from '../lib/mealPlanner'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
@@ -196,8 +198,10 @@ function ConfigView({ planner, onGenerate }) {
 }
 
 // ── Vue aperçu ────────────────────────────────────────────────────────────
-function PreviewView({ plan, onBack, onRegenerate, generating }) {
+function PreviewView({ plan, onBack, onRegenerate, generating, onApply, applying, result }) {
   const dayLabels = ['Jour 1', 'Jour 2', 'Jour 3', 'Jour 4', 'Jour 5', 'Jour 6', 'Jour 7']
+  const [startDateStr, setStartDateStr] = useState(todayStr())
+  const [allowConflicts, setAllowConflicts] = useState(false)
 
   return (
     <>
@@ -266,11 +270,55 @@ function PreviewView({ plan, onBack, onRegenerate, generating }) {
         </div>
       ))}
 
-      <div className="card" style={{ padding: '12px 14px', marginTop: 4, background: 'var(--gray-bg)', border: 'none', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        Prochaine étape du chantier : « Appliquer au calendrier » (crée les repas prévus) et
-        « Ajouter à la liste de courses ». Pour l'instant cet aperçu sert à valider la qualité
-        des plans générés.
-      </div>
+      {/* Appliquer au calendrier */}
+      {result?.inserted > 0 ? (
+        <div className="card" style={{ padding: '14px', marginTop: 4, background: 'var(--green-light)', border: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 700, color: 'var(--green-dark)', marginBottom: result.skippedConflict?.length || result.skippedExcluded?.length ? 6 : 0 }}>
+            <Check size={15} /> {result.inserted} repas ajouté{result.inserted > 1 ? 's' : ''} au calendrier
+          </div>
+          {result.skippedConflict?.length > 0 && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+              {result.skippedConflict.length} créneau{result.skippedConflict.length > 1 ? 'x' : ''} déjà occupé{result.skippedConflict.length > 1 ? 's' : ''} — ignoré{result.skippedConflict.length > 1 ? 's' : ''}.
+            </div>
+          )}
+          {result.skippedExcluded?.length > 0 && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+              {result.skippedExcluded.length} jour{result.skippedExcluded.length > 1 ? 's' : ''} exclu{result.skippedExcluded.length > 1 ? 's' : ''} — sauté{result.skippedExcluded.length > 1 ? 's' : ''}.
+            </div>
+          )}
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 6 }}>
+            Pour la liste de courses : « Depuis mes repas prévus » dans tes courses, sur cette période.
+          </div>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: '12px 14px', marginTop: 4 }}>
+          <SectionLabel>Appliquer au calendrier</SectionLabel>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0 8px' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>À partir du</span>
+            <input
+              type="date" className="input" value={startDateStr}
+              onChange={e => setStartDateStr(e.target.value)}
+              style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
+            />
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 10 }}>
+            <input type="checkbox" checked={allowConflicts} onChange={e => setAllowConflicts(e.target.checked)} />
+            Ajouter même si un repas est déjà prévu sur le créneau
+          </label>
+          <button
+            className="btn-primary"
+            onClick={() => onApply({ startDateStr, conflictStrategy: allowConflicts ? 'add' : 'skip' })}
+            disabled={applying}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: applying ? 0.5 : 1 }}
+          >
+            <CalendarPlus size={16} /> {applying ? 'Ajout…' : 'Appliquer au calendrier'}
+          </button>
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8, lineHeight: 1.5 }}>
+            Crée un repas prévu par jour et par repas. Rien n'est écrasé ni supprimé. Tu pourras
+            retirer tout le plan d'un coup depuis « Mes programmations ».
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -292,13 +340,27 @@ function segBtn(active) {
   }
 }
 
-export default function MealPlannerModal({ onClose }) {
+export default function MealPlannerModal({ onClose, onApplied }) {
   useBackButton(onClose)
   const planner = useMealPlanner()
+  const toast = useToast()
   const [step, setStep] = useState('config')
+  const [applying, setApplying] = useState(false)
+  const [applyResult, setApplyResult] = useState(null)
 
-  const handleGenerate = () => { planner.generate(); setStep('preview') }
-  const handleRegenerate = () => planner.regenerate()
+  const handleGenerate = () => { planner.generate(); setApplyResult(null); setStep('preview') }
+  const handleRegenerate = () => { planner.regenerate(); setApplyResult(null) }
+
+  const handleApply = async ({ startDateStr, conflictStrategy }) => {
+    setApplying(true)
+    const res = await planner.applyToCalendar({ startDateStr, conflictStrategy })
+    setApplying(false)
+    if (res.error) { toast('Erreur à l\'enregistrement'); return }
+    if (res.inserted === 0) { toast('Rien à ajouter (créneaux occupés ou jours exclus)'); return }
+    setApplyResult(res)
+    toast(`✓ ${res.inserted} repas ajoutés`)
+    onApplied?.()
+  }
 
   return (
     <div className="page-modal" style={{ zIndex: 60 }}>
@@ -318,6 +380,9 @@ export default function MealPlannerModal({ onClose }) {
             generating={planner.generating}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
+            onApply={handleApply}
+            applying={applying}
+            result={applyResult}
           />
         )}
       </div>

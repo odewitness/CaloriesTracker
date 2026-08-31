@@ -238,7 +238,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
       )}
 
       {plannerOpen && (
-        <MealPlannerModal onClose={() => setPlannerOpen(false)} />
+        <MealPlannerModal onClose={() => setPlannerOpen(false)} onApplied={onRefetch} />
       )}
     </div>
   )
