@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-31',
+    title: 'Génère ton plan de repas de la semaine',
+    description: "Dans le Calendrier, onglet « Menus », le bouton « Générer un plan de repas » compose pour toi des menus sur 1 à 7 jours à partir de tes recettes et de tes repas types, en essayant de coller au mieux à tes objectifs de calories et de macros. Tu choisis le nombre de jours, la date de début, le nombre de personnes, la saison, et pour chaque repas ce que tu veux (par exemple 1 plat + 1 dessert au déjeuner) et combien de recettes différentes sur la semaine. L'aperçu te montre les macros par repas, par jour et sur la semaine, avec un code couleur d'écart à l'objectif ; chaque repas est complété par un ou deux aliments de tes favoris pour combler les manques. Tu peux verrouiller un jour ou un repas qui te plaît puis régénérer le reste, remplacer une recette par une autre, puis « Appliquer au calendrier », générer la liste de courses et, si besoin, retirer tout le plan d'un coup.",
+  },
+  {
+    date: '2026-08-31',
     title: 'Modifier une recette plus vite',
     description: "Dans la liste de tes recettes, le petit menu « ⋮ » d'une recette propose maintenant « Modifier » directement, sans avoir à ouvrir la recette d'abord.",
   },

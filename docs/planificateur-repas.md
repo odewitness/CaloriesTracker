@@ -282,6 +282,11 @@ appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
 - ✅ Aperçu 3 niveaux (repas / jour / période) + feu tricolore + récap
   « À préparer » (portions exactes + facteur d'échelle des ingrédients).
 - ✅ Régénérer.
+- ✅ **Verrouiller** un jour / un repas (cadenas dans l'aperçu) : conservés à la
+  régénération, comptés dans l'anti-répétition. `buildMealPlan({ locked })`.
+- ✅ **Éditer une brique** dans l'aperçu : remplacer une recette par une autre de
+  la même catégorie (vivier), retirer une recette / un aliment « en + ». Toute
+  édition manuelle verrouille le repas.
 - ✅ « Appliquer au calendrier » → `repas_planifies` avec `recurrence_group_id`,
   conflits (skip / add, jamais d'écrasement) + jours exclus.
 - ✅ « Générer la liste de courses » inline (× personnes) + « Retirer tout le
@@ -289,15 +294,19 @@ appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
 - ✅ Vue Menus : bouton **« Retirer le plan généré de cette semaine »** quand la
   semaine affichée contient des repas d'un plan généré (identifiés par
   `recurrence_group_id` stashé en `localStorage`, `meal-planner:applied-plans`).
-- ⏳ **Reste** : verrouiller un jour / repas, épingler une recette avant
-  régénération ; édition manuelle d'une brique dans l'aperçu.
+**Palier 1 : terminé** (hors épinglage, repoussé au Palier 2 — le verrouillage +
+l'édition de brique couvrent le besoin « garder la main »).
 
 ### Palier 2 — Micros + confort
 
+- **Épingler une recette** avant génération (« je veux ce curry cette semaine ») :
+  le solveur lit déjà `slot.pinnedIds` ; reste l'UI (sélecteur de recette dans
+  l'éditeur de composition).
 - Manques vitamines / minéraux pris en compte pour les aliments en + (agrégation
   `recette_ingredients` pour les recettes ; `items` déjà OK pour les repas types).
 - Solveur : autoriser **2 portions/jour** d'un même plat (portions entières) pour
-  mieux coller aux cibles.
+  mieux coller aux cibles + privilégier les usages tombant sur un multiple propre
+  des portions d'une recette.
 - Filtre temps de cuisine (`temps_preparation_min` + `temps_cuisson_min`).
 
 ### Palier 3 — Historique, reconduction & batch cooking
