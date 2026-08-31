@@ -214,6 +214,13 @@ score = Σ_jours Σ_macros  w_macro × |apport - cible| / cible
 - « Appliquer » crée les `repas_planifies` (`date`, `meal`, `nom`, `items`,
   `source_type` `'recette'` | `'repas_type'` | `'libre'`, `source_id`), avec un
   `recurrence_group_id` commun à tout le plan (permet un « retirer tout le plan »).
+- **Forme des `items`** (corrigé le 2026-08-31) : une brique recette = **UNE
+  ligne agrégée** `food_source: 'recette'` (nom + grammage d'une portion +
+  nutriments enrichis via `calcPer100g`), comme une recette ajoutée au journal
+  depuis la recherche → « marquer mangé » recopie « Curry — 320 g », pas le
+  détail des ingrédients. La **liste de courses** ré-explose cet item en
+  ingrédients (`addPlannedItems`, voir §5). Un repas type reste développé en ses
+  items (assemblage d'aliments). Aliments « en + » = `scaleFood`.
 - **Conflits** : si des repas sont déjà planifiés / déjà mangés sur la plage,
   demander (remplacer / garder / compléter les créneaux vides seulement). Ne
   jamais écraser un repas `mange = true`.
@@ -231,6 +238,13 @@ additionnés, noms des repas d'origine listés) et insère dans
 de rediriger vers ce chemin (ou d'appeler `addPlannedItems` sur le plan fraîchement
 appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
 
+Depuis le 2026-08-31, `addPlannedItems` **ré-explose** tout item
+`food_source: 'recette'` en ses `recette_ingredients` mis à l'échelle d'une
+portion (`1 / recette.portions`) avant l'aplatissement — les briques recette
+sont désormais stockées agrégées dans `repas_planifies.items` (voir §4.4). Les
+plans appliqués avant cette date (items déjà explosés, `food_source`
+`ciqual`/`custom`) passent inchangés.
+
 ---
 
 ## 6. Zones d'ombre
@@ -246,11 +260,16 @@ appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
   config.
 - **C. Aliments en + : favoris ou toute la base Ciqual ? — TRANCHÉ (2026-08-31) :
   favoris uniquement.** Pas d'ouverture à Ciqual.
-- **D. Micros (vitamines / minéraux).** Pas de cible en base (seulement kcal +
-  4 macros + fibres). Les recettes n'ont **pas** les colonnes micro : il faut
-  agréger `recette_ingredients`. *Décision : palier 1 = macros seulement. Micros
-  au palier 2, via le moteur `TodayGapsSection` appliqué jour par jour après la
-  pose des recettes — pas dans l'optimisation globale.*
+- **D. Micros (vitamines / minéraux) — FAIT (Palier 2, 2026-08-31).** Pas de
+  cible personnelle en base (seulement kcal + 4 macros + fibres) → on utilise
+  les VNR fixes de l'Explorer (`getNutrientGaps` / `field.ref`). Correction : la
+  table `recettes` **porte déjà** toutes les colonnes micro /100 g (comme les
+  macros), pas besoin d'agréger `recette_ingredients`. Implémenté comme une
+  **passe locale jour par jour** dans le solveur (`fillDayMicros`) après la pose
+  des recettes + aliments « en + » macro : on somme les micros du jour, on prend
+  les 1–2 manques les plus forts, on ajoute 1–2 favoris riches dans ces
+  nutriments (via `gapCoverage`) sans dépasser les calories restantes de la
+  journée. Pas dans l'optimisation globale. Activable/désactivable (`fillMicros`).
 - **E. Un seul plan à la fois ?** Historique des plans, « reconduire la semaine
   dernière » ? *Palier 1 : un plan courant, écrasé à la regénération avant
   application. Historique = palier ultérieur.*
@@ -310,15 +329,23 @@ l'édition de brique couvrent le besoin « garder la main »).
 
 ### Palier 2 — Micros + confort
 
-- **Épingler une recette** avant génération (« je veux ce curry cette semaine ») :
-  le solveur lit déjà `slot.pinnedIds` ; reste l'UI (sélecteur de recette dans
-  l'éditeur de composition).
-- Manques vitamines / minéraux pris en compte pour les aliments en + (agrégation
-  `recette_ingredients` pour les recettes ; `items` déjà OK pour les repas types).
+- ✅ **Épingler une recette** avant génération (« je veux ce curry cette
+  semaine ») : composant `PinPicker` par brique dans l'éditeur de composition.
+  Une imposée entre forcément dans le pool de sa catégorie (même hors saison /
+  hors filtre temps, via `candidateFromId`), n'est jamais remplacée par la
+  recherche locale (`pinnedByKey`), et force `nbDifferentes` effectif ≥ nombre
+  d'imposées. Imposées synchronisées entre briques de même catégorie.
+  Rappel : « Plat » déjeuner + dîner = un seul pool → une recette imposée sur le
+  déjeuner peut aussi tomber au dîner (comportement pool partagé, pas propre au
+  pin). Pour l'avoir à tous les midis : `nbDifferentes` = 1 ou exclure le dîner.
+- ✅ **Manques vitamines / minéraux** pris en compte pour les aliments en +
+  (`fillDayMicros`, passe locale jour par jour — voir zone d'ombre D).
+- ✅ **Filtre temps de cuisine** (`temps_preparation_min` + `temps_cuisson_min`,
+  le repos ne compte pas) : segmenté Peu importe / ≤ 15 / 30 / 45 / 60 min.
+  Recette sans temps renseigné, ou imposée → passe quand même.
 - Solveur : autoriser **2 portions/jour** d'un même plat (portions entières) pour
   mieux coller aux cibles + privilégier les usages tombant sur un multiple propre
-  des portions d'une recette.
-- Filtre temps de cuisine (`temps_preparation_min` + `temps_cuisson_min`).
+  des portions d'une recette. **(reporté — pas encore fait)**
 
 ### Palier 3 — Historique, reconduction & batch cooking
 

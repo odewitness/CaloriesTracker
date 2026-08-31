@@ -224,11 +224,47 @@ export function useShoppingListItems(listeId) {
   // ({ nom, items }). ───────────────────────────────────────────────────────
   // `multiplier` : facteur appliqué aux grammages (ex. nombre de personnes du
   // planificateur de repas — les repas planifiés sont stockés pour 1 portion).
+  //
+  // Un item `food_source: 'recette'` (repas planifié par le planificateur : la
+  // brique recette y est stockée en UNE ligne agrégée, pour que « marquer
+  // mangé » l'ajoute au journal comme une vraie recette) est ré-explosé ici en
+  // ses ingrédients mis à l'échelle d'une portion — la liste de courses veut
+  // « farine, oignons… », pas « 1 × Curry ».
   const addPlannedItems = async (plannedMeals, { multiplier = 1 } = {}) => {
+    const recipeRefIds = [...new Set(
+      (plannedMeals || []).flatMap(r => (r.items || [])
+        .filter(it => it.food_source === 'recette' && isUuid(it.food_ref_id))
+        .map(it => it.food_ref_id)),
+    )]
+    const ingByRecipe = {}
+    const recipeMeta = {}
+    if (recipeRefIds.length) {
+      const [{ data: ings }, { data: recs }] = await Promise.all([
+        supabase.from('recette_ingredients').select('*').in('recette_id', recipeRefIds).eq('user_id', user.id),
+        supabase.from('recettes').select('id, portions').in('id', recipeRefIds).eq('user_id', user.id),
+      ])
+      for (const ing of ings || []) (ingByRecipe[ing.recette_id] = ingByRecipe[ing.recette_id] || []).push(ing)
+      for (const r of recs || []) recipeMeta[r.id] = r
+    }
+
     const flat = []
     for (const repas of plannedMeals || []) {
       for (const it of (repas.items || [])) {
-        flat.push({ ...it, _repasNom: repas.nom })
+        if (it.food_source === 'recette' && ingByRecipe[it.food_ref_id]) {
+          const parts = recipeMeta[it.food_ref_id]?.portions || 1
+          const f = parts > 0 ? 1 / parts : 1
+          for (const ing of ingByRecipe[it.food_ref_id]) {
+            flat.push({
+              food_name: ing.food_name,
+              food_source: ing.food_source,
+              food_ref_id: ing.food_ref_id,
+              qty_g: ing.qty_g != null ? ing.qty_g * f : null,
+              _repasNom: repas.nom,
+            })
+          }
+        } else {
+          flat.push({ ...it, _repasNom: repas.nom })
+        }
       }
     }
     if (flat.length === 0) return { error: null }

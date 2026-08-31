@@ -14,7 +14,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { filterBySeasons } from './seasons'
-import { getPortion, rawValue } from './ciqualExplorer'
+import {
+  getPortion, rawValue, getNutrientGaps, getGapAmount, gapCoverage, CLAIM_MICRO_FIELDS,
+} from './ciqualExplorer'
 
 // Macros suivies par le solveur. `key` = clé dans l'objet macros interne,
 // `target` = clé correspondante dans computeMealTargets() (null = pas de cible
@@ -238,12 +240,23 @@ function repasTypeCandidates(repasTypes, categorie, season, seasonMode) {
     .filter(c => c.macros && c.macros.kcal > 0)
 }
 
-function recetteCandidates(recettes, categorie, season, seasonMode) {
+// Temps de cuisine d'une recette = préparation + cuisson (le repos est passif,
+// exclu). null / 0 des deux côtés → temps inconnu, la recette passe le filtre.
+export function recipeCookMinutes(recette) {
+  return (recette.temps_preparation_min || 0) + (recette.temps_cuisson_min || 0)
+}
+
+function recetteCandidates(recettes, categorie, season, seasonMode, maxCookMinutes) {
   return (recettes || [])
     .filter(r => (r.categories || []).includes(categorie))
     .filter(r => (r.energie_kcal || 0) > 0)
     .filter(r => recipePortionWeightG(r) > 0)
     .filter(r => matchesSeason(r, season, seasonMode))
+    .filter(r => {
+      if (!maxCookMinutes) return true
+      const t = recipeCookMinutes(r)
+      return t === 0 || t <= maxCookMinutes
+    })
     .map(r => ({ kind: 'recette', id: r.id, nom: r.nom, entity: r, macros: recipePortionMacros(r) }))
     .filter(c => c.macros)
 }
@@ -252,11 +265,29 @@ function recetteCandidates(recettes, categorie, season, seasonMode) {
 // même catégorie si `includeRepasTypes`), avec valeurs nutritionnelles
 // exploitables et portion dimensionnable. Exporté : réutilisé par
 // useMealPlanner pour proposer un remplacement de brique dans l'aperçu.
-export function buildVivier(categorie, { recettes, repasTypes, season, seasonMode, includeRepasTypes = true }) {
-  const recs = recetteCandidates(recettes, categorie, season, seasonMode)
+export function buildVivier(categorie, { recettes, repasTypes, season, seasonMode, includeRepasTypes = true, maxCookMinutes = null }) {
+  const recs = recetteCandidates(recettes, categorie, season, seasonMode, maxCookMinutes)
   return includeRepasTypes
     ? [...recs, ...repasTypeCandidates(repasTypes, categorie, season, seasonMode)]
     : recs
+}
+
+// Candidat construit à partir d'un id de recette / repas type — sert aux
+// recettes ÉPINGLÉES (slot.pinnedIds) : une recette imposée doit entrer dans le
+// pool même si elle est écartée du vivier par le filtre saison strict ou le
+// filtre temps de cuisine (choix explicite de l'utilisatrice → il l'emporte).
+function candidateFromId(id, { recettes = [], repasTypes = [] }) {
+  const r = recettes.find(x => x.id === id)
+  if (r) {
+    const macros = recipePortionMacros(r)
+    if (macros) return { kind: 'recette', id: r.id, nom: r.nom, entity: r, macros }
+  }
+  const t = repasTypes.find(x => x.id === id)
+  if (t) {
+    const macros = templateServingMacros(t)
+    if (macros && macros.kcal > 0) return { kind: 'repas_type', id: t.id, nom: t.nom, entity: t, macros }
+  }
+  return null
 }
 
 function averageTargets(list) {
@@ -368,6 +399,110 @@ function foodKey(f) {
   return `${f._source || f.food_source || 'ciqual'}:${f.alim_code || f.id || f.food_ref_id || f.alim_nom || f.food_name}`
 }
 
+// ── Manques vitamines / minéraux (favoris) ─────────────────────────────────
+// PALIER 2. Après avoir posé recettes + aliments « en + » macro, on regarde
+// les manques du JOUR en vitamines / minéraux (mêmes VNR que l'Explorer, via
+// getNutrientGaps) et on ajoute 0 à MAX_MICRO_ADDONS_PER_DAY favoris riches
+// dans ces nutriments — dans la limite des calories qu'il reste à la journée.
+// Pas d'optimisation globale : c'est une passe locale, jour par jour.
+const MAX_MICRO_ADDONS_PER_DAY = 2
+const MICRO_COLUMN_KEYS = [...new Set(CLAIM_MICRO_FIELDS.flatMap(f => f.sumKeys || [f.key]))]
+const MICRO_FIELD_KEYS = new Set(CLAIM_MICRO_FIELDS.map(f => f.key))
+
+// Ajoute à `acc` (indexé par clé de colonne brute, valeurs ABSOLUES) les
+// vitamines / minéraux apportés par un item de repas du plan.
+function addMicroContribution(acc, item, { recettesById, templatesById }) {
+  if (item.kind === 'ajout') {
+    const f = (item.qty_g || 0) / 100
+    const src = item.food || {}
+    for (const k of MICRO_COLUMN_KEYS) {
+      const v = src[k]
+      if (v != null) acc[k] = (acc[k] || 0) + Number(v) * f
+    }
+  } else if (item.kind === 'recette') {
+    const rec = recettesById[item.id]
+    if (!rec) return
+    const f = (item.portionG || 0) / 100 // colonnes recette = /100 g
+    for (const k of MICRO_COLUMN_KEYS) {
+      const v = rec[k]
+      if (v != null) acc[k] = (acc[k] || 0) + Number(v) * f
+    }
+  } else if (item.kind === 'repas_type') {
+    const tpl = templatesById[item.id]
+    if (!tpl) return
+    const parts = tpl.nb_portions || 1
+    const f = parts > 0 ? 1 / parts : 1 // items du repas type = valeurs absolues
+    for (const tit of (tpl.items || [])) {
+      for (const k of MICRO_COLUMN_KEYS) {
+        const v = tit[k]
+        if (v != null) acc[k] = (acc[k] || 0) + Number(v) * f
+      }
+    }
+  }
+}
+
+// Répartit 0..MAX_MICRO_ADDONS_PER_DAY favoris sur les repas non verrouillés du
+// jour pour combler les manques micro. Mute `usedAddonKeys` et les `items` /
+// `totals` / `score` des repas hôtes. Retourne les items ajoutés.
+function fillDayMicros(dayMicros, hostMeals, foods, settings, rng, usedAddonKeys, remainKcal) {
+  const out = []
+  let budget = remainKcal
+  if (!hostMeals.length || budget <= MIN_RESIDUAL_KCAL || !foods.length) return out
+  const micros = { ...dayMicros }
+
+  for (let step = 0; step < MAX_MICRO_ADDONS_PER_DAY; step++) {
+    if (budget <= MIN_RESIDUAL_KCAL) break
+    const gaps = getNutrientGaps(micros, settings, 40).filter(g => MICRO_FIELD_KEYS.has(g.field.key))
+    if (!gaps.length) break
+
+    let placed = false
+    for (const g of gaps) {
+      const missing = getGapAmount(micros, settings, g.field)
+      if (!missing || missing <= 0) continue
+      const ranked = foods
+        .filter(food => !usedAddonKeys.has(foodKey(food)))
+        .map(food => ({ food, cov: gapCoverage(food, [{ field: g.field, missing }], budget) }))
+        .filter(x => x.cov && x.cov.pct > 0 && x.cov.grams >= 5)
+        .sort((a, b) => b.cov.pct - a.cov.pct)
+      if (!ranked.length) continue
+
+      const pick = pickWeighted(ranked.slice(0, 4), x => x.cov.pct, rng)
+      if (!pick) continue
+      const food = pick.food
+      const gq = Math.max(5, Math.round(pick.cov.grams / 5) * 5)
+      const factor = gq / 100
+      const macros = {
+        kcal: (food.energie_kcal || 0) * factor,
+        prot: (food.proteines || 0) * factor,
+        gluc: (food.glucides || 0) * factor,
+        lip: (food.lipides || 0) * factor,
+        fibres: (food.fibres || 0) * factor,
+      }
+      // Repas hôte = celui qui a le plus de marge calorique (on répartit).
+      const host = hostMeals.slice().sort((a, b) =>
+        (b.target.kcal - b.totals.kcal) - (a.target.kcal - a.totals.kcal))[0]
+      const item = {
+        kind: 'ajout', food, nom: food.alim_nom || food.food_name,
+        qty_g: gq, macros, micro: g.field.label,
+      }
+      host.items.push(item)
+      host.totals = addMacros(host.totals, macros)
+      host.score = macroDistance(host.totals, host.target) + (host.totals.kcal > host.target.kcal * 1.12 ? 0.5 : 0)
+      usedAddonKeys.add(foodKey(food))
+      budget = Math.max(0, budget - macros.kcal)
+      for (const k of MICRO_COLUMN_KEYS) {
+        const v = food[k]
+        if (v != null) micros[k] = Math.max(0, (micros[k] || 0) - Number(v) * factor)
+      }
+      out.push(item)
+      placed = true
+      break
+    }
+    if (!placed) break
+  }
+  return out
+}
+
 // ── Construction du plan ───────────────────────────────────────────────────
 
 /**
@@ -375,13 +510,17 @@ function foodKey(f) {
  * @param {number} p.days            1..7
  * @param {number} [p.people=1]      nombre de personnes (liste de courses)
  * @param {string|null} [p.season]   'Printemps'|'Été'|'Automne'|'Hiver'|null
- * @param {object} p.mealConfig      { [meal]: [{ categorie, nbDifferentes }] }
+ * @param {object} p.mealConfig      { [meal]: [{ categorie, nbDifferentes, pinnedIds? }] }
+ *                                   pinnedIds : recettes / repas types imposés dans le pool de la catégorie.
  * @param {Array}  p.recettes        useRecipes().recettes
  * @param {Array}  p.repasTypes      liste des repas_types
  * @param {Array}  p.favorites       useFavorites().favorites
  * @param {object} p.mealTargets     computeMealTargets(settings)
  * @param {number} [p.goalFibres=0]  settings.goal_fibres
  * @param {boolean} [p.includeRepasTypes=true]  inclure les repas types dans les viviers
+ * @param {number|null} [p.maxCookMinutes=null]  temps prépa + cuisson max (min) ; null = pas de filtre
+ * @param {boolean} [p.fillMicros=true]  compléter les manques vitamines / minéraux du jour avec des favoris
+ * @param {object} [p.settings]      settings (pour getNutrientGaps : goal_proteines / goal_fibres ; VNR micro = fixes)
  * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number }
  * @param {object} [p.locked]        { `${dayIndex}|${meal}`: <objet repas figé de l'aperçu> }
  *                                   — repas verrouillés, repris tels quels à la régénération.
@@ -391,13 +530,15 @@ export function buildMealPlan(p) {
   const {
     days, people = 1, season = null, mealConfig, recettes = [], repasTypes = [],
     favorites = [], mealTargets = {}, goalFibres = 0, includeRepasTypes = true,
-    options = {}, locked = {},
+    maxCookMinutes = null, fillMicros = true, settings = {}, options = {}, locked = {},
   } = p
   const seasonMode = options.seasonMode === 'filter' ? 'filter' : 'bonus'
-  const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes }
+  const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes, maxCookMinutes }
   const rng = makeRng(options.seed || 1)
   const warnings = []
   const foods = favoriteFoods(favorites)
+  const recettesById = Object.fromEntries((recettes || []).map(r => [r.id, r]))
+  const templatesById = Object.fromEntries((repasTypes || []).map(t => [t.id, t]))
 
   const meals = Object.keys(mealConfig || {})
 
@@ -414,13 +555,30 @@ export function buildMealPlan(p) {
   }
 
   // 1. Vivier + pool de recettes tirées, par catégorie.
-  const viviers = {} // categorie -> [candidate,...]
-  const picks = {}   // categorie -> [candidate,...] (pool partagé par les slots de la catégorie)
+  const viviers = {}    // categorie -> [candidate,...]
+  const picks = {}      // categorie -> [candidate,...] (pool partagé par les slots de la catégorie)
+  const pinnedByKey = {} // categorie -> Set d'ids épinglés (jamais remplacés en recherche locale)
   for (const [key, entries] of Object.entries(groupSlots)) {
     const viv = buildVivier(key, vivierCtx)
     viviers[key] = viv
-    if (!viv.length) {
-      warnings.push(`Aucune recette disponible pour « ${key} ».`)
+
+    // Recettes imposées pour ce groupe (une ou plusieurs briques de même
+    // catégorie mutualisent leur pinnedIds), reprises même si le vivier les a
+    // écartées (saison stricte / temps de cuisine).
+    const wantPinned = new Set(entries.flatMap(e => e.slot.pinnedIds || []))
+    const chosen = []
+    for (const id of wantPinned) {
+      const fc = viv.find(c => c.id === id) || candidateFromId(id, vivierCtx)
+      if (fc && !chosen.some(x => x.id === fc.id)) chosen.push(fc)
+    }
+    pinnedByKey[key] = new Set(chosen.map(c => c.id))
+
+    if (!viv.length && !chosen.length) {
+      warnings.push(
+        maxCookMinutes
+          ? `Aucune recette « ${key} » sous ${maxCookMinutes} min — augmente le temps de cuisine max ou impose une recette.`
+          : `Aucune recette disponible pour « ${key} ».`,
+      )
       picks[key] = []
       continue
     }
@@ -428,15 +586,11 @@ export function buildMealPlan(p) {
     const scored = viv
       .map(c => ({ c, dist: macroDistance(c.macros, avgTarget) - seasonBonus(c.entity, season) }))
       .sort((a, b) => a.dist - b.dist)
+    // Il faut au moins autant de recettes différentes que d'imposées.
     const nWanted = Math.max(...entries.map(e => e.slot.nbDifferentes || 1))
-    const n = Math.max(1, Math.min(nWanted, scored.length))
-    const chosen = []
-    for (const id of new Set(entries.flatMap(e => e.slot.pinnedIds || []))) {
-      const fc = viv.find(c => c.id === id)
-      if (fc && chosen.length < n && !chosen.some(x => x.id === fc.id)) chosen.push(fc)
-    }
+    const n = Math.max(1, nWanted, chosen.length)
     const poolSize = Math.min(scored.length, Math.max(n + 3, Math.ceil(scored.length * 0.5)))
-    const cpool = scored.slice(0, poolSize).map(x => x.c)
+    const cpool = scored.slice(0, poolSize).map(x => x.c).filter(c => !chosen.some(x => x.id === c.id))
     while (chosen.length < n && cpool.length) {
       const cand = pickWeighted(
         cpool.filter(c => !chosen.some(x => x.id === c.id)),
@@ -521,6 +675,22 @@ export function buildMealPlan(p) {
           score: macroDistance(totals, target) + (totals.kcal > target.kcal * 1.12 ? 0.5 : 0),
         })
       }
+
+      // Passe vitamines / minéraux : on répartit 0..2 favoris sur les repas non
+      // verrouillés du jour pour combler les manques micro, sans déborder les
+      // calories restantes de la journée.
+      if (fillMicros) {
+        const dayMicros = {}
+        for (const m of dayMeals) {
+          for (const it of m.items) addMicroContribution(dayMicros, it, { recettesById, templatesById })
+        }
+        const lockedNames = new Set(meals.filter(mm => locked[`${d}|${mm}`]))
+        const hostMeals = dayMeals.filter(m => !lockedNames.has(m.meal))
+        const dayKcalTarget = meals.reduce((s, mm) => s + mealTargetWithFibres(mealTargets, mm, goalFibres).kcal, 0)
+        const dayKcalSoFar = dayMeals.reduce((s, m) => s + m.totals.kcal, 0)
+        fillDayMicros(dayMicros, hostMeals, foods, settings, rng, usedAddonKeys, dayKcalTarget - dayKcalSoFar)
+      }
+
       const dayTarget = meals.reduce((acc, m) => addMacros(acc, mealTargetWithFibres(mealTargets, m, goalFibres)), { ...EMPTY_MACROS })
       const dayTotals = dayMeals.reduce((acc, m) => addMacros(acc, m.totals), { ...EMPTY_MACROS })
       // pénalité répétition : même recette deux jours de suite
@@ -542,14 +712,20 @@ export function buildMealPlan(p) {
   let bestScore = dayList.reduce((s, d) => s + d.score, 0)
 
   // 3. Recherche locale : on tente de remplacer une recette d'un pool de groupe
-  //    par une autre de son vivier ; on garde si le score total baisse.
-  const swappableKeys = Object.keys(picks).filter(k => picks[k].length && (viviers[k] || []).length > picks[k].length)
+  //    par une autre de son vivier ; on garde si le score total baisse. Les
+  //    recettes épinglées ne sont jamais remplacées.
+  const swappableKeys = Object.keys(picks).filter(k => {
+    const free = picks[k].filter(c => !pinnedByKey[k]?.has(c.id)).length
+    return free > 0 && (viviers[k] || []).length > picks[k].length
+  })
   for (let round = 0; round < LOCAL_SEARCH_ROUNDS && swappableKeys.length; round++) {
     const key = swappableKeys[Math.floor(rng() * swappableKeys.length)]
     const pool = picks[key]
     const alt = (viviers[key] || []).find(c => !pool.some(x => x.id === c.id))
     if (!alt) continue
-    const replaceIdx = Math.floor(rng() * pool.length)
+    const freeIdx = pool.map((c, i) => i).filter(i => !pinnedByKey[key]?.has(pool[i].id))
+    if (!freeIdx.length) continue
+    const replaceIdx = freeIdx[Math.floor(rng() * freeIdx.length)]
     const prev = pool[replaceIdx]
     pool[replaceIdx] = alt
     const trial = build()

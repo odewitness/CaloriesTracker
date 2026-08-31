@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { useRecipes } from './useRecipes'
+import { useRecipes, sumIngredients, calcPer100g } from './useRecipes'
 import { useMealTemplatesList } from './useMealTemplates'
 import { useFavorites } from './useFavorites'
 import { useSettings } from './useSettings'
@@ -44,6 +44,8 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     season: getCurrentSeason(),
     seasonMode: 'bonus', // 'bonus' | 'filter'
     includeRepasTypes: true, // inclure les repas types dans les viviers
+    maxCookMinutes: null, // temps prépa + cuisson max (min) ; null = pas de filtre
+    fillMicros: true,     // compléter les manques vitamines / minéraux du jour
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
   }))
@@ -139,6 +141,9 @@ export function useMealPlanner({ defaultStartDate } = {}) {
         mealTargets,
         goalFibres: settings?.goal_fibres || 0,
         includeRepasTypes: config.includeRepasTypes !== false,
+        maxCookMinutes: config.maxCookMinutes || null,
+        fillMicros: config.fillMicros !== false,
+        settings,
         options: { seasonMode: config.seasonMode, seed },
         locked,
       })
@@ -147,7 +152,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     } finally {
       setGenerating(false)
     }
-  }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings?.goal_fibres, plan, lockedKeys])
+  }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings, plan, lockedKeys])
 
   // Première génération : seed aléatoire.
   const generate = useCallback(() => runGenerate((Math.random() * 2 ** 31) >>> 0), [runGenerate])
@@ -191,11 +196,12 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     return buildVivier(it.categorie, {
       recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
       includeRepasTypes: config.includeRepasTypes !== false,
+      maxCookMinutes: config.maxCookMinutes || null,
     })
       .filter(c => c.id !== it.id && !usedToday.has(c.id))
       .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes])
+  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes, config.maxCookMinutes])
 
   const swapItem = useCallback((dayIndex, meal, itemIndex, candidateId) => {
     const rec = recettes.find(r => r.id === candidateId)
@@ -258,8 +264,20 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     const recettesById = Object.fromEntries(recettes.map(r => [r.id, r]))
     const templatesById = Object.fromEntries(repasTypes.map(t => [t.id, t]))
 
+    // per100g enrichi (vitamines/minéraux inclus) de chaque recette du plan,
+    // recalculé depuis ses ingrédients — la ligne `recettes` ne stocke que les
+    // macros. Sert à ce que la ligne « recette » agrégée écrite dans
+    // repas_planifies porte les mêmes nutriments qu'une recette ajoutée au
+    // journal via la recherche.
+    const recipePer100ById = {}
+    for (const [rid, ings] of Object.entries(ingredientsByRecetteId)) {
+      const rec = recettesById[rid]
+      const per100 = calcPer100g(sumIngredients(ings), rec?.poids_cuit_g || rec?.poids_cru_g)
+      if (per100) recipePer100ById[rid] = per100
+    }
+
     const { rows, skippedExcluded } = planToPlannedRows(plan, {
-      startDateStr, recettesById, ingredientsByRecetteId, templatesById, excludedDates,
+      startDateStr, recettesById, recipePer100ById, templatesById, excludedDates,
     })
 
     const skippedConflict = []

@@ -8,6 +8,21 @@
 export const CHANGELOG = [
   {
     date: '2026-08-31',
+    title: 'Plan de repas : liste de courses dans une nouvelle liste',
+    description: "Au moment de générer la liste de courses depuis ton plan de repas, tu peux maintenant créer une nouvelle liste sur place (avec le nom que tu veux) au lieu de devoir choisir parmi tes listes existantes.",
+  },
+  {
+    date: '2026-08-31',
+    title: 'Une recette prévue au menu = une seule ligne',
+    description: "Quand tu coches « mangé » sur une recette prévue par le plan de repas, elle arrive maintenant dans ta journée comme une seule ligne (le nom de la recette et son grammage), comme quand tu ajoutes une recette à la main — fini la longue liste de chaque ingrédient. La liste de courses, elle, continue de détailler tous les ingrédients à acheter.",
+  },
+  {
+    date: '2026-08-31',
+    title: 'Plan de repas : impose tes recettes et affine',
+    description: "Quand tu prépares un plan de repas, tu peux maintenant imposer une ou plusieurs recettes : sous chaque repas, « Imposer une recette » te laisse cocher celles que tu veux absolument au menu cette semaine-là — elles seront toujours dans le plan et ne bougent pas quand tu régénères. Tu peux aussi limiter le temps de cuisine (par exemple « ≤ 30 min ») pour n'avoir que des recettes rapides. Et si tu le laisses coché, le plan complète tes journées avec un ou deux aliments de tes favoris pour combler tes manques en vitamines et minéraux, en plus des calories et des protéines.",
+  },
+  {
+    date: '2026-08-31',
     title: 'Génère ton plan de repas de la semaine',
     description: "Dans le Calendrier, onglet « Menus », le bouton « Générer un plan de repas » compose pour toi des menus sur 1 à 7 jours à partir de tes recettes et de tes repas types, en essayant de coller au mieux à tes objectifs de calories et de macros. Tu choisis le nombre de jours, la date de début, le nombre de personnes, la saison, et pour chaque repas ce que tu veux (par exemple 1 plat + 1 dessert au déjeuner) et combien de recettes différentes sur la semaine. L'aperçu te montre les macros par repas, par jour et sur la semaine, avec un code couleur d'écart à l'objectif ; chaque repas est complété par un ou deux aliments de tes favoris pour combler les manques. Tu peux verrouiller un jour ou un repas qui te plaît puis régénérer le reste, remplacer une recette par une autre, puis « Appliquer au calendrier », générer la liste de courses et, si besoin, retirer tout le plan d'un coup.",
   },
