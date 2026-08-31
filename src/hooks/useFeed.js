@@ -95,6 +95,7 @@ export function useFeed() {
       poids_cuit_g: recette.poids_cuit_g || null,
       tare_g: recette.tare_g || null,
       categories: recette.categories || [],
+      saisons: recette.saisons || [],
       instructions: recette.instructions?.trim() || null,
       temps_preparation_min: recette.temps_preparation_min || null,
       temps_cuisson_min: recette.temps_cuisson_min || null,

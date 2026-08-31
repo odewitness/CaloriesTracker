@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { SORT_FIELDS, SORT_BASES, describeSortField } from '../lib/mealTemplateSort'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
+import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import FieldPicker from './FieldPicker'
 
@@ -20,6 +21,7 @@ export default function MealTemplateSortModal({ value, onChange, onClose }) {
   const [secondaryDir, setSecondaryDir]     = useState(value.secondary?.dir || 'desc')
   const [basis, setBasis]                   = useState(value.basis || 'total')
   const [categories, setCategories]         = useState(value.categories || [])
+  const [seasons, setSeasons]               = useState(value.saisons || [])
 
   // Si le critère secondaire devient identique au principal, on l'efface
   useEffect(() => { if (secondaryField === primaryField) setSecondaryField(null) }, [primaryField]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -27,12 +29,18 @@ export default function MealTemplateSortModal({ value, onChange, onClose }) {
   const toggleCategory = (cat) =>
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
 
-  const filterCount = categories.length
+  const toggleSeason = (s) =>
+    setSeasons(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+
+  const filterCount = categories.length + seasons.length
   const sortIsCustom = primaryField !== 'nom' || primaryDir !== 'asc' || !!secondaryField || basis === 'portion'
 
   const activeChips = [
     ...categories.map(cat => ({
       id: `cat:${cat}`, label: `${getRecipeCategoryIcon(cat)} ${cat}`, onRemove: () => toggleCategory(cat),
+    })),
+    ...seasons.map(s => ({
+      id: `season:${s}`, label: `${getSeasonIcon(s)} ${s}`, onRemove: () => toggleSeason(s),
     })),
     ...(primaryField !== 'nom' || primaryDir !== 'asc' ? [{
       id: 'sort-primary',
@@ -57,6 +65,7 @@ export default function MealTemplateSortModal({ value, onChange, onClose }) {
       secondary: secondaryField ? { field: secondaryField, dir: secondaryDir } : null,
       basis,
       categories,
+      saisons: seasons,
     })
     onClose()
   }
@@ -65,7 +74,7 @@ export default function MealTemplateSortModal({ value, onChange, onClose }) {
     setPrimaryField('nom'); setPrimaryDir('asc')
     setSecondaryField(null); setSecondaryDir('desc')
     setBasis('total')
-    setCategories([])
+    setCategories([]); setSeasons([])
   }
 
   return (
@@ -143,7 +152,7 @@ export default function MealTemplateSortModal({ value, onChange, onClose }) {
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 9 }}>
                 Catégories
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
                 {RECIPE_CATEGORIES.map(cat => (
                   <button
                     key={cat}
@@ -152,6 +161,22 @@ export default function MealTemplateSortModal({ value, onChange, onClose }) {
                     style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
                   >
                     {getRecipeCategoryIcon(cat)} {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 9 }}>
+                Saisons
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {SEASONS.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => toggleSeason(s)}
+                    className="chip"
+                    style={seasons.includes(s) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                  >
+                    {getSeasonIcon(s)} {s}
                   </button>
                 ))}
               </div>

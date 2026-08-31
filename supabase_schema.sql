@@ -40,6 +40,10 @@
 -- cron 'complements-reminder-hourly' (rappels programmables de compléments —
 -- Edge Function complements-reminder). Voir
 -- supabase/sql/complements_rappels_setup.sql. Pas encore confirmé appliqué.
+-- Complété le 2026-08-31 : colonne `saisons text[]` sur recettes, repas_types
+-- et partages_recettes (multi-sélection de saison(s), même modèle que
+-- `categories`). Voir supabase/sql/saisons_setup.sql. Pas encore confirmé
+-- appliqué en base au moment de l'écriture de ce fichier.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -216,7 +220,8 @@ create table if not exists repas_types (
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   user_id uuid references auth.users(id),
-  categories text[] not null default '{}' -- mêmes valeurs que recettes.categories (voir RECIPE_CATEGORIES dans src/lib/recipeCategories.js) : 'Petit-déjeuner' | 'Collation' | 'Plat' | 'Accompagnement' | 'Boisson' | 'Dessert' | 'Pain / pâtes' (multi)
+  categories text[] not null default '{}', -- mêmes valeurs que recettes.categories (voir RECIPE_CATEGORIES dans src/lib/recipeCategories.js) : 'Petit-déjeuner' | 'Collation' | 'Plat' | 'Accompagnement' | 'Boisson' | 'Dessert' | 'Pain / pâtes' (multi)
+  saisons text[] not null default '{}' -- multi-sélection de saison(s) (voir SEASONS dans src/lib/seasons.js) : 'Printemps' | 'Été' | 'Automne' | 'Hiver'
 );
 
 -- 4. TABLE SETTINGS
@@ -491,6 +496,7 @@ create table if not exists recettes (
   updated_at timestamptz not null default now(),
   tare_g numeric,
   categories text[] not null default '{}', -- 'Petit-déjeuner' | 'Collation' | 'Plat' | 'Accompagnement' | 'Boisson' | 'Dessert' (multi)
+  saisons text[] not null default '{}', -- multi-sélection de saison(s) (voir SEASONS dans src/lib/seasons.js) : 'Printemps' | 'Été' | 'Automne' | 'Hiver'
   instructions text,
   temps_preparation_min integer,
   temps_cuisson_min integer,
@@ -697,6 +703,7 @@ create table if not exists partages_recettes (
   poids_cuit_g numeric,
   tare_g numeric,
   categories text[] not null default '{}',
+  saisons text[] not null default '{}', -- snapshot de recettes.saisons au moment du partage
   instructions text,
   temps_preparation_min integer,
   temps_cuisson_min integer,

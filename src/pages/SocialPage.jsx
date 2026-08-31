@@ -293,6 +293,7 @@ function PartageDetailContainer({ partageId, onClose, onDeleted, deletePartage }
       poidsCruG: partage.poids_cru_g,
       tareG: partage.tare_g,
       categories: partage.categories,
+      saisons: partage.saisons,
       instructions: partage.instructions,
       tempsPreparationMin: partage.temps_preparation_min,
       tempsCuissonMin: partage.temps_cuisson_min,

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { ArrowLeft, X, MoreVertical, Trash2, Clock, Flame, Hourglass, BookmarkPlus } from 'lucide-react'
 import { MacroGrid } from './RecipeDetailModal'
 import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeInstructions'
+import { getSeasonIcon } from '../lib/seasons'
 import { useBackButton } from '../hooks/useBackButton'
 import Loader from './Loader'
 
@@ -104,8 +105,9 @@ export default function PartageDetailModal({ partage, ingredients, loading, isOw
 
         {reactionsSlot}
 
-        {totalTempsMin > 0 && (
+        {(totalTempsMin > 0 || partage.saisons?.length > 0) && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+            {partage.saisons?.map(s => <span key={s} style={CHIP_STYLE}>{getSeasonIcon(s)} {s}</span>)}
             {partage.temps_preparation_min > 0 && <span style={CHIP_STYLE}><Clock size={12} /> Prépa {partage.temps_preparation_min} min</span>}
             {partage.temps_cuisson_min > 0 && <span style={CHIP_STYLE}><Flame size={12} /> Cuisson {partage.temps_cuisson_min} min</span>}
             {partage.temps_repos_min > 0 && <span style={CHIP_STYLE}><Hourglass size={12} /> Repos {partage.temps_repos_min} min</span>}

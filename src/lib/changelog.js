@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-08-31',
+    title: 'Modifier une recette plus vite',
+    description: "Dans la liste de tes recettes, le petit menu « ⋮ » d'une recette propose maintenant « Modifier » directement, sans avoir à ouvrir la recette d'abord.",
+  },
+  {
+    date: '2026-08-31',
+    title: 'Une saison pour tes recettes et tes repas types',
+    description: "Quand tu crées ou modifies une recette ou un repas type, tu peux maintenant cocher une ou plusieurs saisons (printemps, été, automne, hiver). Elles s'affichent sur la fiche, et le bouton de tri te permet de n'afficher que les recettes ou repas d'une saison donnée. Pratique pour retrouver tes idées de plats d'hiver quand il fait froid.",
+  },
+  {
+    date: '2026-08-31',
     title: 'Alimentation ou compléments : qui apporte quoi',
     description: "Dans Historique › Nutrition, le « Détail nutritionnel » montre maintenant, pour chaque vitamine et chaque minéral, la part qui vient de ton alimentation et celle qui vient de tes compléments (en violet). En haut, un résumé t'indique quelle proportion de tes vitamines et minéraux vient des compléments sur la période.",
   },

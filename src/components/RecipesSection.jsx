@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useState, useMemo } from 'react'
-import { ChevronDown, Trash2, Share2, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock } from 'lucide-react'
+import { ChevronDown, Trash2, Share2, Pencil, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -15,10 +15,11 @@ import { getRecipeCategoryIcon, getRecipeCategoryColor } from '../lib/categoryIc
 import { todayStr } from '../lib/dates'
 import {
   DEFAULT_SORT, sortRecettes, describeSortField, isCustomSort,
-  filterByCategories, filterByTimeRanges, isCustomFilter, describeActiveFilters,
+  filterByCategories, filterBySeasons, filterByTimeRanges, isCustomFilter, describeActiveFilters,
   PREP_TIME_RANGES, COOK_TIME_RANGES, REST_TIME_RANGES,
 } from '../lib/recipeSort'
 import { RECIPE_CATEGORIES, UNCATEGORIZED_LABEL } from '../lib/recipeCategories'
+import { getSeasonIcon } from '../lib/seasons'
 import { getNutriBadge } from '../lib/nutriBadge'
 import MacroPillsRow from './MacroPillsRow'
 import Loader from './Loader'
@@ -27,7 +28,7 @@ import EmptyState from './EmptyState'
 // ─────────────────────────────────────────────────────────────────────────────
 // RecipeCard — carte d'une recette dans la liste
 // ─────────────────────────────────────────────────────────────────────────────
-function RecipeCard({ recette, ingredients, onOpen, onDelete, onShare }) {
+function RecipeCard({ recette, ingredients, onOpen, onEdit, onDelete, onShare }) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const hasIngredients = ingredients && ingredients.length > 0
@@ -71,6 +72,12 @@ function RecipeCard({ recette, ingredients, onOpen, onDelete, onShare }) {
               <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={e => { e.stopPropagation(); setMenuOpen(false) }} />
               <div className="card" style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, padding: 4, minWidth: 150 }}>
                 <button
+                  onClick={e => { e.stopPropagation(); setMenuOpen(false); onEdit(recette) }}
+                  style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  <Pencil size={14} /> Modifier
+                </button>
+                <button
                   onClick={e => { e.stopPropagation(); setMenuOpen(false); onShare(recette) }}
                   style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
                 >
@@ -89,12 +96,17 @@ function RecipeCard({ recette, ingredients, onOpen, onDelete, onShare }) {
       </div>
 
       <div onClick={() => onOpen(recette)} style={{ cursor: 'pointer' }}>
-        {/* ── Chips catégorie / temps / badge nutritionnel ── */}
-        {(recette.categories?.length > 0 || totalTempsMin > 0 || badge) && (
+        {/* ── Chips catégorie / saison / temps / badge nutritionnel ── */}
+        {(recette.categories?.length > 0 || recette.saisons?.length > 0 || totalTempsMin > 0 || badge) && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
             {recette.categories?.length > 0 && (
               <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
                 {recette.categories.map(c => `${getRecipeCategoryIcon(c)} ${c}`).join(', ')}
+              </span>
+            )}
+            {recette.saisons?.length > 0 && (
+              <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
+                {recette.saisons.map(s => `${getSeasonIcon(s)} ${s}`).join(', ')}
               </span>
             )}
             {totalTempsMin > 0 && (
@@ -211,6 +223,7 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
   // recettes qui n'en ont aucune.
   const groupedRecettes = useMemo(() => {
     let timeFiltered = filterByCategories(filteredRecettes, recipeSort.categories)
+    timeFiltered = filterBySeasons(timeFiltered, recipeSort.saisons)
     timeFiltered = filterByTimeRanges(timeFiltered, 'temps_preparation_min', recipeSort.prepRanges, PREP_TIME_RANGES)
     timeFiltered = filterByTimeRanges(timeFiltered, 'temps_cuisson_min',     recipeSort.cookRanges, COOK_TIME_RANGES)
     timeFiltered = filterByTimeRanges(timeFiltered, 'temps_repos_min',       recipeSort.restRanges, REST_TIME_RANGES)
@@ -361,6 +374,7 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
                     recette={r}
                     ingredients={ingredientsByRecette[r.id]}
                     onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+                    onEdit={(rec) => setRecipeModal({ type: 'edit', recette: rec })}
                     onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
                     onShare={handleShareFromCard}
                   />

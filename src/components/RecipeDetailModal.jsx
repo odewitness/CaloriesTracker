@@ -7,6 +7,7 @@ import { useBackButton } from '../hooks/useBackButton'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { sumIngredients, calcPer100g } from '../hooks/useRecipes'
 import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeInstructions'
+import { getSeasonIcon } from '../lib/seasons'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MacroGrid — grille 4 colonnes P / G / L / Fibres (les kcal sont affichées
@@ -221,6 +222,7 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
 
   const sousTitreParts = [
     recette.categories?.length ? recette.categories.join(', ') : null,
+    recette.saisons?.length ? recette.saisons.map(s => `${getSeasonIcon(s)} ${s}`).join(', ') : null,
     `${nbPortionsBase} portion${nbPortionsBase > 1 ? 's' : ''}`,
     estCuit ? 'pesé cuit' : null,
   ].filter(Boolean)

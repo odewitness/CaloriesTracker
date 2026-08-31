@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { filterByCategories } from './recipeSort'
+export { filterBySeasons } from './seasons'
 
 export const SORT_FIELDS = [
   { key: 'nom',       label: 'Nom',       ascLabel: 'A → Z',         descLabel: 'Z → A' },
@@ -21,7 +22,7 @@ export const SORT_BASES = [
 ]
 
 export const DEFAULT_SORT = {
-  primary: { field: 'nom', dir: 'asc' }, secondary: null, basis: 'total', categories: [],
+  primary: { field: 'nom', dir: 'asc' }, secondary: null, basis: 'total', categories: [], saisons: [],
 }
 
 function computeTotals(repas) {
@@ -83,9 +84,9 @@ export function isCustomSort(sort) {
 }
 
 export function isCustomFilter(sort) {
-  return (sort.categories || []).length > 0
+  return (sort.categories || []).length > 0 || (sort.saisons || []).length > 0
 }
 
 export function describeActiveFilters(sort) {
-  return [...(sort.categories || [])]
+  return [...(sort.categories || []), ...(sort.saisons || [])]
 }

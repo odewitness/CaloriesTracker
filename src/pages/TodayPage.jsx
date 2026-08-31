@@ -364,8 +364,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
       .map(({ id, date: _d, meal: _m, user_id, created_at, ...rest }) => rest)
   }, [templateCreateMeal, entries])
 
-  const handleSaveTemplateFromMeal = async ({ nom, description, items, nb_portions, categories }) => {
-    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: null, nom, description, items, nbPortions: nb_portions, categories })
+  const handleSaveTemplateFromMeal = async ({ nom, description, items, nb_portions, categories, saisons }) => {
+    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: null, nom, description, items, nbPortions: nb_portions, categories, saisons })
     if (!error) toast(`✓ Repas type « ${nom} » créé !`)
     else toast('Erreur')
     setTemplateCreateMeal(null)

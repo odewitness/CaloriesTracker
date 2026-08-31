@@ -15,8 +15,9 @@ import { getRecipeCategoryIcon, getRecipeCategoryColor } from '../lib/categoryIc
 import { RECIPE_CATEGORIES, UNCATEGORIZED_LABEL } from '../lib/recipeCategories'
 import {
   DEFAULT_SORT, sortMealTemplates, describeSortField, isCustomSort,
-  filterByCategories, isCustomFilter, describeActiveFilters,
+  filterByCategories, filterBySeasons, isCustomFilter, describeActiveFilters,
 } from '../lib/mealTemplateSort'
+import { getSeasonIcon } from '../lib/seasons'
 import MacroPillsRow from './MacroPillsRow'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
@@ -106,6 +107,11 @@ function MealTemplateCard({ repas, onDelete, onEdit, onAddToJournal, onPlan }) {
           <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
             {items.length} aliment{items.length > 1 ? 's' : ''}
           </span>
+          {repas.saisons?.length > 0 && (
+            <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
+              {repas.saisons.map(s => `${getSeasonIcon(s)} ${s}`).join(', ')}
+            </span>
+          )}
           {badge && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: badge.bg, color: badge.color, borderRadius: 20, padding: '2px 9px 2px 7px', fontSize: 10.5, fontWeight: 700 }}>
               {badge.emoji} {badge.label}
@@ -203,7 +209,7 @@ const MealTemplatesSection = forwardRef(function MealTemplatesSection({ active }
   // Regroupés par catégorie (un repas type avec plusieurs catégories apparaît
   // dans chaque groupe correspondant) — même logique que RecipesSection.
   const groupedRepas = useMemo(() => {
-    const catFiltered = filterByCategories(filteredRepasList, sort.categories)
+    const catFiltered = filterBySeasons(filterByCategories(filteredRepasList, sort.categories), sort.saisons)
     const sorted = sortMealTemplates(catFiltered, sort)
     const groups = []
     for (const cat of RECIPE_CATEGORIES) {
@@ -235,8 +241,8 @@ const MealTemplatesSection = forwardRef(function MealTemplatesSection({ active }
     setLoading(false)
   }
 
-  const handleSave = async ({ nom, description, items, nb_portions, categories }) => {
-    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: editTarget?.id, nom, description, items, nbPortions: nb_portions, categories })
+  const handleSave = async ({ nom, description, items, nb_portions, categories, saisons }) => {
+    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: editTarget?.id, nom, description, items, nbPortions: nb_portions, categories, saisons })
     if (!error) { toast(editTarget?.id ? '✓ Repas modifié !' : '✓ Repas créé !'); load() }
     else toast('Erreur')
     setEditTarget(null)
