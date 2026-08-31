@@ -235,8 +235,9 @@ export function slotGroupKey(slot) {
   return `recette:${slot.categorie}`
 }
 
-function repasTypeCandidates(repasTypes, season, seasonMode) {
+function repasTypeCandidates(repasTypes, season, seasonMode, categorie = null) {
   return (repasTypes || [])
+    .filter(rt => !categorie || (rt.categories || []).includes(categorie))
     .filter(rt => matchesSeason(rt, season, seasonMode))
     .map(rt => ({ kind: 'repas_type', id: rt.id, nom: rt.nom, entity: rt, macros: templateServingMacros(rt) }))
     .filter(c => c.macros && c.macros.kcal > 0)
@@ -256,9 +257,13 @@ function recetteCandidates(recettes, categorie, season, seasonMode) {
 // portion dimensionnable. Exporté : réutilisé par useMealPlanner pour proposer
 // un remplacement de brique dans l'aperçu.
 export function buildVivier(slot, { recettes, repasTypes, season, seasonMode }) {
+  // 'repas_type' = n'importe quel repas type entier (pas de catégorie imposée).
   if (slot.type === 'repas_type') return repasTypeCandidates(repasTypes, season, seasonMode)
   const recs = recetteCandidates(recettes, slot.categorie, season, seasonMode)
-  if (slot.type === 'mixte') return [...recs, ...repasTypeCandidates(repasTypes, season, seasonMode)]
+  // 'mixte' = recette de la catégorie OU repas type DE LA MÊME catégorie.
+  if (slot.type === 'mixte') {
+    return [...recs, ...repasTypeCandidates(repasTypes, season, seasonMode, slot.categorie)]
+  }
   return recs
 }
 
