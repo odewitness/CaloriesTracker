@@ -50,8 +50,17 @@ export function useMealPlanner() {
     return defaultMealConfig(mealTargets)
   }, [config.mealConfig, mealTargets])
 
+  // ── Plan généré ─────────────────────────────────────────────────────────
+  const [plan, setPlan] = useState(null)
+  const [generating, setGenerating] = useState(false)
+  // Repas verrouillés : Set de `${dayIndex}|${meal}`. Repris tels quels à la
+  // régénération. Vidé dès que la config change (les index de jour / repas
+  // pourraient ne plus correspondre).
+  const [lockedKeys, setLockedKeys] = useState(() => new Set())
+
   const setConfig = useCallback((patch) => {
     setConfigState(c => ({ ...c, ...patch }))
+    setLockedKeys(new Set())
   }, [])
 
   const setMealConfig = useCallback((updater) => {
@@ -61,15 +70,40 @@ export function useMealPlanner() {
         ? updater(c.mealConfig || defaultMealConfig(mealTargets))
         : updater,
     }))
+    setLockedKeys(new Set())
   }, [mealTargets])
 
-  // ── Plan généré ─────────────────────────────────────────────────────────
-  const [plan, setPlan] = useState(null)
-  const [generating, setGenerating] = useState(false)
+  const toggleLock = useCallback((dayIndex, meal) => {
+    setLockedKeys(s => {
+      const n = new Set(s)
+      const k = `${dayIndex}|${meal}`
+      n.has(k) ? n.delete(k) : n.add(k)
+      return n
+    })
+  }, [])
+
+  const toggleLockDay = useCallback((dayIndex, meals) => {
+    setLockedKeys(s => {
+      const n = new Set(s)
+      const keys = meals.map(m => `${dayIndex}|${m}`)
+      const allLocked = keys.every(k => n.has(k))
+      keys.forEach(k => (allLocked ? n.delete(k) : n.add(k)))
+      return n
+    })
+  }, [])
 
   const runGenerate = useCallback((seed) => {
     setGenerating(true)
     try {
+      // Repas figés depuis le plan courant, pour les clés verrouillées.
+      const locked = {}
+      if (plan) {
+        for (const key of lockedKeys) {
+          const [dStr, meal] = key.split('|')
+          const dayMeal = plan.days[Number(dStr)]?.meals.find(m => m.meal === meal)
+          if (dayMeal) locked[key] = dayMeal
+        }
+      }
       const result = buildMealPlan({
         days: config.days,
         people: config.people,
@@ -81,20 +115,21 @@ export function useMealPlanner() {
         mealTargets,
         goalFibres: settings?.goal_fibres || 0,
         options: { seasonMode: config.seasonMode, seed },
+        locked,
       })
       setPlan(result)
       return result
     } finally {
       setGenerating(false)
     }
-  }, [config, mealTargets, recettes, repasTypes, favorites, settings?.goal_fibres])
+  }, [config, mealTargets, recettes, repasTypes, favorites, settings?.goal_fibres, plan, lockedKeys])
 
   // Première génération : seed aléatoire.
   const generate = useCallback(() => runGenerate((Math.random() * 2 ** 31) >>> 0), [runGenerate])
-  // Régénérer : nouveau seed → nouveau tirage.
+  // Régénérer : nouveau seed → nouveau tirage (garde les repas verrouillés).
   const regenerate = generate
 
-  const reset = useCallback(() => setPlan(null), [])
+  const reset = useCallback(() => { setPlan(null); setLockedKeys(new Set()) }, [])
 
   // ── Appliquer au calendrier ─────────────────────────────────────────────
   // Charge les données manquantes (ingrédients des recettes du plan, jours
@@ -191,6 +226,9 @@ export function useMealPlanner() {
     generate,
     regenerate,
     reset,
+    lockedKeys,
+    toggleLock,
+    toggleLockDay,
     applyToCalendar,
     removePlan,
   }

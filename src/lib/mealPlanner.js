@@ -336,12 +336,14 @@ function foodKey(f) {
  * @param {object} p.mealTargets     computeMealTargets(settings)
  * @param {number} [p.goalFibres=0]  settings.goal_fibres
  * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number }
+ * @param {object} [p.locked]        { `${dayIndex}|${meal}`: <objet repas figé de l'aperçu> }
+ *                                   — repas verrouillés, repris tels quels à la régénération.
  * @returns {{ days:Array, weekTotals:object, weekScore:number, picks:object, warnings:Array }}
  */
 export function buildMealPlan(p) {
   const {
     days, people = 1, season = null, mealConfig, recettes = [], repasTypes = [],
-    favorites = [], mealTargets = {}, goalFibres = 0, options = {},
+    favorites = [], mealTargets = {}, goalFibres = 0, options = {}, locked = {},
   } = p
   const seasonMode = options.seasonMode === 'filter' ? 'filter' : 'bonus'
   const rng = makeRng(options.seed || 1)
@@ -407,6 +409,17 @@ export function buildMealPlan(p) {
       const usedRecipeIds = new Set()
       const usedAddonKeys = new Set()
       for (const meal of meals) {
+        // Repas verrouillé : repris tel quel, et ses briques / aliments « en + »
+        // comptent quand même dans l'anti-répétition de la journée.
+        const frozen = locked[`${d}|${meal}`]
+        if (frozen) {
+          dayMeals.push(frozen)
+          for (const it of frozen.items) {
+            if (it.kind === 'ajout') { if (it.food) usedAddonKeys.add(foodKey(it.food)) }
+            else usedRecipeIds.add(it.id)
+          }
+          continue
+        }
         const slots = mealConfig[meal] || []
         const target = mealTargetWithFibres(mealTargets, meal, goalFibres)
         const items = []

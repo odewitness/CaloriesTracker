@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat } from 'lucide-react'
+import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
@@ -238,8 +238,10 @@ function ConfigView({ planner, onGenerate }) {
 function PreviewView({
   plan, startDateStr, recettesById, templatesById, people,
   onBack, onRegenerate, generating, onApply, applying, result, applied,
+  lockedKeys, onToggleLock, onToggleLockDay,
 }) {
   const [allowConflicts, setAllowConflicts] = useState(false)
+  const anyLocked = lockedKeys && lockedKeys.size > 0
   const batches = useMemo(
     () => batchSummary(plan, { recettesById, templatesById }),
     [plan, recettesById, templatesById],
@@ -260,6 +262,12 @@ function PreviewView({
         </button>
       </div>
 
+      {anyLocked && (
+        <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '-4px 0 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Lock size={11} /> Les repas verrouillés sont conservés à la régénération.
+        </div>
+      )}
+
       {plan.warnings?.length > 0 && (
         <div className="card" style={{ padding: '10px 12px', marginBottom: 12, background: 'var(--amber-light)', border: 'none' }}>
           {plan.warnings.map((w, i) => (
@@ -279,19 +287,41 @@ function PreviewView({
       </div>
 
       {/* Niveau 2 & 1 : jour puis repas */}
-      {plan.days.map((day, di) => (
+      {plan.days.map((day, di) => {
+        const dayMealNames = day.meals.map(m => m.meal)
+        const dayAllLocked = dayMealNames.length > 0 && dayMealNames.every(m => lockedKeys?.has(`${di}|${m}`))
+        return (
         <div key={di} className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'capitalize' }}>{dayChipLabel(startDateStr, di)}</span>
+            <button
+              onClick={() => onToggleLockDay(di, dayMealNames)}
+              className="btn-icon"
+              aria-label={dayAllLocked ? 'Déverrouiller la journée' : 'Verrouiller la journée'}
+              style={{ width: 26, height: 26, color: dayAllLocked ? 'var(--green-dark)' : 'var(--text-hint)' }}
+            >
+              {dayAllLocked ? <Lock size={13} /> : <LockOpen size={13} />}
+            </button>
           </div>
           <div style={{ marginBottom: 8 }}>
             <MacroRow totals={day.totals} target={day.target} />
           </div>
 
-          {day.meals.map((m, mi) => (
-            <div key={mi} style={{ borderTop: '1px solid var(--border)', paddingTop: 7, marginTop: 7 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>{m.meal}</span>
+          {day.meals.map((m, mi) => {
+            const mealLocked = lockedKeys?.has(`${di}|${m.meal}`)
+            return (
+            <div key={mi} style={{ borderTop: '1px solid var(--border)', paddingTop: 7, marginTop: 7, background: mealLocked ? 'var(--green-light)' : undefined, borderRadius: mealLocked ? 6 : 0, marginLeft: mealLocked ? -6 : 0, marginRight: mealLocked ? -6 : 0, padding: mealLocked ? '7px 6px 4px' : '7px 0 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 8 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
+                  <button
+                    onClick={() => onToggleLock(di, m.meal)}
+                    aria-label={mealLocked ? `Déverrouiller ${m.meal}` : `Verrouiller ${m.meal}`}
+                    style={{ display: 'flex', background: 'none', border: 'none', padding: 0, color: mealLocked ? 'var(--green-dark)' : 'var(--text-hint)' }}
+                  >
+                    {mealLocked ? <Lock size={12} /> : <LockOpen size={12} />}
+                  </button>
+                  {m.meal}
+                </span>
                 <span style={{ fontSize: 11.5, fontWeight: 700, color: LEVEL_COLOR[deviationLevel(m.totals.kcal, m.target.kcal)] }}>
                   {r0(m.totals.kcal)} / {r0(m.target.kcal)} kcal
                 </span>
@@ -308,9 +338,9 @@ function PreviewView({
                 </div>
               ))}
             </div>
-          ))}
+          )})}
         </div>
-      ))}
+      )})}
 
       {/* Batch cooking : quoi préparer, en quelle quantité */}
       {batches.length > 0 && (
@@ -546,6 +576,9 @@ export default function MealPlannerModal({ onClose, onApplied }) {
             templatesById={templatesById}
             people={planner.config.people}
             generating={planner.generating}
+            lockedKeys={planner.lockedKeys}
+            onToggleLock={planner.toggleLock}
+            onToggleLockDay={planner.toggleLockDay}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
             onApply={handleApply}
