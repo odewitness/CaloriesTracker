@@ -97,9 +97,13 @@ export function useShoppingListItems(listeId) {
   // ciqual (food_source='ciqual' → alim_code) ou aliments_custom
   // (food_source='custom' → id). Les items Open Food Facts ('off') n'ont
   // pas de table de référence ici → 'Autre'.
+  const isUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v || '')
   const resolveCategories = async (ingredients) => {
-    const ciqualCodes = ingredients.filter(i => i.food_source === 'ciqual' && i.food_ref_id).map(i => i.food_ref_id)
-    const customIds    = ingredients.filter(i => i.food_source === 'custom' && i.food_ref_id).map(i => i.food_ref_id)
+    const ciqualCodes = ingredients.filter(i => i.food_source === 'ciqual' && i.food_ref_id && i.food_ref_id !== 'undefined').map(i => i.food_ref_id)
+    // Garde uniquement des uuid valides : aliments_custom.id est de type uuid,
+    // une valeur parasite ("undefined", un code Ciqual, un code-barres OFF)
+    // ferait échouer tout le .in() côté Postgres.
+    const customIds    = ingredients.filter(i => i.food_source === 'custom' && isUuid(i.food_ref_id)).map(i => i.food_ref_id)
 
     const [{ data: ciqualCats }, { data: customCats }] = await Promise.all([
       ciqualCodes.length

@@ -176,6 +176,14 @@ export async function deletePlannedMeal(id, userId) {
   return { error }
 }
 
+// Supprime un lot de repas planifiés par ids (ex. les lignes d'un plan généré
+// tombant dans une semaine donnée).
+export async function deletePlannedMeals(ids, userId) {
+  if (!ids?.length) return { error: null }
+  const { error } = await supabase.from('repas_planifies').delete().in('id', ids).eq('user_id', userId)
+  return { error }
+}
+
 // Supprime toutes les occurrences d'une série récurrente (même recurrence_group_id).
 export async function deletePlannedMealSeries(recurrenceGroupId, userId) {
   const { error } = await supabase.from('repas_planifies').delete().eq('recurrence_group_id', recurrenceGroupId).eq('user_id', userId)

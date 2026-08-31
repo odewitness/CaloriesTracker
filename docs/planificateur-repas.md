@@ -62,14 +62,17 @@ Sorties :
 - **Saison = préférence, pas filtre strict.** Décidé le 2026-08-31 (zone d'ombre B
   close) : bonus de score, les recettes sans saison restent utilisables. Une
   option « filtre strict » existe dans l'écran de config pour qui veut.
-- **Pas de recette mise à l'échelle par fractions.** Décidé le 2026-08-31 (zone
-  d'ombre A) : l'app n'incrémente les portions que de +1 et une recette fait un
-  nombre fixe de portions. Plutôt que d'étirer une recette, on affiche un
-  **récap « À préparer »** (batch cooking) : pour chaque recette du plan, le
-  nombre de **fournées entières** à cuisiner (`ceil(portionsNeeded /
-  recette.portions)`), les portions utilisées et le reste. Une **page batch
-  cooking dédiée** (recettes du plan regroupées, quantités, cases à cocher au
-  fur et à mesure) est une piste Palier 3.
+- **Pas de mise à l'échelle fractionnaire dans le solveur** (décidé le
+  2026-08-31, zone d'ombre A) : le solveur pose des portions entières. **Mais
+  pas de « rab » non plus** — planifier sert à avoir le bon nombre. Le récap
+  **« À préparer »** affiche donc, par recette, le **nombre exact de portions**
+  que le plan consomme et le **facteur** à appliquer aux ingrédients pour y
+  tomber pile (`portionsNeeded / recette.portions` : « recette telle quelle »,
+  « 2× la recette », « ×1,25 (prévue pour 4) »). La liste de courses est déjà
+  exacte (ingrédients mis à l'échelle au prorata des portions utilisées). Une
+  **page batch cooking dédiée** (recettes regroupées, cases à cocher) est une
+  piste Palier 3. Piste Palier 2 : que le solveur préfère les combinaisons où
+  l'usage de chaque recette tombe sur un multiple propre de ses portions.
 - **On avance par paliers** (voir §7). Palier 1 = macros seulement.
 - **Le plan s'écrit dans `repas_planifies`** (pas de nouvelle table de « plans »
   au palier 1), après un écran d'aperçu et validation. Voir §4.4.
@@ -277,12 +280,15 @@ appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
 - ✅ Aliments en + parmi les **favoris**, sur le reste à cibler, dédupliqués sur
   la journée.
 - ✅ Aperçu 3 niveaux (repas / jour / période) + feu tricolore + récap
-  « À préparer » (fournées).
+  « À préparer » (portions exactes + facteur d'échelle des ingrédients).
 - ✅ Régénérer.
 - ✅ « Appliquer au calendrier » → `repas_planifies` avec `recurrence_group_id`,
   conflits (skip / add, jamais d'écrasement) + jours exclus.
 - ✅ « Générer la liste de courses » inline (× personnes) + « Retirer tout le
-  plan » en un clic.
+  plan » en un clic dans la modale.
+- ✅ Vue Menus : bouton **« Retirer le plan généré de cette semaine »** quand la
+  semaine affichée contient des repas d'un plan généré (identifiés par
+  `recurrence_group_id` stashé en `localStorage`, `meal-planner:applied-plans`).
 - ⏳ **Reste** : verrouiller un jour / repas, épingler une recette avant
   régénération ; édition manuelle d'une brique dans l'aperçu.
 

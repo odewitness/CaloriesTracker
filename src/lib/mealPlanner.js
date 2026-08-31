@@ -509,11 +509,12 @@ export function buildMealPlan(p) {
   }
 }
 
-// Récapitulatif « batch cooking » : pour chaque recette / repas type du plan,
-// combien de portions il consomme sur la période et combien de fournées cela
-// représente (une fournée = recette.portions, ou repasType.nb_portions).
-// Répond à la question « je prépare quoi, en quelle quantité » sans avoir à
-// mettre une recette à l'échelle : on cuisine N fournées entières.
+// Récapitulatif « À préparer » : pour chaque recette / repas type du plan,
+// combien de portions le plan consomme EXACTEMENT sur la période — c'est le
+// « bon nombre », pas de reste. `baseYield` = portions d'origine de la recette
+// (recette.portions / repasType.nb_portions) ; `factor` = de combien multiplier
+// les ingrédients pour tomber pile sur `portionsNeeded` (1 = tel quel, 2 = deux
+// fois la recette, 1,25 = une fois et quart…).
 export function batchSummary(plan, { recettesById = {}, templatesById = {} } = {}) {
   const map = new Map()
   for (const day of plan.days) {
@@ -528,11 +529,11 @@ export function batchSummary(plan, { recettesById = {}, templatesById = {} } = {
   }
   return [...map.values()]
     .map(e => {
-      const perBatch = e.kind === 'recette'
+      const baseYield = e.kind === 'recette'
         ? (recettesById[e.id]?.portions || 1)
         : (templatesById[e.id]?.nb_portions || 1)
-      const batches = Math.max(1, Math.ceil(e.portionsNeeded / perBatch))
-      return { ...e, perBatch, batches, leftover: batches * perBatch - e.portionsNeeded }
+      const factor = baseYield > 0 ? e.portionsNeeded / baseYield : 1
+      return { ...e, baseYield, factor }
     })
     .sort((a, b) => b.portionsNeeded - a.portionsNeeded)
 }

@@ -5,7 +5,7 @@ import { useMealPlanner } from '../hooks/useMealPlanner'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
 import { useToast } from '../lib/toast'
 import { deviationLevel, batchSummary } from '../lib/mealPlanner'
-import { addDaysStr, stashAppliedPlan, clearAppliedPlan } from '../lib/mealPlannerApply'
+import { addDaysStr, stashAppliedPlan, removeAppliedPlan } from '../lib/mealPlannerApply'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import Loader from './Loader'
@@ -33,6 +33,13 @@ const MACRO_ROWS = [
 ]
 
 function r0(n) { return Math.round(n || 0) }
+
+// "recette telle quelle" / "2× la recette" / "×1,25 (prévue pour 4)"
+function factorLabel(b) {
+  if (Math.abs(b.factor - 1) < 0.01) return 'recette telle quelle'
+  if (Math.abs(b.factor - Math.round(b.factor)) < 0.01) return `${Math.round(b.factor)}× la recette`
+  return `×${b.factor.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} (prévue pour ${b.baseYield})`
+}
 
 // "lun. 8 sept."
 function dayChipLabel(startStr, dayIndex) {
@@ -313,18 +320,17 @@ function PreviewView({
             <SectionLabel>À préparer</SectionLabel>
           </div>
           {batches.map(b => (
-            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{b.nom}</span>
-              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
-                {b.batches === 1 ? '1 fournée' : `${b.batches} fournées`}
-                {b.perBatch > 1 && <span style={{ color: 'var(--text-hint)' }}> · {b.portionsNeeded}/{b.batches * b.perBatch} portions</span>}
-                {b.leftover > 0 && <span style={{ color: 'var(--text-hint)' }}> · {b.leftover} en rab</span>}
+            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', gap: 8 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.nom}</span>
+              <span style={{ color: 'var(--text-muted)', flexShrink: 0, textAlign: 'right' }}>
+                {b.portionsNeeded} portion{b.portionsNeeded > 1 ? 's' : ''}
+                <span style={{ color: 'var(--text-hint)' }}> · {factorLabel(b)}</span>
               </span>
             </div>
           ))}
           {people > 1 && (
             <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 5 }}>
-              Portions pour 1 personne. Pour {people}, multiplie les fournées.
+              Quantités pour 1 personne. Pour {people}, multiplie par {people}.
             </div>
           )}
         </div>
@@ -514,7 +520,7 @@ export default function MealPlannerModal({ onClose, onApplied }) {
     const { error } = await planner.removePlan(applyResult.groupId)
     setRemoving(false)
     if (error) { toast('Erreur au retrait'); return }
-    clearAppliedPlan()
+    removeAppliedPlan(applyResult.groupId)
     resetApply()
     toast('Plan retiré du calendrier')
     onApplied?.()

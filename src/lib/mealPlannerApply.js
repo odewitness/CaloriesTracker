@@ -27,30 +27,56 @@ export function addDaysStr(dateStr, n) {
   return fmt(d)
 }
 
-// ── Dernier plan appliqué (localStorage) ──────────────────────────────────
-// Sert au bouton « Retirer le plan généré » de la vue Menus, qui doit
-// fonctionner après fermeture de la modale. On ne stocke que de quoi cibler la
-// suppression : le recurrence_group_id partagé par toutes les lignes du plan.
-const LAST_PLAN_KEY = 'meal-planner:last-applied'
+// ── Plans appliqués (localStorage) ────────────────────────────────────────
+// Liste des plans générés puis appliqués au calendrier — sert au bouton
+// « Retirer le plan généré de cette semaine » de la vue Menus (qui doit
+// fonctionner après fermeture de la modale). On ne stocke que le
+// recurrence_group_id partagé par les lignes du plan + de quoi dater. Purge des
+// entrées de plus de 60 jours, plafond à 30 entrées.
+const APPLIED_PLANS_KEY = 'meal-planner:applied-plans'
+const APPLIED_MAX_AGE_MS = 60 * 24 * 3600 * 1000
+
+export function readAppliedPlans() {
+  try {
+    const list = JSON.parse(localStorage.getItem(APPLIED_PLANS_KEY))
+    if (!Array.isArray(list)) return []
+    const cutoff = Date.now() - APPLIED_MAX_AGE_MS
+    return list.filter(p => p && p.groupId && (p.appliedAt || 0) > cutoff)
+  } catch { return [] }
+}
+
+function writeAppliedPlans(list) {
+  try { localStorage.setItem(APPLIED_PLANS_KEY, JSON.stringify(list.slice(-30))) } catch { /* quota / privé */ }
+}
 
 export function stashAppliedPlan(info) {
-  try { localStorage.setItem(LAST_PLAN_KEY, JSON.stringify(info)) } catch { /* quota / privé */ }
+  if (!info?.groupId) return
+  const list = readAppliedPlans().filter(p => p.groupId !== info.groupId)
+  list.push({ appliedAt: Date.now(), ...info })
+  writeAppliedPlans(list)
 }
-export function readAppliedPlan() {
-  try { return JSON.parse(localStorage.getItem(LAST_PLAN_KEY)) || null } catch { return null }
+
+export function removeAppliedPlan(groupId) {
+  writeAppliedPlans(readAppliedPlans().filter(p => p.groupId !== groupId))
 }
-export function clearAppliedPlan() {
-  try { localStorage.removeItem(LAST_PLAN_KEY) } catch { /* ignore */ }
+
+// Nettoie une référence : les chaînes "undefined" / "null" / "" (issues d'un
+// stringify accidentel quelque part dans l'historique des données) doivent
+// devenir null, sinon resolveCategories les envoie telles quelles dans un
+// `.in('id', …)` sur une colonne uuid → « invalid input syntax for type uuid ».
+function cleanRef(v) {
+  return (v == null || v === 'undefined' || v === 'null' || v === '') ? null : v
 }
 
 // Remet à l'échelle un item DÉJÀ en valeurs absolues (ligne recette_ingredients
 // ou item de repas type) par un facteur — garde uniquement les champs utiles à
 // une entrée de `journal` / `repas_planifies`.
 function scaleAbsoluteItem(item, factor) {
+  const ref = cleanRef(item.food_ref_id)
   const out = {
     food_name: item.food_name,
-    food_source: item.food_source || null,
-    food_ref_id: item.food_ref_id || null,
+    food_source: ref ? (item.food_source || null) : null,
+    food_ref_id: ref,
   }
   for (const k of [...BASE_NUM_KEYS, ...ALL_NUTRIENT_KEYS]) {
     const v = item[k]
@@ -92,7 +118,9 @@ export function planToPlannedRows(plan, ctx) {
       for (const it of meal.items) {
         if (it.kind === 'ajout') {
           addonCount++
-          items.push(scaleFood(it.food, it.qty_g))
+          const scaled = scaleFood(it.food, it.qty_g)
+          const ref = cleanRef(scaled.food_ref_id)
+          items.push({ ...scaled, food_ref_id: ref, food_source: ref ? scaled.food_source : null })
         } else if (it.kind === 'recette') {
           briqueCount++
           briqueNames.push(it.nom)
