@@ -507,6 +507,29 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
 - **Effort.** Moyen (dépend de ce qu'on accepte de partager entre comptes —
   cadrer RLS).
 
+#### M9 — Page « Batch cooking » (indépendante du planificateur)
+- **Quoi.** Un écran dédié qui regroupe au même endroit toutes les recettes à
+  cuisiner, avec pour chacune une case « faite / à faire ». Utilisable seule,
+  sans passer par un plan de repas généré.
+- **Pourquoi.** Quand on enchaîne plusieurs recettes (meal prep du dimanche),
+  on veut une check-list unique cochable au fur et à mesure — pas éparpillée
+  dans les fiches de recettes ni coincée dans l'aperçu du planificateur.
+- **Esquisse.**
+  - Une session de batch cooking = une liste de recettes choisies (+ quantité
+    à préparer, optionnelle) + un état coché par recette.
+  - Stockage : nouvelle table en RLS « own » (`batch_cooking` ou sessions +
+    items) si on veut un historique / la même liste sur plusieurs appareils ;
+    `localStorage` si on se limite à une session courante locale. À trancher.
+  - Points d'entrée : sélection multiple depuis la liste des recettes
+    (« préparer ces recettes »), depuis l'aperçu du planificateur (envoyer la
+    fournée ici — remplace le récap interne « À préparer »), ajout manuel.
+  - UI : liste simple, checkbox par recette, barre de progression, geste pour
+    retirer les recettes faites. Pas de minuteur ni d'ordonnancement des
+    étapes au premier palier.
+- **Effort.** Moyen (surtout le choix de stockage + les points d'entrée).
+- **Lien.** Reprend et remplace la piste « page batch cooking » du Palier 3 de
+  `docs/planificateur-repas.md`.
+
 ### 4.4 — Complexes
 
 #### C1 — Suggestion de repas qui « bouclent » la journée

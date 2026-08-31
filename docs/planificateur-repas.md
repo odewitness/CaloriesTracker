@@ -350,9 +350,11 @@ l'édition de brique couvrent le besoin « garder la main »).
 ### Palier 3 — Historique, reconduction & batch cooking
 
 - Plusieurs plans conservés, « reconduire / repartir de la semaine dernière ».
-- **Page batch cooking** : recettes du plan regroupées, quantités à préparer,
-  cases à cocher au fur et à mesure (nécessite un stockage — table ou
-  `localStorage`).
+- **Page batch cooking** — désormais cadrée comme une **page à part entière,
+  indépendante du planificateur** (voir `docs/analyse-et-roadmap.md` §M9) :
+  toutes les recettes à cuisiner au même endroit, cochables « faite / à faire »,
+  utilisable seule. Le planificateur ne fait que l'alimenter (remplace le récap
+  interne « À préparer »), il ne la possède pas.
 - Contraintes alimentaires (tags simples).
 
 ---
