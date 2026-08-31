@@ -191,6 +191,27 @@ export function deviationLevel(value, target) {
   return 'off'
 }
 
+// Somme des macros d'une liste d'items { macros }.
+export function sumItemMacros(items) {
+  return (items || []).reduce((acc, it) => addMacros(acc, it.macros || EMPTY_MACROS), { ...EMPTY_MACROS })
+}
+
+// Recalcule totals + scores (repas / jour / semaine) d'un plan dont les items
+// ont été édités à la main (swap / retrait de brique). Les cibles ne changent
+// pas.
+export function recomputePlanAggregates(plan) {
+  const days = plan.days.map(day => {
+    const meals = day.meals.map(m => {
+      const totals = sumItemMacros(m.items)
+      return { ...m, totals, score: macroDistance(totals, m.target) + (totals.kcal > m.target.kcal * 1.12 ? 0.5 : 0) }
+    })
+    const totals = meals.reduce((acc, m) => addMacros(acc, m.totals), { ...EMPTY_MACROS })
+    return { ...day, meals, totals, score: meals.reduce((s, m) => s + m.score, 0) }
+  })
+  const weekTotals = days.reduce((acc, d) => addMacros(acc, d.totals), { ...EMPTY_MACROS })
+  return { ...plan, days, weekTotals, weekScore: days.reduce((s, d) => s + d.score, 0) }
+}
+
 // ── Vivier ─────────────────────────────────────────────────────────────────
 
 function matchesSeason(entity, season, mode) {
@@ -205,7 +226,9 @@ function seasonBonus(entity, season) {
 
 // Candidats d'un slot : recettes de la bonne catégorie (ou repas types), avec
 // des valeurs nutritionnelles exploitables et une portion dimensionnable.
-function buildVivier(slot, { recettes, repasTypes, season, seasonMode }) {
+// Exporté : réutilisé par useMealPlanner pour proposer un remplacement de
+// brique dans l'aperçu.
+export function buildVivier(slot, { recettes, repasTypes, season, seasonMode }) {
   if (slot.type === 'repas_type') {
     return (repasTypes || [])
       .filter(rt => matchesSeason(rt, season, seasonMode))
@@ -439,6 +462,7 @@ export function buildMealPlan(p) {
           usedRecipeIds.add(cand.id)
           items.push({
             kind: cand.kind, id: cand.id, nom: cand.nom,
+            categorie: slot.type === 'repas_type' ? null : (slot.categorie || null),
             portions: 1,
             portionG: cand.macros._portionG || null,
             macros: { ...cand.macros },

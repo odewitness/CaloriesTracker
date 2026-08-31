@@ -234,13 +234,55 @@ function ConfigView({ planner, onGenerate }) {
   )
 }
 
+// Panneau d'édition d'une brique / d'un aliment « en + » dans l'aperçu.
+function ItemEditor({ item, candidates, onSwap, onRemove }) {
+  const isAddon = item.kind === 'ajout'
+  return (
+    <div style={{ background: 'var(--gray-bg)', borderRadius: 6, padding: '6px 8px', margin: '2px 0 6px' }}>
+      {!isAddon && (
+        <>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3, margin: '2px 0 4px' }}>
+            Remplacer par
+          </div>
+          {candidates.length === 0 ? (
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', padding: '2px 0 6px' }}>
+              Aucune autre recette disponible dans cette catégorie.
+            </div>
+          ) : (
+            <div style={{ maxHeight: 148, overflowY: 'auto', margin: '0 -2px 4px' }}>
+              {candidates.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => onSwap(c.id)}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', fontSize: 12, padding: '6px 6px', borderRadius: 5, background: 'var(--white)', border: 'none', fontFamily: 'var(--font)', marginBottom: 2, color: 'var(--text)' }}
+                >
+                  {c.nom}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      <button
+        onClick={onRemove}
+        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--coral)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '4px 2px' }}
+      >
+        <Trash2 size={12} /> Retirer {isAddon ? 'cet aliment' : 'cette recette'}
+      </button>
+    </div>
+  )
+}
+
 // ── Vue aperçu ────────────────────────────────────────────────────────────
 function PreviewView({
   plan, startDateStr, recettesById, templatesById, people,
   onBack, onRegenerate, generating, onApply, applying, result, applied,
   lockedKeys, onToggleLock, onToggleLockDay,
+  swapCandidates, onSwapItem, onRemoveItem,
 }) {
   const [allowConflicts, setAllowConflicts] = useState(false)
+  const [editing, setEditing] = useState(null) // { di, meal, ii } | null
+  useEffect(() => { setEditing(null) }, [plan])
   const anyLocked = lockedKeys && lockedKeys.size > 0
   const batches = useMemo(
     () => batchSummary(plan, { recettesById, templatesById }),
@@ -326,17 +368,37 @@ function PreviewView({
                   {r0(m.totals.kcal)} / {r0(m.target.kcal)} kcal
                 </span>
               </div>
-              {m.items.map((it, ii) => (
-                <div key={ii} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: it.kind === 'ajout' ? 'var(--green-dark)' : 'var(--text)' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
-                    {it.kind === 'ajout' ? '+ ' : ''}{it.nom}
-                    {it.kind === 'ajout' && <span style={{ color: 'var(--text-hint)' }}> · {r0(it.qty_g)} g</span>}
-                    {it.kind === 'recette' && it.portionG && <span style={{ color: 'var(--text-hint)' }}> · 1 portion</span>}
-                    {it.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · 1 part</span>}
-                  </span>
-                  <span style={{ color: 'var(--text-hint)', flexShrink: 0 }}>{r0(it.macros.kcal)} kcal</span>
+              {m.items.map((it, ii) => {
+                const isOpen = editing && editing.di === di && editing.meal === m.meal && editing.ii === ii
+                return (
+                <div key={ii}>
+                  <button
+                    onClick={() => setEditing(isOpen ? null : { di, meal: m.meal, ii })}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
+                      fontSize: 12, padding: '3px 4px', borderRadius: 5, gap: 8,
+                      background: isOpen ? 'var(--gray-bg)' : 'none', border: 'none', fontFamily: 'var(--font)',
+                      color: it.kind === 'ajout' ? 'var(--green-dark)' : 'var(--text)', textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {it.kind === 'ajout' ? '+ ' : ''}{it.nom}
+                      {it.kind === 'ajout' && <span style={{ color: 'var(--text-hint)' }}> · {r0(it.qty_g)} g</span>}
+                      {it.kind === 'recette' && it.portionG && <span style={{ color: 'var(--text-hint)' }}> · 1 portion</span>}
+                      {it.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · 1 part</span>}
+                    </span>
+                    <span style={{ color: 'var(--text-hint)', flexShrink: 0 }}>{r0(it.macros.kcal)} kcal</span>
+                  </button>
+                  {isOpen && (
+                    <ItemEditor
+                      item={it}
+                      candidates={it.kind === 'ajout' ? [] : swapCandidates(di, m.meal, ii)}
+                      onSwap={(cid) => { onSwapItem(di, m.meal, ii, cid); setEditing(null) }}
+                      onRemove={() => { onRemoveItem(di, m.meal, ii); setEditing(null) }}
+                    />
+                  )}
                 </div>
-              ))}
+              )})}
             </div>
           )})}
         </div>
@@ -579,6 +641,9 @@ export default function MealPlannerModal({ onClose, onApplied }) {
             lockedKeys={planner.lockedKeys}
             onToggleLock={planner.toggleLock}
             onToggleLockDay={planner.toggleLockDay}
+            swapCandidates={planner.swapCandidates}
+            onSwapItem={planner.swapItem}
+            onRemoveItem={planner.removeItem}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
             onApply={handleApply}

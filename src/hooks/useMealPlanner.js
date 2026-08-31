@@ -8,7 +8,10 @@ import { useSettings } from './useSettings'
 import { computeMealTargets } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getCurrentSeason } from '../lib/seasons'
-import { buildMealPlan, defaultMealConfig } from '../lib/mealPlanner'
+import {
+  buildMealPlan, defaultMealConfig, buildVivier, recomputePlanAggregates,
+  recipePortionMacros, templateServingMacros,
+} from '../lib/mealPlanner'
 import { planToPlannedRows, addDaysStr } from '../lib/mealPlannerApply'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,6 +134,70 @@ export function useMealPlanner() {
 
   const reset = useCallback(() => { setPlan(null); setLockedKeys(new Set()) }, [])
 
+  // ── Édition manuelle d'une brique dans l'aperçu ─────────────────────────
+  // Toute édition manuelle VERROUILLE le repas concerné (sinon la régénération
+  // suivante l'écraserait sans prévenir).
+  const findMealIdx = (p, dayIndex, meal) =>
+    p?.days[dayIndex]?.meals.findIndex(m => m.meal === meal) ?? -1
+
+  const applyItemsEdit = useCallback((dayIndex, meal, mapItems) => {
+    setPlan(p => {
+      if (!p) return p
+      const mi = findMealIdx(p, dayIndex, meal)
+      if (mi < 0) return p
+      const days = p.days.map((d, di) => di !== dayIndex ? d : {
+        ...d,
+        meals: d.meals.map((m, j) => j !== mi ? m : { ...m, items: mapItems(m.items) }),
+      })
+      return recomputePlanAggregates({ ...p, days })
+    })
+    setLockedKeys(s => new Set(s).add(`${dayIndex}|${meal}`))
+  }, [])
+
+  // Recettes / repas types de remplacement possibles pour une brique donnée
+  // (même catégorie), hors brique courante et hors briques déjà utilisées ce
+  // jour-là.
+  const swapCandidates = useCallback((dayIndex, meal, itemIndex) => {
+    const mi = findMealIdx(plan, dayIndex, meal)
+    if (mi < 0) return []
+    const day = plan.days[dayIndex]
+    const it = day.meals[mi].items[itemIndex]
+    if (!it || (it.kind !== 'recette' && it.kind !== 'repas_type')) return []
+    const usedToday = new Set(
+      day.meals.flatMap(m => m.items.filter(x => x.kind !== 'ajout').map(x => x.id)),
+    )
+    const slot = it.kind === 'repas_type'
+      ? { type: 'repas_type' }
+      : { type: 'recette', categorie: it.categorie }
+    return buildVivier(slot, {
+      recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
+    })
+      .filter(c => c.id !== it.id && !usedToday.has(c.id))
+      .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+  }, [plan, recettes, repasTypes, config.season, config.seasonMode])
+
+  const swapItem = useCallback((dayIndex, meal, itemIndex, candidateId) => {
+    const rec = recettes.find(r => r.id === candidateId)
+    const tpl = repasTypes.find(t => t.id === candidateId)
+    const macros = rec ? recipePortionMacros(rec) : tpl ? templateServingMacros(tpl) : null
+    if (!macros) return
+    const next = {
+      kind: rec ? 'recette' : 'repas_type',
+      id: candidateId,
+      nom: rec ? rec.nom : tpl.nom,
+      categorie: rec ? (rec.categories?.[0] || null) : null,
+      portions: 1,
+      portionG: macros._portionG || null,
+      macros: { ...macros },
+    }
+    applyItemsEdit(dayIndex, meal, items => items.map((x, i) => i === itemIndex ? { ...next, categorie: items[i].categorie ?? next.categorie } : x))
+  }, [recettes, repasTypes])
+
+  const removeItem = useCallback((dayIndex, meal, itemIndex) => {
+    applyItemsEdit(dayIndex, meal, items => items.filter((_, i) => i !== itemIndex))
+  }, [])
+
   // ── Appliquer au calendrier ─────────────────────────────────────────────
   // Charge les données manquantes (ingrédients des recettes du plan, jours
   // exclus, repas déjà planifiés sur la plage), construit les lignes via
@@ -229,6 +296,9 @@ export function useMealPlanner() {
     lockedKeys,
     toggleLock,
     toggleLockDay,
+    swapCandidates,
+    swapItem,
+    removeItem,
     applyToCalendar,
     removePlan,
   }
