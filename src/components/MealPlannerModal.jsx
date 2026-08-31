@@ -4,7 +4,7 @@ import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
 import { useToast } from '../lib/toast'
-import { deviationLevel, batchSummary } from '../lib/mealPlanner'
+import { deviationLevel, batchSummary, slotGroupKey } from '../lib/mealPlanner'
 import { addDaysStr, stashAppliedPlan, removeAppliedPlan } from '../lib/mealPlannerApply'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
@@ -83,57 +83,92 @@ function MacroRow({ totals, target }) {
   )
 }
 
+const MIXTE_PLAT = '__mixte_plat__'
+const REPAS_TYPE = '__repas_type__'
+
+function slotSelectValue(slot) {
+  if (slot.type === 'repas_type') return REPAS_TYPE
+  if (slot.type === 'mixte') return MIXTE_PLAT
+  return slot.categorie
+}
+function slotFromSelectValue(v) {
+  if (v === REPAS_TYPE) return { type: 'repas_type', categorie: undefined }
+  if (v === MIXTE_PLAT) return { type: 'mixte', categorie: 'Plat' }
+  return { type: 'recette', categorie: v }
+}
+
 // ── Éditeur de composition d'un repas ──────────────────────────────────────
-function MealSlotsEditor({ meal, slots, onChange }) {
+function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange }) {
   const setSlot = (i, patch) => onChange(slots.map((s, si) => si === i ? { ...s, ...patch } : s))
   const removeSlot = (i) => onChange(slots.filter((_, si) => si !== i))
   const addSlot = () => onChange([...slots, { type: 'recette', categorie: 'Plat', nbDifferentes: 2 }])
 
   return (
-    <div className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>{meal}</div>
-      {slots.map((slot, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <select
-            className="input"
-            value={slot.type === 'repas_type' ? '__repas_type__' : slot.categorie}
-            onChange={e => {
-              const v = e.target.value
-              if (v === '__repas_type__') setSlot(i, { type: 'repas_type', categorie: undefined })
-              else setSlot(i, { type: 'recette', categorie: v })
-            }}
-            style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
+    <div className="card" style={{ padding: '10px 12px', marginBottom: 8, opacity: included ? 1 : 0.55 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, marginBottom: included ? 6 : 0, cursor: 'pointer' }}>
+        <input type="checkbox" checked={included} onChange={onToggleIncluded} />
+        {meal}
+        {!included && <span style={{ fontWeight: 500, color: 'var(--text-hint)', fontSize: 11 }}>— pas dans ce plan</span>}
+      </label>
+      {included && (
+        <>
+          {slots.map((slot, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <select
+                className="input"
+                value={slotSelectValue(slot)}
+                onChange={e => setSlot(i, slotFromSelectValue(e.target.value))}
+                style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
+              >
+                <option value={MIXTE_PLAT}>Plat ou repas type</option>
+                {RECIPE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value={REPAS_TYPE}>Un repas type</option>
+              </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.max(1, (slot.nbDifferentes || 1) - 1) })} aria-label="Moins">−</button>
+                <span style={{ fontSize: 12.5, fontWeight: 700, width: 46, textAlign: 'center' }} title="recettes différentes sur la période">
+                  {slot.nbDifferentes || 1}×
+                </span>
+                <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.min(7, (slot.nbDifferentes || 1) + 1) })} aria-label="Plus">+</button>
+              </div>
+              {slots.length > 1 && (
+                <button className="btn-icon" style={{ width: 26, height: 26, color: 'var(--coral)' }} onClick={() => removeSlot(i)} aria-label="Retirer la brique">
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            onClick={addSlot}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--green-dark)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '2px 0' }}
           >
-            {RECIPE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            <option value="__repas_type__">Un repas type</option>
-          </select>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.max(1, (slot.nbDifferentes || 1) - 1) })} aria-label="Moins">−</button>
-            <span style={{ fontSize: 12.5, fontWeight: 700, width: 46, textAlign: 'center' }} title="recettes différentes sur la période">
-              {slot.nbDifferentes || 1}×
-            </span>
-            <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.min(7, (slot.nbDifferentes || 1) + 1) })} aria-label="Plus">+</button>
-          </div>
-          {slots.length > 1 && (
-            <button className="btn-icon" style={{ width: 26, height: 26, color: 'var(--coral)' }} onClick={() => removeSlot(i)} aria-label="Retirer la brique">
-              <Trash2 size={13} />
-            </button>
-          )}
-        </div>
-      ))}
-      <button
-        onClick={addSlot}
-        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--green-dark)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '2px 0' }}
-      >
-        <Plus size={13} /> Ajouter une brique
-      </button>
+            <Plus size={13} /> Ajouter une brique
+          </button>
+        </>
+      )}
     </div>
   )
 }
 
 // ── Vue configuration ─────────────────────────────────────────────────────
 function ConfigView({ planner, onGenerate }) {
-  const { config, mealConfig, setConfig, setMealConfig, recipeCount, templateCount, favoriteCount } = planner
+  const {
+    config, mealConfig, baseMealConfig, excludedMeals, setConfig, setMealConfig, toggleMeal,
+    recipeCount, templateCount, favoriteCount,
+  } = planner
+  const excluded = new Set(excludedMeals)
+
+  // Change les slots d'un repas ET synchronise le « N× » entre tous les slots
+  // qui partagent la même clé de groupe (ex. « Plat » au déjeuner et au dîner).
+  const changeMealSlots = (meal, nextSlots) => setMealConfig(mc => {
+    const updated = { ...mc, [meal]: nextSlots }
+    const nByKey = {}
+    for (const s of nextSlots) nByKey[slotGroupKey(s)] = s.nbDifferentes
+    for (const [mn, slots] of Object.entries(updated)) {
+      updated[mn] = slots.map(s => nByKey[slotGroupKey(s)] != null ? { ...s, nbDifferentes: nByKey[slotGroupKey(s)] } : s)
+    }
+    return updated
+  })
 
   return (
     <>
@@ -199,22 +234,25 @@ function ConfigView({ planner, onGenerate }) {
       </label>
 
       {/* Composition des repas */}
-      <SectionLabel>Composition des repas</SectionLabel>
+      <SectionLabel>Repas & composition</SectionLabel>
       <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '2px 0 8px' }}>
-        Pour chaque repas, les briques et le nombre de recettes différentes sur la période
-        (2× = deux recettes différentes qui tournent sur les jours).
+        Décoche un repas pour ne pas l'inclure. Pour chaque repas, les briques et le nombre de
+        recettes différentes sur la période (2× = deux recettes qui tournent sur les jours ;
+        « Plat » partagé entre déjeuner et dîner compte une seule fois).
       </div>
-      {Object.keys(mealConfig).length === 0 && (
+      {Object.keys(baseMealConfig).length === 0 && (
         <div className="card" style={{ padding: 14, fontSize: 12.5, color: 'var(--text-hint)', textAlign: 'center', marginBottom: 8 }}>
           Aucun repas activé. Active des repas depuis Profil.
         </div>
       )}
-      {Object.entries(mealConfig).map(([meal, slots]) => (
+      {Object.entries(baseMealConfig).map(([meal, slots]) => (
         <MealSlotsEditor
           key={meal}
           meal={meal}
           slots={slots}
-          onChange={next => setMealConfig(mc => ({ ...mc, [meal]: next }))}
+          included={!excluded.has(meal)}
+          onToggleIncluded={() => toggleMeal(meal)}
+          onChange={next => changeMealSlots(meal, next)}
         />
       ))}
 
@@ -535,9 +573,9 @@ function segBtn(active) {
   }
 }
 
-export default function MealPlannerModal({ onClose, onApplied }) {
+export default function MealPlannerModal({ onClose, onApplied, defaultStartDate }) {
   useBackButton(onClose)
-  const planner = useMealPlanner()
+  const planner = useMealPlanner({ defaultStartDate })
   const toast = useToast()
   const [step, setStep] = useState('config')
   const [applying, setApplying] = useState(false)

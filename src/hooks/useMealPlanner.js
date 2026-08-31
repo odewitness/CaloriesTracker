@@ -9,7 +9,7 @@ import { computeMealTargets } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getCurrentSeason } from '../lib/seasons'
 import {
-  buildMealPlan, defaultMealConfig, buildVivier, recomputePlanAggregates,
+  buildMealPlan, defaultMealConfig, vivierForGroupKey, recomputePlanAggregates,
   recipePortionMacros, templateServingMacros,
 } from '../lib/mealPlanner'
 import { planToPlannedRows, addDaysStr } from '../lib/mealPlannerApply'
@@ -25,7 +25,7 @@ import { planToPlannedRows, addDaysStr } from '../lib/mealPlannerApply'
 //
 // Voir docs/planificateur-repas.md.
 // ─────────────────────────────────────────────────────────────────────────────
-export function useMealPlanner() {
+export function useMealPlanner({ defaultStartDate } = {}) {
   const { user } = useAuth()
   const { recettes, loading: loadingRecipes } = useRecipes()
   const { repasTypes, loading: loadingTemplates } = useMealTemplatesList()
@@ -40,18 +40,28 @@ export function useMealPlanner() {
   const [config, setConfigState] = useState(() => ({
     days: 7,
     people: 1,
-    startDateStr: todayStr(),
+    startDateStr: defaultStartDate || todayStr(),
     season: getCurrentSeason(),
     seasonMode: 'bonus', // 'bonus' | 'filter'
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
+    excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
   }))
 
   // mealConfig par défaut dès que les cibles par repas sont connues (repas
-  // actifs), sauf si l'utilisatrice l'a déjà personnalisé.
+  // actifs), sauf si l'utilisatrice l'a déjà personnalisé. Les repas exclus de
+  // ce plan (config.excludedMeals) sont retirés.
   const effectiveMealConfig = useMemo(() => {
-    if (config.mealConfig) return config.mealConfig
-    return defaultMealConfig(mealTargets)
-  }, [config.mealConfig, mealTargets])
+    const base = config.mealConfig || defaultMealConfig(mealTargets)
+    const excluded = new Set(config.excludedMeals || [])
+    return Object.fromEntries(Object.entries(base).filter(([meal]) => !excluded.has(meal)))
+  }, [config.mealConfig, config.excludedMeals, mealTargets])
+
+  // Config complète (repas exclus INCLUS) pour l'écran de configuration —
+  // chaque repas y a une case « inclure ».
+  const baseMealConfig = useMemo(
+    () => config.mealConfig || defaultMealConfig(mealTargets),
+    [config.mealConfig, mealTargets],
+  )
 
   // ── Plan généré ─────────────────────────────────────────────────────────
   const [plan, setPlan] = useState(null)
@@ -75,6 +85,16 @@ export function useMealPlanner() {
     }))
     setLockedKeys(new Set())
   }, [mealTargets])
+
+  // Exclure / réinclure un repas de CE plan (n'affecte pas meal_enabled).
+  const toggleMeal = useCallback((meal) => {
+    setConfigState(c => {
+      const ex = new Set(c.excludedMeals || [])
+      ex.has(meal) ? ex.delete(meal) : ex.add(meal)
+      return { ...c, excludedMeals: [...ex] }
+    })
+    setLockedKeys(new Set())
+  }, [])
 
   const toggleLock = useCallback((dayIndex, meal) => {
     setLockedKeys(s => {
@@ -111,7 +131,7 @@ export function useMealPlanner() {
         days: config.days,
         people: config.people,
         season: config.season,
-        mealConfig: config.mealConfig || defaultMealConfig(mealTargets),
+        mealConfig: effectiveMealConfig,
         recettes,
         repasTypes,
         favorites,
@@ -125,7 +145,7 @@ export function useMealPlanner() {
     } finally {
       setGenerating(false)
     }
-  }, [config, mealTargets, recettes, repasTypes, favorites, settings?.goal_fibres, plan, lockedKeys])
+  }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings?.goal_fibres, plan, lockedKeys])
 
   // Première génération : seed aléatoire.
   const generate = useCallback(() => runGenerate((Math.random() * 2 ** 31) >>> 0), [runGenerate])
@@ -155,8 +175,8 @@ export function useMealPlanner() {
   }, [])
 
   // Recettes / repas types de remplacement possibles pour une brique donnée
-  // (même catégorie), hors brique courante et hors briques déjà utilisées ce
-  // jour-là.
+  // (même groupe : catégorie, ou « Plat ou repas type »), hors brique courante
+  // et hors briques déjà utilisées ce jour-là.
   const swapCandidates = useCallback((dayIndex, meal, itemIndex) => {
     const mi = findMealIdx(plan, dayIndex, meal)
     if (mi < 0) return []
@@ -166,10 +186,8 @@ export function useMealPlanner() {
     const usedToday = new Set(
       day.meals.flatMap(m => m.items.filter(x => x.kind !== 'ajout').map(x => x.id)),
     )
-    const slot = it.kind === 'repas_type'
-      ? { type: 'repas_type' }
-      : { type: 'recette', categorie: it.categorie }
-    return buildVivier(slot, {
+    const key = it.groupKey || (it.kind === 'repas_type' ? 'repas_type' : `recette:${it.categorie}`)
+    return vivierForGroupKey(key, {
       recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
     })
       .filter(c => c.id !== it.id && !usedToday.has(c.id))
@@ -182,16 +200,16 @@ export function useMealPlanner() {
     const tpl = repasTypes.find(t => t.id === candidateId)
     const macros = rec ? recipePortionMacros(rec) : tpl ? templateServingMacros(tpl) : null
     if (!macros) return
-    const next = {
+    applyItemsEdit(dayIndex, meal, items => items.map((x, i) => i !== itemIndex ? x : {
+      ...x,
       kind: rec ? 'recette' : 'repas_type',
       id: candidateId,
       nom: rec ? rec.nom : tpl.nom,
-      categorie: rec ? (rec.categories?.[0] || null) : null,
+      categorie: rec ? (x.categorie || rec.categories?.[0] || null) : null,
       portions: 1,
       portionG: macros._portionG || null,
       macros: { ...macros },
-    }
-    applyItemsEdit(dayIndex, meal, items => items.map((x, i) => i === itemIndex ? { ...next, categorie: items[i].categorie ?? next.categorie } : x))
+    }))
   }, [recettes, repasTypes])
 
   const removeItem = useCallback((dayIndex, meal, itemIndex) => {
@@ -285,8 +303,11 @@ export function useMealPlanner() {
     // config
     config,
     mealConfig: effectiveMealConfig,
+    baseMealConfig,
+    excludedMeals: config.excludedMeals || [],
     setConfig,
     setMealConfig,
+    toggleMeal,
     // plan
     plan,
     generating,

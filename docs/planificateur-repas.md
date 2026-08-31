@@ -284,9 +284,17 @@ appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
 - ✅ Régénérer.
 - ✅ **Verrouiller** un jour / un repas (cadenas dans l'aperçu) : conservés à la
   régénération, comptés dans l'anti-répétition. `buildMealPlan({ locked })`.
-- ✅ **Éditer une brique** dans l'aperçu : remplacer une recette par une autre de
-  la même catégorie (vivier), retirer une recette / un aliment « en + ». Toute
+- ✅ **Éditer une brique** dans l'aperçu : remplacer une recette par une autre du
+  même groupe (vivier), retirer une recette / un aliment « en + ». Toute
   édition manuelle verrouille le repas.
+- ✅ **Cocher / décocher un repas** dans la config (`config.excludedMeals`, sans
+  toucher `meal_enabled` global).
+- ✅ **Slots regroupés par clé** (`slotGroupKey`) : « Plat » au déjeuner et au
+  dîner partagent un vivier et un pool de N recettes (pas N + N) ; le « N× » se
+  synchronise entre eux dans la config. Type de slot **`mixte`** = recette d'une
+  catégorie OU repas type ; défaut déjeuner / dîner = `mixte:Plat`.
+- ✅ Bouton « Générer un plan » de la vue Menus : date de début pré-réglée au
+  1ᵉʳ jour de la semaine affichée.
 - ✅ « Appliquer au calendrier » → `repas_planifies` avec `recurrence_group_id`,
   conflits (skip / add, jamais d'écrasement) + jours exclus.
 - ✅ « Générer la liste de courses » inline (× personnes) + « Retirer tout le
