@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-31',
+    title: 'Des rappels pour tes compléments',
+    description: "Dans « Mes aliments », ouvre un complément : tu peux lui mettre un ou plusieurs rappels dans la journée (le fer le matin, le magnésium le soir…) et choisir les jours. Quand tu programmes un complément dans le calendrier, son rappel s'active tout seul. Tu retrouves tous tes rappels dans Profil › Notifications › Rappels compléments.",
+  },
+  {
+    date: '2026-08-31',
     title: 'La collation, jour par jour',
     description: "Sur ta journée, la carte « Collation » a maintenant son propre interrupteur. Tu peux la couper les jours où tu ne grignotes pas et la remettre quand tu veux, sans toucher à ton réglage habituel. Chaque jour est indépendant, et quand la collation est coupée ses calories et ses protéines sont réparties sur tes autres repas.",
   },

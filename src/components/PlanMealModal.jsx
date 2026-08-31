@@ -9,6 +9,9 @@ import { createPlannedMeals } from '../hooks/usePlannedMeals'
 import FoodPicker from './FoodPicker'
 import AddFromRecipeModal from './AddFromRecipeModal'
 import CalendarMonthGrid, { WEEKDAYS } from './CalendarMonthGrid'
+import ComplementReminderEditor from './ComplementReminderEditor'
+import { mergeReminder } from '../lib/complementReminders'
+import { usePushSubscription } from '../hooks/usePushSubscription'
 import { SUPPLEMENT_MEAL } from './SupplementSection'
 import { fmt } from '../lib/dates'
 import Loader from './Loader'
@@ -163,6 +166,22 @@ function ScheduleStep({ source, defaultDate, defaultMeal, forcedMeal, onBack, on
   const [meal, setMeal] = useState(forcedMeal || (defaultMeal && MEALS.includes(defaultMeal) ? defaultMeal : MEALS[0]))
   const [saving, setSaving] = useState(false)
 
+  // Rappel du complément : quand on planifie un complément personnalisé, on
+  // active (par défaut) son rappel sur sa fiche aliments_custom — voir
+  // ComplementReminderEditor / complements-reminder.
+  const complementFoodId = forcedMeal === SUPPLEMENT_MEAL && source.items?.[0]?.food_source === 'custom'
+    ? source.items[0].food_ref_id
+    : null
+  const { permission: pushPermission } = usePushSubscription()
+  const [reminder, setReminder] = useState(null)
+  useEffect(() => {
+    if (!complementFoodId || !user?.id) return
+    let cancelled = false
+    supabase.from('aliments_custom').select('rappel').eq('id', complementFoodId).eq('user_id', user.id).single()
+      .then(({ data }) => { if (!cancelled) setReminder(mergeReminder({ ...(data?.rappel || {}), enabled: true })) })
+    return () => { cancelled = true }
+  }, [complementFoodId, user?.id])
+
   // Motif/fin/jours changés → régénère intégralement la sélection. Les clics
   // directs sur la grille (toggleGridDate) ne passent jamais par ici : ils
   // permettent d'ajuster la sélection générée sans qu'elle ne soit écrasée.
@@ -202,6 +221,12 @@ function ScheduleStep({ source, defaultDate, defaultMeal, forcedMeal, onBack, on
       sourceType: source.sourceType,
       sourceId: source.sourceId,
     })
+    if (!error && complementFoodId && reminder?.enabled) {
+      await supabase.from('aliments_custom')
+        .update({ rappel: reminder })
+        .eq('id', complementFoodId)
+        .eq('user_id', user.id)
+    }
     setSaving(false)
     if (error) toast('Erreur lors de la planification')
     else {
@@ -321,6 +346,17 @@ function ScheduleStep({ source, defaultDate, defaultMeal, forcedMeal, onBack, on
               })}
             </div>
           </>
+        )}
+
+        {complementFoodId && reminder && (
+          <div className="card" style={{ padding: '14px', marginBottom: 20 }}>
+            <ComplementReminderEditor
+              value={reminder}
+              onChange={setReminder}
+              pushGranted={pushPermission === 'granted'}
+              compact
+            />
+          </div>
         )}
 
         <button className="btn-primary" onClick={confirm} disabled={saving || selectedDates.size === 0} style={{ opacity: saving || selectedDates.size === 0 ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>

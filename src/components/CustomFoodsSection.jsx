@@ -16,6 +16,8 @@ import FoodSortModal from './FoodSortModal'
 import MacroPillsRow from './MacroPillsRow'
 import BrandCombobox from './BrandCombobox'
 import ComplementNutrientPills from './ComplementNutrientPills'
+import ComplementReminderEditor from './ComplementReminderEditor'
+import { usePushSubscription } from '../hooks/usePushSubscription'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -264,7 +266,10 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   const [form,      setForm]      = useState(EMPTY_FORM)
   const [extra,     setExtra]     = useState({})
   const [portions,  setPortions]  = useState([{ label: '', g: '' }])
+  const [reminder,  setReminder]  = useState(null) // aliments_custom.rappel (compléments)
   const [saving,    setSaving]    = useState(false)
+
+  const { permission: pushPermission } = usePushSubscription()
 
   // Portions courantes des compléments — exprimées en nombre de doses (ex: "2"
   // pour "2 gélules") plutôt qu'en grammes, puisque l'utilisateur pense en
@@ -405,7 +410,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
 
   const resetForm = () => {
     setForm(EMPTY_FORM); setExtra({}); setPortions([{ label: '', g: '' }]); setEditingId(null)
-    setDoseType(DOSE_TYPES[0].key); setDoseLabel(''); setComplementPortions([])
+    setDoseType(DOSE_TYPES[0].key); setDoseLabel(''); setComplementPortions([]); setReminder(null)
   }
   const startNew  = () => { resetForm(); setView('form') }
 
@@ -432,6 +437,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
     } else {
       setDoseType(DOSE_TYPES[0].key); setDoseLabel(''); setComplementPortions([])
     }
+    setReminder(isComp ? (aliment.rappel || null) : null)
 
     const scale = v => v == null ? '' : String(round(v * factor))
     setForm({
@@ -496,6 +502,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
       acides_gras_satures: round((parseFloat(form.acides_gras_satures) || 0) * factor),
       ...extraValues,
       portions: cleanPortions,
+      rappel: isComplement ? (reminder || null) : null,
     }
     if (payload.marque) await ensureMarque(payload.marque)
     const { error } = editingId
@@ -704,6 +711,18 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
             ))
           )}
         </div>
+
+        {/* ── Rappel (compléments uniquement) ── */}
+        {isComplement && (
+          <div className="card" style={{ padding: '16px', marginBottom: 20 }}>
+            <div className="section-title">Rappel</div>
+            <ComplementReminderEditor
+              value={reminder}
+              onChange={setReminder}
+              pushGranted={pushPermission === 'granted'}
+            />
+          </div>
+        )}
 
         {/* ── Bouton sauvegarde ── */}
         <button className="btn-primary" onClick={save} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>

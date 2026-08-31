@@ -1,16 +1,17 @@
 import React from 'react'
-import { Bell, Users } from 'lucide-react'
+import { Bell, Users, Pill, ChevronRight } from 'lucide-react'
 import { Row, ToggleSwitch, SectionScreen } from './primitives'
 
 // Écran de détail « Notifications ». Sauvegarde immédiate.
 export default function NotificationsSection({
   pushSupported, pushPermission, pushLoading, enablingPush, onEnablePush,
   reminderEnabled, socialEnabled, onToggleReminder, onToggleSocial,
+  complementsSummary, onOpenComplementReminders,
   onBack,
 }) {
   return (
     <SectionScreen title="Notifications" onBack={onBack}>
-      <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
+      <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
         {!pushSupported ? (
           <div style={{ padding: '13px 16px', fontSize: 12.5, color: 'var(--text-hint)' }}>
             Non disponible sur ce navigateur.
@@ -40,6 +41,19 @@ export default function NotificationsSection({
           </>
         )}
       </div>
+
+      <button
+        onClick={onOpenComplementReminders}
+        className="card"
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', marginBottom: 20, fontFamily: 'var(--font)', textAlign: 'left' }}
+      >
+        <div style={{ color: 'var(--purple, #8b5cf6)', flexShrink: 0, display: 'flex' }}><Pill size={18} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>Rappels compléments</div>
+          <div style={{ fontSize: 12, color: 'var(--text-hint)', marginTop: 1 }}>{complementsSummary}</div>
+        </div>
+        <ChevronRight size={16} color="var(--text-hint)" style={{ flexShrink: 0 }} />
+      </button>
 
       <div style={{ fontSize: 12, color: 'var(--text-hint)', lineHeight: 1.5 }}>
         Les rappels pour penser à boire se règlent dans l'écran « Hydratation ».

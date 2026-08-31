@@ -35,6 +35,11 @@
 -- de l'activation de la Collation (l'interrupteur global settings.meal_enabled
 -- reste la valeur par défaut). Voir supabase/sql/collation_jours_setup.sql. Pas
 -- encore confirmé appliqué en base au moment de l'écriture de ce fichier.
+-- Complété le 2026-08-31 : colonne aliments_custom.rappel + colonnes
+-- settings.notif_complements_enabled / settings.complements_reminder_state +
+-- cron 'complements-reminder-hourly' (rappels programmables de compléments —
+-- Edge Function complements-reminder). Voir
+-- supabase/sql/complements_rappels_setup.sql. Pas encore confirmé appliqué.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -284,7 +289,17 @@ create table if not exists settings (
   --   afficher_pas, objectif_pas_jour, pas_seuil_baseline (Palier 10, pas
   --   quotidiens — voir supabase/sql/pas_jour_setup.sql) }. Fusionné côté
   -- client avec SPORT_DEFAULTS (src/lib/sport.js). Défaut = suivi désactivé.
-  sport jsonb not null default '{"enabled":false,"objectif_hebdo_minutes":150,"objectif_hebdo_seances":0,"afficher_page_jour":true,"afficher_calendrier":true,"afficher_pas":false,"objectif_pas_jour":8000,"pas_seuil_baseline":4000,"mode_energie":"aucun","depense_max_creditee_kcal":400,"rappels":{"enabled":false,"jours":[],"heure":18},"strava":{"connected":false,"athlete_nom":null,"derniere_synchro":null,"auto":true}}'
+  sport jsonb not null default '{"enabled":false,"objectif_hebdo_minutes":150,"objectif_hebdo_seances":0,"afficher_page_jour":true,"afficher_calendrier":true,"afficher_pas":false,"objectif_pas_jour":8000,"pas_seuil_baseline":4000,"mode_energie":"aucun","depense_max_creditee_kcal":400,"rappels":{"enabled":false,"jours":[],"heure":18},"strava":{"connected":false,"athlete_nom":null,"derniere_synchro":null,"auto":true}}',
+  -- Ajoutées le 2026-08-31 (rappels de compléments — voir
+  -- supabase/sql/complements_rappels_setup.sql).
+  -- notif_complements_enabled : interrupteur maître des rappels de compléments
+  -- (Profil > Notifications > Rappels compléments). Fusionné côté client par
+  -- useSettings DEFAULTS.
+  notif_complements_enabled boolean not null default true,
+  -- complements_reminder_state : anti-doublon écrit par l'Edge Function
+  -- complements-reminder, jamais lu côté client —
+  -- { "<aliment_id>|<heure>": "YYYY-MM-DD" } = dernier envoi de chaque créneau.
+  complements_reminder_state jsonb not null default '{}'::jsonb
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
@@ -363,7 +378,16 @@ create table if not exists aliments_custom (
   vit_a numeric,
   magnesium numeric,
   potassium numeric,
-  vit_e numeric
+  vit_e numeric,
+  -- Ajoutée le 2026-08-31 (rappels de compléments — voir
+  -- supabase/sql/complements_rappels_setup.sql). Pertinent seulement pour
+  -- categorie = 'Compléments alimentaires'. Forme :
+  --   { "enabled": true, "heures": [8,21], "jours": [0..6], "stop_si_pris": true }
+  -- heures : entiers 0-23 (cron horaire). jours : 0=lundi..6=dimanche, vide =
+  -- tous les jours. stop_si_pris (défaut true) : pas de rappel si déjà noté ce
+  -- jour. null / enabled:false = aucun rappel. Délivré par l'Edge Function
+  -- complements-reminder. Normalisé côté client par src/lib/complementReminders.js.
+  rappel jsonb
 );
 
 -- 6. TABLE PROFILES (infos utilisateur, 1 ligne par compte auth)
