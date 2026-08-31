@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { useRecipes } from './useRecipes'
+import { useRecipes, sumIngredients, calcPer100g } from './useRecipes'
 import { useMealTemplatesList } from './useMealTemplates'
 import { useFavorites } from './useFavorites'
 import { useSettings } from './useSettings'
@@ -264,8 +264,20 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     const recettesById = Object.fromEntries(recettes.map(r => [r.id, r]))
     const templatesById = Object.fromEntries(repasTypes.map(t => [t.id, t]))
 
+    // per100g enrichi (vitamines/minéraux inclus) de chaque recette du plan,
+    // recalculé depuis ses ingrédients — la ligne `recettes` ne stocke que les
+    // macros. Sert à ce que la ligne « recette » agrégée écrite dans
+    // repas_planifies porte les mêmes nutriments qu'une recette ajoutée au
+    // journal via la recherche.
+    const recipePer100ById = {}
+    for (const [rid, ings] of Object.entries(ingredientsByRecetteId)) {
+      const rec = recettesById[rid]
+      const per100 = calcPer100g(sumIngredients(ings), rec?.poids_cuit_g || rec?.poids_cru_g)
+      if (per100) recipePer100ById[rid] = per100
+    }
+
     const { rows, skippedExcluded } = planToPlannedRows(plan, {
-      startDateStr, recettesById, ingredientsByRecetteId, templatesById, excludedDates,
+      startDateStr, recettesById, recipePer100ById, templatesById, excludedDates,
     })
 
     const skippedConflict = []

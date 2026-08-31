@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-31',
+    title: 'Une recette prévue au menu = une seule ligne',
+    description: "Quand tu coches « mangé » sur une recette prévue par le plan de repas, elle arrive maintenant dans ta journée comme une seule ligne (le nom de la recette et son grammage), comme quand tu ajoutes une recette à la main — fini la longue liste de chaque ingrédient. La liste de courses, elle, continue de détailler tous les ingrédients à acheter.",
+  },
+  {
+    date: '2026-08-31',
     title: 'Plan de repas : impose tes recettes et affine',
     description: "Quand tu prépares un plan de repas, tu peux maintenant imposer une ou plusieurs recettes : sous chaque repas, « Imposer une recette » te laisse cocher celles que tu veux absolument au menu cette semaine-là — elles seront toujours dans le plan et ne bougent pas quand tu régénères. Tu peux aussi limiter le temps de cuisine (par exemple « ≤ 30 min ») pour n'avoir que des recettes rapides. Et si tu le laisses coché, le plan complète tes journées avec un ou deux aliments de tes favoris pour combler tes manques en vitamines et minéraux, en plus des calories et des protéines.",
   },

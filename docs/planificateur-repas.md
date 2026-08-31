@@ -214,6 +214,13 @@ score = Σ_jours Σ_macros  w_macro × |apport - cible| / cible
 - « Appliquer » crée les `repas_planifies` (`date`, `meal`, `nom`, `items`,
   `source_type` `'recette'` | `'repas_type'` | `'libre'`, `source_id`), avec un
   `recurrence_group_id` commun à tout le plan (permet un « retirer tout le plan »).
+- **Forme des `items`** (corrigé le 2026-08-31) : une brique recette = **UNE
+  ligne agrégée** `food_source: 'recette'` (nom + grammage d'une portion +
+  nutriments enrichis via `calcPer100g`), comme une recette ajoutée au journal
+  depuis la recherche → « marquer mangé » recopie « Curry — 320 g », pas le
+  détail des ingrédients. La **liste de courses** ré-explose cet item en
+  ingrédients (`addPlannedItems`, voir §5). Un repas type reste développé en ses
+  items (assemblage d'aliments). Aliments « en + » = `scaleFood`.
 - **Conflits** : si des repas sont déjà planifiés / déjà mangés sur la plage,
   demander (remplacer / garder / compléter les créneaux vides seulement). Ne
   jamais écraser un repas `mange = true`.
@@ -230,6 +237,13 @@ additionnés, noms des repas d'origine listés) et insère dans
 `liste_courses_items`. Le planificateur écrit dans `repas_planifies` → il suffit
 de rediriger vers ce chemin (ou d'appeler `addPlannedItems` sur le plan fraîchement
 appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
+
+Depuis le 2026-08-31, `addPlannedItems` **ré-explose** tout item
+`food_source: 'recette'` en ses `recette_ingredients` mis à l'échelle d'une
+portion (`1 / recette.portions`) avant l'aplatissement — les briques recette
+sont désormais stockées agrégées dans `repas_planifies.items` (voir §4.4). Les
+plans appliqués avant cette date (items déjà explosés, `food_source`
+`ciqual`/`custom`) passent inchangés.
 
 ---
 

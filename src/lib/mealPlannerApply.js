@@ -4,11 +4,14 @@
 // le hook useMealPlanner charge les données manquantes (ingrédients de recette,
 // jours exclus, repas déjà planifiés) et fait l'insert.
 //
-// Une brique « recette » est développée en SES INGRÉDIENTS mis à l'échelle
-// d'UNE portion (1 / recette.portions) — même choix que PlanMealModal, pour que
-// la liste de courses générée depuis ces repas prévus liste des aliments et non
-// « 1 × Curry ». Idem pour un repas type (1 / nb_portions). Les aliments « en +
-// » passent par scaleFood.
+// Une brique « recette » devient UNE ligne agrégée `food_source: 'recette'`
+// (nom + grammage d'une portion + nutriments de la portion), comme quand on
+// ajoute une recette au journal depuis la recherche : « marquer mangé » recopie
+// donc « Curry — 320 g » et non le détail des ingrédients. La liste de courses,
+// elle, ré-explose cet item en ingrédients (useShoppingLists.addPlannedItems).
+// Un repas type reste développé en ses items (1 / nb_portions) — c'est un
+// assemblage d'aliments, pas un aliment. Les aliments « en + » passent par
+// scaleFood.
 //
 // Voir docs/planificateur-repas.md.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,14 +94,14 @@ function scaleAbsoluteItem(item, factor) {
  * @param {object} ctx
  * @param {string} ctx.startDateStr        'YYYY-MM-DD' du jour 1 du plan
  * @param {Object<string,object>} ctx.recettesById
- * @param {Object<string,Array>}  ctx.ingredientsByRecetteId  { [recetteId]: [recette_ingredients] }
+ * @param {Object<string,object>} ctx.recipePer100ById  { [recetteId]: per100g enrichi (calcPer100g) } — nutriments complets de la portion
  * @param {Object<string,object>} ctx.templatesById
  * @param {Set<string>} [ctx.excludedDates]  dates 'YYYY-MM-DD' à ne pas planifier
  * @returns {{ rows: Array, skippedExcluded: string[] }}
  */
 export function planToPlannedRows(plan, ctx) {
   const {
-    startDateStr, recettesById = {}, ingredientsByRecetteId = {},
+    startDateStr, recettesById = {}, recipePer100ById = {},
     templatesById = {}, excludedDates = new Set(),
   } = ctx
   const rows = []
@@ -125,11 +128,18 @@ export function planToPlannedRows(plan, ctx) {
           briqueCount++
           briqueNames.push(it.nom)
           const rec = recettesById[it.id]
-          const parts = rec?.portions || 1
-          const factor = parts > 0 ? 1 / parts : 1
-          for (const ing of (ingredientsByRecetteId[it.id] || [])) {
-            items.push(scaleAbsoluteItem(ing, factor))
-          }
+          const per100 = recipePer100ById[it.id] || null
+          const portionG = it.portionG
+            || ((rec?.poids_cuit_g || rec?.poids_cru_g || 0) / (rec?.portions || 1))
+          // UNE ligne « recette » agrégée (voir en-tête du fichier). per100
+          // enrichi si dispo (vitamines/minéraux via calcPer100g), sinon les
+          // macros stockées sur la ligne recettes.
+          const base = per100 ? { ...per100 } : (rec || {})
+          const single = scaleFood(
+            { ...base, alim_nom: it.nom, _source: 'recette', id: it.id },
+            portionG || 0,
+          )
+          if (single.food_name && single.qty_g > 0) items.push(single)
           soloSource = { source_type: 'recette', source_id: it.id }
         } else if (it.kind === 'repas_type') {
           briqueCount++
