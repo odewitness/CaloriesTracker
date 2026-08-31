@@ -49,7 +49,9 @@ const rows = useMemo(() => {
       byFood.set(e.food_name, { food_name: e.food_name, val, count: 1, entries: [e] })
     }
   }
-  return Array.from(byFood.values()).sort((a, b) => b.val - a.val)
+  return Array.from(byFood.values())
+    .map(g => ({ ...g, isSupp: g.entries.every(e => e.meal === 'Compléments') }))
+    .sort((a, b) => b.val - a.val)
 }, [entries, field])
 
   const maxVal = rows.length > 0 ? rows[0].val : 0
@@ -83,6 +85,11 @@ const rows = useMemo(() => {
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0 }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {r.food_name}
+                        {r.isSupp && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--purple)', background: 'var(--purple-light, #ede9fe)', borderRadius: 4, padding: '1px 5px', marginLeft: 5 }}>
+                            complément
+                          </span>
+                        )}
                         {single && r.entries[0].qty_g
                           ? <span style={{ color: 'var(--text-hint)', fontWeight: 400 }}>{` · ${r.entries[0].qty_g}g`}</span>
                           : !single
@@ -99,7 +106,7 @@ const rows = useMemo(() => {
                     <div style={{
                       width: `${maxVal > 0 ? (r.val / maxVal) * 100 : 0}%`,
                       height: '100%',
-                      background: field.color || 'var(--green)',
+                      background: r.isSupp ? 'var(--purple)' : (field.color || 'var(--green)'),
                       borderRadius: 3,
                     }} />
                   </div>

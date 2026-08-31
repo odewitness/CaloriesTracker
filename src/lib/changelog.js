@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-08-31',
+    title: 'Alimentation ou compléments : qui apporte quoi',
+    description: "Dans Historique › Nutrition, le « Détail nutritionnel » montre maintenant, pour chaque vitamine et chaque minéral, la part qui vient de ton alimentation et celle qui vient de tes compléments (en violet). En haut, un résumé t'indique quelle proportion de tes vitamines et minéraux vient des compléments sur la période.",
+  },
+  {
+    date: '2026-08-31',
     title: 'Des rappels pour tes compléments',
     description: "Dans « Mes aliments », ouvre un complément : tu peux lui mettre un ou plusieurs rappels dans la journée (le fer le matin, le magnésium le soir…) et choisir les jours. Quand tu programmes un complément dans le calendrier, son rappel s'active tout seul. Tu retrouves tous tes rappels dans Profil › Notifications › Rappels compléments.",
   },

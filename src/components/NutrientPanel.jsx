@@ -17,8 +17,16 @@ function fmtVal(val, unit) {
 }
 
 // ── Ligne "jauge" vitamines/minéraux — % du RNP, marqueur LSS/seuil ────────
-function GaugeRow({ v, totals, hasEntries, onClick, highlight }) {
-  const val = (v.sumKeys || [v.key]).reduce((s, k) => s + (totals[k] ?? 0), 0)
+// `suppTotals` (optionnel) : part de `totals` apportée par des compléments
+// (meal='Compléments'). Fournie → la barre se scinde en deux segments
+// alimentation / complément (violet). Absente → rendu mono-couleur inchangé.
+function GaugeRow({ v, totals, suppTotals, hasEntries, onClick, highlight }) {
+  const keys = v.sumKeys || [v.key]
+  const val = keys.reduce((s, k) => s + (totals[k] ?? 0), 0)
+  const suppVal = suppTotals ? keys.reduce((s, k) => s + (suppTotals[k] ?? 0), 0) : 0
+  const foodVal = Math.max(0, val - suppVal)
+  const foodShare = val > 0 ? foodVal / val : 1
+  const suppShare = val > 0 ? suppVal / val : 0
   const hasData = hasEntries // N/D uniquement si aucune entrée loggée — 0 sur un aliment loggé est une vraie donnée
 
   const pct = Math.round((val / v.ref) * 100)
@@ -34,7 +42,7 @@ function GaugeRow({ v, totals, hasEntries, onClick, highlight }) {
   const refLabel = v.limite ? 'Objectif max' : 'RNP'
   const lssLabel = v.limite ? 'Seuil' : 'LSS'
   const tooltip = hasData
-    ? `${val.toFixed(val < 1 ? 3 : 1)} ${v.unit} / ${refLabel} ${v.ref} ${v.unit}${v.lss ? ` / ${lssLabel} ${v.lss} ${v.unit}` : ''}`
+    ? `${val.toFixed(val < 1 ? 3 : 1)} ${v.unit} / ${refLabel} ${v.ref} ${v.unit}${v.lss ? ` / ${lssLabel} ${v.lss} ${v.unit}` : ''}${suppVal > 1e-6 ? ` · dont ${suppVal.toFixed(suppVal < 1 ? 3 : 1)} ${v.unit} de compléments` : ''}`
     : 'Données non disponibles'
 
   const Wrapper = onClick ? 'button' : 'div'
@@ -53,12 +61,16 @@ function GaugeRow({ v, totals, hasEntries, onClick, highlight }) {
       <div style={{ flex: 1, position: 'relative', height: 6 }}>
         <div style={{ position: 'absolute', inset: 0, background: 'var(--gray-bg)', borderRadius: 3, overflow: 'hidden' }}>
           <div style={{
+            display: 'flex',
             width: hasData ? `${barPct}%` : '0%',
             height: '100%',
-            background: STATUS_COLOR[status],
-            borderRadius: 3,
             transition: 'width .4s',
-          }} />
+          }}>
+            <div style={{ width: `${foodShare * 100}%`, height: '100%', background: STATUS_COLOR[status] }} />
+            {suppShare > 0 && (
+              <div style={{ width: `${suppShare * 100}%`, height: '100%', background: 'var(--purple)' }} />
+            )}
+          </div>
         </div>
 
         {lssMarkerPct !== null && lssMarkerPct < 100 && (
@@ -87,6 +99,45 @@ function GaugeRow({ v, totals, hasEntries, onClick, highlight }) {
         {hasData ? `${status === 'excess' ? '⚠︎ ' : ''}${pct}%` : 'N/D'}
       </span>
     </Wrapper>
+  )
+}
+
+// ── Bandeau « d'où viennent tes vitamines & minéraux » ────────────────────
+// Résumé global alimentation vs compléments, chaque nutriment pondéré par son
+// RNP (mise à l'échelle sans unité). Ne s'affiche que si des compléments ont
+// réellement apporté des vitamines/minéraux sur la période.
+function SourceSplitStrip({ totals, suppTotals }) {
+  if (!suppTotals) return null
+  let sumFood = 0, sumSupp = 0
+  const contributors = []
+  for (const v of [...VITAMIN_FIELDS, ...MINERAL_FIELDS]) {
+    const keys = v.sumKeys || [v.key]
+    const tot = keys.reduce((s, k) => s + (totals[k] ?? 0), 0)
+    const sup = keys.reduce((s, k) => s + (suppTotals[k] ?? 0), 0)
+    if (sup <= 1e-6 || !v.ref) continue
+    sumFood += Math.max(0, tot - sup) / v.ref
+    sumSupp += sup / v.ref
+    contributors.push({ label: v.label, w: sup / v.ref })
+  }
+  if (sumSupp <= 0) return null
+
+  const suppPct = Math.round((sumSupp / (sumFood + sumSupp)) * 100)
+  const names = contributors.sort((a, b) => b.w - a.w).map(c => c.label)
+  const shown = names.slice(0, 6).join(', ') + (names.length > 6 ? '…' : '')
+
+  return (
+    <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--gray-bg)' }}>
+      <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 6, lineHeight: 1.45 }}>
+        ≈ <strong style={{ color: 'var(--purple)' }}>{suppPct}&nbsp;%</strong> de tes vitamines &amp; minéraux viennent de compléments sur cette période
+      </div>
+      <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
+        <div style={{ width: `${100 - suppPct}%`, background: '#1D9E75' }} />
+        <div style={{ width: `${suppPct}%`, background: 'var(--purple)' }} />
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-hint)', lineHeight: 1.4 }}>
+        Compléments : {shown} · pondéré par le RNP de chaque nutriment
+      </div>
+    </div>
   )
 }
 
@@ -218,7 +269,7 @@ function AGSGauge({ totals, hasEntries }) {
 // carte entière sur la page du jour (et partout où les deux s'affichaient
 // déjà côte à côte : historique, fiches aliment/recette).
 // ─────────────────────────────────────────────────────────────────────────
-export default function NutrientPanel({ totals, hasEntries, defaultOpen = false, entries, onUpdate, highlightKeys = [] }) {
+export default function NutrientPanel({ totals, suppTotals, hasEntries, defaultOpen = false, entries, onUpdate, highlightKeys = [] }) {
   const [open, setOpen] = useState(defaultOpen)
   const [tab, setTab] = useState('vitamines')
   const [selectedField, setSelectedField] = useState(null)
@@ -266,11 +317,13 @@ export default function NutrientPanel({ totals, hasEntries, defaultOpen = false,
             ))}
           </div>
 
+          {isGauge && <SourceSplitStrip totals={totals} suppTotals={suppTotals} />}
+
           {tab === 'vitamines' && VITAMIN_FIELDS.map(v => (
-            <GaugeRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} highlight={isHl(v)} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
+            <GaugeRow key={v.key} v={v} totals={totals} suppTotals={suppTotals} hasEntries={hasEntries} highlight={isHl(v)} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
           ))}
           {tab === 'mineraux' && MINERAL_FIELDS.map(v => (
-            <GaugeRow key={v.key} v={v} totals={totals} hasEntries={hasEntries} highlight={isHl(v)} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
+            <GaugeRow key={v.key} v={v} totals={totals} suppTotals={suppTotals} hasEntries={hasEntries} highlight={isHl(v)} onClick={canBreakdown ? () => setSelectedField(v) : undefined} />
           ))}
 
           {tab === 'sucres' && (
@@ -294,6 +347,12 @@ export default function NutrientPanel({ totals, hasEntries, defaultOpen = false,
                 <div style={{ width: 2, height: 10, background: 'var(--coral)', borderRadius: 1, opacity: 0.55 }} />
                 <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>LSS / Seuil</span>
               </div>
+              {suppTotals && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ width: 10, height: 6, background: 'var(--purple)', borderRadius: 2 }} />
+                  <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>apporté par un complément</span>
+                </div>
+              )}
               <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>
                 <span style={{ color: '#1D9E75', fontWeight: 600 }}>vert</span> = bien &nbsp;·&nbsp;
                 <span style={{ color: 'var(--amber)', fontWeight: 600 }}>orange</span> = à surveiller &nbsp;·&nbsp;

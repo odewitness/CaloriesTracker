@@ -14,6 +14,7 @@ import { TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
 import NutrientPanel from '../components/NutrientPanel'
+import { SUPPLEMENT_MEAL } from '../components/SupplementSection'
 import { ALL_NUTRIENT_KEYS, computeCalorieNeeds } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getPeriodBounds, shiftAnchor, dayStatus, eachDay } from '../lib/history'
@@ -222,6 +223,21 @@ export default function HistoryPage() {
       obj.gluc += e.glucides || 0
       obj.lip  += e.lipides || 0
       obj.fib  += e.fibres || 0
+      for (const key of ALL_NUTRIENT_KEYS) obj[key] += e[key] || 0
+    }
+    for (const key in obj) obj[key] /= n
+    return obj
+  }, [entries, daysCounted, excludedDates])
+
+  // Même moyenne/jour que `avg`, mais restreinte aux entrées « Compléments » —
+  // sert à NutrientPanel (vue Nutrition) pour scinder chaque jauge vitamine/
+  // minéral en part alimentation / part complément.
+  const avgSupp = useMemo(() => {
+    const n = daysCounted || 1
+    const obj = {}
+    for (const key of ALL_NUTRIENT_KEYS) obj[key] = 0
+    for (const e of entries) {
+      if (e.meal !== SUPPLEMENT_MEAL || excludedDates.has(e.date)) continue
       for (const key of ALL_NUTRIENT_KEYS) obj[key] += e[key] || 0
     }
     for (const key in obj) obj[key] /= n
@@ -596,7 +612,7 @@ export default function HistoryPage() {
               <MacroBar prot={avg.prot} gluc={avg.gluc} lip={avg.lip} fib={avg.fib} goals={settings} />
 
               <div className="section-title">Détail nutritionnel</div>
-              <NutrientPanel totals={avg} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
+              <NutrientPanel totals={avg} suppTotals={avgSupp} hasEntries={hasEntries} entries={entries} onUpdate={handleUpdate} />
 
               <div className="section-title">Répartition par repas</div>
               <MealSplitBar entries={entries} daysCounted={daysCounted} excludedDates={excludedDates} />
