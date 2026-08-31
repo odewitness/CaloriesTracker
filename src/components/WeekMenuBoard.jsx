@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER } from '../lib/nutrients'
 import { deletePlannedMeal, markAsEaten } from '../hooks/usePlannedMeals'
 import { fmt } from '../lib/dates'
 import PlanMealModal from './PlanMealModal'
+import MealPlannerModal from './MealPlannerModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WeekMenuBoard (roadmap §M5) — plateau de menus de la semaine : 7 jours
@@ -46,6 +47,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
   const [planSlot, setPlanSlot] = useState(null)   // { date: 'YYYY-MM-DD', meal } | null
   const [menuFor, setMenuFor] = useState(null)     // repas.id dont le petit menu d'actions est ouvert
   const [busyId, setBusyId] = useState(null)
+  const [plannerOpen, setPlannerOpen] = useState(false)
 
   const todayStr = fmt(new Date())
 
@@ -105,6 +107,19 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           <ChevronRight size={18} color="var(--text-muted)" />
         </button>
       </div>
+
+      {/* Générateur automatique de plan (chantier planificateur de repas) */}
+      <button
+        onClick={() => setPlannerOpen(true)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
+          padding: '10px 12px', marginBottom: 12, borderRadius: 'var(--radius-sm)',
+          background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
+          fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
+        }}
+      >
+        <Wand2 size={15} /> Générer un plan de repas
+      </button>
 
       {enabledMeals.length === 0 && (
         <div className="card" style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--text-hint)' }}>
@@ -220,6 +235,10 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           onClose={() => setPlanSlot(null)}
           onPlanned={onRefetch}
         />
+      )}
+
+      {plannerOpen && (
+        <MealPlannerModal onClose={() => setPlannerOpen(false)} />
       )}
     </div>
   )
