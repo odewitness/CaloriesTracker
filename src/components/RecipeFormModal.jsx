@@ -10,6 +10,7 @@ import { scaleFood } from '../lib/nutrients'
 import EmptyState from './EmptyState'
 import FieldLabel from './FieldLabel'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
+import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 
 
@@ -32,6 +33,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [tare,       setTare]       = useState(recette?.tare_g ? String(recette.tare_g) : '')
   const [totalBrut,  setTotalBrut]  = useState('')
   const [categories, setCategories] = useState(recette?.categories || [])
+  const [saisons, setSaisons] = useState(recette?.saisons || [])
   const [instructions, setInstructions] = useState(recette?.instructions || '')
   const [tempsPreparation, setTempsPreparation] = useState(recette?.temps_preparation_min ? String(recette.temps_preparation_min) : '')
   const [tempsCuisson,     setTempsCuisson]     = useState(recette?.temps_cuisson_min ? String(recette.temps_cuisson_min) : '')
@@ -42,6 +44,9 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
 
   const toggleCategory = (cat) =>
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
+
+  const toggleSaison = (s) =>
+    setSaisons(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
 
   const [ingredients, setIngredients] = useState(initIngredients)
   const [showSearch,  setShowSearch]  = useState(false)
@@ -98,6 +103,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
       tareG:           parseFloat(tare) > 0 ? parseFloat(tare) : null,
       poidsReferenceG: poidsRef,
       categories,
+      saisons,
       instructions,
       tempsPreparationMin: parseInt(tempsPreparation, 10) || null,
       tempsCuissonMin:     parseInt(tempsCuisson, 10)     || null,
@@ -179,7 +185,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
               </div>
             </div>
           </div>
-          <div>
+          <div style={{ marginBottom: 10 }}>
             <FieldLabel>Catégories</FieldLabel>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {RECIPE_CATEGORIES.map(cat => (
@@ -191,6 +197,22 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
                   style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
                 >
                   {getRecipeCategoryIcon(cat)} {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Saisons</FieldLabel>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {SEASONS.map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggleSaison(s)}
+                  className="chip"
+                  style={saisons.includes(s) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                >
+                  {getSeasonIcon(s)} {s}
                 </button>
               ))}
             </div>

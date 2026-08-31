@@ -7,6 +7,7 @@ import { useJournal } from '../hooks/useJournal'
 import { useBackButton } from '../hooks/useBackButton'
 import { todayStr } from '../lib/dates'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
+import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
@@ -183,7 +184,7 @@ function ImportFromDayModal({ onImport, onClose }) {
 // ─── Édition d'un repas type — plein écran (même pattern que AddFoodModal) ──
 // Props :
 //   repas   — repas type existant (avec .id) en édition, ou null pour un nouveau
-//   onSave({ nom, description, items, nb_portions, categories })
+//   onSave({ nom, description, items, nb_portions, categories, saisons })
 //   onClose()
 export default function EditMealTemplatePage({ repas, onSave, onClose }) {
   useBackButton(onClose)
@@ -193,12 +194,16 @@ export default function EditMealTemplatePage({ repas, onSave, onClose }) {
   const [portions, setPortions] = useState(repas?.nb_portions || 1)
   const [items, setItems] = useState(repas?.items || [])
   const [categories, setCategories] = useState(repas?.categories || [])
+  const [saisons, setSaisons] = useState(repas?.saisons || [])
   const [showAddFood, setShowAddFood] = useState(false)
   const [showImportMeal, setShowImportMeal] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const toggleCategory = (cat) =>
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
+
+  const toggleSaison = (s) =>
+    setSaisons(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
 
   const handleAddFood = (entry) => {
     setItems(prev => [...prev, { ...entry, meal: undefined }])
@@ -238,7 +243,7 @@ export default function EditMealTemplatePage({ repas, onSave, onClose }) {
     if (!nom.trim()) { toast('Donne un nom au repas'); return }
     if (items.length === 0) { toast('Ajoute au moins un aliment'); return }
     setSaving(true)
-    await onSave({ nom: nom.trim(), description: desc.trim(), items, nb_portions: portions, categories })
+    await onSave({ nom: nom.trim(), description: desc.trim(), items, nb_portions: portions, categories, saisons })
     setSaving(false)
   }
 
@@ -297,6 +302,22 @@ export default function EditMealTemplatePage({ repas, onSave, onClose }) {
                   style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
                 >
                   {getRecipeCategoryIcon(cat)} {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Saisons</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {SEASONS.map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggleSaison(s)}
+                  className="chip"
+                  style={saisons.includes(s) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                >
+                  {getSeasonIcon(s)} {s}
                 </button>
               ))}
             </div>

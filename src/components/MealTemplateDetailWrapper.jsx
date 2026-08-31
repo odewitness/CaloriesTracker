@@ -34,8 +34,8 @@ export default function MealTemplateDetailWrapper({ repasTypeId, onClose, onSave
     )
   }
 
-  const handleSave = async ({ nom, description, items, nb_portions }) => {
-    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: repas.id, nom, description, items, nbPortions: nb_portions })
+  const handleSave = async ({ nom, description, items, nb_portions, categories, saisons }) => {
+    const { error } = await saveMealTemplate({ userId: user.id, repasTypeId: repas.id, nom, description, items, nbPortions: nb_portions, categories, saisons })
     if (!error) { toast('✓ Repas modifié !'); refetch(); onSaved?.(); onClose() }
     else toast('Erreur')
   }

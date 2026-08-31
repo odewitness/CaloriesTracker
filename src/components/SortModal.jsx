@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { SORT_FIELDS, SORT_BASES, PREP_TIME_RANGES, COOK_TIME_RANGES, REST_TIME_RANGES, describeSortField } from '../lib/recipeSort'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
+import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import FieldPicker from './FieldPicker'
 
@@ -30,6 +31,7 @@ export default function SortModal({ value, onChange, onClose }) {
   const [secondaryDir, setSecondaryDir]     = useState(value.secondary?.dir || 'desc')
   const [basis, setBasis]                   = useState(value.basis || 'per100g')
   const [categories, setCategories]         = useState(value.categories || [])
+  const [seasons, setSeasons]               = useState(value.saisons || [])
   const [prepRanges, setPrepRanges]         = useState(value.prepRanges || [])
   const [cookRanges, setCookRanges]         = useState(value.cookRanges || [])
   const [restRanges, setRestRanges]         = useState(value.restRanges || [])
@@ -40,13 +42,16 @@ export default function SortModal({ value, onChange, onClose }) {
   const toggleCategory = (cat) =>
     setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
 
+  const toggleSeason = (s) =>
+    setSeasons(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+
   const toggleRange = (setter) => (key) =>
     setter(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
 
   const rangeSetters = { prepRanges: setPrepRanges, cookRanges: setCookRanges, restRanges: setRestRanges }
   const rangeValues  = { prepRanges, cookRanges, restRanges }
 
-  const filterCount = categories.length + prepRanges.length + cookRanges.length + restRanges.length
+  const filterCount = categories.length + seasons.length + prepRanges.length + cookRanges.length + restRanges.length
   const sortIsCustom = primaryField !== 'nom' || primaryDir !== 'asc' || !!secondaryField || basis === 'portion'
 
   // Résumé des filtres + du tri actifs, chacun retirable d'un tap sans avoir
@@ -54,6 +59,9 @@ export default function SortModal({ value, onChange, onClose }) {
   const activeChips = [
     ...categories.map(cat => ({
       id: `cat:${cat}`, label: `${getRecipeCategoryIcon(cat)} ${cat}`, onRemove: () => toggleCategory(cat),
+    })),
+    ...seasons.map(s => ({
+      id: `season:${s}`, label: `${getSeasonIcon(s)} ${s}`, onRemove: () => toggleSeason(s),
     })),
     ...DURATION_DIMENSIONS.flatMap(dim =>
       rangeValues[dim.setter].map(key => ({
@@ -85,6 +93,7 @@ export default function SortModal({ value, onChange, onClose }) {
       secondary: secondaryField ? { field: secondaryField, dir: secondaryDir } : null,
       basis,
       categories,
+      saisons: seasons,
       prepRanges,
       cookRanges,
       restRanges,
@@ -96,7 +105,7 @@ export default function SortModal({ value, onChange, onClose }) {
     setPrimaryField('nom'); setPrimaryDir('asc')
     setSecondaryField(null); setSecondaryDir('desc')
     setBasis('per100g')
-    setCategories([])
+    setCategories([]); setSeasons([])
     setPrepRanges([]); setCookRanges([]); setRestRanges([])
   }
 
@@ -186,6 +195,22 @@ export default function SortModal({ value, onChange, onClose }) {
                     style={categories.includes(cat) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
                   >
                     {getRecipeCategoryIcon(cat)} {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 9 }}>
+                Saisons
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+                {SEASONS.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => toggleSeason(s)}
+                    className="chip"
+                    style={seasons.includes(s) ? undefined : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
+                  >
+                    {getSeasonIcon(s)} {s}
                   </button>
                 ))}
               </div>

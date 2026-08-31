@@ -21,7 +21,7 @@ export const SORT_BASES = [
 
 export const DEFAULT_SORT = {
   primary: { field: 'nom', dir: 'asc' }, secondary: null, basis: 'per100g',
-  categories: [], prepRanges: [], cookRanges: [], restRanges: [],
+  categories: [], saisons: [], prepRanges: [], cookRanges: [], restRanges: [],
 }
 
 // Une recette matche le filtre si elle a au moins une des catégories
@@ -30,6 +30,9 @@ export function filterByCategories(list, categories) {
   if (!categories || categories.length === 0) return list
   return list.filter(r => (r.categories || []).some(c => categories.includes(c)))
 }
+
+// Re-export : filtre par saison(s), même sémantique que filterByCategories.
+export { filterBySeasons } from './seasons'
 
 // ── Filtres par durée (préparation / cuisson / repos) ──────────────────────
 // Tranches prédéfinies, affichées comme des puces à cocher (même logique
@@ -116,13 +119,13 @@ export function isCustomSort(sort) {
 }
 
 export function isCustomFilter(sort) {
-  return [sort.categories, sort.prepRanges, sort.cookRanges, sort.restRanges].some(a => a && a.length > 0)
+  return [sort.categories, sort.saisons, sort.prepRanges, sort.cookRanges, sort.restRanges].some(a => a && a.length > 0)
 }
 
-// Libellés lisibles de tous les filtres actifs (catégories + tranches de
-// durée), pour l'affichage "Filtré par ..." de RecipesSection.
+// Libellés lisibles de tous les filtres actifs (catégories + saisons +
+// tranches de durée), pour l'affichage "Filtré par ..." de RecipesSection.
 export function describeActiveFilters(sort) {
-  const labels = [...(sort.categories || [])]
+  const labels = [...(sort.categories || []), ...(sort.saisons || [])]
   for (const [selected, ranges] of [
     [sort.prepRanges, PREP_TIME_RANGES],
     [sort.cookRanges, COOK_TIME_RANGES],
