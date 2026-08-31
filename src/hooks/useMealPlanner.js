@@ -6,6 +6,7 @@ import { useMealTemplatesList } from './useMealTemplates'
 import { useFavorites } from './useFavorites'
 import { useSettings } from './useSettings'
 import { computeMealTargets } from '../lib/nutrients'
+import { todayStr } from '../lib/dates'
 import { getCurrentSeason } from '../lib/seasons'
 import { buildMealPlan, defaultMealConfig } from '../lib/mealPlanner'
 import { planToPlannedRows, addDaysStr } from '../lib/mealPlannerApply'
@@ -36,6 +37,7 @@ export function useMealPlanner() {
   const [config, setConfigState] = useState(() => ({
     days: 7,
     people: 1,
+    startDateStr: todayStr(),
     season: getCurrentSeason(),
     seasonMode: 'bonus', // 'bonus' | 'filter'
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)

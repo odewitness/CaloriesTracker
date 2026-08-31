@@ -3,8 +3,8 @@ import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, Calendar
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
 import { useToast } from '../lib/toast'
-import { todayStr } from '../lib/dates'
 import { deviationLevel } from '../lib/mealPlanner'
+import { addDaysStr } from '../lib/mealPlannerApply'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import Loader from './Loader'
@@ -32,6 +32,22 @@ const MACRO_ROWS = [
 ]
 
 function r0(n) { return Math.round(n || 0) }
+
+// "lun. 8 sept."
+function dayChipLabel(startStr, dayIndex) {
+  const d = new Date(addDaysStr(startStr, dayIndex) + 'T12:00:00')
+  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+// "du lun. 8 au dim. 14 sept."
+function rangeLabel(startStr, days) {
+  if (!startStr || days < 1) return ''
+  const a = new Date(startStr + 'T12:00:00')
+  const b = new Date(addDaysStr(startStr, days - 1) + 'T12:00:00')
+  const fa = a.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', ...(a.getMonth() === b.getMonth() ? {} : { month: 'short' }) })
+  const fb = b.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+  return days === 1 ? `le ${fb}` : `du ${fa} au ${fb}`
+}
 
 // Puce valeur/cible colorée par l'écart.
 function MacroChip({ label, value, target, unit }) {
@@ -121,7 +137,7 @@ function ConfigView({ planner, onGenerate }) {
 
       {/* Jours */}
       <SectionLabel>Nombre de jours</SectionLabel>
-      <div style={{ display: 'flex', gap: 5, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap' }}>
         {[1, 2, 3, 4, 5, 6, 7].map(n => (
           <button
             key={n}
@@ -129,6 +145,19 @@ function ConfigView({ planner, onGenerate }) {
             style={segBtn(config.days === n)}
           >{n}</button>
         ))}
+      </div>
+
+      {/* Jour de début */}
+      <SectionLabel>À partir du</SectionLabel>
+      <input
+        type="date"
+        className="input"
+        value={config.startDateStr}
+        onChange={e => setConfig({ startDateStr: e.target.value })}
+        style={{ marginBottom: 4, fontSize: 13 }}
+      />
+      <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 16 }}>
+        {rangeLabel(config.startDateStr, config.days)}
       </div>
 
       {/* Personnes */}
@@ -198,9 +227,7 @@ function ConfigView({ planner, onGenerate }) {
 }
 
 // ── Vue aperçu ────────────────────────────────────────────────────────────
-function PreviewView({ plan, onBack, onRegenerate, generating, onApply, applying, result }) {
-  const dayLabels = ['Jour 1', 'Jour 2', 'Jour 3', 'Jour 4', 'Jour 5', 'Jour 6', 'Jour 7']
-  const [startDateStr, setStartDateStr] = useState(todayStr())
+function PreviewView({ plan, startDateStr, onBack, onRegenerate, generating, onApply, applying, result }) {
   const [allowConflicts, setAllowConflicts] = useState(false)
 
   return (
@@ -240,7 +267,7 @@ function PreviewView({ plan, onBack, onRegenerate, generating, onApply, applying
       {plan.days.map((day, di) => (
         <div key={di} className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>{dayLabels[di]}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'capitalize' }}>{dayChipLabel(startDateStr, di)}</span>
           </div>
           <div style={{ marginBottom: 8 }}>
             <MacroRow totals={day.totals} target={day.target} />
@@ -293,13 +320,14 @@ function PreviewView({ plan, onBack, onRegenerate, generating, onApply, applying
       ) : (
         <div className="card" style={{ padding: '12px 14px', marginTop: 4 }}>
           <SectionLabel>Appliquer au calendrier</SectionLabel>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0 8px' }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>À partir du</span>
-            <input
-              type="date" className="input" value={startDateStr}
-              onChange={e => setStartDateStr(e.target.value)}
-              style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
-            />
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 8px' }}>
+            {rangeLabel(startDateStr, plan.days.length)}
+            <button
+              onClick={onBack}
+              style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 700, color: 'var(--green-dark)', background: 'none', border: 'none', fontFamily: 'var(--font)' }}
+            >
+              changer
+            </button>
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 10 }}>
             <input type="checkbox" checked={allowConflicts} onChange={e => setAllowConflicts(e.target.checked)} />
@@ -377,6 +405,7 @@ export default function MealPlannerModal({ onClose, onApplied }) {
         ) : (
           <PreviewView
             plan={planner.plan}
+            startDateStr={planner.config.startDateStr}
             generating={planner.generating}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
