@@ -289,10 +289,13 @@ appliqué). Multiplication par le **nombre de personnes** à appliquer ici.
   édition manuelle verrouille le repas.
 - ✅ **Cocher / décocher un repas** dans la config (`config.excludedMeals`, sans
   toucher `meal_enabled` global).
-- ✅ **Slots regroupés par clé** (`slotGroupKey`) : « Plat » au déjeuner et au
-  dîner partagent un vivier et un pool de N recettes (pas N + N) ; le « N× » se
-  synchronise entre eux dans la config. Type de slot **`mixte`** = recette d'une
-  catégorie OU repas type ; défaut déjeuner / dîner = `mixte:Plat`.
+- ✅ **Slots regroupés par catégorie** (`slotGroupKey` = la catégorie) : « Plat »
+  au déjeuner et au dîner partagent un vivier et un pool de N recettes (pas
+  N + N) ; le « N× » se synchronise entre eux dans la config.
+- ✅ **Interrupteur unique « piocher aussi dans mes repas types »**
+  (`config.includeRepasTypes`, défaut oui) : quand actif, le vivier de chaque
+  catégorie = recettes + repas types **de la même catégorie**. Pas de type de
+  slot spécial, pas d'option « Un repas type » : un slot = une catégorie.
 - ✅ Bouton « Générer un plan » de la vue Menus : date de début pré-réglée au
   1ᵉʳ jour de la semaine affichée.
 - ✅ « Appliquer au calendrier » → `repas_planifies` avec `recurrence_group_id`,
