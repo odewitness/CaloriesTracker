@@ -28,6 +28,7 @@ import CyclePhaseBadge from '../components/CyclePhaseBadge'
 import PlanMealModal from '../components/PlanMealModal'
 import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
+import { useCollationDay } from '../hooks/useCollationDay'
 import { useSport } from '../hooks/useSport'
 import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
 import { saveMealTemplate } from '../hooks/useMealTemplates'
@@ -64,6 +65,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const isToday = dateStr === fmt(new Date())
   const { entries, loading, addEntry, deleteEntry, updateEntry, refetch: refetchJournal } = useJournal(dateStr)
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
+  const { override: collationOverride, setOverride: setCollationOverride } = useCollationDay(dateStr)
   const { activites: sportActivites, week: sportWeek, pasJour, setPas, add: addSport, update: updateSport, remove: removeSport } = useSport(dateStr)
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
 
@@ -202,11 +204,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   // N'affecte QUE la page du jour ; `settings` brut reste la source pour
   // water / réglages, et HistoryPage / calendrier gardent l'objectif à plat.
   const daySettings = useMemo(
-    () => sportAdjustedSettings(
-      cycleAdjustedSettings(settings, cycleDays, dateStr),
-      { profile, weightKg: latestWeight, activityKcalToday: sportKcalToday },
-    ),
-    [settings, cycleDays, dateStr, profile, latestWeight, sportKcalToday],
+    () => {
+      const base = sportAdjustedSettings(
+        cycleAdjustedSettings(settings, cycleDays, dateStr),
+        { profile, weightKg: latestWeight, activityKcalToday: sportKcalToday },
+      )
+      // Surcharge « par jour » de la Collation (interrupteur de sa carte) : null
+      // = on garde le défaut global settings.meal_enabled.Collation.
+      if (collationOverride == null) return base
+      return { ...base, meal_enabled: { ...base.meal_enabled, Collation: collationOverride } }
+    },
+    [settings, cycleDays, dateStr, profile, latestWeight, sportKcalToday, collationOverride],
   )
   const cycleKcalDelta = daySettings._cycleKcalDelta || 0
   const sportKcalAdjust = daySettings._sportKcalAdjust || 0
@@ -452,8 +460,11 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           // SAUF s'il contient déjà des aliments enregistrés ou planifiés
           // (sinon ils deviendraient invisibles tout en comptant dans les
           // totaux) — dans ce cas MealSection affiche sa carte grisée
-          // « Désactivé ».
-          .filter(m => mealTargets[m]?.enabled !== false
+          // « Désactivé ». La Collation reste TOUJOURS affichée : son
+          // interrupteur « ce jour » vit sur sa carte, il faut donc pouvoir la
+          // réactiver même désactivée et vide.
+          .filter(m => m === 'Collation'
+            || mealTargets[m]?.enabled !== false
             || entries.some(e => e.meal === m)
             || nonMangesPlanifies.some(r => r.meal === m))
           .map(m => (
@@ -463,6 +474,9 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             entries={entries.filter(e => e.meal === m)}
             target={mealTargets[m]}
             plannedItems={nonMangesPlanifies.filter(r => r.meal === m)}
+            onToggleEnabled={m === 'Collation'
+              ? () => setCollationOverride(mealTargets['Collation']?.enabled === false)
+              : undefined}
             onAdd={(meal) => onOpenModal({ meal, addEntry: handleAdd, top10Gaps })}
             onDelete={handleDelete}
             onUpdate={handleUpdate}

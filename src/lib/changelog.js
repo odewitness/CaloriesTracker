@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-08-31',
+    title: 'La collation, jour par jour',
+    description: "Sur ta journée, la carte « Collation » a maintenant son propre interrupteur. Tu peux la couper les jours où tu ne grignotes pas et la remettre quand tu veux, sans toucher à ton réglage habituel. Chaque jour est indépendant, et quand la collation est coupée ses calories et ses protéines sont réparties sur tes autres repas.",
+  },
+  {
     date: '2026-08-30',
     title: 'La fenêtre de partage ne déborde plus',
     description: "Depuis la page principale, quand tu touches « Partager » dans le petit menu en haut (ou le partage d'un repas), la fenêtre qui s'ouvrait décalée et coupée sur les côtés s'affiche maintenant bien centrée.",

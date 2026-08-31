@@ -3,6 +3,30 @@ import { Plus, ChevronDown, Share2, MoreVertical, BookOpen, BookmarkPlus } from 
 import EditableFoodRow from './EditableFoodRow'
 import PlannedMealCard from './PlannedMealCard'
 
+// Interrupteur on/off « ce repas, ce jour » — même look que celui de
+// MealSplitSection (Profil › Répartition par repas). Rendu seulement quand
+// TodayPage passe `onToggleEnabled` (aujourd'hui : la Collation uniquement).
+function EnabledToggle({ enabled, onToggle, label }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={label}
+      title={label}
+      style={{
+        width: 36, height: 20, borderRadius: 10, position: 'relative', flexShrink: 0,
+        background: enabled ? 'var(--green)' : 'var(--border-md)',
+        transition: 'background .2s',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 2, left: enabled ? 18 : 2,
+        width: 16, height: 16, borderRadius: '50%', background: 'white',
+        transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+      }} />
+    </button>
+  )
+}
+
 // plannedItems — repas_planifies non mangés pour ce repas, affichés en
 // cartes distinctes au-dessus des aliments déjà mangés (mêmes actions que
 // dans le calendrier : marquer mangé, supprimer, supprimer la série).
@@ -12,8 +36,9 @@ import PlannedMealCard from './PlannedMealCard'
 // ajouter directement à ce repas (voir TodayPage).
 // onCreateTemplate(name) — optionnel ; crée un nouveau repas type à partir
 // des aliments déjà enregistrés dans ce repas (masqué si le repas est vide).
-export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare, onAddFromTemplate, onCreateTemplate }) {
+export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare, onAddFromTemplate, onCreateTemplate, onToggleEnabled }) {
   const enabled = target?.enabled !== false
+  const toggleLabel = enabled ? `Désactiver ${name} ce jour` : `Réactiver ${name} ce jour`
   const storageKey = `meal-collapsed:${name}`
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem(storageKey)) ?? false }
@@ -38,20 +63,25 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
   // ── Repas désactivé : carte compacte grisée ───────────────────────────
   if (!enabled) {
     return (
-      <div className="card" style={{ marginBottom: 10, overflow: 'hidden', opacity: 0.45 }}>
+      <div className="card" style={{ marginBottom: 10, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px' }}>
-          <div>
+          <div style={{ opacity: 0.45 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-muted)' }}>{name}</div>
             <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 1 }}>
               Désactivé · {entries.length > 0 ? `${Math.round(totalKcal)} kcal enregistrées` : 'Aucun aliment'}
             </div>
           </div>
-          <button
-            onClick={() => onAdd(name)}
-            style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--gray-bg)', color: 'var(--text-hint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-          >
-            <Plus size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {onToggleEnabled && (
+              <EnabledToggle enabled={false} onToggle={onToggleEnabled} label={toggleLabel} />
+            )}
+            <button
+              onClick={() => onAdd(name)}
+              style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--gray-bg)', color: 'var(--text-hint)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: onToggleEnabled ? 0.45 : 1 }}
+            >
+              <Plus size={18} />
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -144,6 +174,11 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
                 </div>
               </>
             )}
+          </div>
+        )}
+        {onToggleEnabled && (
+          <div style={{ flexShrink: 0, marginRight: 8 }}>
+            <EnabledToggle enabled onToggle={onToggleEnabled} label={toggleLabel} />
           </div>
         )}
         <button

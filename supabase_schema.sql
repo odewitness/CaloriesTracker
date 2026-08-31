@@ -31,6 +31,10 @@
 -- objectif_pas_jour, pas_seuil_baseline) — chantier « Suivi de l'activité
 -- sportive » Palier 10 (pas quotidiens). Voir supabase/sql/pas_jour_setup.sql
 -- et docs/suivi-sport.md. SQL appliqué + testé par l'utilisatrice le 2026-08-30.
+-- Complété le 2026-08-31 : table 33 (collation_jours) — surcharge « par jour »
+-- de l'activation de la Collation (l'interrupteur global settings.meal_enabled
+-- reste la valeur par défaut). Voir supabase/sql/collation_jours_setup.sql. Pas
+-- encore confirmé appliqué en base au moment de l'écriture de ce fichier.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -961,6 +965,21 @@ create table if not exists pas_jour (
 );
 create index if not exists idx_pas_jour_user_date on pas_jour (user_id, date desc);
 
+-- 33. TABLE COLLATION_JOURS (surcharge « par jour » de l'activation de la
+-- Collation — écrit le 2026-08-31, voir supabase/sql/collation_jours_setup.sql).
+-- ligne présente = surcharge explicite pour ce jour (`active` true/false) ;
+-- ligne absente = on suit le défaut global settings.meal_enabled.Collation.
+-- UNE LIGNE = UN JOUR. RLS « own » stricte comme pas_jour.
+create table if not exists collation_jours (
+  user_id uuid not null references auth.users(id),
+  date date not null,
+  active boolean not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, date)
+);
+create index if not exists idx_collation_jours_user_date on collation_jours (user_id, date desc);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -1080,6 +1099,12 @@ alter table commentaires_sport enable row level security;
 -- supabase/sql/pas_jour_setup.sql. La policy update sert au ré-enregistrement
 -- du total d'un jour (upsert on conflict user_id,date).
 alter table pas_jour enable row level security;
+
+-- RLS activé sur collation_jours dès sa création (2026-08-31), policies
+-- select/insert/update/delete "own" (auth.uid() = user_id) — voir
+-- supabase/sql/collation_jours_setup.sql. La policy update sert au
+-- rebasculement de l'interrupteur (upsert on conflict user_id,date).
+alter table collation_jours enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)
