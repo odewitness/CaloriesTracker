@@ -235,10 +235,17 @@ function favoriteFoods(favorites) {
 // plus fort (protéines pondérées plus haut via PLAN_MACROS), on prend le
 // favori le plus dense sur cette macro, et on le dimensionne pour combler ce
 // déficit sans dépasser le résidu calorique ni MAX_ADDON_G.
-function fillWithAddons(residual, target, foods, rng) {
+//
+// `excludeKeys` : foodKey des favoris déjà utilisés ailleurs dans la journée —
+// évités en priorité (repli sur la liste complète si ça ne laisse rien).
+function fillWithAddons(residual, target, foods, rng, excludeKeys = new Set()) {
   const addons = []
   let res = { ...residual }
   const used = new Set()
+  const preferFoods = excludeKeys.size
+    ? foods.filter(f => !excludeKeys.has(foodKey(f)))
+    : foods
+  const pool = preferFoods.length ? preferFoods : foods
 
   for (let step = 0; step < MAX_ADDONS_PER_MEAL; step++) {
     if (res.kcal < MIN_RESIDUAL_KCAL) break
@@ -256,7 +263,7 @@ function fillWithAddons(residual, target, foods, rng) {
     if (!driver) driver = 'kcal'
 
     const field = FIELD_BY_MACRO[driver]
-    const ranked = foods
+    const ranked = pool
       .filter(f => !used.has(foodKey(f)))
       .map(f => ({ f, per100: driver === 'kcal' ? (f.energie_kcal || 0) : (rawValue(f, field) || 0) }))
       .filter(x => x.per100 > 0)
@@ -335,14 +342,23 @@ export function buildMealPlan(p) {
 
   const meals = Object.keys(mealConfig || {})
 
-  // 1. Vivier + tirage des N recettes distinctes par slot, sur toute la période.
+  // Vivier de chaque slot, calculé une fois et réutilisé (tirage, affectation,
+  // recherche locale).
+  const viviers = {} // { [meal]: [ [candidate, ...] par slot ] }
+  for (const meal of meals) {
+    viviers[meal] = (mealConfig[meal] || []).map(
+      slot => buildVivier(slot, { recettes, repasTypes, season, seasonMode }),
+    )
+  }
+
+  // 1. Tirage des N recettes distinctes par slot, sur toute la période.
   const picks = {} // { [meal]: [ [candidate, ...] par slot ] }
   for (const meal of meals) {
     const slots = mealConfig[meal] || []
     const target = mealTargetWithFibres(mealTargets, meal, goalFibres)
     const slotTargets = splitMealTarget(target, slots)
     picks[meal] = slots.map((slot, si) => {
-      const viv = buildVivier(slot, { recettes, repasTypes, season, seasonMode })
+      const viv = viviers[meal][si]
       if (!viv.length) {
         warnings.push(`Aucune ${slot.type === 'repas_type' ? 'recette / repas type' : `recette « ${slot.categorie} »`} disponible pour ${meal}.`)
         return []
@@ -377,6 +393,11 @@ export function buildMealPlan(p) {
     const dayList = []
     for (let d = 0; d < days; d++) {
       const dayMeals = []
+      // Aucune brique (recette / repas type) ni aucun aliment « en + » ne doit
+      // réapparaître dans un autre repas du MÊME jour — sinon on voit le même
+      // plat midi et soir. Suivi sur toute la journée, tous repas confondus.
+      const usedRecipeIds = new Set()
+      const usedAddonKeys = new Set()
       for (const meal of meals) {
         const slots = mealConfig[meal] || []
         const target = mealTargetWithFibres(mealTargets, meal, goalFibres)
@@ -385,7 +406,16 @@ export function buildMealPlan(p) {
           const slotPicks = picks[meal][si]
           if (!slotPicks.length) return
           // rotation décalée par slot pour ne pas aligner toutes les briques
-          const cand = slotPicks[(d + si) % slotPicks.length]
+          let cand = slotPicks[(d + si) % slotPicks.length]
+          if (usedRecipeIds.has(cand.id)) {
+            // collision dans la journée : on prend d'abord un autre tirage du
+            // slot, puis n'importe quel candidat du vivier, non encore utilisé
+            // aujourd'hui. En dernier recours seulement, on garde la collision.
+            const alt = slotPicks.find(c => !usedRecipeIds.has(c.id))
+              || (viviers[meal][si] || []).find(c => !usedRecipeIds.has(c.id))
+            if (alt) cand = alt
+          }
+          usedRecipeIds.add(cand.id)
           items.push({
             kind: cand.kind, id: cand.id, nom: cand.nom,
             portions: 1,
@@ -401,7 +431,8 @@ export function buildMealPlan(p) {
           lip: target.lip - recipeTotals.lip,
           fibres: target.fibres - recipeTotals.fibres,
         }
-        const addons = fillWithAddons(residual, target, foods, rng)
+        const addons = fillWithAddons(residual, target, foods, rng, usedAddonKeys)
+        for (const a of addons) usedAddonKeys.add(foodKey(a.food))
         const allItems = [...items, ...addons]
         const totals = allItems.reduce((acc, it) => addMacros(acc, it.macros), { ...EMPTY_MACROS })
         dayMeals.push({
@@ -436,11 +467,10 @@ export function buildMealPlan(p) {
     const slots = mealConfig[meal] || []
     if (!slots.length) continue
     const si = Math.floor(rng() * slots.length)
-    const slot = slots[si]
     const slotPicks = picks[meal][si]
     if (slotPicks.length < 1) continue
-    const viv = buildVivier(slot, { recettes, repasTypes, season, seasonMode })
-    const alt = viv.find(c => !slotPicks.some(x => x.id === c.id) && (rng() < 0.5 || true))
+    const viv = viviers[meal][si] || []
+    const alt = viv.find(c => !slotPicks.some(x => x.id === c.id))
     if (!alt) continue
     const replaceIdx = Math.floor(rng() * slotPicks.length)
     const prev = slotPicks[replaceIdx]
