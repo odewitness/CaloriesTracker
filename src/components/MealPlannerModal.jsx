@@ -310,6 +310,24 @@ function ConfigView({ planner, onGenerate }) {
         N'utiliser que les recettes de cette saison (sinon : simple préférence)
       </label>
 
+      {/* Temps de cuisine */}
+      <SectionLabel>Temps de cuisine max</SectionLabel>
+      <div style={{ display: 'flex', gap: 5, marginBottom: 6, flexWrap: 'wrap' }}>
+        {[null, 15, 30, 45, 60].map(v => (
+          <button
+            key={v ?? 'any'}
+            onClick={() => setConfig({ maxCookMinutes: v })}
+            style={segBtn((config.maxCookMinutes ?? null) === v)}
+          >
+            {v == null ? 'Peu importe' : `≤ ${v} min`}
+          </button>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 18 }}>
+        Préparation + cuisson. Les recettes sans temps renseigné passent quand même ;
+        une recette imposée aussi.
+      </div>
+
       {/* Composition des repas */}
       <SectionLabel>Repas & composition</SectionLabel>
       <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '2px 0 8px' }}>

@@ -238,12 +238,23 @@ function repasTypeCandidates(repasTypes, categorie, season, seasonMode) {
     .filter(c => c.macros && c.macros.kcal > 0)
 }
 
-function recetteCandidates(recettes, categorie, season, seasonMode) {
+// Temps de cuisine d'une recette = préparation + cuisson (le repos est passif,
+// exclu). null / 0 des deux côtés → temps inconnu, la recette passe le filtre.
+export function recipeCookMinutes(recette) {
+  return (recette.temps_preparation_min || 0) + (recette.temps_cuisson_min || 0)
+}
+
+function recetteCandidates(recettes, categorie, season, seasonMode, maxCookMinutes) {
   return (recettes || [])
     .filter(r => (r.categories || []).includes(categorie))
     .filter(r => (r.energie_kcal || 0) > 0)
     .filter(r => recipePortionWeightG(r) > 0)
     .filter(r => matchesSeason(r, season, seasonMode))
+    .filter(r => {
+      if (!maxCookMinutes) return true
+      const t = recipeCookMinutes(r)
+      return t === 0 || t <= maxCookMinutes
+    })
     .map(r => ({ kind: 'recette', id: r.id, nom: r.nom, entity: r, macros: recipePortionMacros(r) }))
     .filter(c => c.macros)
 }
@@ -252,8 +263,8 @@ function recetteCandidates(recettes, categorie, season, seasonMode) {
 // même catégorie si `includeRepasTypes`), avec valeurs nutritionnelles
 // exploitables et portion dimensionnable. Exporté : réutilisé par
 // useMealPlanner pour proposer un remplacement de brique dans l'aperçu.
-export function buildVivier(categorie, { recettes, repasTypes, season, seasonMode, includeRepasTypes = true }) {
-  const recs = recetteCandidates(recettes, categorie, season, seasonMode)
+export function buildVivier(categorie, { recettes, repasTypes, season, seasonMode, includeRepasTypes = true, maxCookMinutes = null }) {
+  const recs = recetteCandidates(recettes, categorie, season, seasonMode, maxCookMinutes)
   return includeRepasTypes
     ? [...recs, ...repasTypeCandidates(repasTypes, categorie, season, seasonMode)]
     : recs
@@ -401,6 +412,7 @@ function foodKey(f) {
  * @param {object} p.mealTargets     computeMealTargets(settings)
  * @param {number} [p.goalFibres=0]  settings.goal_fibres
  * @param {boolean} [p.includeRepasTypes=true]  inclure les repas types dans les viviers
+ * @param {number|null} [p.maxCookMinutes=null]  temps prépa + cuisson max (min) ; null = pas de filtre
  * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number }
  * @param {object} [p.locked]        { `${dayIndex}|${meal}`: <objet repas figé de l'aperçu> }
  *                                   — repas verrouillés, repris tels quels à la régénération.
@@ -410,10 +422,10 @@ export function buildMealPlan(p) {
   const {
     days, people = 1, season = null, mealConfig, recettes = [], repasTypes = [],
     favorites = [], mealTargets = {}, goalFibres = 0, includeRepasTypes = true,
-    options = {}, locked = {},
+    maxCookMinutes = null, options = {}, locked = {},
   } = p
   const seasonMode = options.seasonMode === 'filter' ? 'filter' : 'bonus'
-  const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes }
+  const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes, maxCookMinutes }
   const rng = makeRng(options.seed || 1)
   const warnings = []
   const foods = favoriteFoods(favorites)
@@ -452,7 +464,11 @@ export function buildMealPlan(p) {
     pinnedByKey[key] = new Set(chosen.map(c => c.id))
 
     if (!viv.length && !chosen.length) {
-      warnings.push(`Aucune recette disponible pour « ${key} ».`)
+      warnings.push(
+        maxCookMinutes
+          ? `Aucune recette « ${key} » sous ${maxCookMinutes} min — augmente le temps de cuisine max ou impose une recette.`
+          : `Aucune recette disponible pour « ${key} ».`,
+      )
       picks[key] = []
       continue
     }

@@ -44,6 +44,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     season: getCurrentSeason(),
     seasonMode: 'bonus', // 'bonus' | 'filter'
     includeRepasTypes: true, // inclure les repas types dans les viviers
+    maxCookMinutes: null, // temps prépa + cuisson max (min) ; null = pas de filtre
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
   }))
@@ -139,6 +140,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
         mealTargets,
         goalFibres: settings?.goal_fibres || 0,
         includeRepasTypes: config.includeRepasTypes !== false,
+        maxCookMinutes: config.maxCookMinutes || null,
         options: { seasonMode: config.seasonMode, seed },
         locked,
       })
@@ -191,11 +193,12 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     return buildVivier(it.categorie, {
       recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
       includeRepasTypes: config.includeRepasTypes !== false,
+      maxCookMinutes: config.maxCookMinutes || null,
     })
       .filter(c => c.id !== it.id && !usedToday.has(c.id))
       .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes])
+  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes, config.maxCookMinutes])
 
   const swapItem = useCallback((dayIndex, meal, itemIndex, candidateId) => {
     const rec = recettes.find(r => r.id === candidateId)
