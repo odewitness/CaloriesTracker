@@ -27,6 +27,34 @@ export function useMealTemplateDetail(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// useMealTemplatesList — charge la liste complète des repas types de
+// l'utilisateur (mêmes données que MealTemplatesSection, qui les charge en
+// interne). Extrait en hook réutilisable pour le planificateur de repas
+// (src/lib/mealPlanner.js).
+// ─────────────────────────────────────────────────────────────────────────────
+export function useMealTemplatesList() {
+  const { user } = useAuth()
+  const [repasTypes, setRepasTypes] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    if (!user?.id) { setRepasTypes([]); setLoading(false); return }
+    setLoading(true)
+    const { data } = await supabase
+      .from('repas_types')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+    setRepasTypes(data || [])
+    setLoading(false)
+  }, [user?.id])
+
+  useEffect(() => { load() }, [load])
+
+  return { repasTypes, loading, refetch: load }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // saveMealTemplate — crée ou met à jour un repas type. Extrait de
 // MealTemplatesSection.handleSave pour être réutilisable ailleurs (une seule
 // source de vérité pour la logique d'enregistrement).

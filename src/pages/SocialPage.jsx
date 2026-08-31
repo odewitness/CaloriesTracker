@@ -266,14 +266,19 @@ function PartageDetailContainer({ partageId, onClose, onDeleted, deletePartage }
     let degraded = false
     const enrichedIngredients = await Promise.all(ingredients.map(async ing => {
       if (ing.food_source === 'ciqual' && ing.food_ref_id) {
-        const { data: ciqualRow } = await supabase.from('ciqual').select('*').eq('alim_code', ing.food_ref_id).single()
+        const { data: ciqualRow } = await supabase.from('ciqual').select('*').eq('alim_code', ing.food_ref_id).maybeSingle()
         if (ciqualRow) return scaleFood(ciqualRow, ing.qty_g)
       }
       degraded = true
+      // On garde le lien Ciqual d'origine même sans avoir pu recharger le
+      // détail : ça permet au moins de classer l'ingrédient par rayon dans la
+      // liste de courses (et de le ré-enrichir plus tard). Un ingrédient
+      // custom/recette de l'auteure (base privée) reste sans référence.
+      const keepCiqualRef = ing.food_source === 'ciqual' && ing.food_ref_id
       return {
         food_name: ing.food_name,
-        food_source: null,
-        food_ref_id: null,
+        food_source: keepCiqualRef ? 'ciqual' : null,
+        food_ref_id: keepCiqualRef ? ing.food_ref_id : null,
         qty_g: ing.qty_g,
         energie_kcal: ing.energie_kcal,
         proteines: ing.proteines,

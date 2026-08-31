@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2 } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER } from '../lib/nutrients'
-import { deletePlannedMeal, markAsEaten } from '../hooks/usePlannedMeals'
+import { deletePlannedMeal, deletePlannedMeals, markAsEaten } from '../hooks/usePlannedMeals'
 import { fmt } from '../lib/dates'
+import { readAppliedPlans } from '../lib/mealPlannerApply'
 import PlanMealModal from './PlanMealModal'
+import MealPlannerModal from './MealPlannerModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WeekMenuBoard (roadmap §M5) — plateau de menus de la semaine : 7 jours
@@ -46,6 +48,15 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
   const [planSlot, setPlanSlot] = useState(null)   // { date: 'YYYY-MM-DD', meal } | null
   const [menuFor, setMenuFor] = useState(null)     // repas.id dont le petit menu d'actions est ouvert
   const [busyId, setBusyId] = useState(null)
+  const [plannerOpen, setPlannerOpen] = useState(false)
+  const [appliedGroupIds, setAppliedGroupIds] = useState(() => new Set(readAppliedPlans().map(p => p.groupId)))
+  const [removingPlan, setRemovingPlan] = useState(false)
+
+  // Re-lit la liste des plans générés appliqués (stashée en localStorage par
+  // MealPlannerModal) à la fermeture de la modale.
+  useEffect(() => {
+    if (!plannerOpen) setAppliedGroupIds(new Set(readAppliedPlans().map(p => p.groupId)))
+  }, [plannerOpen])
 
   const todayStr = fmt(new Date())
 
@@ -62,6 +73,25 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
     () => MEALS_ORDER.filter(m => settings?.meal_enabled?.[m] !== false),
     [settings?.meal_enabled],
   )
+
+  // Lignes de la semaine affichée qui appartiennent à un plan généré par le
+  // planificateur (recurrence_group_id présent dans le stash).
+  const weekPlanRows = useMemo(() => {
+    if (!appliedGroupIds.size) return []
+    return days
+      .flatMap(d => plannedByDate?.[d] || [])
+      .filter(r => r.recurrence_group_id && appliedGroupIds.has(r.recurrence_group_id))
+  }, [days, plannedByDate, appliedGroupIds])
+
+  const handleRemovePlan = async () => {
+    if (!weekPlanRows.length) return
+    setRemovingPlan(true)
+    const { error } = await deletePlannedMeals(weekPlanRows.map(r => r.id), user.id)
+    setRemovingPlan(false)
+    if (error) { toast('Erreur'); return }
+    toast('Plan retiré de cette semaine')
+    onRefetch()
+  }
 
   const handleDelete = async (repas) => {
     setBusyId(repas.id)
@@ -105,6 +135,35 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           <ChevronRight size={18} color="var(--text-muted)" />
         </button>
       </div>
+
+      {/* Générateur automatique de plan (chantier planificateur de repas) */}
+      <button
+        onClick={() => setPlannerOpen(true)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
+          padding: '10px 12px', marginBottom: weekPlanRows.length ? 6 : 12, borderRadius: 'var(--radius-sm)',
+          background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
+          fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
+        }}
+      >
+        <Wand2 size={15} /> Générer un plan de repas
+      </button>
+
+      {weekPlanRows.length > 0 && (
+        <button
+          onClick={handleRemovePlan}
+          disabled={removingPlan}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+            padding: '8px 12px', marginBottom: 12, borderRadius: 'var(--radius-sm)',
+            background: 'none', color: 'var(--coral)', border: '1px solid var(--coral-light)',
+            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+          }}
+        >
+          <Trash2 size={13} />
+          {removingPlan ? 'Retrait…' : `Retirer le plan généré de cette semaine (${weekPlanRows.length} repas)`}
+        </button>
+      )}
 
       {enabledMeals.length === 0 && (
         <div className="card" style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--text-hint)' }}>
@@ -219,6 +278,14 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           defaultMeal={planSlot.meal}
           onClose={() => setPlanSlot(null)}
           onPlanned={onRefetch}
+        />
+      )}
+
+      {plannerOpen && (
+        <MealPlannerModal
+          onClose={() => setPlannerOpen(false)}
+          onApplied={onRefetch}
+          defaultStartDate={days[0]}
         />
       )}
     </div>

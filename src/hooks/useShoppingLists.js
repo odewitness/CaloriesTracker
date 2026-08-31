@@ -97,9 +97,13 @@ export function useShoppingListItems(listeId) {
   // ciqual (food_source='ciqual' → alim_code) ou aliments_custom
   // (food_source='custom' → id). Les items Open Food Facts ('off') n'ont
   // pas de table de référence ici → 'Autre'.
+  const isUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v || '')
   const resolveCategories = async (ingredients) => {
-    const ciqualCodes = ingredients.filter(i => i.food_source === 'ciqual' && i.food_ref_id).map(i => i.food_ref_id)
-    const customIds    = ingredients.filter(i => i.food_source === 'custom' && i.food_ref_id).map(i => i.food_ref_id)
+    const ciqualCodes = ingredients.filter(i => i.food_source === 'ciqual' && i.food_ref_id && i.food_ref_id !== 'undefined').map(i => i.food_ref_id)
+    // Garde uniquement des uuid valides : aliments_custom.id est de type uuid,
+    // une valeur parasite ("undefined", un code Ciqual, un code-barres OFF)
+    // ferait échouer tout le .in() côté Postgres.
+    const customIds    = ingredients.filter(i => i.food_source === 'custom' && isUuid(i.food_ref_id)).map(i => i.food_ref_id)
 
     const [{ data: ciqualCats }, { data: customCats }] = await Promise.all([
       ciqualCodes.length
@@ -218,7 +222,9 @@ export function useShoppingListItems(listeId) {
   // repas de la plage devient UNE ligne, grammages additionnés, avec le nom de
   // chaque repas d'origine listé dessous. plannedMeals : lignes repas_planifies
   // ({ nom, items }). ───────────────────────────────────────────────────────
-  const addPlannedItems = async (plannedMeals) => {
+  // `multiplier` : facteur appliqué aux grammages (ex. nombre de personnes du
+  // planificateur de repas — les repas planifiés sont stockés pour 1 portion).
+  const addPlannedItems = async (plannedMeals, { multiplier = 1 } = {}) => {
     const flat = []
     for (const repas of plannedMeals || []) {
       for (const it of (repas.items || [])) {
@@ -230,7 +236,7 @@ export function useShoppingListItems(listeId) {
     const toAdd = withCategories.map(i => ({
       nom: i.food_name,
       categorie: i.categorie,
-      qty_g: i.qty_g,
+      qty_g: i.qty_g != null ? i.qty_g * multiplier : null,
       food_source: i.food_source,
       food_ref_id: i.food_ref_id,
       recetteNom: i._repasNom,

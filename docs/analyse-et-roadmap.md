@@ -516,6 +516,10 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
   Les briques existent dans `TodayPage` : `remainingKcal`, `top10Gaps`,
   `getGapAmount`, la liste des favoris.
 - **Effort.** Élevé (algo + UI de présentation des combinaisons).
+- **Voir aussi.** `docs/planificateur-repas.md` (chantier « Planificateur
+  automatique de repas de la semaine », cadré le 2026-08-31) — généralise C1 à
+  1–7 jours à partir des recettes / repas types, et réutilise M5 pour l'export
+  liste de courses. Le moteur d'aliments « en + » de ce chantier est celui de C1.
 
 #### C2 — Saisie en langage naturel (API Claude)
 - **Quoi.** « ce midi steak-frites salade » → analysé en aliments Ciqual +
