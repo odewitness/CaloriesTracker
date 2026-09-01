@@ -1019,31 +1019,35 @@ create index if not exists idx_collation_jours_user_date on collation_jours (use
 -- du chantier planificateur. Check-list unique des recettes à cuisiner lors
 -- d'une session de meal prep, indépendante du planificateur. Écrit le
 -- 2026-09-01, voir supabase/sql/batch_cooking_setup.sql).
--- V1 : UNE seule liste courante par utilisatrice (pas de sessions nommées ni
--- d'historique). UNE LIGNE = UNE RECETTE dans la fournée en cours. RLS « own »
--- select/insert/update/delete ; update sert à cocher `fait` et éditer `portions`.
+-- Rattachée à UNE semaine (`semaine` = lundi 'YYYY-MM-DD', convention calendrier) :
+-- chaque semaine de la vue Menus a sa propre fournée. UNE LIGNE = UNE RECETTE
+-- dans la fournée d'une semaine. RLS « own » select/insert/update/delete ;
+-- update sert à cocher `fait` et éditer `portions`. Colonne `semaine` +
+-- contrainte unique par semaine ajoutées le 2026-09-01.
 create table if not exists batch_cooking_items (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
+  semaine date not null,      -- lundi de la semaine
   recette_id uuid references recettes(id) on delete set null,
   nom text not null,          -- snapshot du nom (garde la ligne lisible si la recette est supprimée)
   portions numeric,           -- quantité à préparer, optionnelle
   fait boolean not null default false,
   created_at timestamptz not null default now(),
-  unique (user_id, recette_id)
+  unique (user_id, semaine, recette_id)
 );
-create index if not exists idx_batch_cooking_items_user on batch_cooking_items (user_id, created_at);
+create index if not exists idx_batch_cooking_items_user_semaine on batch_cooking_items (user_id, semaine);
 
 -- 35. TABLE BATCH_COOKING_STEPS (« Plan de cuisine » de Ma fournée — roadmap
 -- §M9. Toutes les étapes d'instructions des recettes de la fournée, mises bout
 -- à bout puis réorganisées à la main par l'utilisatrice + cochées au fur et à
 -- mesure. Écrit le 2026-09-01, voir supabase/sql/batch_cooking_steps_setup.sql).
--- V1 : UN plan courant par utilisatrice. UNE LIGNE = UNE ÉTAPE (texte = snapshot,
--- reconstruit via un bouton « Régénérer »). RLS « own » s/i/u/d ; update sert à
--- réordonner (`ordre`) et cocher (`fait`).
+-- Rattaché à UNE semaine (`semaine` = lundi, comme batch_cooking_items). UNE
+-- LIGNE = UNE ÉTAPE (texte = snapshot, reconstruit via un bouton « Régénérer »).
+-- RLS « own » s/i/u/d ; update sert à réordonner (`ordre`) et cocher (`fait`).
 create table if not exists batch_cooking_steps (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
+  semaine date not null,      -- lundi de la semaine
   recette_id uuid references recettes(id) on delete set null,
   recette_nom text not null,
   texte text not null,
@@ -1051,7 +1055,7 @@ create table if not exists batch_cooking_steps (
   fait boolean not null default false,
   created_at timestamptz not null default now()
 );
-create index if not exists idx_batch_cooking_steps_user on batch_cooking_steps (user_id, ordre);
+create index if not exists idx_batch_cooking_steps_user_semaine on batch_cooking_steps (user_id, semaine, ordre);
 
 -- =============================================
 -- RLS

@@ -104,10 +104,10 @@ function RecipePicker({ recettes, loading, excludeIds, onAdd, onCancel }) {
   )
 }
 
-export default function BatchCookingModal({ onClose }) {
+export default function BatchCookingModal({ onClose, semaine }) {
   useBackButton(onClose)
   const toast = useToast()
-  const { items, loading, addRecipes, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking()
+  const { items, loading, addRecipes, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking(semaine)
   const { recettes, loading: loadingRecipes } = useRecipes()
   const [picking, setPicking] = useState(false)
   const [detail, setDetail] = useState(null) // { recette, portions } dont on affiche la fiche
@@ -293,7 +293,7 @@ export default function BatchCookingModal({ onClose }) {
       />
     )}
 
-    {planOpen && <CookingPlanModal onClose={() => setPlanOpen(false)} />}
+    {planOpen && <CookingPlanModal semaine={semaine} onClose={() => setPlanOpen(false)} />}
     </>
   )
 }

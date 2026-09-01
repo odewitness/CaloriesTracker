@@ -365,7 +365,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
       )}
 
       {batchOpen && (
-        <BatchCookingModal onClose={() => setBatchOpen(false)} />
+        <BatchCookingModal semaine={days[0]} onClose={() => setBatchOpen(false)} />
       )}
     </div>
   )

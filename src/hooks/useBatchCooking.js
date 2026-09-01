@@ -3,41 +3,42 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useBatchCooking — page « Ma fournée » (roadmap §M9). Une check-list unique
-// des recettes à cuisiner lors d'une session de meal prep, indépendante du
-// planificateur. V1 : UNE liste courante par utilisatrice, table
-// `batch_cooking_items` en RLS « own » (voir supabase/sql/batch_cooking_setup.sql).
+// useBatchCooking — page « Ma fournée » (roadmap §M9). Check-list des recettes
+// à cuisiner pour UNE semaine donnée (`semaine` = lundi 'YYYY-MM-DD', même
+// convention que le calendrier). Chaque semaine de la vue Menus a sa propre
+// fournée. Table `batch_cooking_items` en RLS « own »
+// (voir supabase/sql/batch_cooking_setup.sql).
 //
-// Une ligne = une recette : { id, recette_id, nom, portions, fait, created_at }.
-// Ajout = insert (dédupliqué sur recette_id) ; cocher / éditer portions =
-// update ; retrait = delete.
+// Une ligne = une recette : { id, semaine, recette_id, nom, portions, fait }.
+// Ajout = upsert dédupliqué sur (user_id, semaine, recette_id) ; cocher /
+// éditer portions = update ; retrait = delete.
 // ─────────────────────────────────────────────────────────────────────────────
-export function useBatchCooking() {
+export function useBatchCooking(semaine) {
   const { user } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    if (!user) { setItems([]); setLoading(false); return }
+    if (!user || !semaine) { setItems([]); setLoading(false); return }
     setLoading(true)
     const { data } = await supabase
       .from('batch_cooking_items')
       .select('*')
       .eq('user_id', user.id)
+      .eq('semaine', semaine)
       .order('created_at', { ascending: true })
     setItems(data || [])
     setLoading(false)
-  }, [user])
+  }, [user, semaine])
 
   useEffect(() => { load() }, [load])
 
-  // Ajoute des recettes à la fournée. `recettes` : lignes `recettes`
-  // ({ id, nom, portions }) OU objets { recette_id, nom, portions }. Les
-  // recettes déjà présentes sont laissées telles quelles (upsert
-  // ON CONFLICT DO NOTHING sur la contrainte unique user_id,recette_id — leur
-  // état « fait » et leurs portions ne sont pas écrasés).
+  // Ajoute des recettes à la fournée de la semaine. `recettes` : lignes
+  // `recettes` ({ id, nom, portions }) OU objets { recette_id, nom, portions }.
+  // Les recettes déjà présentes cette semaine-là sont laissées telles quelles
+  // (upsert ON CONFLICT DO NOTHING — `fait` et `portions` non écrasés).
   const addRecipes = useCallback(async (recettes, { portionsById } = {}) => {
-    if (!user || !recettes?.length) return { error: null, added: 0 }
+    if (!user || !semaine || !recettes?.length) return { error: null, added: 0 }
     const seen = new Set()
     const rows = recettes
       .map(r => ({
@@ -54,13 +55,13 @@ export function useBatchCooking() {
     const { data, error } = await supabase
       .from('batch_cooking_items')
       .upsert(
-        rows.map(r => ({ ...r, user_id: user.id })),
-        { onConflict: 'user_id,recette_id', ignoreDuplicates: true },
+        rows.map(r => ({ ...r, user_id: user.id, semaine })),
+        { onConflict: 'user_id,semaine,recette_id', ignoreDuplicates: true },
       )
       .select()
     if (!error) await load()
     return { error, added: (data || []).length }
-  }, [user, load])
+  }, [user, semaine, load])
 
   const toggleFait = useCallback(async (id, fait) => {
     setItems(list => list.map(i => i.id === id ? { ...i, fait } : i)) // optimiste
@@ -113,15 +114,16 @@ export function useBatchCooking() {
   }, [user, items, load])
 
   const clearAll = useCallback(async () => {
-    if (!items.length) return { error: null }
+    if (!items.length || !semaine) return { error: null }
     setItems([])
     const { error } = await supabase
       .from('batch_cooking_items')
       .delete()
       .eq('user_id', user.id)
+      .eq('semaine', semaine)
     if (error) load()
     return { error }
-  }, [user, items, load])
+  }, [user, semaine, items, load])
 
   return {
     items, loading,
