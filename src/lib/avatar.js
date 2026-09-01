@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { processImage } from './image'
 
 // Photo de profil : bucket Storage public `avatars`, un fichier par compte à
 // un chemin déterministe basé sur l'id auth (`<user_id>/avatar.jpg`). Comme
@@ -55,26 +56,5 @@ export function avatarColors(name) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-// Redimensionne + recadre une image (File/Blob) en carré `size` px et renvoie
-// un Blob JPEG. Pas de dépendance : canvas natif. ~15–30 Ko en sortie.
-export async function processAvatarImage(file, size = 256, quality = 0.85) {
-  const bitmap = await createImageBitmap(file)
-  const side = Math.min(bitmap.width, bitmap.height)
-  const sx = (bitmap.width - side) / 2
-  const sy = (bitmap.height - side) / 2
-
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, size, size)
-  bitmap.close?.()
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Conversion image impossible'))),
-      'image/jpeg',
-      quality,
-    )
-  })
-}
+// Recadre l'image en carré et la borne à 256 px (cf. lib/image.js).
+export const processAvatarImage = (file) => processImage(file, { maxSize: 256, square: true })

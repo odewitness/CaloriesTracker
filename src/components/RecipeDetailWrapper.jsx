@@ -26,7 +26,13 @@ import Loader from './Loader'
 // ─────────────────────────────────────────────────────────────────────────────
 export default function RecipeDetailWrapper({ recetteId, initialRecette, onEdit, onDelete, onShare, onClose, onPlan, onAddToJournal, initialPortions }) {
   const { recette, ingredients, loading, updateIngredient } = useRecetteDetail(recetteId)
-  const displayRecette = recette || initialRecette
+  // La recette rechargée fait autorité, mais on retombe sur `initialRecette`
+  // pour `photo_updated_at` s'il manque (ex. juste après l'ajout d'une photo,
+  // le temps que la ligne rechargée le reflète) — évite que la photo affichée
+  // depuis la liste disparaisse une fraction de seconde après l'ouverture.
+  const displayRecette = recette
+    ? { ...recette, photo_updated_at: recette.photo_updated_at ?? initialRecette?.photo_updated_at ?? null }
+    : initialRecette
 
   if (!displayRecette) {
     return (

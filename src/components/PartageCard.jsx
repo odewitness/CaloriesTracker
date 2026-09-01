@@ -3,6 +3,7 @@ import { MoreVertical, Trash2, MessageCircle } from 'lucide-react'
 import MacroPillsRow from './MacroPillsRow'
 import ReactionBar from './ReactionBar'
 import Avatar from './Avatar'
+import RecipePhoto from './RecipePhoto'
 
 function formatDate(iso) {
   const d = new Date(iso)
@@ -68,6 +69,8 @@ export default function PartageCard({ partage, isOwn, commentCount, reactions, u
       {partage.message && (
         <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8, lineHeight: 1.4 }}>{partage.message}</div>
       )}
+
+      <RecipePhoto recetteId={partage.recette_id} version={partage.photo_updated_at} style={{ marginBottom: 8 }} />
 
       {partage.energie_kcal != null && (
         <>

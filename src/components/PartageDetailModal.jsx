@@ -6,6 +6,7 @@ import { getSeasonIcon } from '../lib/seasons'
 import { useBackButton } from '../hooks/useBackButton'
 import Loader from './Loader'
 import Avatar from './Avatar'
+import RecipePhoto from './RecipePhoto'
 
 const CHIP_STYLE = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -96,6 +97,9 @@ export default function PartageDetailModal({ partage, ingredients, loading, isOw
             {partage.message}
           </div>
         )}
+
+        <RecipePhoto recetteId={partage.recette_id} version={partage.photo_updated_at} style={{ marginBottom: 12 }} />
+
 
         <div className="card" style={{ padding: '14px 14px 16px', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>

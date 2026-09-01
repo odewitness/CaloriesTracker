@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Share2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen, ChefHat } from 'lucide-react'
 import NutrientPanel from './NutrientPanel'
 import FoodDetailModal from './FoodDetailModal'
+import RecipePhoto from './RecipePhoto'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
 import { useWakeLock } from '../hooks/useWakeLock'
@@ -315,6 +316,17 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
       </div>
 
       <div className="page-modal-body">
+
+        {/* ── Photo de la recette (si renseignée) — bandeau pleine largeur,
+             collé sous l'en-tête (annule le padding du corps) ── */}
+        <RecipePhoto
+          eager
+          recetteId={recette.id}
+          version={recette.photo_updated_at}
+          ratio="3 / 2"
+          radius={0}
+          style={{ margin: '-16px -16px 14px', width: 'auto' }}
+        />
 
         {/* ── Carte "Je regarde" — sélecteur d'échelle (onglet Ingrédients) ── */}
         {activeTab === 'ingredients' && (

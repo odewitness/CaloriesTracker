@@ -521,8 +521,23 @@ create table if not exists recettes (
   temps_repos_min integer,
   source_type text, -- 'lien' | 'livre'
   source_valeur text, -- URL si 'lien', titre du livre si 'livre'
-  source_page integer -- n° de page, utilisé seulement si source_type = 'livre'
+  source_page integer, -- n° de page, utilisé seulement si source_type = 'livre'
+  -- Ajoutée le 2026-09-01 pour la photo de recette. Horodatage du dernier
+  -- upload (null = pas de photo). Le fichier est dans le bucket Storage
+  -- `recette-photos` à `<recette_id>/photo.jpg`. Voir src/lib/recipePhoto.js.
+  photo_updated_at timestamptz
 );
+
+-- Photo de recette : bucket Storage `recette-photos` (créé le 2026-09-01),
+-- PUBLIC en lecture. Un fichier par recette à `<recette_id>/photo.jpg`
+-- (upsert). Policies sur storage.objects (exécutées manuellement) :
+--   * SELECT : public.
+--   * INSERT / UPDATE / DELETE : réservés à la propriétaire de la recette,
+--     condition `exists (select 1 from recettes r
+--       where r.id::text = (storage.foldername(name))[1] and r.user_id = auth.uid())`.
+-- Une recette partagée est relue via partages_recettes.recette_id (même astuce
+-- que les avatars) ; partages_recettes.photo_updated_at (ci-dessous) est la
+-- copie dénormalisée posée au moment du partage.
 
 -- 8. TABLE RECETTE_INGREDIENTS (lignes d'ingrédients d'une recette)
 create table if not exists recette_ingredients (
@@ -715,6 +730,10 @@ create table if not exists partages_recettes (
   auteur_pseudo text,
   auteur_prenom text,
   recette_id uuid references recettes(id), -- nullable : la recette source peut disparaître sans supprimer le partage
+  -- Ajoutée le 2026-09-01. Copie dénormalisée de recettes.photo_updated_at au
+  -- moment du partage : dit s'il faut tenter d'afficher une photo (relue via
+  -- recette_id). Peut devenir périmée si l'auteure change/retire sa photo.
+  photo_updated_at timestamptz,
   nom text not null,
   portions integer not null default 1,
   poids_cru_g numeric,

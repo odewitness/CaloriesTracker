@@ -7,6 +7,7 @@ import { useRecipes, useRecetteDetail } from '../hooks/useRecipes'
 import { useFeed } from '../hooks/useFeed'
 import RecipeFormModal from './RecipeFormModal'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
+import RecipePhoto from './RecipePhoto'
 import PlanMealModal from './PlanMealModal'
 import SortModal from './SortModal'
 import AddToJournalSheet from './AddToJournalSheet'
@@ -44,6 +45,11 @@ function RecipeCard({ recette, ingredients, onOpen, onEdit, onDelete, onShare })
   return (
     <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+        {recette.photo_updated_at && (
+          <div style={{ width: 44, flexShrink: 0, cursor: 'pointer' }} onClick={() => onOpen(recette)}>
+            <RecipePhoto recetteId={recette.id} version={recette.photo_updated_at} ratio="1 / 1" radius={9} />
+          </div>
+        )}
         <span
           style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           onClick={() => onOpen(recette)}
