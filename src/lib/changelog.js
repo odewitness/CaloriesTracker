@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Menus : récap vitamines/minéraux de la semaine + fiches des plats combinés',
+    description: "Sous le résumé de la semaine, une flèche « Vitamines, minéraux, sucres & graisses » déplie la moyenne par jour planifié : sucres, graisses saturées, fibres, et chaque vitamine / minéral en pourcentage des repères conseillés. Et quand un repas prévu regroupe plusieurs recettes sur une même ligne (« Curry + Riz »), tu peux maintenant toucher le nom pour choisir laquelle ouvrir.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Menus & génération de plan : plus clair, moins chargé',
     description: "L'onglet Menus est allégé : chaque jour ne montre que ses repas prévus (fini la liste de créneaux vides), avec un lien « Ajouter un repas » pour compléter, et un résumé de semaine avec une petite barre de progression. La génération de plan a été simplifiée : l'écran de réglages tient en trois choix (nombre de jours, date de début, générer), tout le reste est rangé sous « Options avancées ». Dans l'aperçu, chaque jour affiche juste ses calories, et le détail protéines / glucides / lipides s'ouvre d'un tap si tu veux le voir.",
   },

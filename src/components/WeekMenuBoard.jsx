@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, Pencil, MoreVertical } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, Pencil, MoreVertical } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { MEALS_ORDER } from '../lib/nutrients'
+import { MEALS_ORDER, computeTotals, VITAMIN_FIELDS, MINERAL_FIELDS, SATURATED_FAT_KEY, SUCRES_ANSES_REF } from '../lib/nutrients'
 import { deviationLevel } from '../lib/mealPlanner'
 import { deletePlannedMeal, deletePlannedMeals } from '../hooks/usePlannedMeals'
 import { fmt } from '../lib/dates'
@@ -50,13 +50,105 @@ function rangeLabel(days) {
   return `${fa} – ${fb}`
 }
 
+// Recettes / repas type joignables depuis une ligne repas_planifies. Une ligne
+// « solo » a source_type/source_id ; une ligne combinée (« Curry + Riz »,
+// source_type 'libre') porte quand même chaque brique recette dans items
+// (food_source 'recette' + food_ref_id) → on peut ouvrir leur fiche une par une.
+function rowSources(r) {
+  if ((r.source_type === 'recette' || r.source_type === 'repas_type') && r.source_id) {
+    return [{ type: r.source_type, id: r.source_id, nom: r.nom }]
+  }
+  const out = []
+  const seen = new Set()
+  for (const it of (r.items || [])) {
+    if (it.food_source === 'recette' && it.food_ref_id && !seen.has(it.food_ref_id)) {
+      seen.add(it.food_ref_id)
+      out.push({ type: 'recette', id: it.food_ref_id, nom: it.food_name })
+    }
+  }
+  return out
+}
+
+// Niveau couleur d'un %VNR : garde-fou (vert ≥ 80 %, ambre ≥ 50 %, corail en
+// dessous) ; pour un nutriment « limite » (sodium, sel) c'est l'inverse.
+function pctLevel(pct, isLimit) {
+  if (isLimit) return pct > 100 ? 'off' : pct > 80 ? 'warn' : 'ok'
+  return pct >= 80 ? 'ok' : pct >= 50 ? 'warn' : 'off'
+}
+
+function fmtVal(v, unit) {
+  const n = v < 10 ? Math.round(v * 10) / 10 : Math.round(v)
+  return `${n} ${unit}`
+}
+
+// Récap déplié sous le résumé : moyenne par jour planifié des sucres / graisses
+// saturées / fibres + vitamines & minéraux en %VNR (réf. ANSES adulte, non
+// personnalisée). Best-effort : un aliment sans donnée micro compte pour 0.
+function WeekNutrientRecap({ plannedByDate, days, mealSet, plannedDays }) {
+  const totals = useMemo(() => {
+    const items = []
+    for (const d of days) {
+      for (const r of (plannedByDate?.[d] || [])) {
+        if (mealSet.has(r.meal)) items.push(...(r.items || []))
+      }
+    }
+    return computeTotals(items)
+  }, [plannedByDate, days, mealSet])
+
+  if (!plannedDays) return null
+  const per = (key) => (totals[key] || 0) / plannedDays
+  const sumFields = (f) => (f.sumKeys || [f.key]).reduce((s, k) => s + (totals[k] || 0), 0) / plannedDays
+
+  const Row = ({ label, value, unit, rnp, isLimit }) => {
+    const pct = rnp ? (value / rnp) * 100 : null
+    const level = pct == null ? 'ok' : pctLevel(pct, isLimit)
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+        <span style={{ fontSize: 11.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        {pct != null && (
+          <span style={{ width: 46, height: 4, borderRadius: 2, background: 'var(--gray-bg)', overflow: 'hidden', flexShrink: 0 }}>
+            <span style={{ display: 'block', width: `${Math.min(100, pct)}%`, height: '100%', background: LEVEL_COLOR[level] }} />
+          </span>
+        )}
+        <span style={{ fontSize: 11, fontWeight: 700, color: LEVEL_COLOR[level], width: 66, textAlign: 'right', flexShrink: 0 }}>
+          {fmtVal(value, unit)}
+          {pct != null && <span style={{ color: 'var(--text-hint)', fontWeight: 500 }}> · {Math.round(pct)}%</span>}
+        </span>
+      </div>
+    )
+  }
+
+  const GroupLabel = ({ children }) => (
+    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4, margin: '10px 0 3px' }}>{children}</div>
+  )
+
+  return (
+    <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-hint)', marginBottom: 4 }}>Moyenne par jour planifié</div>
+      <Row label="Sucres" value={per('sucres')} unit="g" rnp={SUCRES_ANSES_REF} isLimit />
+      <Row label="Graisses saturées" value={per(SATURATED_FAT_KEY)} unit="g" />
+      <Row label="Fibres" value={per('fibres')} unit="g" rnp={30} />
+      <GroupLabel>Vitamines</GroupLabel>
+      {VITAMIN_FIELDS.map(f => (
+        <Row key={f.key} label={f.label} value={sumFields(f)} unit={f.unit} rnp={f.ref} />
+      ))}
+      <GroupLabel>Minéraux</GroupLabel>
+      {MINERAL_FIELDS.map(f => (
+        <Row key={f.key} label={f.label} value={sumFields(f)} unit={f.unit} rnp={f.ref} isLimit={f.limite} />
+      ))}
+    </div>
+  )
+}
+
 export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onChangeWeek, onGoToday, onRefetch }) {
   const { user } = useAuth()
   const toast = useToast()
   const [planSlot, setPlanSlot] = useState(null)   // { date: 'YYYY-MM-DD', meal } | null
-  const [menuFor, setMenuFor] = useState(null)     // repas.id dont le petit menu d'actions est ouvert
+  const [menuFor, setMenuFor] = useState(null)     // repas.id dont le petit menu d'actions ⋮ est ouvert
+  const [pickFor, setPickFor] = useState(null)     // repas.id dont le choix « quelle recette voir » est ouvert
   const [addFor, setAddFor] = useState(null)       // dateStr dont le menu « ajouter un repas » est ouvert
   const [sourceDetail, setSourceDetail] = useState(null) // { source_type, source_id } du plat dont on ouvre la fiche
+  const [nutriOpen, setNutriOpen] = useState(false) // récap vitamines/minéraux de la semaine déplié
   const [busyId, setBusyId] = useState(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
@@ -193,6 +285,26 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           <div style={{ height: 4, borderRadius: 2, background: 'var(--gray-bg)', marginTop: 8, overflow: 'hidden' }}>
             <div style={{ width: `${Math.round((weekStats.plannedDays / 7) * 100)}%`, height: '100%', background: 'var(--green)', transition: 'width .2s' }} />
           </div>
+
+          {weekStats.plannedDays > 0 && (
+            <>
+              <button
+                onClick={() => setNutriOpen(o => !o)}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font)', padding: 0 }}
+              >
+                <ChevronDown size={13} style={{ transform: nutriOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                Vitamines, minéraux, sucres & graisses
+              </button>
+              {nutriOpen && (
+                <WeekNutrientRecap
+                  plannedByDate={plannedByDate}
+                  days={days}
+                  mealSet={mealSet}
+                  plannedDays={weekStats.plannedDays}
+                />
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -271,20 +383,24 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
                 </span>
                 {byMeal[meal].map(r => {
                   const kcal = (r.items || []).reduce((s, i) => s + (i.energie_kcal || 0), 0)
-                  const hasSource = r.source_type === 'recette' || r.source_type === 'repas_type'
+                  const sources = rowSources(r)
+                  const openFiche = () => {
+                    if (sources.length === 1) setSourceDetail({ source_type: sources[0].type, source_id: sources[0].id })
+                    else if (sources.length > 1) setPickFor(pickFor === r.id ? null : r.id)
+                  }
                   return (
                     <span key={r.id} style={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch', maxWidth: '100%' }}>
                       <button
-                        onClick={() => hasSource && setSourceDetail({ source_type: r.source_type, source_id: r.source_id })}
+                        onClick={openFiche}
                         disabled={busyId === r.id}
-                        title={hasSource ? 'Voir la fiche' : undefined}
+                        title={sources.length ? 'Voir la fiche' : undefined}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left',
                           background: r.mange ? 'var(--green-light)' : 'var(--gray-bg)',
                           color: r.mange ? 'var(--green-dark)' : 'var(--text)',
                           border: 'none', borderRadius: '7px 0 0 7px', padding: '4px 8px',
                           fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)',
-                          cursor: hasSource ? 'pointer' : 'default',
+                          cursor: sources.length ? 'pointer' : 'default',
                         }}
                       >
                         {r.mange && <Check size={11} style={{ flexShrink: 0 }} />}
@@ -315,6 +431,26 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
                             >
                               <Trash2 size={14} /> Retirer
                             </button>
+                          </div>
+                        </>
+                      )}
+
+                      {pickFor === r.id && sources.length > 1 && (
+                        <>
+                          <div style={{ position: 'fixed', inset: 0, zIndex: 19 }} onClick={() => setPickFor(null)} />
+                          <div className="card" style={{ position: 'absolute', top: 28, left: 0, zIndex: 20, padding: 4, minWidth: 160 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3, padding: '4px 8px 2px' }}>
+                              Voir la fiche
+                            </div>
+                            {sources.map(s => (
+                              <button
+                                key={s.id}
+                                onClick={() => { setSourceDetail({ source_type: s.type, source_id: s.id }); setPickFor(null) }}
+                                style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: 'var(--text)', display: 'block' }}
+                              >
+                                {s.nom}
+                              </button>
+                            ))}
                           </div>
                         </>
                       )}
