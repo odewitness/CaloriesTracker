@@ -507,10 +507,24 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
 - **Effort.** Moyen (dépend de ce qu'on accepte de partager entre comptes —
   cadrer RLS).
 
-#### M9 — Page « Batch cooking » (indépendante du planificateur)
-- **Quoi.** Un écran dédié qui regroupe au même endroit toutes les recettes à
-  cuisiner, avec pour chacune une case « faite / à faire ». Utilisable seule,
-  sans passer par un plan de repas généré.
+#### M9 — Page « Batch cooking » (indépendante du planificateur) — V1 LIVRÉE 2026-09-01
+- **Fait (branche `feat-batch-cooking`).** Page « Ma fournée » : check-list de
+  recettes à cuisiner, case « faite / à faire » + barre d'avancement, portions
+  optionnelles par recette, ajout via un sélecteur de recettes interne.
+  - Stockage : **table Supabase** `batch_cooking_items` (RLS « own »
+    select/insert/update/delete), une liste courante par utilisatrice, pas de
+    sessions nommées ni d'historique en V1. SQL :
+    `supabase/sql/batch_cooking_setup.sql`.
+  - Code : `src/hooks/useBatchCooking.js`, `src/components/BatchCookingModal.jsx`.
+  - Entrée V1 : **Calendrier → Menus → bouton « Ma fournée »** (à côté de
+    « Générer un plan de repas »).
+  - Non fait (palier ultérieur) : envoi depuis l'aperçu du planificateur — le
+    récap interne « À préparer » de `MealPlannerModal` est conservé tel quel
+    pour l'instant, pas remplacé ; sélection multiple depuis la liste des
+    recettes ; sessions / historique.
+- **Quoi (cadrage initial).** Un écran dédié qui regroupe au même endroit toutes
+  les recettes à cuisiner, avec pour chacune une case « faite / à faire ».
+  Utilisable seule, sans passer par un plan de repas généré.
 - **Pourquoi.** Quand on enchaîne plusieurs recettes (meal prep du dimanche),
   on veut une check-list unique cochable au fur et à mesure — pas éparpillée
   dans les fiches de recettes ni coincée dans l'aperçu du planificateur.

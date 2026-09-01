@@ -3,10 +3,11 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-08-31.
 
-**État au 2026-09-01 : Palier 1 + Palier 2 livrés et en prod.** Ce document fixe
-le périmètre, les décisions prises avec l'utilisatrice, l'algorithme, les zones
-d'ombre et le découpage en paliers. Reste le Palier 3 (historique / reconduction /
-page batch cooking / contraintes alimentaires).
+**État au 2026-09-01 : Palier 1 + Palier 2 livrés et en prod ; Palier 3 entamé
+(page batch cooking « Ma fournée » V1 livrée).** Ce document fixe le périmètre,
+les décisions prises avec l'utilisatrice, l'algorithme, les zones d'ombre et le
+découpage en paliers. Reste du Palier 3 : historique / reconduction de plans,
+contraintes alimentaires, et le raccordement planificateur → fournée.
 
 ---
 
@@ -366,11 +367,17 @@ l'édition de brique couvrent le besoin « garder la main »).
 ### Palier 3 — Historique, reconduction & batch cooking
 
 - Plusieurs plans conservés, « reconduire / repartir de la semaine dernière ».
-- **Page batch cooking** — désormais cadrée comme une **page à part entière,
-  indépendante du planificateur** (voir `docs/analyse-et-roadmap.md` §M9) :
-  toutes les recettes à cuisiner au même endroit, cochables « faite / à faire »,
-  utilisable seule. Le planificateur ne fait que l'alimenter (remplace le récap
-  interne « À préparer »), il ne la possède pas.
+- ✅ **Page batch cooking** — **V1 livrée le 2026-09-01** (branche
+  `feat-batch-cooking`). Page « Ma fournée » indépendante du planificateur
+  (`docs/analyse-et-roadmap.md` §M9) : check-list de recettes à cuisiner,
+  cochables « faite / à faire », barre d'avancement, portions optionnelles par
+  recette. Table dédiée `batch_cooking_items` (RLS « own », voir
+  `supabase/sql/batch_cooking_setup.sql`), hook `useBatchCooking`, composant
+  `BatchCookingModal`. Entrée : Calendrier → Menus → « Ma fournée ». V1 = une
+  liste courante, ajout de recettes via un sélecteur interne.
+  Reste (palier ultérieur) : alimentation depuis l'aperçu du planificateur (le
+  récap interne « À préparer » est conservé tel quel pour l'instant), sélection
+  multiple depuis la liste des recettes, sessions nommées / historique.
 - Contraintes alimentaires (tags simples).
 
 ---
