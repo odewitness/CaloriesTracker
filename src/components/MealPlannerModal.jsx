@@ -218,7 +218,7 @@ function shortDate(dateStr) {
 
 // ── Liste des plans enregistrés (vue configuration) ───────────────────────
 function SavedPlansSection({ plans, onLoad, onRename, onDelete }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [editingId, setEditingId] = useState(null)
   const [draft, setDraft] = useState('')
   if (!plans.length) return null
@@ -230,18 +230,21 @@ function SavedPlansSection({ plans, onLoad, onRename, onDelete }) {
   }
 
   return (
-    <div className="card" style={{ padding: '10px 12px', marginBottom: 16 }}>
+    <div className="card" style={{ padding: '10px 12px', marginBottom: 16, borderLeft: '3px solid var(--green)' }}>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'space-between', background: 'none', border: 'none', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'space-between', background: 'none', border: 'none', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FolderOpen size={14} /> Mes plans enregistrés ({plans.length})
+          <FolderOpen size={14} color="var(--green-dark)" /> Reprendre un plan enregistré ({plans.length})
         </span>
         <ChevronDown size={15} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
       {open && (
         <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>
+            Touche un plan pour l'ouvrir dans l'aperçu, l'ajuster et l'appliquer à la semaine de ton choix.
+          </div>
           {plans.map(p => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderTop: '1px solid var(--border)' }}>
               {editingId === p.id ? (
@@ -850,6 +853,14 @@ function PreviewView({
               onCreate={applied.onCreateList}
               creating={applied.creatingList}
             />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--text-muted)', margin: '2px 0 8px' }}>
+              <input
+                type="checkbox"
+                checked={applied.clearListFirst}
+                onChange={e => applied.setClearListFirst(e.target.checked)}
+              />
+              Vider cette liste avant d'ajouter (repartir à neuf)
+            </label>
             <button
               className="btn-primary"
               onClick={applied.onGenerateShopping}
@@ -859,7 +870,7 @@ function PreviewView({
               <ShoppingCart size={15} />
               {applied.shoppingState === 'busy' ? 'Ajout…'
                 : applied.shoppingState === 'done' ? '✓ Ajouté à la liste'
-                : 'Générer la liste de courses'}
+                : applied.clearListFirst ? 'Régénérer la liste de courses' : 'Générer la liste de courses'}
             </button>
           </div>
 
@@ -942,6 +953,10 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
 
   const { plans: savedPlans, savePlan, updatePlan, renamePlan, deletePlan } = useMealPlans()
 
+  // Vrai quand on ré-applique un plan qu'on est en train de MODIFIER, sur la
+  // même semaine : on remplace l'ancien (retrait de ses lignes avant écriture).
+  const replacingWeekPlan = !!replaceGroupId && planner.config.startDateStr === replaceStartDate
+
   // Fournée de la semaine du 1er jour du plan (les recettes / repas types du
   // plan appliqué y sont versés).
   const { addSources: addBatchSources } = useBatchCooking(mondayOf(planner.config.startDateStr))
@@ -952,7 +967,12 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
   useEffect(() => {
     if (!shoppingListId && shoppingLists.length) setShoppingListId(shoppingLists[0].id)
   }, [shoppingLists, shoppingListId])
-  const { addPlannedItems } = useShoppingListItems(shoppingListId)
+  const { addPlannedItems, clearAllItems } = useShoppingListItems(shoppingListId)
+  // Vider la liste cible avant d'y verser le plan (utile quand on remplace un
+  // plan : sinon les ingrédients de l'ancien plan restent). Coché par défaut
+  // quand on est en train de remplacer.
+  const [clearListFirst, setClearListFirst] = useState(false)
+  useEffect(() => { setClearListFirst(replacingWeekPlan) }, [replacingWeekPlan])
 
   const recettesById = useMemo(
     () => Object.fromEntries(planner.recettes.map(r => [r.id, r])),
@@ -1046,10 +1066,6 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
     return { added }
   }
 
-  // Vrai quand on ré-applique un plan qu'on est en train de MODIFIER, sur la
-  // même semaine : on remplace l'ancien (on retire ses lignes avant d'écrire).
-  const replacingWeekPlan = !!replaceGroupId && planner.config.startDateStr === replaceStartDate
-
   const handleApply = async ({ startDateStr, conflictStrategy }) => {
     setApplying(true)
     const replacing = !!replaceGroupId && startDateStr === replaceStartDate
@@ -1098,6 +1114,14 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
     if (!applyResult?.rows?.length || !shoppingListId) return
     setShoppingState('busy')
     try {
+      if (clearListFirst) {
+        const { error: clearErr } = await clearAllItems()
+        if (clearErr) {
+          setShoppingState('idle')
+          toast('Erreur en vidant la liste')
+          return
+        }
+      }
       const { error } = await addPlannedItems(applyResult.rows, { multiplier: planner.config.people })
       if (error) {
         console.error('[planificateur] liste de courses :', error)
@@ -1180,6 +1204,8 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
               creatingList,
               onGenerateShopping: handleGenerateShopping,
               shoppingState,
+              clearListFirst,
+              setClearListFirst,
               onRemovePlan: handleRemovePlan,
               removing,
             }}

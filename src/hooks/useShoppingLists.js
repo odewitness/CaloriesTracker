@@ -357,5 +357,19 @@ export function useShoppingListItems(listeId) {
     return { error }
   }
 
-  return { items, loading, addItems, addRecetteIngredients, addRepasItems, addPlannedItems, addSuggestedItem, toggleChecked, deleteItem, clearChecked, refetch: load }
+  // Vide entièrement la liste courante (utilisé pour « régénérer à neuf » depuis
+  // le planificateur quand un plan a été remplacé).
+  const clearAllItems = async () => {
+    if (!listeId || !user) return { error: null }
+    setItems([])
+    const { error } = await supabase
+      .from('liste_courses_items')
+      .delete()
+      .eq('liste_id', listeId)
+      .eq('user_id', user.id)
+    if (error) load()
+    return { error }
+  }
+
+  return { items, loading, addItems, addRecetteIngredients, addRepasItems, addPlannedItems, addSuggestedItem, toggleChecked, deleteItem, clearChecked, clearAllItems, refetch: load }
 }

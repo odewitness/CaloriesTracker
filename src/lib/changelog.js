@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Plan de repas : liste de courses « à neuf » + plans enregistrés visibles',
+    description: "Au moment de générer la liste de courses depuis un plan, une case « Vider cette liste avant d'ajouter » (cochée d'office quand tu remplaces un plan) permet de repartir de zéro plutôt que d'empiler par-dessus l'ancienne. Et dans les réglages du planificateur, la section « Reprendre un plan enregistré » est maintenant dépliée et mise en avant : touche un plan pour le rouvrir, l'ajuster et l'appliquer à la semaine que tu veux.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Menus : « Modifier mon plan » et retrait plus clair',
     description: "Quand une semaine a déjà un plan généré, le bouton du haut devient « Modifier mon plan » et rouvre ton plan tel quel pour l'ajuster ; en le ré-appliquant, l'ancien est retiré et remplacé automatiquement (tes repas ajoutés à la main restent). Le bouton « Retirer le plan généré » est descendu tout en bas, bien visible en rouge. Et la moyenne kcal/jour du résumé ne compte plus les jours encore vides.",
   },
