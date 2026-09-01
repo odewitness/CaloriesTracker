@@ -1021,19 +1021,22 @@ create index if not exists idx_collation_jours_user_date on collation_jours (use
 -- 2026-09-01, voir supabase/sql/batch_cooking_setup.sql).
 -- Rattachée à UNE semaine (`semaine` = lundi 'YYYY-MM-DD', convention calendrier) :
 -- chaque semaine de la vue Menus a sa propre fournée. UNE LIGNE = UNE RECETTE
--- dans la fournée d'une semaine. RLS « own » select/insert/update/delete ;
--- update sert à cocher `fait` et éditer `portions`. Colonne `semaine` +
--- contrainte unique par semaine ajoutées le 2026-09-01.
+-- OU UN REPAS TYPE (une seule des deux réfs non nulle). RLS « own »
+-- select/insert/update/delete ; update sert à cocher `fait` et éditer
+-- `portions`. Colonne `semaine` + unique par semaine ajoutées le 2026-09-01 ;
+-- `repas_type_id` + son unique ajoutés le 2026-09-01 (repas types dans la fournée).
 create table if not exists batch_cooking_items (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id),
   semaine date not null,      -- lundi de la semaine
   recette_id uuid references recettes(id) on delete set null,
-  nom text not null,          -- snapshot du nom (garde la ligne lisible si la recette est supprimée)
+  repas_type_id uuid references repas_types(id) on delete set null,
+  nom text not null,          -- snapshot du nom (garde la ligne lisible si la source est supprimée)
   portions numeric,           -- quantité à préparer, optionnelle
   fait boolean not null default false,
   created_at timestamptz not null default now(),
-  unique (user_id, semaine, recette_id)
+  unique (user_id, semaine, recette_id),
+  unique (user_id, semaine, repas_type_id)
 );
 create index if not exists idx_batch_cooking_items_user_semaine on batch_cooking_items (user_id, semaine);
 

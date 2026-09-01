@@ -3,52 +3,56 @@ import { X, Plus, Trash2, ChefHat, Search, Check, ChevronRight, ListChecks } fro
 import { useBackButton } from '../hooks/useBackButton'
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useRecipes } from '../hooks/useRecipes'
+import { useMealTemplatesList } from '../hooks/useMealTemplates'
 import { useToast } from '../lib/toast'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
+import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 import CookingPlanModal from './CookingPlanModal'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BatchCookingModal — page « Ma fournée » (roadmap §M9). Check-list unique des
-// recettes à cuisiner lors d'une session de meal prep, cochables « faite / à
+// BatchCookingModal — page « Ma fournée » (roadmap §M9). Check-list des
+// recettes ET repas types à cuisiner pour une semaine, cochables « faite / à
 // faire », indépendante du planificateur (données propres dans
 // batch_cooking_items, voir useBatchCooking). Ouverte depuis Calendrier →
 // Menus.
 //
-// Props : onClose()
+// Props : onClose(), semaine (lundi 'YYYY-MM-DD')
 // ─────────────────────────────────────────────────────────────────────────────
 
 const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+const keyOf = (kind, id) => `${kind}:${id}`
 
-// Panneau d'ajout : recherche + cases à cocher sur les recettes pas encore
-// dans la fournée.
-function RecipePicker({ recettes, loading, excludeIds, onAdd, onCancel }) {
+// Panneau d'ajout : recherche + cases à cocher sur les recettes / repas types
+// pas encore dans la fournée. `options` : [{ id, nom, kind, categorie }].
+function SourcePicker({ options, loading, excludeKeys, onAdd, onCancel }) {
   const [q, setQ] = useState('')
-  const [sel, setSel] = useState(() => new Set())
+  const [sel, setSel] = useState(() => new Set()) // set de keyOf(kind, id)
   const [adding, setAdding] = useState(false)
 
   const list = useMemo(() => {
     const nq = normalize(q)
-    return recettes
-      .filter(r => !excludeIds.has(r.id))
-      .filter(r => !nq || normalize(r.nom).includes(nq))
+    return options
+      .filter(o => !excludeKeys.has(keyOf(o.kind, o.id)))
+      .filter(o => !nq || normalize(o.nom).includes(nq))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-  }, [recettes, excludeIds, q])
+  }, [options, excludeKeys, q])
 
-  const toggle = (id) => setSel(s => {
+  const toggle = (k) => setSel(s => {
     const n = new Set(s)
-    n.has(id) ? n.delete(id) : n.add(id)
+    n.has(k) ? n.delete(k) : n.add(k)
     return n
   })
 
   const confirm = async () => {
     if (!sel.size || adding) return
     setAdding(true)
-    // On n'envoie que l'identité : pas de préremplissage des portions (champ
-    // optionnel, laissé vide tant que l'utilisatrice ne le renseigne pas).
-    await onAdd(recettes.filter(r => sel.has(r.id)).map(r => ({ id: r.id, nom: r.nom })))
+    // On n'envoie que l'identité : pas de préremplissage des portions.
+    await onAdd(
+      options.filter(o => sel.has(keyOf(o.kind, o.id))).map(o => ({ id: o.id, nom: o.nom, kind: o.kind })),
+    )
     setAdding(false)
   }
 
@@ -58,7 +62,7 @@ function RecipePicker({ recettes, loading, excludeIds, onAdd, onCancel }) {
         <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }} />
         <input
           className="input"
-          placeholder="Rechercher une recette"
+          placeholder="Rechercher une recette ou un repas type"
           value={q}
           onChange={e => setQ(e.target.value)}
           style={{ paddingLeft: 28, fontSize: 12.5 }}
@@ -70,17 +74,23 @@ function RecipePicker({ recettes, loading, excludeIds, onAdd, onCancel }) {
         <Loader />
       ) : list.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--text-hint)', padding: '6px 2px' }}>
-          {recettes.length ? 'Toutes tes recettes sont déjà dans la fournée.' : 'Aucune recette pour l’instant.'}
+          {options.length ? 'Tout est déjà dans la fournée.' : 'Aucune recette ni repas type pour l’instant.'}
         </div>
       ) : (
         <div style={{ maxHeight: 240, overflowY: 'auto', margin: '0 -2px' }}>
-          {list.map(r => (
-            <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', fontSize: 12.5, cursor: 'pointer' }}>
-              <input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} />
-              <span style={{ flexShrink: 0 }}>{getRecipeCategoryIcon(r.categories?.[0])}</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nom}</span>
-            </label>
-          ))}
+          {list.map(o => {
+            const k = keyOf(o.kind, o.id)
+            return (
+              <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', fontSize: 12.5, cursor: 'pointer' }}>
+                <input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} />
+                <span style={{ flexShrink: 0 }}>{getRecipeCategoryIcon(o.categorie)}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {o.nom}
+                  {o.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · repas type</span>}
+                </span>
+              </label>
+            )
+          })}
         </div>
       )}
 
@@ -107,28 +117,40 @@ function RecipePicker({ recettes, loading, excludeIds, onAdd, onCancel }) {
 export default function BatchCookingModal({ onClose, semaine }) {
   useBackButton(onClose)
   const toast = useToast()
-  const { items, loading, addRecipes, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking(semaine)
+  const { items, loading, addSources, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking(semaine)
   const { recettes, loading: loadingRecipes } = useRecipes()
+  const { repasTypes, loading: loadingTemplates } = useMealTemplatesList()
   const [picking, setPicking] = useState(false)
-  const [detail, setDetail] = useState(null) // { recette, portions } dont on affiche la fiche
+  const [detail, setDetail] = useState(null) // { kind, entity, portions } | null
   const [planOpen, setPlanOpen] = useState(false)
 
+  const loadingSources = loadingRecipes || loadingTemplates
   const recetteById = useMemo(() => new Map(recettes.map(r => [r.id, r])), [recettes])
-  const excludeIds = useMemo(() => new Set(items.map(i => i.recette_id).filter(Boolean)), [items])
+  const templateById = useMemo(() => new Map(repasTypes.map(t => [t.id, t])), [repasTypes])
+
+  const pickerOptions = useMemo(() => [
+    ...recettes.map(r => ({ id: r.id, nom: r.nom, kind: 'recette', categorie: r.categories?.[0] })),
+    ...repasTypes.map(t => ({ id: t.id, nom: t.nom, kind: 'repas_type', categorie: t.categories?.[0] })),
+  ], [recettes, repasTypes])
+
+  const excludeKeys = useMemo(() => new Set(
+    items.map(i => i.recette_id ? keyOf('recette', i.recette_id) : (i.repas_type_id ? keyOf('repas_type', i.repas_type_id) : null)).filter(Boolean),
+  ), [items])
+
   const doneCount = items.filter(i => i.fait).length
   const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0
 
-  const handleAdd = async (recettesToAdd) => {
-    const { error, added } = await addRecipes(recettesToAdd)
+  const handleAdd = async (sources) => {
+    const { error, added } = await addSources(sources)
     if (error) { toast('Erreur à l’ajout'); return }
-    if (added) toast(`✓ ${added} recette${added > 1 ? 's' : ''} ajoutée${added > 1 ? 's' : ''}`)
+    if (added) toast(`✓ ${added} ajouté${added > 1 ? 's' : ''}`)
     setPicking(false)
   }
 
   const handleClearDone = async () => {
     const { error } = await clearDone()
     if (error) { toast('Erreur'); return }
-    toast('Recettes faites retirées')
+    toast('Éléments faits retirés')
   }
 
   return (
@@ -141,8 +163,9 @@ export default function BatchCookingModal({ onClose, semaine }) {
       </div>
       <div className="page-modal-body">
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 14 }}>
-          Ta liste de recettes à cuisiner, à cocher au fur et à mesure. Elle vit à part : rien à
-          voir avec un plan de repas généré, tu peux t’en servir seule pour un meal prep.
+          Tes recettes et repas types à cuisiner cette semaine, à cocher au fur et à mesure. Elle
+          vit à part : rien à voir avec un plan de repas généré, tu peux t’en servir seule pour un
+          meal prep.
         </div>
 
         {items.length > 0 && (
@@ -176,13 +199,16 @@ export default function BatchCookingModal({ onClose, semaine }) {
         ) : items.length === 0 && !picking ? (
           <EmptyState
             icon={<ChefHat size={28} />}
-            title="Aucune recette dans la fournée"
-            description="Ajoute les recettes que tu comptes préparer."
+            title="Rien dans la fournée"
+            description="Ajoute les recettes et repas types que tu comptes préparer."
           />
         ) : (
           <div style={{ marginBottom: 12 }}>
             {items.map(it => {
-              const rec = it.recette_id ? recetteById.get(it.recette_id) : null
+              const kind = it.recette_id ? 'recette' : (it.repas_type_id ? 'repas_type' : null)
+              const entity = kind === 'recette'
+                ? recetteById.get(it.recette_id)
+                : kind === 'repas_type' ? templateById.get(it.repas_type_id) : null
               return (
               <div
                 key={it.id}
@@ -195,9 +221,9 @@ export default function BatchCookingModal({ onClose, semaine }) {
                   onChange={e => toggleFait(it.id, e.target.checked)}
                   style={{ width: 18, height: 18, flexShrink: 0 }}
                 />
-                {rec ? (
+                {entity ? (
                   <button
-                    onClick={() => setDetail({ recette: rec, portions: it.portions })}
+                    onClick={() => setDetail({ kind, entity, portions: it.portions })}
                     style={{
                       flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 4,
                       background: 'none', border: 'none', padding: 0, fontFamily: 'var(--font)',
@@ -206,7 +232,10 @@ export default function BatchCookingModal({ onClose, semaine }) {
                       textDecoration: it.fait ? 'line-through' : 'none',
                     }}
                   >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nom}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {it.nom}
+                      {kind === 'repas_type' && <span style={{ color: 'var(--text-hint)', fontWeight: 500 }}> · repas type</span>}
+                    </span>
                     <ChevronRight size={13} style={{ flexShrink: 0, color: 'var(--text-hint)' }} />
                   </button>
                 ) : (
@@ -214,10 +243,10 @@ export default function BatchCookingModal({ onClose, semaine }) {
                     style={{
                       flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      color: loadingRecipes && !it.fait ? 'var(--text)' : 'var(--text-hint)',
+                      color: loadingSources && !it.fait ? 'var(--text)' : 'var(--text-hint)',
                       textDecoration: it.fait ? 'line-through' : 'none',
                     }}
-                    title={loadingRecipes ? undefined : 'Recette supprimée'}
+                    title={loadingSources ? undefined : 'Élément supprimé'}
                   >
                     {it.nom}
                   </span>
@@ -256,10 +285,10 @@ export default function BatchCookingModal({ onClose, semaine }) {
         )}
 
         {picking ? (
-          <RecipePicker
-            recettes={recettes}
-            loading={loadingRecipes}
-            excludeIds={excludeIds}
+          <SourcePicker
+            options={pickerOptions}
+            loading={loadingSources}
+            excludeKeys={excludeKeys}
             onAdd={handleAdd}
             onCancel={() => setPicking(false)}
           />
@@ -269,7 +298,7 @@ export default function BatchCookingModal({ onClose, semaine }) {
             className="btn-primary"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           >
-            <Plus size={16} /> Ajouter des recettes
+            <Plus size={16} /> Ajouter recettes / repas types
           </button>
         )}
 
@@ -278,17 +307,23 @@ export default function BatchCookingModal({ onClose, semaine }) {
             onClick={handleClearDone}
             style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12, fontWeight: 700, color: 'var(--coral)', background: 'none', border: 'none', fontFamily: 'var(--font)' }}
           >
-            <Check size={13} /> Retirer les {doneCount} recette{doneCount > 1 ? 's' : ''} faite{doneCount > 1 ? 's' : ''}
+            <Check size={13} /> Retirer les {doneCount} fait{doneCount > 1 ? 's' : ''}
           </button>
         )}
       </div>
     </div>
 
-    {detail && (
+    {detail?.kind === 'recette' && (
       <RecipeDetailWrapper
-        recetteId={detail.recette.id}
-        initialRecette={detail.recette}
+        recetteId={detail.entity.id}
+        initialRecette={detail.entity}
         initialPortions={detail.portions}
+        onClose={() => setDetail(null)}
+      />
+    )}
+    {detail?.kind === 'repas_type' && (
+      <MealTemplateDetailWrapper
+        repasTypeId={detail.entity.id}
         onClose={() => setDetail(null)}
       />
     )}

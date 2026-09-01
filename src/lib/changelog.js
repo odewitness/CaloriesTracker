@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Ma fournée : les repas types aussi',
+    description: "Tu peux maintenant ajouter des repas types à « Ma fournée », pas seulement des recettes — dans le sélecteur d’ajout comme depuis un plan de repas appliqué. Ils apparaissent dans la liste avec la mention « repas type », et leurs ingrédients (mis à l’échelle des portions à préparer) s’affichent dans le Plan de cuisine.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Un plantage n’efface plus tout l’écran',
     description: "Si un écran ou une fenêtre bugue, tu vois maintenant un petit message avec un bouton « Réessayer » au lieu d’une page blanche — et le reste de l’app continue de fonctionner. Le message affiche aussi un « détail technique » : si tu me le copies, ça m’aide à corriger.",
   },
