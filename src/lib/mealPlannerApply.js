@@ -127,26 +127,36 @@ export function planToPlannedRows(plan, ctx) {
         } else if (it.kind === 'recette') {
           briqueCount++
           briqueNames.push(it.nom)
+          const portions = it.portions || 1
           const rec = recettesById[it.id]
           const per100 = recipePer100ById[it.id] || null
           const portionG = it.portionG
             || ((rec?.poids_cuit_g || rec?.poids_cru_g || 0) / (rec?.portions || 1))
-          // UNE ligne « recette » agrégée (voir en-tête du fichier). per100
-          // enrichi si dispo (vitamines/minéraux via calcPer100g), sinon les
-          // macros stockées sur la ligne recettes.
+          // UNE ligne « recette » agrégée (voir en-tête du fichier), au grammage
+          // de `portions` portion(s). per100 enrichi si dispo (vitamines/minéraux
+          // via calcPer100g), sinon les macros stockées sur la ligne recettes.
           const base = per100 ? { ...per100 } : (rec || {})
           const single = scaleFood(
             { ...base, alim_nom: it.nom, _source: 'recette', id: it.id },
-            portionG || 0,
+            (portionG || 0) * portions,
           )
-          if (single.food_name && single.qty_g > 0) items.push(single)
+          // `portions` conservé sur l'item : addPlannedItems (liste de courses)
+          // ignore `qty_g` d'un item recette et ré-explose depuis
+          // recette_ingredients → sans cette clé, un plat doublé n'achèterait
+          // qu'une portion d'ingrédients.
+          if (single.food_name && single.qty_g > 0) items.push({ ...single, portions })
           soloSource = { source_type: 'recette', source_id: it.id }
         } else if (it.kind === 'repas_type') {
           briqueCount++
           briqueNames.push(it.nom)
+          const portions = it.portions || 1
           const tpl = templatesById[it.id]
           const parts = tpl?.nb_portions || 1
-          const factor = parts > 0 ? 1 / parts : 1
+          // `portions` est cuit dans le facteur : les items du repas type sont
+          // éclatés en lignes d'ingrédients normales, addPlannedItems les prend
+          // au grammage tel quel (pas de re-scaling par `portions`, contrairement
+          // à la branche recette).
+          const factor = (parts > 0 ? 1 / parts : 1) * portions
           for (const tit of (tpl?.items || [])) {
             items.push(scaleAbsoluteItem(tit, factor))
           }

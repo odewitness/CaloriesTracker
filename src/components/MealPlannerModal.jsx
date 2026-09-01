@@ -351,6 +351,14 @@ function ConfigView({ planner, onGenerate }) {
         />
         Compléter aussi les manques en vitamines et minéraux
       </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+        <input
+          type="checkbox"
+          checked={config.allowDoublePortions !== false}
+          onChange={e => setConfig({ allowDoublePortions: e.target.checked })}
+        />
+        Autoriser 2 portions d'un même plat quand ça rapproche des objectifs
+      </label>
       {Object.keys(baseMealConfig).length === 0 && (
         <div className="card" style={{ padding: 14, fontSize: 12.5, color: 'var(--text-hint)', textAlign: 'center', marginBottom: 8 }}>
           Aucun repas activé. Active des repas depuis Profil.
@@ -385,12 +393,21 @@ function ConfigView({ planner, onGenerate }) {
 }
 
 // Panneau d'édition d'une brique / d'un aliment « en + » dans l'aperçu.
-function ItemEditor({ item, candidates, onSwap, onRemove }) {
+function ItemEditor({ item, candidates, onSwap, onRemove, onSetPortions }) {
   const isAddon = item.kind === 'ajout'
+  const portions = item.portions || 1
   return (
     <div style={{ background: 'var(--gray-bg)', borderRadius: 6, padding: '6px 8px', margin: '2px 0 6px' }}>
       {!isAddon && (
         <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 6px' }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              Portions
+            </span>
+            <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions - 1)} disabled={portions <= 1} aria-label="Moins de portions">−</button>
+            <span style={{ fontSize: 12.5, fontWeight: 700, width: 16, textAlign: 'center' }}>{portions}</span>
+            <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions + 1)} disabled={portions >= 2} aria-label="Plus de portions">+</button>
+          </div>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3, margin: '2px 0 4px' }}>
             Remplacer par
           </div>
@@ -495,7 +512,7 @@ function PreviewView({
   plan, startDateStr, recettesById, templatesById, people,
   onBack, onRegenerate, generating, onApply, applying, result, applied,
   lockedKeys, onToggleLock, onToggleLockDay,
-  swapCandidates, onSwapItem, onRemoveItem,
+  swapCandidates, onSwapItem, onRemoveItem, onSetItemPortions,
 }) {
   const [allowConflicts, setAllowConflicts] = useState(false)
   const [editing, setEditing] = useState(null) // { di, meal, ii } | null
@@ -602,8 +619,8 @@ function PreviewView({
                       {it.kind === 'ajout' ? '+ ' : ''}{it.nom}
                       {it.kind === 'ajout' && <span style={{ color: 'var(--text-hint)' }}> · {r0(it.qty_g)} g</span>}
                       {it.micro && <span style={{ color: 'var(--text-hint)' }}> · {String(it.micro).toLowerCase()}</span>}
-                      {it.kind === 'recette' && it.portionG && <span style={{ color: 'var(--text-hint)' }}> · 1 portion</span>}
-                      {it.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · 1 part</span>}
+                      {it.kind === 'recette' && it.portionG && <span style={{ color: 'var(--text-hint)' }}> · {it.portions || 1} portion{(it.portions || 1) > 1 ? 's' : ''}</span>}
+                      {it.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · {it.portions || 1} part{(it.portions || 1) > 1 ? 's' : ''}</span>}
                     </span>
                     <span style={{ color: 'var(--text-hint)', flexShrink: 0 }}>{r0(it.macros.kcal)} kcal</span>
                   </button>
@@ -613,6 +630,7 @@ function PreviewView({
                       candidates={it.kind === 'ajout' ? [] : swapCandidates(di, m.meal, ii)}
                       onSwap={(cid) => { onSwapItem(di, m.meal, ii, cid); setEditing(null) }}
                       onRemove={() => { onRemoveItem(di, m.meal, ii); setEditing(null) }}
+                      onSetPortions={(n) => onSetItemPortions(di, m.meal, ii, n)}
                     />
                   )}
                 </div>
@@ -865,6 +883,7 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
             swapCandidates={planner.swapCandidates}
             onSwapItem={planner.swapItem}
             onRemoveItem={planner.removeItem}
+            onSetItemPortions={planner.setItemPortions}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
             onApply={handleApply}

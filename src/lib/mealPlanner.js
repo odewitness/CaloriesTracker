@@ -54,6 +54,21 @@ const MAX_ADDON_G = 200
 // Itérations de recherche locale.
 const LOCAL_SEARCH_ROUNDS = 60
 
+// ── Portions doublées (PALIER 2) ───────────────────────────────────────────
+// Le solveur peut poser 1 OU 2 portions (jamais fractionnaire, jamais plus)
+// d'une brique quand un repas reste loin sous sa cible et qu'une brique
+// éligible s'en rapproche en doublant.
+const MAX_MEAL_PORTIONS = 2
+// Catégories dont une brique peut être doublée (pas un Accompagnement / Dessert
+// / Boisson : doubler la garniture ou le dessert n'a pas de sens).
+const DOUBLE_ELIGIBLE_CATEGORIES = new Set(['Plat', 'Petit-déjeuner', 'Collation'])
+// On ne double pas si le repas dépasse alors ce multiple de sa cible kcal.
+const DOUBLE_KCAL_CEILING = 1.10
+// Poids de la pénalité « portions gâchées » (recherche locale, niveau semaine) :
+// privilégie les plans où le nombre total de portions d'une recette tombe sur un
+// multiple propre de son rendement (moins de restes / de facteurs bâtards).
+const LEFTOVER_PORTION_WEIGHT = 0.12
+
 // ── RNG déterministe (mulberry32) ───────────────────────────────────────────
 // Un même `seed` reproduit le même plan → le bouton « régénérer » change juste
 // de seed, et « verrouiller + régénérer » garde les parties verrouillées avec
@@ -92,6 +107,18 @@ function addMacros(a, b) {
     gluc: a.gluc + b.gluc,
     lip: a.lip + b.lip,
     fibres: a.fibres + b.fibres,
+  }
+}
+
+// Multiplie un profil macro par un scalaire (ex. 2 portions d'une brique).
+// Exporté : le hook s'en sert pour le réglage manuel 1 / 2 portions dans l'aperçu.
+export function scaleMacros(m, k) {
+  return {
+    kcal: (m.kcal || 0) * k,
+    prot: (m.prot || 0) * k,
+    gluc: (m.gluc || 0) * k,
+    lip: (m.lip || 0) * k,
+    fibres: (m.fibres || 0) * k,
   }
 }
 
@@ -422,7 +449,7 @@ function addMicroContribution(acc, item, { recettesById, templatesById }) {
   } else if (item.kind === 'recette') {
     const rec = recettesById[item.id]
     if (!rec) return
-    const f = (item.portionG || 0) / 100 // colonnes recette = /100 g
+    const f = ((item.portionG || 0) / 100) * (item.portions || 1) // colonnes recette = /100 g
     for (const k of MICRO_COLUMN_KEYS) {
       const v = rec[k]
       if (v != null) acc[k] = (acc[k] || 0) + Number(v) * f
@@ -431,7 +458,7 @@ function addMicroContribution(acc, item, { recettesById, templatesById }) {
     const tpl = templatesById[item.id]
     if (!tpl) return
     const parts = tpl.nb_portions || 1
-    const f = parts > 0 ? 1 / parts : 1 // items du repas type = valeurs absolues
+    const f = (parts > 0 ? 1 / parts : 1) * (item.portions || 1) // items du repas type = valeurs absolues
     for (const tit of (tpl.items || [])) {
       for (const k of MICRO_COLUMN_KEYS) {
         const v = tit[k]
@@ -503,6 +530,35 @@ function fillDayMicros(dayMicros, hostMeals, foods, settings, rng, usedAddonKeys
   return out
 }
 
+// Pénalité « portions gâchées » sur tout le plan : pour chaque recette / repas
+// type, on somme les portions consommées et on regarde de combien il faudrait
+// arrondir au multiple supérieur de son rendement (recette pour 4 utilisée 5
+// fois → 3 portions cuisinées en trop → 3/4 de fournée gâchée). Poussée dans le
+// score de la recherche locale pour préférer les combinaisons « propres ».
+function leftoverPortionPenalty(dayList, recettesById, templatesById) {
+  const used = new Map() // id -> { kind, n }
+  for (const d of dayList) {
+    for (const m of d.meals) {
+      for (const it of m.items) {
+        if (it.kind !== 'recette' && it.kind !== 'repas_type') continue
+        const cur = used.get(it.id) || { kind: it.kind, n: 0 }
+        cur.n += it.portions || 1
+        used.set(it.id, cur)
+      }
+    }
+  }
+  let pen = 0
+  for (const [id, { kind, n }] of used) {
+    const baseYield = kind === 'recette'
+      ? (recettesById[id]?.portions || 1)
+      : (templatesById[id]?.nb_portions || 1)
+    if (baseYield <= 1) continue // rendement 1 → tout compte est « propre »
+    const rem = n % baseYield
+    if (rem !== 0) pen += (baseYield - rem) / baseYield
+  }
+  return LEFTOVER_PORTION_WEIGHT * pen
+}
+
 // ── Construction du plan ───────────────────────────────────────────────────
 
 /**
@@ -520,6 +576,7 @@ function fillDayMicros(dayMicros, hostMeals, foods, settings, rng, usedAddonKeys
  * @param {boolean} [p.includeRepasTypes=true]  inclure les repas types dans les viviers
  * @param {number|null} [p.maxCookMinutes=null]  temps prépa + cuisson max (min) ; null = pas de filtre
  * @param {boolean} [p.fillMicros=true]  compléter les manques vitamines / minéraux du jour avec des favoris
+ * @param {boolean} [p.allowDoublePortions=true]  autoriser 2 portions d'un même plat sur un repas quand ça rapproche des cibles
  * @param {object} [p.settings]      settings (pour getNutrientGaps : goal_proteines / goal_fibres ; VNR micro = fixes)
  * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number }
  * @param {object} [p.locked]        { `${dayIndex}|${meal}`: <objet repas figé de l'aperçu> }
@@ -530,7 +587,8 @@ export function buildMealPlan(p) {
   const {
     days, people = 1, season = null, mealConfig, recettes = [], repasTypes = [],
     favorites = [], mealTargets = {}, goalFibres = 0, includeRepasTypes = true,
-    maxCookMinutes = null, fillMicros = true, settings = {}, options = {}, locked = {},
+    maxCookMinutes = null, fillMicros = true, allowDoublePortions = true,
+    settings = {}, options = {}, locked = {},
   } = p
   const seasonMode = options.seasonMode === 'filter' ? 'filter' : 'bonus'
   const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes, maxCookMinutes }
@@ -656,8 +714,32 @@ export function buildMealPlan(p) {
             portions: 1,
             portionG: cand.macros._portionG || null,
             macros: { ...cand.macros },
+            unitMacros: { ...cand.macros }, // référence « 1 portion » (doublement / réglage manuel)
           })
         })
+
+        // 2 portions d'un même plat (PALIER 2) : si le repas reste loin sous sa
+        // cible, on double la brique éligible qui l'en rapproche le plus — une
+        // seule par repas, portions entières, sans faire déborder les calories.
+        if (allowDoublePortions && items.length) {
+          const base1 = items.reduce((acc, it) => addMacros(acc, it.macros), { ...EMPTY_MACROS })
+          const dist1 = macroDistance(base1, target)
+          let best = null // { idx, dist }
+          items.forEach((it, idx) => {
+            if (it.kind !== 'recette' && it.kind !== 'repas_type') return
+            if (!DOUBLE_ELIGIBLE_CATEGORIES.has(it.categorie)) return
+            const trial = addMacros(base1, it.macros) // brique comptée 2×
+            if (trial.kcal > target.kcal * DOUBLE_KCAL_CEILING) return
+            const d = macroDistance(trial, target)
+            if (d < dist1 - 1e-6 && (!best || d < best.dist)) best = { idx, dist: d }
+          })
+          if (best) {
+            const it = items[best.idx]
+            it.portions = MAX_MEAL_PORTIONS
+            it.macros = scaleMacros(it.unitMacros, MAX_MEAL_PORTIONS)
+          }
+        }
+
         const recipeTotals = items.reduce((acc, it) => addMacros(acc, it.macros), { ...EMPTY_MACROS })
         const residual = {
           kcal: target.kcal - recipeTotals.kcal,
@@ -708,8 +790,11 @@ export function buildMealPlan(p) {
     return dayList
   }
 
+  const scorePlan = (dl) => dl.reduce((s, d) => s + d.score, 0)
+    + leftoverPortionPenalty(dl, recettesById, templatesById)
+
   let dayList = build()
-  let bestScore = dayList.reduce((s, d) => s + d.score, 0)
+  let bestScore = scorePlan(dayList)
 
   // 3. Recherche locale : on tente de remplacer une recette d'un pool de groupe
   //    par une autre de son vivier ; on garde si le score total baisse. Les
@@ -729,7 +814,7 @@ export function buildMealPlan(p) {
     const prev = pool[replaceIdx]
     pool[replaceIdx] = alt
     const trial = build()
-    const trialScore = trial.reduce((s, d) => s + d.score, 0)
+    const trialScore = scorePlan(trial)
     if (trialScore < bestScore - 1e-6) {
       dayList = trial
       bestScore = trialScore
