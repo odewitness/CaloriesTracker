@@ -142,9 +142,12 @@ export function useShoppingListItems(listeId) {
         const mergedNoms = art.recetteNom && !existing.recette_noms.includes(art.recetteNom)
           ? [...existing.recette_noms, art.recetteNom]
           : existing.recette_noms
+        // Grammages arrondis au gramme : une liste de courses n'a pas besoin
+        // de décimales, et la mise à l'échelle d'ingrédients de recette
+        // (1 / nb_portions) produit sinon des "33,3333…".
         const mergedQty = (existing.qty_g == null && art.qty_g == null)
           ? null
-          : (existing.qty_g || 0) + (art.qty_g || 0)
+          : Math.round((existing.qty_g || 0) + (art.qty_g || 0))
         toUpdate.push({ id: existing.id, qty_g: mergedQty, recette_noms: mergedNoms })
         // Pour fusionner correctement plusieurs ajouts identiques dans le même lot
         existingByKey.set(key, { ...existing, qty_g: mergedQty, recette_noms: mergedNoms })
@@ -154,7 +157,7 @@ export function useShoppingListItems(listeId) {
           user_id: user.id,
           nom: art.nom,
           categorie: art.categorie || 'Autre',
-          qty_g: art.qty_g ?? null,
+          qty_g: art.qty_g == null ? null : Math.round(art.qty_g),
           food_source: art.food_source || null,
           food_ref_id: art.food_ref_id || null,
           recette_noms: art.recetteNom ? [art.recetteNom] : [],

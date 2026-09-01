@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Liste de courses : grammages arrondis',
+    description: "Fini les « 33,33333 g » : les quantités de la liste de courses sont maintenant arrondies au gramme.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Ma fournée : un plan de cuisine à réorganiser',
     description: "Depuis « Ma fournée », le bouton « Plan de cuisine » met bout à bout toutes les étapes de tes recettes. Tu les remontes ou descends avec les flèches pour les faire dans l’ordre qui t’arrange, tu coches au fur et à mesure, et chaque étape garde la couleur de sa recette pour t’y retrouver. Les grammages sont écrits dans les étapes, à l’échelle des portions à préparer, et un panneau dépliable liste les ingrédients de chaque recette.",
   },
