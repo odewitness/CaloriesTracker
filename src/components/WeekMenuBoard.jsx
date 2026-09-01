@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, ChevronDown, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, Pencil, MoreVertical } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, Pencil, MoreVertical } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
-import { MEALS_ORDER, computeTotals, VITAMIN_FIELDS, MINERAL_FIELDS, SATURATED_FAT_KEY, SUCRES_ANSES_REF } from '../lib/nutrients'
+import { MEALS_ORDER, computeTotals } from '../lib/nutrients'
 import { deviationLevel } from '../lib/mealPlanner'
 import { deletePlannedMeal, deletePlannedMeals } from '../hooks/usePlannedMeals'
 import { fmt } from '../lib/dates'
@@ -10,6 +10,7 @@ import { readAppliedPlans } from '../lib/mealPlannerApply'
 import PlanMealModal from './PlanMealModal'
 import MealPlannerModal from './MealPlannerModal'
 import BatchCookingModal from './BatchCookingModal'
+import NutrientPanel from './NutrientPanel'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 
@@ -69,75 +70,22 @@ function rowSources(r) {
   return out
 }
 
-// Niveau couleur d'un %VNR : garde-fou (vert ≥ 80 %, ambre ≥ 50 %, corail en
-// dessous) ; pour un nutriment « limite » (sodium, sel) c'est l'inverse.
-function pctLevel(pct, isLimit) {
-  if (isLimit) return pct > 100 ? 'off' : pct > 80 ? 'warn' : 'ok'
-  return pct >= 80 ? 'ok' : pct >= 50 ? 'warn' : 'off'
-}
-
-function fmtVal(v, unit) {
-  const n = v < 10 ? Math.round(v * 10) / 10 : Math.round(v)
-  return `${n} ${unit}`
-}
-
-// Récap déplié sous le résumé : moyenne par jour planifié des sucres / graisses
-// saturées / fibres + vitamines & minéraux en %VNR (réf. ANSES adulte, non
-// personnalisée). Best-effort : un aliment sans donnée micro compte pour 0.
-function WeekNutrientRecap({ plannedByDate, days, mealSet, plannedDays }) {
-  const totals = useMemo(() => {
-    const items = []
-    for (const d of days) {
-      for (const r of (plannedByDate?.[d] || [])) {
-        if (mealSet.has(r.meal)) items.push(...(r.items || []))
-      }
-    }
-    return computeTotals(items)
-  }, [plannedByDate, days, mealSet])
-
+// Totaux nutritionnels de la semaine affichée, ramenés à la MOYENNE par jour
+// planifié — c'est la forme attendue par NutrientPanel (jauges %RNP quotidiennes,
+// mêmes réf. que la page du jour). Best-effort : un aliment sans donnée micro
+// compte pour 0.
+function weekAvgTotals(plannedByDate, days, mealSet, plannedDays) {
   if (!plannedDays) return null
-  const per = (key) => (totals[key] || 0) / plannedDays
-  const sumFields = (f) => (f.sumKeys || [f.key]).reduce((s, k) => s + (totals[k] || 0), 0) / plannedDays
-
-  const Row = ({ label, value, unit, rnp, isLimit }) => {
-    const pct = rnp ? (value / rnp) * 100 : null
-    const level = pct == null ? 'ok' : pctLevel(pct, isLimit)
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
-        <span style={{ fontSize: 11.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-        {pct != null && (
-          <span style={{ width: 46, height: 4, borderRadius: 2, background: 'var(--gray-bg)', overflow: 'hidden', flexShrink: 0 }}>
-            <span style={{ display: 'block', width: `${Math.min(100, pct)}%`, height: '100%', background: LEVEL_COLOR[level] }} />
-          </span>
-        )}
-        <span style={{ fontSize: 11, fontWeight: 700, color: LEVEL_COLOR[level], width: 66, textAlign: 'right', flexShrink: 0 }}>
-          {fmtVal(value, unit)}
-          {pct != null && <span style={{ color: 'var(--text-hint)', fontWeight: 500 }}> · {Math.round(pct)}%</span>}
-        </span>
-      </div>
-    )
+  const items = []
+  for (const d of days) {
+    for (const r of (plannedByDate?.[d] || [])) {
+      if (mealSet.has(r.meal)) items.push(...(r.items || []))
+    }
   }
-
-  const GroupLabel = ({ children }) => (
-    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4, margin: '10px 0 3px' }}>{children}</div>
-  )
-
-  return (
-    <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: 'var(--text-hint)', marginBottom: 4 }}>Moyenne par jour planifié</div>
-      <Row label="Sucres" value={per('sucres')} unit="g" rnp={SUCRES_ANSES_REF} isLimit />
-      <Row label="Graisses saturées" value={per(SATURATED_FAT_KEY)} unit="g" />
-      <Row label="Fibres" value={per('fibres')} unit="g" rnp={30} />
-      <GroupLabel>Vitamines</GroupLabel>
-      {VITAMIN_FIELDS.map(f => (
-        <Row key={f.key} label={f.label} value={sumFields(f)} unit={f.unit} rnp={f.ref} />
-      ))}
-      <GroupLabel>Minéraux</GroupLabel>
-      {MINERAL_FIELDS.map(f => (
-        <Row key={f.key} label={f.label} value={sumFields(f)} unit={f.unit} rnp={f.ref} isLimit={f.limite} />
-      ))}
-    </div>
-  )
+  const raw = computeTotals(items)
+  const avg = {}
+  for (const k in raw) avg[k] = (raw[k] || 0) / plannedDays
+  return avg
 }
 
 export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onChangeWeek, onGoToday, onRefetch }) {
@@ -148,7 +96,6 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
   const [pickFor, setPickFor] = useState(null)     // repas.id dont le choix « quelle recette voir » est ouvert
   const [addFor, setAddFor] = useState(null)       // dateStr dont le menu « ajouter un repas » est ouvert
   const [sourceDetail, setSourceDetail] = useState(null) // { source_type, source_id } du plat dont on ouvre la fiche
-  const [nutriOpen, setNutriOpen] = useState(false) // récap vitamines/minéraux de la semaine déplié
   const [busyId, setBusyId] = useState(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
@@ -214,6 +161,12 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
       .flatMap(d => plannedByDate?.[d] || [])
       .filter(r => r.recurrence_group_id && appliedGroupIds.has(r.recurrence_group_id))
   }, [days, plannedByDate, appliedGroupIds])
+
+  // Moyenne nutritionnelle par jour planifié → NutrientPanel (design page du jour).
+  const weekAvg = useMemo(
+    () => weekAvgTotals(plannedByDate, days, mealSet, weekStats.plannedDays),
+    [plannedByDate, days, mealSet, weekStats.plannedDays],
+  )
 
   const hasWeekPlan = weekPlanRows.length > 0
   // Entrée de stash du plan appliqué sur CETTE semaine (pour rouvrir le plan
@@ -285,27 +238,18 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           <div style={{ height: 4, borderRadius: 2, background: 'var(--gray-bg)', marginTop: 8, overflow: 'hidden' }}>
             <div style={{ width: `${Math.round((weekStats.plannedDays / 7) * 100)}%`, height: '100%', background: 'var(--green)', transition: 'width .2s' }} />
           </div>
-
-          {weekStats.plannedDays > 0 && (
-            <>
-              <button
-                onClick={() => setNutriOpen(o => !o)}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font)', padding: 0 }}
-              >
-                <ChevronDown size={13} style={{ transform: nutriOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
-                Vitamines, minéraux, sucres & graisses
-              </button>
-              {nutriOpen && (
-                <WeekNutrientRecap
-                  plannedByDate={plannedByDate}
-                  days={days}
-                  mealSet={mealSet}
-                  plannedDays={weekStats.plannedDays}
-                />
-              )}
-            </>
-          )}
         </div>
+      )}
+
+      {/* Détail nutritionnel de la semaine — même carte repliable que la page du
+          jour (NutrientPanel), alimentée par la moyenne par jour planifié. */}
+      {weekAvg && (
+        <>
+          <div style={{ fontSize: 10, color: 'var(--text-hint)', margin: '0 2px 4px' }}>
+            Moyenne par jour planifié · {weekStats.plannedDays} jour{weekStats.plannedDays > 1 ? 's' : ''}
+          </div>
+          <NutrientPanel totals={weekAvg} hasEntries />
+        </>
       )}
 
       {/* Barre d'actions sur une ligne. « Générer un plan » disparaît quand la

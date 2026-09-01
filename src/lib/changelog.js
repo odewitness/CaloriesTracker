@@ -8,8 +8,8 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
-    title: 'Menus : récap vitamines/minéraux de la semaine + fiches des plats combinés',
-    description: "Sous le résumé de la semaine, une flèche « Vitamines, minéraux, sucres & graisses » déplie la moyenne par jour planifié : sucres, graisses saturées, fibres, et chaque vitamine / minéral en pourcentage des repères conseillés. Et quand un repas prévu regroupe plusieurs recettes sur une même ligne (« Curry + Riz »), tu peux maintenant toucher le nom pour choisir laquelle ouvrir.",
+    title: 'Menus : détail nutritionnel de la semaine + fiches des plats combinés',
+    description: "Sous le résumé de la semaine, la carte « Détail nutritionnel » (la même que sur la page du jour : vitamines, minéraux, sucres, acides gras avec les jauges de couleur) montre ta moyenne par jour planifié. Et quand un repas prévu regroupe plusieurs recettes sur une même ligne (« Curry + Riz »), tu peux maintenant toucher le nom pour choisir quelle fiche ouvrir.",
   },
   {
     date: '2026-09-01',
