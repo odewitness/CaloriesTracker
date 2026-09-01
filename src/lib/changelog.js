@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Ma fournée : ouvrir une recette d’un tap',
+    description: "Dans « Ma fournée », touche le nom d’une recette pour ouvrir sa fiche (ingrédients, étapes, valeurs) sans quitter ta liste.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Reprendre la semaine précédente en un geste',
     description: "Dans le Calendrier, onglet « Menus », quand la semaine d'avant contient des repas prévus, un bouton « Reprendre la semaine précédente » les recopie tous sur la semaine affichée. Les créneaux déjà occupés et les jours exclus sont laissés tranquilles, et tu peux tout retirer d'un coup comme un plan généré.",
   },

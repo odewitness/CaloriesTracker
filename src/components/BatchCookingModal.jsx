@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react'
-import { X, Plus, Trash2, ChefHat, Search, Check } from 'lucide-react'
+import { X, Plus, Trash2, ChefHat, Search, Check, ChevronRight } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useRecipes } from '../hooks/useRecipes'
 import { useToast } from '../lib/toast'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
+import RecipeDetailWrapper from './RecipeDetailWrapper'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
 
@@ -108,7 +109,9 @@ export default function BatchCookingModal({ onClose }) {
   const { items, loading, addRecipes, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking()
   const { recettes, loading: loadingRecipes } = useRecipes()
   const [picking, setPicking] = useState(false)
+  const [detailRecette, setDetailRecette] = useState(null) // recette dont on affiche la fiche
 
+  const recetteById = useMemo(() => new Map(recettes.map(r => [r.id, r])), [recettes])
   const excludeIds = useMemo(() => new Set(items.map(i => i.recette_id).filter(Boolean)), [items])
   const doneCount = items.filter(i => i.fait).length
   const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0
@@ -127,6 +130,7 @@ export default function BatchCookingModal({ onClose }) {
   }
 
   return (
+    <>
     <div className="page-modal" style={{ zIndex: 60 }}>
       <div className="page-modal-header">
         <div style={{ width: 32, flexShrink: 0 }} />
@@ -161,7 +165,9 @@ export default function BatchCookingModal({ onClose }) {
           />
         ) : (
           <div style={{ marginBottom: 12 }}>
-            {items.map(it => (
+            {items.map(it => {
+              const rec = it.recette_id ? recetteById.get(it.recette_id) : null
+              return (
               <div
                 key={it.id}
                 className="card"
@@ -173,16 +179,33 @@ export default function BatchCookingModal({ onClose }) {
                   onChange={e => toggleFait(it.id, e.target.checked)}
                   style={{ width: 18, height: 18, flexShrink: 0 }}
                 />
-                <span
-                  style={{
-                    flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    color: it.fait ? 'var(--text-hint)' : 'var(--text)',
-                    textDecoration: it.fait ? 'line-through' : 'none',
-                  }}
-                >
-                  {it.nom}
-                </span>
+                {rec ? (
+                  <button
+                    onClick={() => setDetailRecette(rec)}
+                    style={{
+                      flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 4,
+                      background: 'none', border: 'none', padding: 0, fontFamily: 'var(--font)',
+                      fontSize: 13, fontWeight: 600, textAlign: 'left',
+                      color: it.fait ? 'var(--text-hint)' : 'var(--text)',
+                      textDecoration: it.fait ? 'line-through' : 'none',
+                    }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nom}</span>
+                    <ChevronRight size={13} style={{ flexShrink: 0, color: 'var(--text-hint)' }} />
+                  </button>
+                ) : (
+                  <span
+                    style={{
+                      flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      color: loadingRecipes && !it.fait ? 'var(--text)' : 'var(--text-hint)',
+                      textDecoration: it.fait ? 'line-through' : 'none',
+                    }}
+                    title={loadingRecipes ? undefined : 'Recette supprimée'}
+                  >
+                    {it.nom}
+                  </span>
+                )}
                 <input
                   type="number"
                   inputMode="numeric"
@@ -211,7 +234,8 @@ export default function BatchCookingModal({ onClose }) {
                   <Trash2 size={13} />
                 </button>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -243,5 +267,14 @@ export default function BatchCookingModal({ onClose }) {
         )}
       </div>
     </div>
+
+    {detailRecette && (
+      <RecipeDetailWrapper
+        recetteId={detailRecette.id}
+        initialRecette={detailRecette}
+        onClose={() => setDetailRecette(null)}
+      />
+    )}
+    </>
   )
 }
