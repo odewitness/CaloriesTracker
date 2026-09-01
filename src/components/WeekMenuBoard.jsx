@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, History } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, History, Pencil } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER } from '../lib/nutrients'
@@ -54,14 +54,16 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
   const [busyId, setBusyId] = useState(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
-  const [appliedGroupIds, setAppliedGroupIds] = useState(() => new Set(readAppliedPlans().map(p => p.groupId)))
+  // Plans générés appliqués (stashés en localStorage par MealPlannerModal).
+  const [appliedPlans, setAppliedPlans] = useState(() => readAppliedPlans())
   const [removingPlan, setRemovingPlan] = useState(false)
   const [repeatingWeek, setRepeatingWeek] = useState(false)
 
-  // Re-lit la liste des plans générés appliqués (stashée en localStorage par
-  // MealPlannerModal) à la fermeture de la modale.
+  const appliedGroupIds = useMemo(() => new Set(appliedPlans.map(p => p.groupId)), [appliedPlans])
+
+  // Re-lit le stash à la fermeture de la modale du planificateur.
   useEffect(() => {
-    if (!plannerOpen) setAppliedGroupIds(new Set(readAppliedPlans().map(p => p.groupId)))
+    if (!plannerOpen) setAppliedPlans(readAppliedPlans())
   }, [plannerOpen])
 
   const todayStr = fmt(new Date())
@@ -81,18 +83,27 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
   )
 
   // Cible calorique d'une journée (objectif global) + résumé de la semaine
-  // affichée : repas planifiés / créneaux, moyenne kcal/jour.
+  // affichée : repas planifiés / créneaux, moyenne kcal des jours PLANIFIÉS
+  // (on ne compte pas les jours encore vides).
   const dayKcalTarget = Math.round(settings?.goal_kcal || 0)
   const weekStats = useMemo(() => {
     let planned = 0
     let kcal = 0
+    let plannedDays = 0
     for (const dateStr of days) {
-      for (const r of (plannedByDate?.[dateStr] || [])) {
+      const rows = plannedByDate?.[dateStr] || []
+      if (rows.length) plannedDays++
+      for (const r of rows) {
         planned++
         kcal += (r.items || []).reduce((s, i) => s + (i.energie_kcal || 0), 0)
       }
     }
-    return { planned, slots: enabledMeals.length * 7, avgKcal: Math.round(kcal / 7) }
+    return {
+      planned,
+      slots: enabledMeals.length * 7,
+      plannedDays,
+      avgKcal: plannedDays ? Math.round(kcal / plannedDays) : 0,
+    }
   }, [days, plannedByDate, enabledMeals.length])
 
   // Lignes de la semaine affichée qui appartiennent à un plan généré par le
@@ -103,6 +114,14 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
       .flatMap(d => plannedByDate?.[d] || [])
       .filter(r => r.recurrence_group_id && appliedGroupIds.has(r.recurrence_group_id))
   }, [days, plannedByDate, appliedGroupIds])
+
+  const hasWeekPlan = weekPlanRows.length > 0
+  // Entrée de stash du plan appliqué sur CETTE semaine (pour rouvrir le plan
+  // enregistré correspondant à l'édition).
+  const weekAppliedPlan = useMemo(
+    () => appliedPlans.find(p => weekPlanRows.some(r => r.recurrence_group_id === p.groupId)) || null,
+    [appliedPlans, weekPlanRows],
+  )
 
   const handleRemovePlan = async () => {
     if (!weekPlanRows.length) return
@@ -208,7 +227,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
           </div>
           {weekStats.avgKcal > 0 && dayKcalTarget > 0 && (
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Moyenne / jour</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Moy. / jour planifié</div>
               <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 2, color: LEVEL_COLOR[deviationLevel(weekStats.avgKcal, dayKcalTarget)] }}>
                 {weekStats.avgKcal} <span style={{ color: 'var(--text-hint)', fontWeight: 600 }}>/ {dayKcalTarget} kcal</span>
               </div>
@@ -217,8 +236,8 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
         </div>
       )}
 
-      {/* Barre d'actions : 1 action principale (générer un plan) + 2 actions
-          secondaires côte à côte (reprendre la semaine précédente / fournée). */}
+      {/* Barre d'actions : 1 action principale (générer OU modifier le plan) +
+          2 actions secondaires côte à côte (reprendre la semaine préc. / fournée). */}
       <button
         onClick={() => setPlannerOpen(true)}
         style={{
@@ -228,10 +247,12 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
           fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
         }}
       >
-        <Wand2 size={15} /> Générer un plan de repas
+        {hasWeekPlan
+          ? <><Pencil size={15} /> Modifier mon plan</>
+          : <><Wand2 size={15} /> Générer un plan de repas</>}
       </button>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: weekPlanRows.length ? 6 : 14 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
         {prevWeekRows.length > 0 && (
           <button
             onClick={handleRepeatPrevWeek}
@@ -258,21 +279,6 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
           <ChefHat size={14} /> Ma fournée
         </button>
       </div>
-
-      {weekPlanRows.length > 0 && (
-        <button
-          onClick={handleRemovePlan}
-          disabled={removingPlan}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14,
-            background: 'none', border: 'none', color: 'var(--coral)',
-            fontSize: 11.5, fontWeight: 700, fontFamily: 'var(--font)', opacity: removingPlan ? 0.6 : 1,
-          }}
-        >
-          <Trash2 size={12} />
-          {removingPlan ? 'Retrait…' : `Retirer le plan généré (${weekPlanRows.length} repas)`}
-        </button>
-      )}
 
       {enabledMeals.length === 0 && (
         <div className="card" style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--text-hint)' }}>
@@ -385,6 +391,23 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
         )
       })}
 
+      {/* Retirer le plan généré de cette semaine — en bas, action franche. */}
+      {hasWeekPlan && (
+        <button
+          onClick={handleRemovePlan}
+          disabled={removingPlan}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+            marginTop: 6, padding: '11px 12px', borderRadius: 'var(--radius-sm)',
+            background: 'var(--coral)', color: 'var(--white)', border: 'none',
+            fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', opacity: removingPlan ? 0.6 : 1,
+          }}
+        >
+          <Trash2 size={15} />
+          {removingPlan ? 'Retrait…' : `Retirer le plan généré (${weekPlanRows.length} repas)`}
+        </button>
+      )}
+
       {planSlot && (
         <PlanMealModal
           kind="repas"
@@ -400,6 +423,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
           onClose={() => setPlannerOpen(false)}
           onApplied={onRefetch}
           defaultStartDate={days[0]}
+          initialLoadPlanId={weekAppliedPlan?.savedPlanId || null}
         />
       )}
 
