@@ -1,23 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, History, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, Pencil, MoreVertical } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER } from '../lib/nutrients'
 import { deviationLevel } from '../lib/mealPlanner'
-import { deletePlannedMeal, deletePlannedMeals, duplicatePlannedMeals, markAsEaten } from '../hooks/usePlannedMeals'
+import { deletePlannedMeal, deletePlannedMeals } from '../hooks/usePlannedMeals'
 import { fmt } from '../lib/dates'
-import { readAppliedPlans, stashAppliedPlan } from '../lib/mealPlannerApply'
+import { readAppliedPlans } from '../lib/mealPlannerApply'
 import PlanMealModal from './PlanMealModal'
 import MealPlannerModal from './MealPlannerModal'
 import BatchCookingModal from './BatchCookingModal'
+import RecipeDetailWrapper from './RecipeDetailWrapper'
+import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WeekMenuBoard (roadmap §M5) — plateau de menus de la semaine : 7 jours
 // empilés (lisible sur mobile, contrairement à une grille 7×4), chaque jour
 // avec ses lignes de repas activés. On y ajoute un repas planifié sur une case
-// précise ("+"), on le retire, ou on le marque mangé (→ journal). C'est une
-// autre entrée sur les mêmes données que le calendrier (repas_planifies), pas
-// un stockage à part.
+// précise ("+"), on le retire (menu ⋮), ou on ouvre la fiche de la recette /
+// du repas type en cliquant sur le plat. C'est une autre entrée sur les mêmes
+// données que le calendrier (repas_planifies), pas un stockage à part.
 //
 // Props :
 //   anchorDate     — Date quelque part dans la semaine affichée
@@ -46,18 +48,18 @@ function rangeLabel(days) {
   return `${fa} – ${fb}`
 }
 
-export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates, settings, onChangeWeek, onGoToday, onRefetch }) {
+export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onChangeWeek, onGoToday, onRefetch }) {
   const { user } = useAuth()
   const toast = useToast()
   const [planSlot, setPlanSlot] = useState(null)   // { date: 'YYYY-MM-DD', meal } | null
   const [menuFor, setMenuFor] = useState(null)     // repas.id dont le petit menu d'actions est ouvert
+  const [sourceDetail, setSourceDetail] = useState(null) // { source_type, source_id } du plat dont on ouvre la fiche
   const [busyId, setBusyId] = useState(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
   // Plans générés appliqués (stashés en localStorage par MealPlannerModal).
   const [appliedPlans, setAppliedPlans] = useState(() => readAppliedPlans())
   const [removingPlan, setRemovingPlan] = useState(false)
-  const [repeatingWeek, setRepeatingWeek] = useState(false)
 
   const appliedGroupIds = useMemo(() => new Set(appliedPlans.map(p => p.groupId)), [appliedPlans])
 
@@ -136,46 +138,6 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
     onRefetch()
   }
 
-  // « Reprendre la semaine précédente » : les 7 jours qui précèdent la semaine
-  // affichée (déjà chargés dans plannedByDate — CalendarPage charge une plage
-  // élargie de ±7 jours).
-  const prevWeekRows = useMemo(() => {
-    const s = startOfWeek(anchorDate)
-    s.setDate(s.getDate() - 7)
-    const out = []
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(s); d.setDate(d.getDate() + i)
-      out.push(...(plannedByDate?.[fmt(d)] || []))
-    }
-    return out
-  }, [anchorDate, plannedByDate])
-
-  // Créneaux date|meal déjà occupés dans la semaine affichée (on ne réécrit
-  // jamais par-dessus).
-  const occupiedThisWeek = useMemo(() => {
-    const set = new Set()
-    for (const d of days) for (const r of (plannedByDate?.[d] || [])) set.add(`${d}|${r.meal}`)
-    return set
-  }, [days, plannedByDate])
-
-  const handleRepeatPrevWeek = async () => {
-    if (!prevWeekRows.length || repeatingWeek) return
-    setRepeatingWeek(true)
-    const { error, groupId, inserted } = await duplicatePlannedMeals(prevWeekRows, {
-      userId: user.id,
-      offsetDays: 7,
-      excludedDates: excludedDates || new Set(),
-      skipKeys: occupiedThisWeek,
-    })
-    setRepeatingWeek(false)
-    if (error) { toast('Erreur'); return }
-    if (!inserted) { toast('Rien à reprendre (créneaux déjà occupés ou jours exclus)'); return }
-    stashAppliedPlan({ groupId, startDateStr: days[0], days: 7, appliedAt: Date.now() })
-    setAppliedGroupIds(s => new Set(s).add(groupId))
-    toast(`✓ ${inserted} repas repris de la semaine précédente`)
-    onRefetch()
-  }
-
   const handleDelete = async (repas) => {
     setBusyId(repas.id)
     const { error } = await deletePlannedMeal(repas.id, user.id)
@@ -183,16 +145,6 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
     setMenuFor(null)
     if (error) { toast('Erreur'); return }
     toast('Retiré du planning')
-    onRefetch()
-  }
-
-  const handleEat = async (repas) => {
-    setBusyId(repas.id)
-    const { error } = await markAsEaten(repas, user.id)
-    setBusyId(null)
-    setMenuFor(null)
-    if (error) { toast('Erreur'); return }
-    toast('✓ Marqué mangé')
     onRefetch()
   }
 
@@ -239,49 +191,34 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
         </div>
       )}
 
-      {/* Barre d'actions : 1 action principale (générer OU modifier le plan) +
-          2 actions secondaires côte à côte (reprendre la semaine préc. / fournée). */}
-      <button
-        onClick={() => setPlannerOpen(true)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
-          padding: '11px 12px', marginBottom: 6, borderRadius: 'var(--radius-sm)',
-          background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
-          fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
-        }}
-      >
-        {hasWeekPlan
-          ? <><Pencil size={15} /> Modifier mon plan</>
-          : <><Wand2 size={15} /> Générer un plan de repas</>}
-      </button>
-
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        {prevWeekRows.length > 0 && (
-          <button
-            onClick={handleRepeatPrevWeek}
-            disabled={repeatingWeek}
-            style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '8px 10px', borderRadius: 'var(--radius-sm)',
-              background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
-              fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', opacity: repeatingWeek ? 0.6 : 1,
-            }}
-          >
-            <History size={14} /> {repeatingWeek ? 'Reprise…' : 'Reprendre la semaine préc.'}
-          </button>
-        )}
+      {/* Barre d'actions. Générer un plan : uniquement quand la semaine n'en a
+          pas encore un (« Modifier mon plan » est en bas, près de « Retirer »).
+          « Ma fournée » : toujours dispo. */}
+      {!hasWeekPlan && (
         <button
-          onClick={() => setBatchOpen(true)}
+          onClick={() => setPlannerOpen(true)}
           style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '8px 10px', borderRadius: 'var(--radius-sm)',
-            background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
-            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
+            padding: '11px 12px', marginBottom: 6, borderRadius: 'var(--radius-sm)',
+            background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
+            fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
           }}
         >
-          <ChefHat size={14} /> Ma fournée
+          <Wand2 size={15} /> Générer un plan de repas
         </button>
-      </div>
+      )}
+
+      <button
+        onClick={() => setBatchOpen(true)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+          padding: '8px 10px', marginBottom: 14, borderRadius: 'var(--radius-sm)',
+          background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
+          fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+        }}
+      >
+        <ChefHat size={14} /> Ma fournée
+      </button>
 
       {enabledMeals.length === 0 && (
         <div className="card" style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--text-hint)' }}>
@@ -329,39 +266,47 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
                     {meal}
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'flex-start' }}>
                     {list.map(r => {
                       const kcal = (r.items || []).reduce((s, i) => s + (i.energie_kcal || 0), 0)
+                      const hasSource = r.source_type === 'recette' || r.source_type === 'repas_type'
                       return (
-                        <span key={r.id} style={{ position: 'relative' }}>
+                        <span key={r.id} style={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch', maxWidth: '100%' }}>
                           <button
-                            onClick={() => setMenuFor(menuFor === r.id ? null : r.id)}
+                            onClick={() => hasSource && setSourceDetail({ source_type: r.source_type, source_id: r.source_id })}
                             disabled={busyId === r.id}
+                            title={hasSource ? 'Voir la fiche' : undefined}
                             style={{
-                              display: 'flex', alignItems: 'center', gap: 4, maxWidth: 190,
+                              display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left',
                               background: r.mange ? 'var(--green-light)' : 'var(--gray-bg)',
                               color: r.mange ? 'var(--green-dark)' : 'var(--text)',
-                              border: 'none', borderRadius: 7, padding: '4px 8px',
+                              border: 'none', borderRadius: '7px 0 0 7px', padding: '4px 8px',
                               fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)',
+                              cursor: hasSource ? 'pointer' : 'default',
                             }}
                           >
                             {r.mange && <Check size={11} style={{ flexShrink: 0 }} />}
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nom}</span>
-                            {kcal > 0 && <span style={{ color: 'var(--text-hint)', fontWeight: 500, flexShrink: 0 }}>· {Math.round(kcal)}</span>}
+                            <span>{r.nom}</span>
+                            {kcal > 0 && <span style={{ color: 'var(--text-hint)', fontWeight: 500 }}>· {Math.round(kcal)}</span>}
+                          </button>
+                          <button
+                            onClick={() => setMenuFor(menuFor === r.id ? null : r.id)}
+                            disabled={busyId === r.id}
+                            aria-label="Actions"
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                              background: r.mange ? 'var(--green-light)' : 'var(--gray-bg)',
+                              color: 'var(--text-hint)', border: 'none', borderRadius: '0 7px 7px 0',
+                              padding: '0 5px', marginLeft: 1,
+                            }}
+                          >
+                            <MoreVertical size={13} />
                           </button>
 
                           {menuFor === r.id && (
                             <>
                               <div style={{ position: 'fixed', inset: 0, zIndex: 19 }} onClick={() => setMenuFor(null)} />
-                              <div className="card" style={{ position: 'absolute', top: 28, left: 0, zIndex: 20, padding: 4, minWidth: 150 }}>
-                                {!r.mange && (
-                                  <button
-                                    onClick={() => handleEat(r)}
-                                    style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
-                                  >
-                                    <Check size={14} /> Marquer mangé
-                                  </button>
-                                )}
+                              <div className="card" style={{ position: 'absolute', top: 28, right: 0, zIndex: 20, padding: 4, minWidth: 140 }}>
                                 <button
                                   onClick={() => handleDelete(r)}
                                   style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--coral)', display: 'flex', alignItems: 'center', gap: 8 }}
@@ -394,21 +339,34 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
         )
       })}
 
-      {/* Retirer le plan généré de cette semaine — en bas, action franche. */}
+      {/* Actions du plan généré — en bas : modifier, puis retirer (action franche). */}
       {hasWeekPlan && (
-        <button
-          onClick={handleRemovePlan}
-          disabled={removingPlan}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
-            marginTop: 6, padding: '11px 12px', borderRadius: 'var(--radius-sm)',
-            background: 'var(--coral)', color: 'var(--white)', border: 'none',
-            fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', opacity: removingPlan ? 0.6 : 1,
-          }}
-        >
-          <Trash2 size={15} />
-          {removingPlan ? 'Retrait…' : `Retirer le plan généré (${weekPlanRows.length} repas)`}
-        </button>
+        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <button
+            onClick={() => setPlannerOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
+              padding: '11px 12px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
+              fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
+            }}
+          >
+            <Pencil size={15} /> Modifier mon plan
+          </button>
+          <button
+            onClick={handleRemovePlan}
+            disabled={removingPlan}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+              padding: '11px 12px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--coral)', color: 'var(--white)', border: 'none',
+              fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', opacity: removingPlan ? 0.6 : 1,
+            }}
+          >
+            <Trash2 size={15} />
+            {removingPlan ? 'Retrait…' : `Retirer le plan généré (${weekPlanRows.length} repas)`}
+          </button>
+        </div>
       )}
 
       {planSlot && (
@@ -434,6 +392,20 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
 
       {batchOpen && (
         <BatchCookingModal semaine={days[0]} onClose={() => setBatchOpen(false)} />
+      )}
+
+      {/* Fiche de la recette / du repas type ouverte depuis un plat du plateau */}
+      {sourceDetail?.source_type === 'recette' && (
+        <RecipeDetailWrapper
+          recetteId={sourceDetail.source_id}
+          onClose={() => setSourceDetail(null)}
+        />
+      )}
+      {sourceDetail?.source_type === 'repas_type' && (
+        <MealTemplateDetailWrapper
+          repasTypeId={sourceDetail.source_id}
+          onClose={() => setSourceDetail(null)}
+        />
       )}
     </div>
   )

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Menus : touche un plat pour voir sa fiche',
+    description: "Dans « Menus », le nom entier de chaque plat prévu est visible, et si tu le touches ça ouvre directement la fiche de la recette ou du repas type. Pour retirer un plat, passe par les trois petits points à côté. « Modifier mon plan » est descendu en bas, juste avant le bouton rouge pour retirer le plan.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Menus : les compléments ne faussent plus le résumé',
     description: "Les compléments que tu planifies à l'avance ne sont plus comptés dans le résumé de la semaine (repas planifiés, moyenne kcal/jour) ni dans les calories affichées par jour — seuls les vrais repas comptent.",
   },
