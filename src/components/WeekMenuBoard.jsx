@@ -179,30 +179,13 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
         </button>
       </div>
 
-      {/* Reprendre les repas de la semaine précédente (décalés de 7 jours) —
-          proposé seulement quand la semaine d'avant en contient. */}
-      {prevWeekRows.length > 0 && (
-        <button
-          onClick={handleRepeatPrevWeek}
-          disabled={repeatingWeek}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
-            padding: '6px 12px', marginBottom: 10, background: 'none', border: 'none',
-            color: 'var(--text-muted)', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
-            opacity: repeatingWeek ? 0.6 : 1,
-          }}
-        >
-          <History size={13} />
-          {repeatingWeek ? 'Reprise…' : `Reprendre la semaine précédente (${prevWeekRows.length} repas)`}
-        </button>
-      )}
-
-      {/* Générateur automatique de plan (chantier planificateur de repas) */}
+      {/* Barre d'actions : 1 action principale (générer un plan) + 2 actions
+          secondaires côte à côte (reprendre la semaine précédente / fournée). */}
       <button
         onClick={() => setPlannerOpen(true)}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
-          padding: '10px 12px', marginBottom: 6, borderRadius: 'var(--radius-sm)',
+          padding: '11px 12px', marginBottom: 6, borderRadius: 'var(--radius-sm)',
           background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
           fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
         }}
@@ -210,33 +193,46 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
         <Wand2 size={15} /> Générer un plan de repas
       </button>
 
-      {/* Page batch cooking — check-list de recettes à cuisiner, indépendante
-          du plan généré (roadmap §M9). */}
-      <button
-        onClick={() => setBatchOpen(true)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
-          padding: '9px 12px', marginBottom: weekPlanRows.length ? 6 : 12, borderRadius: 'var(--radius-sm)',
-          background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
-          fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
-        }}
-      >
-        <ChefHat size={15} /> Ma fournée
-      </button>
+      <div style={{ display: 'flex', gap: 6, marginBottom: weekPlanRows.length ? 6 : 14 }}>
+        {prevWeekRows.length > 0 && (
+          <button
+            onClick={handleRepeatPrevWeek}
+            disabled={repeatingWeek}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '8px 10px', borderRadius: 'var(--radius-sm)',
+              background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
+              fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', opacity: repeatingWeek ? 0.6 : 1,
+            }}
+          >
+            <History size={14} /> {repeatingWeek ? 'Reprise…' : 'Reprendre la semaine préc.'}
+          </button>
+        )}
+        <button
+          onClick={() => setBatchOpen(true)}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '8px 10px', borderRadius: 'var(--radius-sm)',
+            background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
+            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+          }}
+        >
+          <ChefHat size={14} /> Ma fournée
+        </button>
+      </div>
 
       {weekPlanRows.length > 0 && (
         <button
           onClick={handleRemovePlan}
           disabled={removingPlan}
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
-            padding: '8px 12px', marginBottom: 12, borderRadius: 'var(--radius-sm)',
-            background: 'none', color: 'var(--coral)', border: '1px solid var(--coral-light)',
-            fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+            display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14,
+            background: 'none', border: 'none', color: 'var(--coral)',
+            fontSize: 11.5, fontWeight: 700, fontFamily: 'var(--font)', opacity: removingPlan ? 0.6 : 1,
           }}
         >
-          <Trash2 size={13} />
-          {removingPlan ? 'Retrait…' : `Retirer le plan généré de cette semaine (${weekPlanRows.length} repas)`}
+          <Trash2 size={12} />
+          {removingPlan ? 'Retrait…' : `Retirer le plan généré (${weekPlanRows.length} repas)`}
         </button>
       )}
 
@@ -277,11 +273,11 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
             {enabledMeals.map(meal => {
               const list = byMeal[meal] || []
               return (
-                <div key={meal} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0' }}>
-                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600, width: 78, flexShrink: 0, paddingTop: 4 }}>
+                <div key={meal} style={{ padding: '5px 0' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
                     {meal}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
                     {list.map(r => {
                       const kcal = (r.items || []).reduce((s, i) => s + (i.energie_kcal || 0), 0)
                       return (

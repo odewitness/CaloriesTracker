@@ -138,33 +138,30 @@ export default function CalendarPage() {
 
   return (
     <div className="page-content">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 20 }}>Calendrier</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Ta régularité et tes repas prévus</div>
-        </div>
-        <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
-          {[
-            { key: 'month', label: 'Mois', icon: <Calendar size={14} /> },
-            { key: 'week',  label: 'Semaine', icon: <CalendarDays size={14} /> },
-            { key: 'planner', label: 'Menus', icon: <UtensilsCrossed size={14} /> },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setView(t.key)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '7px 11px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
-                background: view === t.key ? 'var(--white)' : 'transparent',
-                color: view === t.key ? 'var(--text)' : 'var(--text-muted)',
-                boxShadow: view === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all .15s',
-              }}
-            >
-              {t.icon} {t.label}
-            </button>
-          ))}
-        </div>
+      <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 12 }}>
+        {view === 'planner' ? 'Compose tes menus de la semaine' : 'Ta régularité et tes repas prévus'}
+      </div>
+      <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, gap: 2, marginBottom: 18 }}>
+        {[
+          { key: 'month', label: 'Mois', icon: <Calendar size={14} /> },
+          { key: 'week',  label: 'Semaine', icon: <CalendarDays size={14} /> },
+          { key: 'planner', label: 'Menus', icon: <UtensilsCrossed size={14} /> },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={() => setView(t.key)}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              padding: '8px 6px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+              background: view === t.key ? 'var(--white)' : 'transparent',
+              color: view === t.key ? 'var(--text)' : 'var(--text-muted)',
+              boxShadow: view === t.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all .15s',
+            }}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
       </div>
 
       {view === 'planner' ? (

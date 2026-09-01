@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Calendrier & Menus : présentation allégée',
+    description: "En-tête du Calendrier simplifié, onglets Mois / Semaine / Menus plus lisibles. Dans « Menus », les noms de repas ne sont plus coupés sur deux lignes et les boutons du haut sont regroupés (une action principale, deux raccourcis).",
+  },
+  {
+    date: '2026-09-01',
     title: 'Plan de repas : garde tes plans favoris',
     description: "Dans l’aperçu d’un plan généré, « Enregistrer ce plan » le sauvegarde sous un nom. Tu retrouves tes plans enregistrés en haut des réglages du planificateur : un tap pour rouvrir l’aperçu, le modifier, le ré-appliquer à la semaine que tu veux, ou repartir de lui. Tu peux les renommer et les supprimer.",
   },
