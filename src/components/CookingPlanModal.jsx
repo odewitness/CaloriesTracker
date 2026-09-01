@@ -6,6 +6,7 @@ import { useBackButton } from '../hooks/useBackButton'
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useBatchCookingSteps } from '../hooks/useBatchCookingSteps'
 import { useRecipes } from '../hooks/useRecipes'
+import { useMealTemplatesList } from '../hooks/useMealTemplates'
 import { useToast } from '../lib/toast'
 import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeInstructions'
 import Loader from './Loader'
@@ -41,6 +42,7 @@ export default function CookingPlanModal({ onClose, semaine }) {
   const toast = useToast()
   const { items: fourneeItems, loading: loadingF } = useBatchCooking(semaine)
   const { recettes, loading: loadingR } = useRecipes()
+  const { repasTypes, loading: loadingT } = useMealTemplatesList()
   const { steps, loading: loadingS, generate, toggleFait, move } = useBatchCookingSteps(semaine)
 
   const [ingByRecette, setIngByRecette] = useState({})
@@ -49,10 +51,27 @@ export default function CookingPlanModal({ onClose, semaine }) {
   const [confirmRegen, setConfirmRegen] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  // Recettes de la fournée qui existent encore, dans l'ordre de la fournée.
-  const planRecipes = useMemo(() => fourneeItems
-    .map(it => ({ item: it, rec: recettes.find(r => r.id === it.recette_id) }))
-    .filter(x => x.rec), [fourneeItems, recettes])
+  // Éléments de la fournée qui existent encore, dans l'ordre de la fournée
+  // (recettes ET repas types). `kind` = 'recette' | 'repas_type'.
+  const planSources = useMemo(() => fourneeItems
+    .map(it => {
+      if (it.recette_id) {
+        const rec = recettes.find(r => r.id === it.recette_id)
+        return rec && { item: it, kind: 'recette', entity: rec }
+      }
+      if (it.repas_type_id) {
+        const tpl = repasTypes.find(t => t.id === it.repas_type_id)
+        return tpl && { item: it, kind: 'repas_type', entity: tpl }
+      }
+      return null
+    })
+    .filter(Boolean), [fourneeItems, recettes, repasTypes])
+
+  // Sous-ensemble recettes (seules à porter des instructions → des étapes).
+  const planRecipes = useMemo(
+    () => planSources.filter(s => s.kind === 'recette').map(s => ({ item: s.item, rec: s.entity })),
+    [planSources],
+  )
 
   const recipeIdsKey = planRecipes.map(x => x.rec.id).join(',')
 
@@ -76,31 +95,48 @@ export default function CookingPlanModal({ onClose, semaine }) {
     return () => { cancelled = true }
   }, [user, recipeIdsKey])
 
-  // Facteur d'échelle par recette = portions à préparer (fournée) / portions de
-  // la recette. Absent → 1.
-  const factorFor = (rec, item) => {
-    const want = Number(item.portions)
-    const base = rec.portions || 1
-    return want > 0 ? want / base : 1
+  // Couleur de badge stable par élément (recette OU repas type), sur l'ordre
+  // de la fournée.
+  const badgeIndex = useMemo(() => {
+    const m = {}
+    planSources.forEach((s, i) => { m[`${s.kind}:${s.entity.id}`] = i % RECIPE_BADGES.length })
+    return m
+  }, [planSources])
+
+  const wantPortions = (source) => {
+    const want = Number(source.item.portions)
+    return want > 0 ? want : (source.kind === 'recette' ? source.entity.portions : source.entity.nb_portions) || 1
   }
 
-  const scaledIngFor = (rec, item) => {
-    const f = factorFor(rec, item)
-    return (ingByRecette[rec.id] || []).map(i => ({ ...i, qty_g: (Number(i.qty_g) || 0) * f }))
+  // Ingrédients d'un élément, mis à l'échelle des portions à préparer :
+  //   - recette : lignes recette_ingredients (× portions / recette.portions) ;
+  //   - repas type : ses `items` inline (× portions / nb_portions).
+  const scaledIngredients = (source) => {
+    const want = Number(source.item.portions)
+    if (source.kind === 'recette') {
+      const base = source.entity.portions || 1
+      const f = want > 0 ? want / base : 1
+      return (ingByRecette[source.entity.id] || []).map(i => ({ food_name: i.food_name, qty_g: (Number(i.qty_g) || 0) * f }))
+    }
+    const base = source.entity.nb_portions || 1
+    const f = want > 0 ? want / base : 1
+    return (source.entity.items || []).map(i => ({ food_name: i.food_name, qty_g: (Number(i.qty_g) || 0) * f }))
   }
 
-  // Index couleur + map "texte d'étape brut → segments annotés" par recette.
+  // Map "texte d'étape brut → segments annotés" par recette (les repas types
+  // n'ont pas d'instructions → pas d'étapes).
   const meta = useMemo(() => {
     const byId = {}
-    planRecipes.forEach(({ rec, item }, idx) => {
+    planRecipes.forEach(({ rec }) => {
+      const source = planSources.find(s => s.kind === 'recette' && s.entity.id === rec.id)
       const rawSteps = parseInstructionSteps(rec.instructions)
-      const segs = annotateInstructionSteps(rawSteps, scaledIngFor(rec, item))
+      const segs = annotateInstructionSteps(rawSteps, source ? scaledIngredients(source) : [])
       const map = new Map()
       rawSteps.forEach((s, i) => map.set(s, segs[i]))
-      byId[rec.id] = { badge: RECIPE_BADGES[idx % RECIPE_BADGES.length], annotated: map }
+      byId[rec.id] = { badge: RECIPE_BADGES[badgeIndex[`recette:${rec.id}`] ?? 0], annotated: map }
     })
     return byId
-  }, [planRecipes, ingByRecette]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [planRecipes, planSources, ingByRecette, badgeIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recettes de la fournée sans aucune instruction saisie (ne contribuent
   // aucune étape).
@@ -113,7 +149,7 @@ export default function CookingPlanModal({ onClose, semaine }) {
   const doneCount = orderedSteps.filter(s => s.fait).length
   const pct = orderedSteps.length ? Math.round((doneCount / orderedSteps.length) * 100) : 0
 
-  const loading = loadingF || loadingR || loadingS
+  const loading = loadingF || loadingR || loadingT || loadingS
 
   const handleGenerate = async () => {
     setBusy(true)
@@ -143,11 +179,11 @@ export default function CookingPlanModal({ onClose, semaine }) {
       <div className="page-modal-body">
         {loading ? (
           <Loader />
-        ) : planRecipes.length === 0 ? (
+        ) : planSources.length === 0 ? (
           <EmptyState
             icon={<ListChecks size={28} />}
             title="Rien à cuisiner pour l’instant"
-            description="Ajoute d’abord des recettes à Ma fournée."
+            description="Ajoute d’abord des recettes ou repas types à Ma fournée."
           />
         ) : (
           <>
@@ -164,24 +200,25 @@ export default function CookingPlanModal({ onClose, semaine }) {
               </div>
             )}
 
-            {/* Ingrédients par recette (dépliable) */}
+            {/* Ingrédients par élément (dépliable) */}
             <button
               onClick={() => setShowIngredients(v => !v)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'space-between', background: 'var(--gray-bg)', border: 'none', borderRadius: 8, padding: '9px 12px', marginBottom: 10, fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)' }}
             >
-              Ingrédients par recette
+              Ingrédients
               <ChevronDown size={15} style={{ transform: showIngredients ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
             </button>
             {showIngredients && (
               <div style={{ marginBottom: 12 }}>
-                {loadingIng ? <Loader /> : planRecipes.map(({ rec, item }, idx) => {
-                  const badge = RECIPE_BADGES[idx % RECIPE_BADGES.length]
-                  const ings = scaledIngFor(rec, item)
-                  const want = Number(item.portions) > 0 ? Number(item.portions) : rec.portions
+                {loadingIng ? <Loader /> : planSources.map((source) => {
+                  const badge = RECIPE_BADGES[badgeIndex[`${source.kind}:${source.entity.id}`] ?? 0]
+                  const ings = scaledIngredients(source)
+                  const want = wantPortions(source)
                   return (
-                    <div key={rec.id} className="card" style={{ padding: '10px 12px', marginBottom: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                        <span style={{ background: badge.bg, color: badge.fg, borderRadius: 5, padding: '2px 7px', fontSize: 11, fontWeight: 700 }}>{rec.nom}</span>
+                    <div key={`${source.kind}:${source.entity.id}`} className="card" style={{ padding: '10px 12px', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
+                        <span style={{ background: badge.bg, color: badge.fg, borderRadius: 5, padding: '2px 7px', fontSize: 11, fontWeight: 700 }}>{source.entity.nom}</span>
+                        {source.kind === 'repas_type' && <span style={{ fontSize: 10.5, color: 'var(--text-hint)' }}>repas type</span>}
                         <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>pour {want} portion{want > 1 ? 's' : ''}</span>
                       </div>
                       {ings.length === 0 ? (
@@ -198,7 +235,11 @@ export default function CookingPlanModal({ onClose, semaine }) {
               </div>
             )}
 
-            {orderedSteps.length === 0 ? (
+            {planRecipes.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-hint)', textAlign: 'center', padding: '8px 0' }}>
+                Aucune recette avec des étapes dans la fournée (les repas types n’en ont pas).
+              </div>
+            ) : orderedSteps.length === 0 ? (
               <div style={{ textAlign: 'center' }}>
                 <button
                   className="btn-primary"

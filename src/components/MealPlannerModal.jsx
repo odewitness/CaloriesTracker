@@ -795,9 +795,9 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
   const [removing, setRemoving] = useState(false)
   const [creatingList, setCreatingList] = useState(false)
 
-  // Fournée de la semaine du 1er jour du plan (les recettes du plan appliqué
-  // y sont versées).
-  const { addRecipes: addBatchRecipes } = useBatchCooking(mondayOf(planner.config.startDateStr))
+  // Fournée de la semaine du 1er jour du plan (les recettes / repas types du
+  // plan appliqué y sont versés).
+  const { addSources: addBatchSources } = useBatchCooking(mondayOf(planner.config.startDateStr))
 
   // Liste de courses cible (la plus récente par défaut).
   const { listes: shoppingLists, createListe } = useShoppingLists()
@@ -830,25 +830,24 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
   const handleGenerate = () => { planner.generate(); resetApply(); setStep('preview') }
   const handleRegenerate = () => { planner.regenerate(); resetApply() }
 
-  // Verse les recettes du plan (récap « À préparer ») dans la page « Ma fournée »
-  // — avec le nombre de portions à préparer. Les repas types sont ignorés (la
-  // fournée est une check-list de recettes). Appelé automatiquement à
-  // « Appliquer au calendrier » (silencieux) et via le bouton du récap.
+  // Verse les recettes ET repas types du plan (récap « À préparer ») dans la
+  // page « Ma fournée », avec le nombre de portions à préparer. Appelé
+  // automatiquement à « Appliquer au calendrier » (silencieux) et via le
+  // bouton du récap.
   const addPlanRecipesToBatch = async ({ silent = false } = {}) => {
     if (!planner.plan) return { added: 0 }
     const list = batchSummary(planner.plan, { recettesById, templatesById })
-      .filter(b => b.kind === 'recette')
-      .map(b => ({ id: b.id, nom: b.nom, portions: b.portionsNeeded }))
-    if (!list.length) { if (!silent) toast('Aucune recette à envoyer'); return { added: 0 } }
+      .map(b => ({ id: b.id, nom: b.nom, portions: b.portionsNeeded, kind: b.kind }))
+    if (!list.length) { if (!silent) toast('Rien à envoyer'); return { added: 0 } }
     setBatchState('busy')
-    const { error, added } = await addBatchRecipes(list)
+    const { error, added } = await addBatchSources(list)
     if (error) {
       setBatchState('idle')
       if (!silent) toast('Erreur à l’envoi vers Ma fournée')
       return { added: 0, error }
     }
     setBatchState('done')
-    if (!silent) toast(added ? `✓ ${added} recette${added > 1 ? 's' : ''} dans Ma fournée` : 'Déjà dans Ma fournée')
+    if (!silent) toast(added ? `✓ ${added} ajouté${added > 1 ? 's' : ''} à Ma fournée` : 'Déjà dans Ma fournée')
     return { added }
   }
 

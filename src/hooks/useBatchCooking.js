@@ -9,9 +9,11 @@ import { useAuth } from '../lib/AuthContext'
 // fournée. Table `batch_cooking_items` en RLS « own »
 // (voir supabase/sql/batch_cooking_setup.sql).
 //
-// Une ligne = une recette : { id, semaine, recette_id, nom, portions, fait }.
-// Ajout = upsert dédupliqué sur (user_id, semaine, recette_id) ; cocher /
-// éditer portions = update ; retrait = delete.
+// Une ligne = une recette OU un repas type : { id, semaine, recette_id,
+// repas_type_id, nom, portions, fait } (une seule des deux réfs est non nulle).
+// Ajout = upsert dédupliqué sur (user_id, semaine, recette_id) et
+// (user_id, semaine, repas_type_id) ; cocher / éditer portions = update ;
+// retrait = delete.
 // ─────────────────────────────────────────────────────────────────────────────
 export function useBatchCooking(semaine) {
   const { user } = useAuth()
@@ -33,34 +35,55 @@ export function useBatchCooking(semaine) {
 
   useEffect(() => { load() }, [load])
 
-  // Ajoute des recettes à la fournée de la semaine. `recettes` : lignes
-  // `recettes` ({ id, nom, portions }) OU objets { recette_id, nom, portions }.
-  // Les recettes déjà présentes cette semaine-là sont laissées telles quelles
-  // (upsert ON CONFLICT DO NOTHING — `fait` et `portions` non écrasés).
-  const addRecipes = useCallback(async (recettes, { portionsById } = {}) => {
-    if (!user || !semaine || !recettes?.length) return { error: null, added: 0 }
+  // Ajoute des recettes / repas types à la fournée de la semaine. `sources` :
+  // objets { id, nom, portions?, kind: 'recette' | 'repas_type' } (kind par
+  // défaut 'recette'). Les entrées déjà présentes cette semaine-là sont
+  // laissées telles quelles (upsert ON CONFLICT DO NOTHING — `fait` et
+  // `portions` non écrasés).
+  const addSources = useCallback(async (sources, { portionsById } = {}) => {
+    if (!user || !semaine || !sources?.length) return { error: null, added: 0 }
     const seen = new Set()
-    const rows = recettes
-      .map(r => ({
-        recette_id: r.recette_id || r.id || null,
-        nom: r.nom || 'Recette',
-        portions: portionsById?.[r.recette_id || r.id] ?? r.portions ?? null,
-      }))
+    const rows = sources
+      .map(s => {
+        const kind = s.kind === 'repas_type' ? 'repas_type' : 'recette'
+        const id = s.id || s.recette_id || s.repas_type_id || null
+        return {
+          recette_id: kind === 'recette' ? id : null,
+          repas_type_id: kind === 'repas_type' ? id : null,
+          nom: s.nom || (kind === 'repas_type' ? 'Repas type' : 'Recette'),
+          portions: portionsById?.[id] ?? s.portions ?? null,
+          _kind: kind, _id: id,
+        }
+      })
       .filter(r => {
-        if (!r.recette_id || seen.has(r.recette_id)) return false
-        seen.add(r.recette_id)
+        if (!r._id || seen.has(`${r._kind}:${r._id}`)) return false
+        seen.add(`${r._kind}:${r._id}`)
         return true
       })
     if (!rows.length) return { error: null, added: 0 }
-    const { data, error } = await supabase
-      .from('batch_cooking_items')
-      .upsert(
-        rows.map(r => ({ ...r, user_id: user.id, semaine })),
-        { onConflict: 'user_id,semaine,recette_id', ignoreDuplicates: true },
-      )
-      .select()
-    if (!error) await load()
-    return { error, added: (data || []).length }
+
+    // Deux upserts : ON CONFLICT ne cible qu'une contrainte à la fois.
+    const insert = async (subset, onConflict) => {
+      if (!subset.length) return { added: 0, error: null }
+      const { data, error } = await supabase
+        .from('batch_cooking_items')
+        .upsert(
+          subset.map(r => ({
+            user_id: user.id, semaine,
+            recette_id: r.recette_id, repas_type_id: r.repas_type_id,
+            nom: r.nom, portions: r.portions,
+          })),
+          { onConflict, ignoreDuplicates: true },
+        )
+        .select()
+      return { added: (data || []).length, error }
+    }
+    const rec = await insert(rows.filter(r => r._kind === 'recette'), 'user_id,semaine,recette_id')
+    if (rec.error) return { error: rec.error, added: 0 }
+    const tpl = await insert(rows.filter(r => r._kind === 'repas_type'), 'user_id,semaine,repas_type_id')
+    if (tpl.error) { await load(); return { error: tpl.error, added: rec.added } }
+    await load()
+    return { error: null, added: rec.added + tpl.added }
   }, [user, semaine, load])
 
   const toggleFait = useCallback(async (id, fait) => {
@@ -127,7 +150,7 @@ export function useBatchCooking(semaine) {
 
   return {
     items, loading,
-    addRecipes, toggleFait, setPortions, removeItem, clearDone, clearAll,
+    addSources, toggleFait, setPortions, removeItem, clearDone, clearAll,
     refetch: load,
   }
 }

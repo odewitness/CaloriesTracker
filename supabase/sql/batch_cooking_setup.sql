@@ -17,11 +17,13 @@ create table if not exists batch_cooking_items (
   user_id uuid not null references auth.users(id),
   semaine date not null,            -- lundi de la semaine (convention calendrier)
   recette_id uuid references recettes(id) on delete set null,
-  nom text not null,                -- snapshot du nom (garde la ligne lisible si la recette est supprimée)
+  repas_type_id uuid references repas_types(id) on delete set null,
+  nom text not null,                -- snapshot du nom (garde la ligne lisible si la source est supprimée)
   portions numeric,                 -- quantité à préparer, optionnelle (nombre de portions)
   fait boolean not null default false,
   created_at timestamptz not null default now(),
-  unique (user_id, semaine, recette_id)   -- une recette n'entre qu'une fois par semaine
+  unique (user_id, semaine, recette_id),     -- une recette n'entre qu'une fois par semaine
+  unique (user_id, semaine, repas_type_id)   -- idem pour un repas type
 );
 
 create index if not exists idx_batch_cooking_items_user_semaine
@@ -54,3 +56,10 @@ create policy "batch_cooking_items_delete_own" on batch_cooking_items
 --     unique (user_id, semaine, recette_id);
 --   create index if not exists idx_batch_cooking_items_user_semaine
 --     on batch_cooking_items (user_id, semaine);
+--
+-- ── Migration « repas types dans la fournée » (2026-09-01) ────────────────
+--   alter table batch_cooking_items
+--     add column if not exists repas_type_id uuid references repas_types(id) on delete set null;
+--   alter table batch_cooking_items
+--     add constraint batch_cooking_items_user_semaine_repastype_key
+--     unique (user_id, semaine, repas_type_id);

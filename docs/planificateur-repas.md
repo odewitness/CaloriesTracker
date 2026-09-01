@@ -405,7 +405,14 @@ l'édition de brique couvrent le besoin « garder la main »).
   `semaine` = lundi, `unique(user_id, semaine, recette_id)`) : chaque semaine
   de la vue Menus a sa propre fournée ; `WeekMenuBoard` passe `days[0]`,
   `MealPlannerModal` passe `mondayOf(config.startDateStr)` (2026-09-01, branche
-  `feat-fournee-per-week`).
+  `feat-fournee-per-week`). **Accepte aussi les repas types** (colonne
+  `repas_type_id` + son unique, branche `feat-fournee-repas-types` 2026-09-01) :
+  `useBatchCooking.addSources({ id, nom, kind })` gère les deux (2 upserts, un
+  par contrainte), `MealPlannerModal` verse recettes + repas types du plan.
+  Tap sur un repas type → `MealTemplateDetailWrapper`. Dans « Plan de cuisine »,
+  un repas type figure dans le panneau « Ingrédients » (ses `items` inline,
+  × portions/nb_portions) mais ne contribue **aucune étape** (les repas types
+  n'ont pas de champ `instructions`).
 - ✅ **« Plan de cuisine »** (2026-09-01, branche `feat-cooking-plan`) : depuis
   Ma fournée, bouton qui met bout à bout **toutes les étapes** des recettes de
   la fournée (`parseInstructionSteps` sur `recette.instructions`), réordonnables
