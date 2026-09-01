@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { ArrowLeft, ChevronDown, Scale, ImagePlus, Trash2 } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
@@ -52,6 +52,23 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [ingredients, setIngredients] = useState(initIngredients)
   const [showSearch,  setShowSearch]  = useState(false)
   const [saving,      setSaving]      = useState(false)
+
+  // La recherche d'ingrédient remplace tout l'écran (return anticipé plus bas),
+  // donc le corps scrollable est démonté puis remonté en revenant : sans ça, on
+  // repart en haut du formulaire à chaque ingrédient ajouté. On mémorise la
+  // position avant d'ouvrir la recherche et on la restaure au retour.
+  const bodyRef = useRef(null)
+  const savedScrollRef = useRef(null)
+  const openSearch = () => {
+    savedScrollRef.current = bodyRef.current?.scrollTop ?? null
+    setShowSearch(true)
+  }
+  useLayoutEffect(() => {
+    if (!showSearch && savedScrollRef.current != null && bodyRef.current) {
+      bodyRef.current.scrollTop = savedScrollRef.current
+      savedScrollRef.current = null
+    }
+  }, [showSearch])
 
   // ── Photo de la recette ───────────────────────────────────────────────────
   // Édition : upload immédiat (l'id existe). Création : on garde le fichier de
@@ -197,7 +214,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
         <div style={{ width: 32 }} />
       </div>
 
-      <div className="page-modal-body">
+      <div className="page-modal-body" ref={bodyRef}>
 
         {/* ── Nom + portions ── */}
         <div className="card" style={{ padding: 16, marginBottom: 12 }}>
@@ -319,7 +336,7 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div className="section-title" style={{ marginBottom: 0 }}>Ingrédients ({ingredients.length})</div>
           <button
-            onClick={() => setShowSearch(true)}
+            onClick={openSearch}
             style={{ background: 'var(--green)', color: 'white', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)' }}
           >
             + Ajouter

@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useState, useMemo } from 'react'
-import { ChevronDown, Trash2, Share2, Pencil, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock } from 'lucide-react'
+import { ChevronDown, Trash2, Share2, Pencil, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock, Settings } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -10,6 +10,8 @@ import RecipeDetailWrapper from './RecipeDetailWrapper'
 import RecipePhoto from './RecipePhoto'
 import PlanMealModal from './PlanMealModal'
 import SortModal from './SortModal'
+import RecipeDisplaySettingsModal from './RecipeDisplaySettingsModal'
+import { loadRecipeDisplayPrefs, saveRecipeDisplayPrefs, isDefaultRecipeDisplayPrefs } from '../lib/recipeDisplayPrefs'
 import AddToJournalSheet from './AddToJournalSheet'
 import ShareRecipeModal from './ShareRecipeModal'
 import { getRecipeCategoryIcon, getRecipeCategoryColor } from '../lib/categoryIcons'
@@ -29,7 +31,7 @@ import EmptyState from './EmptyState'
 // ─────────────────────────────────────────────────────────────────────────────
 // RecipeCard — carte d'une recette dans la liste
 // ─────────────────────────────────────────────────────────────────────────────
-function RecipeCard({ recette, ingredients, onOpen, onEdit, onDelete, onShare }) {
+function RecipeCard({ recette, ingredients, prefs, onOpen, onEdit, onDelete, onShare }) {
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const hasIngredients = ingredients && ingredients.length > 0
@@ -42,10 +44,34 @@ function RecipeCard({ recette, ingredients, onOpen, onEdit, onDelete, onShare })
   const totalTempsMin = (recette.temps_preparation_min || 0) + (recette.temps_cuisson_min || 0) + (recette.temps_repos_min || 0)
   const badge = getNutriBadge(recette)
 
+  // ── Préférences d'affichage (feuille « Affichage des recettes ») ──────────
+  const compact   = prefs.layout === 'grid'
+  const coverMode = prefs.imageMode === 'cover'
+  const hasPhoto  = !!recette.photo_updated_at
+
+  const showCategories = prefs.showType    && recette.categories?.length > 0
+  const showSeasons    = prefs.showSeasons && recette.saisons?.length > 0
+  const showTime       = prefs.showTime    && totalTempsMin > 0
+  const showBadge      = prefs.showBadge   && !!badge
+  const anyChip = showCategories || showSeasons || showTime || showBadge
+
+  const chipStyle = { background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }
+
   return (
     <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16 }}>
+      {coverMode && hasPhoto && (
+        <div style={{ cursor: 'pointer' }} onClick={() => onOpen(recette)}>
+          <RecipePhoto
+            recetteId={recette.id}
+            version={recette.photo_updated_at}
+            ratio={compact ? '16 / 9' : '16 / 6'}
+            radius={16}
+            style={{ margin: '-13px -14px 10px', width: 'auto', borderRadius: '16px 16px 0 0' }}
+          />
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
-        {recette.photo_updated_at && (
+        {!coverMode && hasPhoto && (
           <div style={{ width: 44, flexShrink: 0, cursor: 'pointer' }} onClick={() => onOpen(recette)}>
             <RecipePhoto recetteId={recette.id} version={recette.photo_updated_at} ratio="1 / 1" radius={9} />
           </div>
@@ -57,7 +83,7 @@ function RecipeCard({ recette, ingredients, onOpen, onEdit, onDelete, onShare })
           {recette.nom}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, position: 'relative' }}>
-          {hasIngredients && (
+          {!compact && hasIngredients && (
             <button
               onClick={e => { e.stopPropagation(); setExpanded(x => !x) }}
               className="btn-icon"
@@ -103,24 +129,24 @@ function RecipeCard({ recette, ingredients, onOpen, onEdit, onDelete, onShare })
 
       <div onClick={() => onOpen(recette)} style={{ cursor: 'pointer' }}>
         {/* ── Chips catégorie / saison / temps / badge nutritionnel ── */}
-        {(recette.categories?.length > 0 || recette.saisons?.length > 0 || totalTempsMin > 0 || badge) && (
+        {anyChip && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-            {recette.categories?.length > 0 && (
-              <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
+            {showCategories && (
+              <span style={chipStyle}>
                 {recette.categories.map(c => `${getRecipeCategoryIcon(c)} ${c}`).join(', ')}
               </span>
             )}
-            {recette.saisons?.length > 0 && (
-              <span style={{ background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }}>
+            {showSeasons && (
+              <span style={chipStyle}>
                 {recette.saisons.map(s => `${getSeasonIcon(s)} ${s}`).join(', ')}
               </span>
             )}
-            {totalTempsMin > 0 && (
+            {showTime && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--text-hint)', fontSize: 11, fontWeight: 600 }}>
                 <Clock size={11} />{totalTempsMin} min
               </span>
             )}
-            {badge && (
+            {showBadge && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: badge.bg, color: badge.color, borderRadius: 20, padding: '2px 9px 2px 7px', fontSize: 10.5, fontWeight: 700 }}>
                 {badge.emoji} {badge.label}
               </span>
@@ -128,9 +154,22 @@ function RecipeCard({ recette, ingredients, onOpen, onEdit, onDelete, onShare })
           </div>
         )}
 
-        {/* ── Macros en pastilles ── */}
+        {/* ── Macros ── grille : seulement les kcal ; liste : pastilles P/G/L ── */}
         {recette.energie_kcal == null ? (
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Aucun ingrédient</div>
+        ) : compact ? (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ background: 'var(--gray-bg)', color: 'var(--text)', borderRadius: 8, padding: '4px 9px', fontSize: 11.5, fontWeight: 700 }}>
+              {Math.round(recette.energie_kcal)}
+              <span style={{ fontWeight: 500, color: 'var(--text-hint)' }}> kcal /100 g</span>
+            </span>
+            {factor != null && (
+              <span style={{ background: 'var(--green-light)', color: 'var(--green-dark)', borderRadius: 8, padding: '4px 9px', fontSize: 11.5, fontWeight: 700 }}>
+                {Math.round(recette.energie_kcal * factor)}
+                <span style={{ fontWeight: 500 }}> kcal /portion</span>
+              </span>
+            )}
+          </div>
         ) : (
           <>
             <MacroPillsRow
@@ -151,7 +190,7 @@ function RecipeCard({ recette, ingredients, onOpen, onEdit, onDelete, onShare })
       </div>
 
       {/* ── Liste ingrédients + grammage (dépliable) ── */}
-      {expanded && hasIngredients && (
+      {!compact && expanded && hasIngredients && (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
           {ingredients.map((ing, i) => (
             <div
@@ -202,6 +241,13 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
   const { recettes, ingredientsByRecette, loading: loadingRecettes, deleteRecette, refetch: refetchRecettes } = useRecipes()
   const { shareRecette } = useFeed()
   const [recipeSearch, setRecipeSearch] = useState('')
+
+  // ── Préférences d'affichage de la liste (feuille « Affichage des recettes »,
+  // persistées en localStorage — par appareil) ─────────────────────────────
+  const [displayPrefs, setDisplayPrefs] = useState(loadRecipeDisplayPrefs)
+  const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
+  const updateDisplayPrefs = (next) => { setDisplayPrefs(next); saveRecipeDisplayPrefs(next) }
+  const displayCustomized = !isDefaultRecipeDisplayPrefs(displayPrefs)
 
   // Normalise pour une recherche insensible à la casse et aux accents
   const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
@@ -332,8 +378,23 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 border: '1px solid var(--border)',
               }}
+              aria-label="Trier &amp; filtrer"
             >
               <ArrowUpDown size={17} />
+            </button>
+
+            <button
+              onClick={() => setDisplaySettingsOpen(true)}
+              style={{
+                width: 44, height: 44, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                background: displayCustomized ? 'var(--green-light)' : 'var(--gray-bg)',
+                color: displayCustomized ? 'var(--green-dark)' : 'var(--text-muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid var(--border)',
+              }}
+              aria-label="Affichage des recettes"
+            >
+              <Settings size={17} />
             </button>
           </div>
 
@@ -374,17 +435,41 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
                   </span>
                   <ChevronDown size={16} color="var(--text-hint)" style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
                 </button>
-                {!collapsed && items.map(r => (
-                  <RecipeCard
-                    key={r.id}
-                    recette={r}
-                    ingredients={ingredientsByRecette[r.id]}
-                    onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
-                    onEdit={(rec) => setRecipeModal({ type: 'edit', recette: rec })}
-                    onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
-                    onShare={handleShareFromCard}
-                  />
-                ))}
+                {!collapsed && (
+                  displayPrefs.layout === 'grid' ? (
+                    // Disposition en maçonnerie (style Pinterest) : colonnes CSS
+                    // — les cartes s'empilent avec le même écart partout, sans
+                    // s'étirer pour aligner les rangées.
+                    <div style={{ columnCount: 2, columnGap: 10 }}>
+                      {items.map(r => (
+                        <div key={r.id} style={{ breakInside: 'avoid' }}>
+                          <RecipeCard
+                            recette={r}
+                            ingredients={ingredientsByRecette[r.id]}
+                            prefs={displayPrefs}
+                            onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+                            onEdit={(rec) => setRecipeModal({ type: 'edit', recette: rec })}
+                            onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+                            onShare={handleShareFromCard}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    items.map(r => (
+                      <RecipeCard
+                        key={r.id}
+                        recette={r}
+                        ingredients={ingredientsByRecette[r.id]}
+                        prefs={displayPrefs}
+                        onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+                        onEdit={(rec) => setRecipeModal({ type: 'edit', recette: rec })}
+                        onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+                        onShare={handleShareFromCard}
+                      />
+                    ))
+                  )
+                )}
               </div>
             )
           })}
@@ -467,6 +552,15 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
           value={recipeSort}
           onChange={setRecipeSort}
           onClose={() => setSortModalOpen(false)}
+        />
+      )}
+
+      {/* ── Affichage des recettes (infos visibles, image, disposition) ── */}
+      {displaySettingsOpen && (
+        <RecipeDisplaySettingsModal
+          value={displayPrefs}
+          onChange={updateDisplayPrefs}
+          onClose={() => setDisplaySettingsOpen(false)}
         />
       )}
     </>
