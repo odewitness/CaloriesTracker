@@ -119,46 +119,59 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     })
   }, [])
 
-  const runGenerate = useCallback((seed) => {
+  // Nombre de plans tirés (seeds différents) à chaque génération : on garde
+  // celui qui colle le mieux aux cibles (weekScore le plus bas). Évite d'avoir
+  // à « régénérer » plusieurs fois à la main pour tomber sur un bon résultat.
+  const BEST_OF = 4
+
+  const buildOne = useCallback((seed) => {
+    // Repas figés depuis le plan courant, pour les clés verrouillées.
+    const locked = {}
+    if (plan) {
+      for (const key of lockedKeys) {
+        const [dStr, meal] = key.split('|')
+        const dayMeal = plan.days[Number(dStr)]?.meals.find(m => m.meal === meal)
+        if (dayMeal) locked[key] = dayMeal
+      }
+    }
+    return buildMealPlan({
+      days: config.days,
+      people: config.people,
+      season: config.season,
+      mealConfig: effectiveMealConfig,
+      recettes,
+      repasTypes,
+      favorites,
+      mealTargets,
+      goalFibres: settings?.goal_fibres || 0,
+      includeRepasTypes: config.includeRepasTypes !== false,
+      maxCookMinutes: config.maxCookMinutes || null,
+      fillMicros: config.fillMicros !== false,
+      allowDoublePortions: config.allowDoublePortions !== false,
+      settings,
+      options: { seasonMode: config.seasonMode, seed },
+      locked,
+    })
+  }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings, plan, lockedKeys])
+
+  const runGenerate = useCallback((baseSeed) => {
     setGenerating(true)
     try {
-      // Repas figés depuis le plan courant, pour les clés verrouillées.
-      const locked = {}
-      if (plan) {
-        for (const key of lockedKeys) {
-          const [dStr, meal] = key.split('|')
-          const dayMeal = plan.days[Number(dStr)]?.meals.find(m => m.meal === meal)
-          if (dayMeal) locked[key] = dayMeal
-        }
+      let best = null
+      for (let i = 0; i < BEST_OF; i++) {
+        const r = buildOne((baseSeed + i * 0x9e3779b9) >>> 0)
+        if (!best || r.weekScore < best.weekScore) best = r
       }
-      const result = buildMealPlan({
-        days: config.days,
-        people: config.people,
-        season: config.season,
-        mealConfig: effectiveMealConfig,
-        recettes,
-        repasTypes,
-        favorites,
-        mealTargets,
-        goalFibres: settings?.goal_fibres || 0,
-        includeRepasTypes: config.includeRepasTypes !== false,
-        maxCookMinutes: config.maxCookMinutes || null,
-        fillMicros: config.fillMicros !== false,
-        allowDoublePortions: config.allowDoublePortions !== false,
-        settings,
-        options: { seasonMode: config.seasonMode, seed },
-        locked,
-      })
-      setPlan(result)
-      return result
+      setPlan(best)
+      return best
     } finally {
       setGenerating(false)
     }
-  }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings, plan, lockedKeys])
+  }, [buildOne])
 
-  // Première génération : seed aléatoire.
+  // Première génération : base de seed aléatoire.
   const generate = useCallback(() => runGenerate((Math.random() * 2 ** 31) >>> 0), [runGenerate])
-  // Régénérer : nouveau seed → nouveau tirage (garde les repas verrouillés).
+  // Régénérer : nouvelle base de seed → nouveaux tirages (garde les verrous).
   const regenerate = generate
 
   const reset = useCallback(() => { setPlan(null); setLockedKeys(new Set()) }, [])

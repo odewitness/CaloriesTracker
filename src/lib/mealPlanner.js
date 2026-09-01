@@ -51,8 +51,32 @@ const MIN_RESIDUAL_KCAL = 60
 const MAX_ADDONS_PER_MEAL = 2
 // Plafond de grammage d'un aliment « en + » (repris de ciqualExplorer).
 const MAX_ADDON_G = 200
-// Itérations de recherche locale.
-const LOCAL_SEARCH_ROUNDS = 60
+// Itérations de recherche locale (passes aléatoires, après le balayage glouton).
+const LOCAL_SEARCH_ROUNDS = 90
+// Balayage glouton : nb max d'alternatives (les mieux notées) essayées par
+// position de pool avant les passes aléatoires.
+const SWEEP_MAX_ALTS = 6
+
+// ── Dépassement des cibles ─────────────────────────────────────────────────
+// Le solveur ne sait qu'AJOUTER des aliments « en + », jamais retirer : si les
+// recettes seules dépassent déjà la cible, rien ne corrige. Pour éviter les
+// plans qui débordent, on pénalise le dépassement PLUS FORT que le déficit
+// (asymétrie), surtout sur les calories. Appliqué au niveau jour + semaine.
+const OVERSHOOT_KCAL_WEIGHT = 1.5
+const OVERSHOOT_MACRO_WEIGHT = 0.6
+
+function overshootPenalty(total, target) {
+  let p = 0
+  if (target.kcal > 0 && total.kcal > target.kcal) {
+    p += OVERSHOOT_KCAL_WEIGHT * (total.kcal - target.kcal) / target.kcal
+  }
+  for (const k of ['prot', 'gluc', 'lip']) {
+    if (target[k] > 0 && total[k] > target[k]) {
+      p += OVERSHOOT_MACRO_WEIGHT * (total[k] - target[k]) / target[k]
+    }
+  }
+  return p
+}
 
 // ── Portions doublées (PALIER 2) ───────────────────────────────────────────
 // Le solveur peut poser 1 OU 2 portions (jamais fractionnaire, jamais plus)
@@ -613,9 +637,10 @@ export function buildMealPlan(p) {
   }
 
   // 1. Vivier + pool de recettes tirées, par catégorie.
-  const viviers = {}    // categorie -> [candidate,...]
-  const picks = {}      // categorie -> [candidate,...] (pool partagé par les slots de la catégorie)
-  const pinnedByKey = {} // categorie -> Set d'ids épinglés (jamais remplacés en recherche locale)
+  const viviers = {}      // categorie -> [candidate,...]
+  const vivierScored = {} // categorie -> [{ c, dist }] trié (réutilisé par la recherche locale)
+  const picks = {}        // categorie -> [candidate,...] (pool partagé par les slots de la catégorie)
+  const pinnedByKey = {}  // categorie -> Set d'ids épinglés (jamais remplacés en recherche locale)
   for (const [key, entries] of Object.entries(groupSlots)) {
     const viv = buildVivier(key, vivierCtx)
     viviers[key] = viv
@@ -641,12 +666,29 @@ export function buildMealPlan(p) {
       continue
     }
     const avgTarget = averageTargets(entries.map(e => e.target))
+    // Note d'un candidat : distance macro à la part de cible du slot, moins le
+    // bonus saison, PLUS une pénalité si sa portion dépasse déjà la cible
+    // calorique du slot (on préfère des recettes qui laissent de la marge).
     const scored = viv
-      .map(c => ({ c, dist: macroDistance(c.macros, avgTarget) - seasonBonus(c.entity, season) }))
+      .map(c => ({
+        c,
+        dist: macroDistance(c.macros, avgTarget)
+          - seasonBonus(c.entity, season)
+          + (avgTarget.kcal > 0 && c.macros.kcal > avgTarget.kcal
+            ? 0.6 * (c.macros.kcal - avgTarget.kcal) / avgTarget.kcal
+            : 0),
+      }))
       .sort((a, b) => a.dist - b.dist)
+    vivierScored[key] = scored
     // Il faut au moins autant de recettes différentes que d'imposées.
     const nWanted = Math.max(...entries.map(e => e.slot.nbDifferentes || 1))
     const n = Math.max(1, nWanted, chosen.length)
+    // Peu de choix dans cette catégorie → le plan a peu de marge pour ajuster.
+    if (viv.length >= 1 && viv.length < n + 2) {
+      warnings.push(
+        `Peu de recettes « ${key} » (${viv.length}) — le plan a peu de marge pour coller aux calories. En ajouter quelques-unes, plutôt légères, améliorera le résultat.`,
+      )
+    }
     const poolSize = Math.min(scored.length, Math.max(n + 3, Math.ceil(scored.length * 0.5)))
     const cpool = scored.slice(0, poolSize).map(x => x.c).filter(c => !chosen.some(x => x.id === c.id))
     while (chosen.length < n && cpool.length) {
@@ -790,26 +832,72 @@ export function buildMealPlan(p) {
     return dayList
   }
 
-  const scorePlan = (dl) => dl.reduce((s, d) => s + d.score, 0)
-    + leftoverPortionPenalty(dl, recettesById, templatesById)
+  // Score global d'un plan : Σ scores jour + pénalité restes + pénalité de
+  // DÉPASSEMENT (asymétrique) au niveau jour ET semaine — c'est ce dernier
+  // terme qui pousse le solveur à ne pas déborder les calories / macros.
+  const scorePlan = (dl) => {
+    let s = leftoverPortionPenalty(dl, recettesById, templatesById)
+    let wkT = { ...EMPTY_MACROS }
+    let wkTgt = { ...EMPTY_MACROS }
+    for (const d of dl) {
+      s += d.score + overshootPenalty(d.totals, d.target)
+      wkT = addMacros(wkT, d.totals)
+      wkTgt = addMacros(wkTgt, d.target)
+    }
+    return s + overshootPenalty(wkT, wkTgt)
+  }
 
   let dayList = build()
   let bestScore = scorePlan(dayList)
 
-  // 3. Recherche locale : on tente de remplacer une recette d'un pool de groupe
-  //    par une autre de son vivier ; on garde si le score total baisse. Les
-  //    recettes épinglées ne sont jamais remplacées.
+  // 3. Recherche locale : remplacer une recette d'un pool par une autre de son
+  //    vivier, garder si le score global baisse. Recettes épinglées jamais
+  //    touchées. Deux phases : (a) balayage glouton — pour chaque position
+  //    libre, on essaie les meilleures alternatives et on garde la meilleure ;
+  //    (b) passes aléatoires pour sortir des optima locaux.
   const swappableKeys = Object.keys(picks).filter(k => {
     const free = picks[k].filter(c => !pinnedByKey[k]?.has(c.id)).length
     return free > 0 && (viviers[k] || []).length > picks[k].length
   })
+  const altsFor = (key, pool) => (vivierScored[key] || [])
+    .map(x => x.c)
+    .filter(c => !pool.some(p => p.id === c.id))
+  const freeIdxFor = (key, pool) => pool
+    .map((_, i) => i)
+    .filter(i => !pinnedByKey[key]?.has(pool[i].id))
+
+  // (a) balayage glouton
+  for (const key of swappableKeys) {
+    const pool = picks[key]
+    for (const idx of freeIdxFor(key, pool)) {
+      let bestAlt = null
+      let bestAltScore = bestScore
+      let tried = 0
+      for (const alt of altsFor(key, pool)) {
+        if (tried >= SWEEP_MAX_ALTS) break
+        tried++
+        const prev = pool[idx]
+        pool[idx] = alt
+        const ts = scorePlan(build())
+        pool[idx] = prev
+        if (ts < bestAltScore - 1e-6) { bestAltScore = ts; bestAlt = alt }
+      }
+      if (bestAlt) {
+        pool[idx] = bestAlt
+        dayList = build()
+        bestScore = bestAltScore
+      }
+    }
+  }
+
+  // (b) passes aléatoires
   for (let round = 0; round < LOCAL_SEARCH_ROUNDS && swappableKeys.length; round++) {
     const key = swappableKeys[Math.floor(rng() * swappableKeys.length)]
     const pool = picks[key]
-    const alt = (viviers[key] || []).find(c => !pool.some(x => x.id === c.id))
-    if (!alt) continue
-    const freeIdx = pool.map((c, i) => i).filter(i => !pinnedByKey[key]?.has(pool[i].id))
-    if (!freeIdx.length) continue
+    const alts = altsFor(key, pool)
+    const freeIdx = freeIdxFor(key, pool)
+    if (!alts.length || !freeIdx.length) continue
+    const alt = alts[Math.floor(rng() * alts.length)]
     const replaceIdx = freeIdx[Math.floor(rng() * freeIdx.length)]
     const prev = pool[replaceIdx]
     pool[replaceIdx] = alt

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Plan de repas : des menus qui collent mieux du premier coup',
+    description: "La génération a été retravaillée : le plan cherche maintenant à ne pas dépasser tes calories et tes macros (mieux vaut un peu en dessous qu'au dessus), essaie plusieurs combinaisons en coulisse et garde la meilleure, et privilégie les recettes qui laissent de la marge. Tu devrais avoir besoin de « régénérer » beaucoup moins souvent. Si une catégorie a peu de recettes, un message te le signale — c'est ce qui limite le plus le résultat.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Liste de courses : grammages arrondis',
     description: "Fini les « 33,33333 g » : les quantités de la liste de courses sont maintenant arrondies au gramme.",
   },
