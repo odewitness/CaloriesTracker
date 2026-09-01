@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useState, useMemo } from 'react'
-import { ChevronDown, Trash2, Share2, Pencil, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, Trash2, Share2, Pencil, X, Search, ArrowUpDown, UtensilsCrossed, MoreVertical, Clock, Settings } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -394,7 +394,7 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
               }}
               aria-label="Affichage des recettes"
             >
-              <SlidersHorizontal size={17} />
+              <Settings size={17} />
             </button>
           </div>
 
