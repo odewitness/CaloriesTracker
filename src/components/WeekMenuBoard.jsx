@@ -81,17 +81,20 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
     () => MEALS_ORDER.filter(m => settings?.meal_enabled?.[m] !== false),
     [settings?.meal_enabled],
   )
+  // Seuls les vrais repas (pas les « Compléments », planifiés à l'avance et
+  // sans calcul kcal) comptent dans le plateau et le résumé.
+  const mealSet = useMemo(() => new Set(enabledMeals), [enabledMeals])
 
   // Cible calorique d'une journée (objectif global) + résumé de la semaine
   // affichée : repas planifiés / créneaux, moyenne kcal des jours PLANIFIÉS
-  // (on ne compte pas les jours encore vides).
+  // (on ne compte pas les jours encore vides ni les compléments).
   const dayKcalTarget = Math.round(settings?.goal_kcal || 0)
   const weekStats = useMemo(() => {
     let planned = 0
     let kcal = 0
     let plannedDays = 0
     for (const dateStr of days) {
-      const rows = plannedByDate?.[dateStr] || []
+      const rows = (plannedByDate?.[dateStr] || []).filter(r => mealSet.has(r.meal))
       if (rows.length) plannedDays++
       for (const r of rows) {
         planned++
@@ -104,7 +107,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
       plannedDays,
       avgKcal: plannedDays ? Math.round(kcal / plannedDays) : 0,
     }
-  }, [days, plannedByDate, enabledMeals.length])
+  }, [days, plannedByDate, enabledMeals.length, mealSet])
 
   // Lignes de la semaine affichée qui appartiennent à un plan généré par le
   // planificateur (recurrence_group_id présent dans le stash).
@@ -294,9 +297,9 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
         for (const r of (plannedByDate?.[dateStr] || [])) {
           (byMeal[r.meal] = byMeal[r.meal] || []).push(r)
         }
-        const dayKcal = (plannedByDate?.[dateStr] || []).reduce(
-          (s, r) => s + (r.items || []).reduce((ss, i) => ss + (i.energie_kcal || 0), 0), 0,
-        )
+        const dayKcal = (plannedByDate?.[dateStr] || [])
+          .filter(r => mealSet.has(r.meal))
+          .reduce((s, r) => s + (r.items || []).reduce((ss, i) => ss + (i.energie_kcal || 0), 0), 0)
 
         return (
           <div

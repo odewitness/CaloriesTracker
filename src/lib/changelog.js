@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Menus : les compléments ne faussent plus le résumé',
+    description: "Les compléments que tu planifies à l'avance ne sont plus comptés dans le résumé de la semaine (repas planifiés, moyenne kcal/jour) ni dans les calories affichées par jour — seuls les vrais repas comptent.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Plan de repas : liste de courses « à neuf » + plans enregistrés visibles',
     description: "Au moment de générer la liste de courses depuis un plan, une case « Vider cette liste avant d'ajouter » (cochée d'office quand tu remplaces un plan) permet de repartir de zéro plutôt que d'empiler par-dessus l'ancienne. Et dans les réglages du planificateur, la section « Reprendre un plan enregistré » est maintenant dépliée et mise en avant : touche un plan pour le rouvrir, l'ajuster et l'appliquer à la semaine que tu veux.",
   },
