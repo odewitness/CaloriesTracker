@@ -5,6 +5,7 @@ import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeIn
 import { getSeasonIcon } from '../lib/seasons'
 import { useBackButton } from '../hooks/useBackButton'
 import Loader from './Loader'
+import Avatar from './Avatar'
 
 const CHIP_STYLE = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -64,6 +65,7 @@ export default function PartageDetailModal({ partage, ingredients, loading, isOw
     <div className="page-modal">
       <div className="page-modal-header">
         <button className="btn-icon" onClick={onClose} style={{ flexShrink: 0 }}><ArrowLeft size={20} color="var(--text-muted)" /></button>
+        <Avatar userId={partage.auteur_id} name={auteurLabel} size={30} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partage.nom}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Partagé par {auteurLabel}</div>

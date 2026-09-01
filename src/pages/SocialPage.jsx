@@ -13,6 +13,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
+import Avatar from '../components/Avatar'
 import PartageCard from '../components/PartageCard'
 import PartageDetailModal from '../components/PartageDetailModal'
 import JournalPartageCard from '../components/JournalPartageCard'
@@ -135,8 +136,11 @@ function FriendSearch({ friends, incomingRequests, outgoingRequests, searchByPse
 
       {result && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600 }}>
-            {result.pseudo}{result.prenom ? <span style={{ color: 'var(--text-hint)', fontWeight: 500 }}> · {result.prenom}</span> : null}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <Avatar userId={result.id} name={result.pseudo || result.prenom} size={30} />
+            <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+              {result.pseudo}{result.prenom ? <span style={{ color: 'var(--text-hint)', fontWeight: 500 }}> · {result.prenom}</span> : null}
+            </div>
           </div>
           {existingStatus === 'amie' && <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>Déjà amies</span>}
           {existingStatus === 'envoyee' && <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>Demande envoyée</span>}
@@ -156,9 +160,10 @@ function FriendSearch({ friends, incomingRequests, outgoingRequests, searchByPse
   )
 }
 
-function PersonRow({ pseudo, prenom, children }) {
+function PersonRow({ userId, pseudo, prenom, children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid var(--border)', gap: 10 }}>
+      <Avatar userId={userId} name={pseudo || prenom} size={32} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pseudo || '(pseudo supprimé)'}</div>
         {prenom && <div style={{ fontSize: 11.5, color: 'var(--text-hint)' }}>{prenom}</div>}
@@ -194,7 +199,7 @@ function AmisTab() {
           <div className="section-title">Demandes reçues</div>
           <div className="card" style={{ padding: '0 16px' }}>
             {incomingRequests.map(r => (
-              <PersonRow key={r.id} pseudo={r.pseudo} prenom={r.prenom}>
+              <PersonRow key={r.id} userId={r.friendId} pseudo={r.pseudo} prenom={r.prenom}>
                 <button onClick={() => acceptRequest(r.id)} style={{ ...ACTION_BTN, background: 'var(--green-light)', color: 'var(--green-dark)' }} aria-label="Accepter">
                   <Check size={15} />
                 </button>
@@ -212,7 +217,7 @@ function AmisTab() {
           <div className="section-title">Demandes envoyées</div>
           <div className="card" style={{ padding: '0 16px' }}>
             {outgoingRequests.map(r => (
-              <PersonRow key={r.id} pseudo={r.pseudo} prenom={r.prenom}>
+              <PersonRow key={r.id} userId={r.friendId} pseudo={r.pseudo} prenom={r.prenom}>
                 <span style={{ fontSize: 11.5, color: 'var(--text-hint)', display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> En attente</span>
                 <button onClick={() => removeOrDecline(r.id)} style={{ ...ACTION_BTN, background: 'var(--gray-bg)', color: 'var(--text-hint)' }} aria-label="Annuler">
                   <X size={15} />
@@ -233,7 +238,7 @@ function AmisTab() {
       ) : (
         <div className="card" style={{ padding: '0 16px', marginBottom: 20 }}>
           {friends.map(f => (
-            <PersonRow key={f.id} pseudo={f.pseudo} prenom={f.prenom}>
+            <PersonRow key={f.id} userId={f.friendId} pseudo={f.pseudo} prenom={f.prenom}>
               <button onClick={() => removeOrDecline(f.id)} style={{ ...ACTION_BTN, background: 'var(--gray-bg)', color: 'var(--text-hint)' }} aria-label="Retirer">
                 <UserMinus size={15} />
               </button>

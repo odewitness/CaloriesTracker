@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Send, Trash2, CornerDownRight } from 'lucide-react'
+import Avatar from './Avatar'
 
 function formatDate(iso) {
   const d = new Date(iso)
@@ -14,7 +15,10 @@ function CommentRow({ comment, userId, onDelete, isReply, onReplyClick }) {
   return (
     <div className="card" style={{ padding: '10px 12px', marginBottom: 6, marginLeft: isReply ? 22 : 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3, gap: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 700 }}>{comment.auteur_pseudo || comment.auteur_prenom || 'Une amie'}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <Avatar userId={comment.auteur_id} name={comment.auteur_pseudo || comment.auteur_prenom || 'Une amie'} size={18} />
+          <span style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{comment.auteur_pseudo || comment.auteur_prenom || 'Une amie'}</span>
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <span style={{ fontSize: 10.5, color: 'var(--text-hint)' }}>{formatDate(comment.created_at)}</span>
           {comment.auteur_id === userId && (

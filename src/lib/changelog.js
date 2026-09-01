@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Ta photo de profil',
+    description: "Dans « Profil », touche ta pastille tout en haut (ou la petite icône appareil photo) pour choisir une photo. Elle apparaît partout où on te voit : sur tes partages dans le fil, tes commentaires, et dans la liste de tes amies — qui peuvent elles aussi mettre la leur. Un bouton « Retirer la photo » revient à l'affichage avec tes initiales.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Menus : détail nutritionnel de la semaine + fiches des plats combinés',
     description: "Sous le résumé de la semaine, la carte « Détail nutritionnel » (la même que sur la page du jour : vitamines, minéraux, sucres, acides gras avec les jauges de couleur) montre ta moyenne par jour planifié. Et quand un repas prévu regroupe plusieurs recettes sur une même ligne (« Curry + Riz »), tu peux maintenant toucher le nom pour choisir quelle fiche ouvrir.",
   },

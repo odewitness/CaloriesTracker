@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { MoreVertical, Trash2, MessageCircle } from 'lucide-react'
 import MacroPillsRow from './MacroPillsRow'
 import ReactionBar from './ReactionBar'
+import Avatar from './Avatar'
 
 function formatDate(iso) {
   const d = new Date(iso)
@@ -29,11 +30,14 @@ export default function PartageCard({ partage, isOwn, commentCount, reactions, u
   return (
     <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16, cursor: 'pointer' }} onClick={() => onOpen(partage)}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', fontWeight: 600 }}>
-            {auteurLabel} · {formatDate(partage.created_at)}
+        <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+          <Avatar userId={partage.auteur_id} name={auteurLabel} size={30} style={{ marginTop: 1 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', fontWeight: 600 }}>
+              {auteurLabel} · {formatDate(partage.created_at)}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{partage.nom}</div>
           </div>
-          <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{partage.nom}</div>
         </div>
         {isOwn && (
           <div style={{ position: 'relative', flexShrink: 0 }}>

@@ -421,8 +421,22 @@ create table if not exists profiles (
   -- mensurations.taille_cm qui est le tour de taille.
   taille_cm numeric,
   -- 'sedentaire' | 'leger' | 'modere' | 'actif' | 'tres_actif'
-  niveau_activite text
+  niveau_activite text,
+  -- Ajoutée le 2026-09-01 pour la photo de profil. Horodatage du dernier
+  -- upload de l'avatar (null = pas de photo). Sert de cache-buster pour
+  -- l'affichage immédiat de SA PROPRE photo ; la photo d'une amie est servie
+  -- via l'URL publique nue (cache CDN). Voir src/lib/avatar.js.
+  avatar_updated_at timestamptz
 );
+
+-- Photo de profil : bucket Storage `avatars` (créé le 2026-09-01), PUBLIC en
+-- lecture. Un fichier par compte à `<user_id>/avatar.jpg` (upsert). Policies
+-- sur storage.objects (exécutées manuellement dans le SQL editor Supabase) :
+--   * SELECT : public (bucket public).
+--   * INSERT / UPDATE / DELETE : réservés au propriétaire du dossier,
+--     condition `(storage.foldername(name))[1] = auth.uid()::text`.
+-- Aucune dénormalisation de l'avatar sur les tables du fil social : chaque
+-- ligne porte déjà `auteur_id`, l'URL publique est reconstruite côté client.
 
 -- 7. TABLE RECETTES (plats maison, valeurs nutritionnelles pour 100g)
 create table if not exists recettes (

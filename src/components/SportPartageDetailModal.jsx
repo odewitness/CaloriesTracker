@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { ArrowLeft, X, MoreVertical, Trash2 } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import Loader from './Loader'
+import Avatar from './Avatar'
 import {
   sportTypeEmoji, sportTypeLabel, sportIntensiteLabel, formatDuree,
 } from '../lib/sport'
@@ -56,6 +57,7 @@ export default function SportPartageDetailModal({ partage, loading, isOwn, onDel
     <div className="page-modal">
       <div className="page-modal-header">
         <button className="btn-icon" onClick={onClose} style={{ flexShrink: 0 }}><ArrowLeft size={20} color="var(--text-muted)" /></button>
+        <Avatar userId={partage.auteur_id} name={auteurLabel} size={30} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emoji} {title}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
