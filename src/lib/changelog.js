@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Menus : « Modifier mon plan » et retrait plus clair',
+    description: "Quand une semaine a déjà un plan généré, le bouton du haut devient « Modifier mon plan » et rouvre ton plan tel quel pour l'ajuster. Le bouton « Retirer le plan généré » est descendu tout en bas, bien visible en rouge. Et la moyenne kcal/jour du résumé ne compte plus les jours encore vides.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Liste de courses : quantités enfin correctes',
     description: "Correction d'un bug : quand une recette revenait plusieurs fois dans la semaine, ou qu'un ingrédient était partagé entre plusieurs recettes, la liste de courses ne comptait que la première fois. Les grammages sont maintenant bien additionnés sur tout ce que tu prévois.",
   },

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown, Save, FolderOpen, Pencil } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
@@ -923,7 +923,7 @@ function segBtn(active) {
   }
 }
 
-export default function MealPlannerModal({ onClose, onApplied, defaultStartDate }) {
+export default function MealPlannerModal({ onClose, onApplied, defaultStartDate, initialLoadPlanId }) {
   useBackButton(onClose)
   const planner = useMealPlanner({ defaultStartDate })
   const toast = useToast()
@@ -979,7 +979,7 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
 
   const defaultPlanName = `Plan du ${shortDate(planner.config.startDateStr)} · ${planner.config.days} j`
 
-  const handleLoadPlan = (id) => {
+  const handleLoadPlan = useCallback((id) => {
     const saved = savedPlans.find(p => p.id === id)
     if (!saved) return
     const ok = planner.loadSavedPlan(saved)
@@ -987,7 +987,19 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
     setSavedPlanId(id)
     resetApply()
     setStep('preview')
-  }
+  }, [savedPlans, planner, toast])
+
+  // « Modifier mon plan » (vue Menus) : ouvre directement le plan enregistré
+  // du plan appliqué sur cette semaine. On n'auto-charge qu'une fois, quand la
+  // liste des plans est arrivée.
+  const autoLoadedRef = useRef(false)
+  useEffect(() => {
+    if (autoLoadedRef.current || !initialLoadPlanId || !savedPlans.length) return
+    if (savedPlans.some(p => p.id === initialLoadPlanId)) {
+      autoLoadedRef.current = true
+      handleLoadPlan(initialLoadPlanId)
+    }
+  }, [initialLoadPlanId, savedPlans, handleLoadPlan])
 
   const handleSavePlan = async (name, { asNew } = {}) => {
     const payload = { nom: name, config: planner.config, plan: planner.plan }
@@ -1039,11 +1051,22 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
     if (res.inserted === 0) { toast('Rien à ajouter (créneaux occupés ou jours exclus)'); return }
     setApplyResult(res)
     setShoppingState('idle')
+
+    // Enregistre le plan (s'il ne l'est pas déjà) pour que « Modifier mon
+    // plan » de la vue Menus puisse le rouvrir tel quel. On garde le lien
+    // groupId ↔ savedPlanId dans le stash.
+    let planId = savedPlanId
+    if (!planId) {
+      const { data } = await savePlan({ nom: defaultPlanName, config: planner.config, plan: planner.plan })
+      if (data) { planId = data.id; setSavedPlanId(data.id) }
+    }
+
     if (res.groupId) {
       stashAppliedPlan({
         groupId: res.groupId,
         startDateStr,
         days: planner.plan?.days.length || 0,
+        savedPlanId: planId || null,
         appliedAt: Date.now(),
       })
     }
