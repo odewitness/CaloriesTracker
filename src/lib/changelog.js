@@ -34,7 +34,7 @@ export const CHANGELOG = [
   {
     date: '2026-09-01',
     title: 'Ma fournée : ta liste de recettes à cuisiner',
-    description: "Dans le Calendrier, onglet « Menus », le bouton « Ma fournée » ouvre une check-list où tu ajoutes les recettes que tu comptes préparer et tu les coches au fur et à mesure, avec une barre d’avancement. Tu peux noter combien de portions préparer pour chacune. Elle est indépendante du plan de repas : sers-t’en seule pour un gros meal prep du dimanche. La liste te suit d’un appareil à l’autre.",
+    description: "Dans le Calendrier, onglet « Menus », le bouton « Ma fournée » ouvre une check-list où tu ajoutes les recettes que tu comptes préparer et tu les coches au fur et à mesure, avec une barre d’avancement. Tu peux noter combien de portions préparer pour chacune. Chaque semaine a sa propre fournée (elle suit la semaine affichée dans « Menus »). La liste te suit d’un appareil à l’autre.",
   },
   {
     date: '2026-09-01',

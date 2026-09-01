@@ -7,6 +7,7 @@ import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useToast } from '../lib/toast'
 import { deviationLevel, batchSummary, slotGroupKey, buildVivier } from '../lib/mealPlanner'
 import { addDaysStr, stashAppliedPlan, removeAppliedPlan } from '../lib/mealPlannerApply'
+import { mondayOf } from '../lib/dates'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import Loader from './Loader'
@@ -794,7 +795,9 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
   const [removing, setRemoving] = useState(false)
   const [creatingList, setCreatingList] = useState(false)
 
-  const { addRecipes: addBatchRecipes } = useBatchCooking()
+  // Fournée de la semaine du 1er jour du plan (les recettes du plan appliqué
+  // y sont versées).
+  const { addRecipes: addBatchRecipes } = useBatchCooking(mondayOf(planner.config.startDateStr))
 
   // Liste de courses cible (la plus récente par défaut).
   const { listes: shoppingLists, createListe } = useShoppingLists()

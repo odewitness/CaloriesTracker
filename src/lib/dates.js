@@ -21,6 +21,18 @@ export function todayStr(offsetDays = 0) {
   return fmt(d)
 }
 
+// 'YYYY-MM-DD' (local) du LUNDI de la semaine contenant `date` (Date ou
+// chaîne 'YYYY-MM-DD'). Sert à rattacher une donnée à « une semaine »
+// (ex. la fournée de batch cooking) avec la même convention lundi que le
+// calendrier / WeekMenuBoard.
+export function mondayOf(date) {
+  const d = typeof date === 'string' ? new Date(date + 'T12:00:00') : new Date(date)
+  const weekday = (d.getDay() + 6) % 7 // 0 = lundi
+  d.setDate(d.getDate() - weekday)
+  d.setHours(12, 0, 0, 0)
+  return fmt(d)
+}
+
 // "Aujourd'hui" / "Hier" / "Demain" / sinon "lundi 3 mars" (fr-FR).
 export function dateLabel(date) {
   const today = new Date(); today.setHours(0, 0, 0, 0)

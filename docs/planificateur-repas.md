@@ -384,8 +384,12 @@ l'édition de brique couvrent le besoin « garder la main »).
   cochables « faite / à faire », barre d'avancement, portions optionnelles par
   recette. Table dédiée `batch_cooking_items` (RLS « own », voir
   `supabase/sql/batch_cooking_setup.sql`), hook `useBatchCooking`, composant
-  `BatchCookingModal`. Entrée : Calendrier → Menus → « Ma fournée ». V1 = une
-  liste courante, ajout de recettes via un sélecteur interne.
+  `BatchCookingModal`. Entrée : Calendrier → Menus → « Ma fournée ». Ajout de
+  recettes via un sélecteur interne. **Rattachée à une semaine** (colonne
+  `semaine` = lundi, `unique(user_id, semaine, recette_id)`) : chaque semaine
+  de la vue Menus a sa propre fournée ; `WeekMenuBoard` passe `days[0]`,
+  `MealPlannerModal` passe `mondayOf(config.startDateStr)` (2026-09-01, branche
+  `feat-fournee-per-week`).
 - ✅ **« Plan de cuisine »** (2026-09-01, branche `feat-cooking-plan`) : depuis
   Ma fournée, bouton qui met bout à bout **toutes les étapes** des recettes de
   la fournée (`parseInstructionSteps` sur `recette.instructions`), réordonnables

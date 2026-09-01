@@ -35,13 +35,13 @@ const RECIPE_BADGES = [
 
 function r0(n) { return Math.round(n || 0) }
 
-export default function CookingPlanModal({ onClose }) {
+export default function CookingPlanModal({ onClose, semaine }) {
   useBackButton(onClose)
   const { user } = useAuth()
   const toast = useToast()
-  const { items: fourneeItems, loading: loadingF } = useBatchCooking()
+  const { items: fourneeItems, loading: loadingF } = useBatchCooking(semaine)
   const { recettes, loading: loadingR } = useRecipes()
-  const { steps, loading: loadingS, generate, toggleFait, move } = useBatchCookingSteps()
+  const { steps, loading: loadingS, generate, toggleFait, move } = useBatchCookingSteps(semaine)
 
   const [ingByRecette, setIngByRecette] = useState({})
   const [loadingIng, setLoadingIng] = useState(true)

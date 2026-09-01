@@ -3,41 +3,43 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useBatchCookingSteps — « Plan de cuisine » de Ma fournée (roadmap §M9).
-// Toutes les étapes d'instructions des recettes de la fournée, mises bout à
-// bout, réordonnables à la main + cochables. V1 : un plan courant par
-// utilisatrice, table `batch_cooking_steps` (RLS « own », voir
+// useBatchCookingSteps — « Plan de cuisine » de Ma fournée (roadmap §M9), pour
+// UNE semaine (`semaine` = lundi 'YYYY-MM-DD'). Toutes les étapes d'instructions
+// des recettes de la fournée de cette semaine, mises bout à bout, réordonnables
+// à la main + cochables. Table `batch_cooking_steps` (RLS « own », voir
 // supabase/sql/batch_cooking_steps_setup.sql).
 //
-// Une ligne = une étape : { id, recette_id, recette_nom, texte, ordre, fait }.
+// Une ligne = une étape : { id, semaine, recette_id, recette_nom, texte, ordre, fait }.
 // ─────────────────────────────────────────────────────────────────────────────
-export function useBatchCookingSteps() {
+export function useBatchCookingSteps(semaine) {
   const { user } = useAuth()
   const [steps, setSteps] = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    if (!user) { setSteps([]); setLoading(false); return }
+    if (!user || !semaine) { setSteps([]); setLoading(false); return }
     setLoading(true)
     const { data } = await supabase
       .from('batch_cooking_steps')
       .select('*')
       .eq('user_id', user.id)
+      .eq('semaine', semaine)
       .order('ordre', { ascending: true })
     setSteps(data || [])
     setLoading(false)
-  }, [user])
+  }, [user, semaine])
 
   useEffect(() => { load() }, [load])
 
-  // Reconstruit le plan : efface l'existant et réinsère `flat` dans l'ordre
-  // donné. `flat` : [{ recette_id, recette_nom, texte }].
+  // Reconstruit le plan de la semaine : efface l'existant et réinsère `flat`
+  // dans l'ordre donné. `flat` : [{ recette_id, recette_nom, texte }].
   const generate = useCallback(async (flat) => {
-    if (!user) return { error: null }
-    await supabase.from('batch_cooking_steps').delete().eq('user_id', user.id)
+    if (!user || !semaine) return { error: null }
+    await supabase.from('batch_cooking_steps').delete().eq('user_id', user.id).eq('semaine', semaine)
     if (!flat?.length) { setSteps([]); return { error: null } }
     const rows = flat.map((s, i) => ({
       user_id: user.id,
+      semaine,
       recette_id: s.recette_id || null,
       recette_nom: s.recette_nom || 'Recette',
       texte: s.texte,
@@ -47,15 +49,15 @@ export function useBatchCookingSteps() {
     const { error } = await supabase.from('batch_cooking_steps').insert(rows)
     if (!error) await load()
     return { error }
-  }, [user, load])
+  }, [user, semaine, load])
 
   const clear = useCallback(async () => {
-    if (!user) return { error: null }
+    if (!user || !semaine) return { error: null }
     setSteps([])
-    const { error } = await supabase.from('batch_cooking_steps').delete().eq('user_id', user.id)
+    const { error } = await supabase.from('batch_cooking_steps').delete().eq('user_id', user.id).eq('semaine', semaine)
     if (error) load()
     return { error }
-  }, [user, load])
+  }, [user, semaine, load])
 
   const toggleFait = useCallback(async (id, fait) => {
     setSteps(list => list.map(s => s.id === id ? { ...s, fait } : s))
