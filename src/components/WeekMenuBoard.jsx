@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER } from '../lib/nutrients'
@@ -8,6 +8,7 @@ import { fmt } from '../lib/dates'
 import { readAppliedPlans } from '../lib/mealPlannerApply'
 import PlanMealModal from './PlanMealModal'
 import MealPlannerModal from './MealPlannerModal'
+import BatchCookingModal from './BatchCookingModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WeekMenuBoard (roadmap §M5) — plateau de menus de la semaine : 7 jours
@@ -49,6 +50,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
   const [menuFor, setMenuFor] = useState(null)     // repas.id dont le petit menu d'actions est ouvert
   const [busyId, setBusyId] = useState(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
+  const [batchOpen, setBatchOpen] = useState(false)
   const [appliedGroupIds, setAppliedGroupIds] = useState(() => new Set(readAppliedPlans().map(p => p.groupId)))
   const [removingPlan, setRemovingPlan] = useState(false)
 
@@ -141,12 +143,26 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
         onClick={() => setPlannerOpen(true)}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
-          padding: '10px 12px', marginBottom: weekPlanRows.length ? 6 : 12, borderRadius: 'var(--radius-sm)',
+          padding: '10px 12px', marginBottom: 6, borderRadius: 'var(--radius-sm)',
           background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
           fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
         }}
       >
         <Wand2 size={15} /> Générer un plan de repas
+      </button>
+
+      {/* Page batch cooking — check-list de recettes à cuisiner, indépendante
+          du plan généré (roadmap §M9). */}
+      <button
+        onClick={() => setBatchOpen(true)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
+          padding: '9px 12px', marginBottom: weekPlanRows.length ? 6 : 12, borderRadius: 'var(--radius-sm)',
+          background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
+          fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+        }}
+      >
+        <ChefHat size={15} /> Ma fournée
       </button>
 
       {weekPlanRows.length > 0 && (
@@ -287,6 +303,10 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           onApplied={onRefetch}
           defaultStartDate={days[0]}
         />
+      )}
+
+      {batchOpen && (
+        <BatchCookingModal onClose={() => setBatchOpen(false)} />
       )}
     </div>
   )

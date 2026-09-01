@@ -1015,6 +1015,25 @@ create table if not exists collation_jours (
 );
 create index if not exists idx_collation_jours_user_date on collation_jours (user_id, date desc);
 
+-- 34. TABLE BATCH_COOKING_ITEMS (page « Ma fournée » — roadmap §M9, Palier 3
+-- du chantier planificateur. Check-list unique des recettes à cuisiner lors
+-- d'une session de meal prep, indépendante du planificateur. Écrit le
+-- 2026-09-01, voir supabase/sql/batch_cooking_setup.sql).
+-- V1 : UNE seule liste courante par utilisatrice (pas de sessions nommées ni
+-- d'historique). UNE LIGNE = UNE RECETTE dans la fournée en cours. RLS « own »
+-- select/insert/update/delete ; update sert à cocher `fait` et éditer `portions`.
+create table if not exists batch_cooking_items (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  recette_id uuid references recettes(id) on delete set null,
+  nom text not null,          -- snapshot du nom (garde la ligne lisible si la recette est supprimée)
+  portions numeric,           -- quantité à préparer, optionnelle
+  fait boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (user_id, recette_id)
+);
+create index if not exists idx_batch_cooking_items_user on batch_cooking_items (user_id, created_at);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -1140,6 +1159,12 @@ alter table pas_jour enable row level security;
 -- supabase/sql/collation_jours_setup.sql. La policy update sert au
 -- rebasculement de l'interrupteur (upsert on conflict user_id,date).
 alter table collation_jours enable row level security;
+
+-- RLS activé sur batch_cooking_items dès sa création (2026-09-01), policies
+-- select/insert/update/delete "own" (auth.uid() = user_id) — voir
+-- supabase/sql/batch_cooking_setup.sql. La policy update sert à cocher `fait`
+-- et à éditer `portions` sur la ligne existante.
+alter table batch_cooking_items enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)
