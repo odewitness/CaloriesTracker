@@ -9,7 +9,7 @@ export const CHANGELOG = [
   {
     date: '2026-09-01',
     title: 'Ta photo de profil',
-    description: "Dans « Profil », touche ta pastille tout en haut (ou la petite icône appareil photo) pour choisir une photo. Elle apparaît partout où on te voit : sur tes partages dans le fil, tes commentaires, et dans la liste de tes amies — qui peuvent elles aussi mettre la leur. Un bouton « Retirer la photo » revient à l'affichage avec tes initiales.",
+    description: "Dans « Profil », touche ta pastille tout en haut (ou la petite icône appareil photo) pour choisir une photo. Elle apparaît partout où on te voit : le bouton rond en haut de l'app, tes partages dans le fil, tes commentaires, et la liste de tes amies — qui peuvent elles aussi mettre la leur. Un bouton « Retirer la photo » revient à l'affichage avec tes initiales.",
   },
   {
     date: '2026-09-01',

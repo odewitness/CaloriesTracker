@@ -18,6 +18,7 @@ import ExplorerPage from './pages/ExplorerPage'
 import CycleInfoPage from './pages/CycleInfoPage'
 import Loader from './components/Loader'
 import ErrorBoundary from './components/ErrorBoundary'
+import Avatar from './components/Avatar'
 import { getLatestChangelogKey } from './lib/changelog'
 import { useFriends } from './hooks/useFriends'
 import { useSocialNotifications } from './hooks/useSocialNotifications'
@@ -180,6 +181,7 @@ function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClic
   const { open: shortcutsOpen, toggle: toggleShortcuts } = useTodayShortcuts()
   const initials = ((profile?.prenom?.[0] || '') + (profile?.nom?.[0] || '')).toUpperCase()
     || (user?.email?.[0] || '').toUpperCase()
+  const nameForAvatar = `${profile?.prenom || ''} ${profile?.nom || ''}`.trim() || user?.email || ''
 
   return (
     <div className={`top-bar${hidden ? ' top-bar-hidden' : ''}`}>
@@ -209,8 +211,15 @@ function ProfileButton({ onClick, onCalendarClick, onWhatsNewClick, onSocialClic
           <BellIcon />
           {hasUnreadNews && <span className="notif-dot" />}
         </button>
-        <button className="profile-avatar-btn" onClick={onClick} aria-label="Profil">
-          {initials ? initials : <ProfileIcon />}
+        <button
+          className="profile-avatar-btn"
+          onClick={onClick}
+          aria-label="Profil"
+          style={profile?.avatar_updated_at ? { padding: 0, overflow: 'hidden' } : undefined}
+        >
+          {profile?.avatar_updated_at
+            ? <Avatar userId={user?.id} name={nameForAvatar} size={36} version={profile.avatar_updated_at} />
+            : (initials ? initials : <ProfileIcon />)}
         </button>
       </div>
     </div>
