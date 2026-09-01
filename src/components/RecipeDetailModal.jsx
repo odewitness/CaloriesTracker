@@ -317,8 +317,15 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
 
       <div className="page-modal-body">
 
-        {/* ── Photo de la recette (si renseignée) ── */}
-        <RecipePhoto recetteId={recette.id} version={recette.photo_updated_at} style={{ marginBottom: 12 }} />
+        {/* ── Photo de la recette (si renseignée) — bandeau pleine largeur,
+             collé sous l'en-tête (annule le padding du corps) ── */}
+        <RecipePhoto
+          recetteId={recette.id}
+          version={recette.photo_updated_at}
+          ratio="3 / 2"
+          radius={0}
+          style={{ margin: '-16px -16px 14px', width: 'auto' }}
+        />
 
         {/* ── Carte "Je regarde" — sélecteur d'échelle (onglet Ingrédients) ── */}
         {activeTab === 'ingredients' && (
