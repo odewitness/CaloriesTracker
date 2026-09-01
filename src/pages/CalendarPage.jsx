@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, CalendarDays, Plus, Pill, CalendarClock, X, UtensilsCrossed } from 'lucide-react'
+import { CalendarDays, Plus, Pill, CalendarClock, X, UtensilsCrossed } from 'lucide-react'
 import CalendarMonthGrid from '../components/CalendarMonthGrid'
 import CalendarWeekStrip from '../components/CalendarWeekStrip'
 import DayRecapPanel from '../components/DayRecapPanel'
@@ -38,7 +38,8 @@ function endOfWeek(d) {
 // CalendarPage — vue Mois/Semaine + récap du jour sélectionné en dessous.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CalendarPage() {
-  const [view, setView] = useState('month') // 'month' | 'week' | 'planner'
+  const [view, setView] = useState('calendar') // 'calendar' | 'planner'
+  const [zoom, setZoom] = useState('month')    // 'month' | 'week' (dans l'onglet Calendrier)
   const [anchorDate, setAnchorDate] = useState(new Date()) // mois ou semaine affiché
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [planModal, setPlanModal] = useState(null) // 'repas' | 'complement' | null
@@ -60,15 +61,15 @@ export default function CalendarPage() {
   // cases hors-mois visibles dans la grille), suffisant aussi pour la vue
   // semaine qui est toujours incluse dans cette plage.
   const rangeStart = useMemo(() => {
-    const s = view === 'month' ? startOfMonth(anchorDate) : startOfWeek(anchorDate)
+    const s = zoom === 'month' ? startOfMonth(anchorDate) : startOfWeek(anchorDate)
     const padded = new Date(s); padded.setDate(padded.getDate() - 7)
     return padded
-  }, [anchorDate, view])
+  }, [anchorDate, zoom])
   const rangeEnd = useMemo(() => {
-    const e = view === 'month' ? endOfMonth(anchorDate) : endOfWeek(anchorDate)
+    const e = zoom === 'month' ? endOfMonth(anchorDate) : endOfWeek(anchorDate)
     const padded = new Date(e); padded.setDate(padded.getDate() + 7)
     return padded
-  }, [anchorDate, view])
+  }, [anchorDate, zoom])
 
   const { byDate: journalByDate, refetch: refetchJournal } = useJournalRange(rangeStart, rangeEnd)
   const { byDate: planifiesByDate, refetch: refetchPlanifies } = usePlannedMealsRange(rangeStart, rangeEnd)
@@ -130,21 +131,20 @@ export default function CalendarPage() {
   // affiché n'est pas celui du jour.
   const isCurrentPeriod = useMemo(() => {
     const now = new Date()
-    if (view === 'month') {
+    if (zoom === 'month') {
       return anchorDate.getFullYear() === now.getFullYear() && anchorDate.getMonth() === now.getMonth()
     }
     return fmt(startOfWeek(anchorDate)) === fmt(startOfWeek(now))
-  }, [anchorDate, view])
+  }, [anchorDate, zoom])
 
   return (
     <div className="page-content">
       <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 12 }}>
         {view === 'planner' ? 'Compose tes menus de la semaine' : 'Ta régularité et tes repas prévus'}
       </div>
-      <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, gap: 2, marginBottom: 18 }}>
+      <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 'var(--radius-sm)', padding: 3, gap: 2, marginBottom: view === 'calendar' ? 10 : 18 }}>
         {[
-          { key: 'month', label: 'Mois', icon: <Calendar size={14} /> },
-          { key: 'week',  label: 'Semaine', icon: <CalendarDays size={14} /> },
+          { key: 'calendar', label: 'Calendrier', icon: <CalendarDays size={14} /> },
           { key: 'planner', label: 'Menus', icon: <UtensilsCrossed size={14} /> },
         ].map(t => (
           <button
@@ -164,6 +164,28 @@ export default function CalendarPage() {
         ))}
       </div>
 
+      {view === 'calendar' && (
+        <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+          {[
+            { key: 'month', label: 'Mois' },
+            { key: 'week', label: 'Semaine' },
+          ].map(z => (
+            <button
+              key={z.key}
+              onClick={() => setZoom(z.key)}
+              style={{
+                padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+                border: `1px solid ${zoom === z.key ? 'var(--green)' : 'var(--border)'}`,
+                background: zoom === z.key ? 'var(--green-light)' : 'transparent',
+                color: zoom === z.key ? 'var(--green-dark)' : 'var(--text-muted)',
+              }}
+            >
+              {z.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {view === 'planner' ? (
         <WeekMenuBoard
           anchorDate={anchorDate}
@@ -174,7 +196,7 @@ export default function CalendarPage() {
           onGoToday={isCurrentPeriod ? undefined : goToday}
           onRefetch={refetchAll}
         />
-      ) : view === 'month' ? (
+      ) : zoom === 'month' ? (
         <CalendarMonthGrid
           monthDate={anchorDate}
           onChangeMonth={changeMonth}
@@ -206,7 +228,7 @@ export default function CalendarPage() {
 
       {/* Planifier + récap du jour : masqués en vue « Menus » (le plateau a
           son propre "+" par case et n'a pas de jour sélectionné). */}
-      {view !== 'planner' && (
+      {view === 'calendar' && (
       <>
       {/* Planifier : action secondaire, démotée sous le calendrier (consulter
           d'abord). « Planifier… » déplie le choix repas / complément. */}

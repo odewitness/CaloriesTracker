@@ -8,8 +8,8 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
-    title: 'Calendrier & Menus : présentation allégée',
-    description: "En-tête du Calendrier simplifié, onglets Mois / Semaine / Menus plus lisibles. Dans « Menus », les noms de repas ne sont plus coupés sur deux lignes et les boutons du haut sont regroupés (une action principale, deux raccourcis).",
+    title: 'Calendrier & Menus : réorganisation',
+    description: "Deux onglets au lieu de trois : « Calendrier » (avec un bouton Mois / Semaine à l'intérieur) et « Menus ». Dans « Menus », un résumé de semaine en haut (repas planifiés, moyenne kcal/jour vs ton objectif avec code couleur), les boutons d'action regroupés, les noms de repas ne se coupent plus sur deux lignes, et chaque jour affiche ses calories planifiées par rapport à ta cible.",
   },
   {
     date: '2026-09-01',

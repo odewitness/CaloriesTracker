@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, Ch
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER } from '../lib/nutrients'
+import { deviationLevel } from '../lib/mealPlanner'
 import { deletePlannedMeal, deletePlannedMeals, duplicatePlannedMeals, markAsEaten } from '../hooks/usePlannedMeals'
 import { fmt } from '../lib/dates'
 import { readAppliedPlans, stashAppliedPlan } from '../lib/mealPlannerApply'
@@ -33,6 +34,8 @@ function startOfWeek(d) {
   r.setHours(0, 0, 0, 0)
   return r
 }
+
+const LEVEL_COLOR = { ok: 'var(--green-dark)', warn: 'var(--amber)', off: 'var(--coral)' }
 
 function rangeLabel(days) {
   const a = new Date(days[0] + 'T12:00:00')
@@ -76,6 +79,21 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
     () => MEALS_ORDER.filter(m => settings?.meal_enabled?.[m] !== false),
     [settings?.meal_enabled],
   )
+
+  // Cible calorique d'une journée (objectif global) + résumé de la semaine
+  // affichée : repas planifiés / créneaux, moyenne kcal/jour.
+  const dayKcalTarget = Math.round(settings?.goal_kcal || 0)
+  const weekStats = useMemo(() => {
+    let planned = 0
+    let kcal = 0
+    for (const dateStr of days) {
+      for (const r of (plannedByDate?.[dateStr] || [])) {
+        planned++
+        kcal += (r.items || []).reduce((s, i) => s + (i.energie_kcal || 0), 0)
+      }
+    }
+    return { planned, slots: enabledMeals.length * 7, avgKcal: Math.round(kcal / 7) }
+  }, [days, plannedByDate, enabledMeals.length])
 
   // Lignes de la semaine affichée qui appartiennent à un plan généré par le
   // planificateur (recurrence_group_id présent dans le stash).
@@ -179,6 +197,26 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
         </button>
       </div>
 
+      {/* Résumé de la semaine affichée */}
+      {enabledMeals.length > 0 && (
+        <div className="card" style={{ padding: '10px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Repas planifiés</div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 2 }}>
+              {weekStats.planned} <span style={{ color: 'var(--text-hint)', fontWeight: 600 }}>/ {weekStats.slots}</span>
+            </div>
+          </div>
+          {weekStats.avgKcal > 0 && dayKcalTarget > 0 && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Moyenne / jour</div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 2, color: LEVEL_COLOR[deviationLevel(weekStats.avgKcal, dayKcalTarget)] }}>
+                {weekStats.avgKcal} <span style={{ color: 'var(--text-hint)', fontWeight: 600 }}>/ {dayKcalTarget} kcal</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Barre d'actions : 1 action principale (générer un plan) + 2 actions
           secondaires côte à côte (reprendre la semaine précédente / fournée). */}
       <button
@@ -266,7 +304,12 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
                 {isToday && <span style={{ color: 'var(--green-dark)', fontWeight: 700 }}> · aujourd'hui</span>}
               </div>
               {dayKcal > 0 && (
-                <span style={{ fontSize: 11.5, color: 'var(--text-hint)', fontWeight: 600 }}>{Math.round(dayKcal)} kcal</span>
+                <span style={{
+                  fontSize: 11.5, fontWeight: 600,
+                  color: dayKcalTarget > 0 ? LEVEL_COLOR[deviationLevel(dayKcal, dayKcalTarget)] : 'var(--text-hint)',
+                }}>
+                  {Math.round(dayKcal)}{dayKcalTarget > 0 ? ` / ${dayKcalTarget}` : ''} kcal
+                </span>
               )}
             </div>
 
