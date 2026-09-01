@@ -3,6 +3,7 @@ import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, Calendar
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
+import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useToast } from '../lib/toast'
 import { deviationLevel, batchSummary, slotGroupKey, buildVivier } from '../lib/mealPlanner'
 import { addDaysStr, stashAppliedPlan, removeAppliedPlan } from '../lib/mealPlannerApply'
@@ -513,6 +514,7 @@ function PreviewView({
   onBack, onRegenerate, generating, onApply, applying, result, applied,
   lockedKeys, onToggleLock, onToggleLockDay,
   swapCandidates, onSwapItem, onRemoveItem, onSetItemPortions,
+  onAddToBatch, batchState,
 }) {
   const [allowConflicts, setAllowConflicts] = useState(false)
   const [editing, setEditing] = useState(null) // { di, meal, ii } | null
@@ -661,6 +663,23 @@ function PreviewView({
               Quantités pour 1 personne. Pour {people}, multiplie par {people}.
             </div>
           )}
+          {batches.some(b => b.kind === 'recette') && (
+            <button
+              onClick={onAddToBatch}
+              disabled={batchState === 'busy' || batchState === 'done'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, marginTop: 8,
+                fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+                background: 'none', border: 'none', color: 'var(--green-dark)',
+                opacity: batchState === 'busy' ? 0.6 : 1,
+              }}
+            >
+              <ChefHat size={13} />
+              {batchState === 'busy' ? 'Envoi…'
+                : batchState === 'done' ? '✓ Ajouté à Ma fournée'
+                : 'Ajouter à Ma fournée'}
+            </button>
+          )}
         </div>
       )}
 
@@ -771,8 +790,11 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
   const [applying, setApplying] = useState(false)
   const [applyResult, setApplyResult] = useState(null)
   const [shoppingState, setShoppingState] = useState('idle') // 'idle' | 'busy' | 'done'
+  const [batchState, setBatchState] = useState('idle') // 'idle' | 'busy' | 'done'
   const [removing, setRemoving] = useState(false)
   const [creatingList, setCreatingList] = useState(false)
+
+  const { addRecipes: addBatchRecipes } = useBatchCooking()
 
   // Liste de courses cible (la plus récente par défaut).
   const { listes: shoppingLists, createListe } = useShoppingLists()
@@ -801,9 +823,31 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
     return data
   }
 
-  const resetApply = () => { setApplyResult(null); setShoppingState('idle') }
+  const resetApply = () => { setApplyResult(null); setShoppingState('idle'); setBatchState('idle') }
   const handleGenerate = () => { planner.generate(); resetApply(); setStep('preview') }
   const handleRegenerate = () => { planner.regenerate(); resetApply() }
+
+  // Verse les recettes du plan (récap « À préparer ») dans la page « Ma fournée »
+  // — avec le nombre de portions à préparer. Les repas types sont ignorés (la
+  // fournée est une check-list de recettes). Appelé automatiquement à
+  // « Appliquer au calendrier » (silencieux) et via le bouton du récap.
+  const addPlanRecipesToBatch = async ({ silent = false } = {}) => {
+    if (!planner.plan) return { added: 0 }
+    const list = batchSummary(planner.plan, { recettesById, templatesById })
+      .filter(b => b.kind === 'recette')
+      .map(b => ({ id: b.id, nom: b.nom, portions: b.portionsNeeded }))
+    if (!list.length) { if (!silent) toast('Aucune recette à envoyer'); return { added: 0 } }
+    setBatchState('busy')
+    const { error, added } = await addBatchRecipes(list)
+    if (error) {
+      setBatchState('idle')
+      if (!silent) toast('Erreur à l’envoi vers Ma fournée')
+      return { added: 0, error }
+    }
+    setBatchState('done')
+    if (!silent) toast(added ? `✓ ${added} recette${added > 1 ? 's' : ''} dans Ma fournée` : 'Déjà dans Ma fournée')
+    return { added }
+  }
 
   const handleApply = async ({ startDateStr, conflictStrategy }) => {
     setApplying(true)
@@ -821,7 +865,13 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
         appliedAt: Date.now(),
       })
     }
-    toast(`✓ ${res.inserted} repas ajoutés`)
+    // Verse aussi les recettes du plan dans « Ma fournée » (check-list de
+    // batch cooking), silencieusement — un seul toast récapitulatif.
+    const b = await addPlanRecipesToBatch({ silent: true })
+    toast(
+      `✓ ${res.inserted} repas ajoutés`
+      + (b?.added ? ` · ${b.added} recette${b.added > 1 ? 's' : ''} dans Ma fournée` : ''),
+    )
     onApplied?.()
   }
 
@@ -884,6 +934,8 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
             onSwapItem={planner.swapItem}
             onRemoveItem={planner.removeItem}
             onSetItemPortions={planner.setItemPortions}
+            onAddToBatch={() => addPlanRecipesToBatch()}
+            batchState={batchState}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
             onApply={handleApply}

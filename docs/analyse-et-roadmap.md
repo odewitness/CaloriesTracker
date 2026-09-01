@@ -518,10 +518,14 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
   - Code : `src/hooks/useBatchCooking.js`, `src/components/BatchCookingModal.jsx`.
   - Entrée V1 : **Calendrier → Menus → bouton « Ma fournée »** (à côté de
     « Générer un plan de repas »).
-  - Non fait (palier ultérieur) : envoi depuis l'aperçu du planificateur — le
-    récap interne « À préparer » de `MealPlannerModal` est conservé tel quel
-    pour l'instant, pas remplacé ; sélection multiple depuis la liste des
-    recettes ; sessions / historique.
+  - Raccordement planificateur → fournée **fait** (2026-09-01, branche
+    `feat-planner-to-batch`) : « Appliquer au calendrier » verse les recettes du
+    plan dans `batch_cooking_items` (portions = `portionsNeeded`), + bouton
+    « Ajouter à Ma fournée » dans le récap « À préparer ». Dédoublonné (upsert
+    ON CONFLICT DO NOTHING). Le récap interne « À préparer » est conservé, pas
+    remplacé.
+  - Non fait (palier ultérieur) : sélection multiple depuis la liste des
+    recettes ; sessions / historique ; repas types dans la fournée (ignorés).
 - **Quoi (cadrage initial).** Un écran dédié qui regroupe au même endroit toutes
   les recettes à cuisiner, avec pour chacune une case « faite / à faire ».
   Utilisable seule, sans passer par un plan de repas généré.
