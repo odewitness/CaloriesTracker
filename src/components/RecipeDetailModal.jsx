@@ -320,6 +320,7 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
         {/* ── Photo de la recette (si renseignée) — bandeau pleine largeur,
              collé sous l'en-tête (annule le padding du corps) ── */}
         <RecipePhoto
+          eager
           recetteId={recette.id}
           version={recette.photo_updated_at}
           ratio="3 / 2"
