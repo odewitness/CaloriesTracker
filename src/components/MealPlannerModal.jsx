@@ -37,13 +37,6 @@ const MACRO_ROWS = [
 
 function r0(n) { return Math.round(n || 0) }
 
-// "recette telle quelle" / "2× la recette" / "×1,25 (prévue pour 4)"
-function factorLabel(b) {
-  if (Math.abs(b.factor - 1) < 0.01) return 'recette telle quelle'
-  if (Math.abs(b.factor - Math.round(b.factor)) < 0.01) return `${Math.round(b.factor)}× la recette`
-  return `×${b.factor.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} (prévue pour ${b.baseYield})`
-}
-
 // "lun. 8 sept."
 function dayChipLabel(startStr, dayIndex) {
   const d = new Date(addDaysStr(startStr, dayIndex) + 'T12:00:00')
@@ -379,12 +372,6 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
 
   return (
     <>
-      <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 16 }}>
-        On choisit des recettes qui approchent au mieux tes objectifs de macros, puis on complète
-        chaque repas avec un ou deux aliments piochés dans tes favoris. Rien n'est ajouté au
-        calendrier sans que tu valides l'aperçu.
-      </div>
-
       <SavedPlansSection
         plans={savedPlans}
         onLoad={onLoadPlan}
@@ -394,13 +381,9 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
 
       {/* Jours */}
       <SectionLabel>Nombre de jours</SectionLabel>
-      <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 5, marginBottom: 14, flexWrap: 'wrap' }}>
         {[1, 2, 3, 4, 5, 6, 7].map(n => (
-          <button
-            key={n}
-            onClick={() => setConfig({ days: n })}
-            style={segBtn(config.days === n)}
-          >{n}</button>
+          <button key={n} onClick={() => setConfig({ days: n })} style={segBtn(config.days === n)}>{n}</button>
         ))}
       </div>
 
@@ -413,107 +396,88 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
         onChange={e => setConfig({ startDateStr: e.target.value })}
         style={{ marginBottom: 4, fontSize: 13 }}
       />
-      <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 16 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>
         {rangeLabel(config.startDateStr, config.days)}
       </div>
 
-      {/* Personnes */}
-      <SectionLabel>Nombre de personnes</SectionLabel>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <button className="btn-icon" onClick={() => setConfig({ people: Math.max(1, config.people - 1) })} aria-label="Moins">−</button>
-        <span style={{ fontSize: 15, fontWeight: 700, width: 24, textAlign: 'center' }}>{config.people}</span>
-        <button className="btn-icon" onClick={() => setConfig({ people: Math.min(12, config.people + 1) })} aria-label="Plus">+</button>
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 16 }}>
-        Sert aux quantités de la liste de courses, pas au calcul des macros par portion.
-      </div>
-
-      {/* Saison */}
-      <SectionLabel>Saison</SectionLabel>
-      <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
-        {SEASONS.map(s => (
-          <button key={s} onClick={() => setConfig({ season: config.season === s ? null : s })} style={segBtn(config.season === s)}>
-            {getSeasonIcon(s)} {s}
-          </button>
-        ))}
-      </div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 18 }}>
-        <input
-          type="checkbox"
-          checked={config.seasonMode === 'filter'}
-          onChange={e => setConfig({ seasonMode: e.target.checked ? 'filter' : 'bonus' })}
-          disabled={!config.season}
-        />
-        N'utiliser que les recettes de cette saison (sinon : simple préférence)
-      </label>
-
-      {/* Temps de cuisine */}
-      <SectionLabel>Temps de cuisine max</SectionLabel>
-      <div style={{ display: 'flex', gap: 5, marginBottom: 6, flexWrap: 'wrap' }}>
-        {[null, 15, 30, 45, 60].map(v => (
-          <button
-            key={v ?? 'any'}
-            onClick={() => setConfig({ maxCookMinutes: v })}
-            style={segBtn((config.maxCookMinutes ?? null) === v)}
-          >
-            {v == null ? 'Peu importe' : `≤ ${v} min`}
-          </button>
-        ))}
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 18 }}>
-        Préparation + cuisson. Les recettes sans temps renseigné passent quand même ;
-        une recette imposée aussi.
-      </div>
-
-      {/* Composition des repas */}
-      <SectionLabel>Repas & composition</SectionLabel>
-      <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '2px 0 8px' }}>
-        Décoche un repas pour ne pas l'inclure. Pour chaque repas, les briques et le nombre de
-        recettes différentes sur la période (2× = deux recettes qui tournent sur les jours ;
-        une même catégorie partagée entre déjeuner et dîner compte une seule fois).
-      </div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={config.includeRepasTypes !== false}
-          onChange={e => setConfig({ includeRepasTypes: e.target.checked })}
-        />
-        Piocher aussi dans mes repas types (en plus des recettes)
-      </label>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-        <input
-          type="checkbox"
-          checked={config.fillMicros !== false}
-          onChange={e => setConfig({ fillMicros: e.target.checked })}
-        />
-        Compléter aussi les manques en vitamines et minéraux
-      </label>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-        <input
-          type="checkbox"
-          checked={config.allowDoublePortions !== false}
-          onChange={e => setConfig({ allowDoublePortions: e.target.checked })}
-        />
-        Autoriser 2 portions d'un même plat quand ça rapproche des objectifs
-      </label>
-      {Object.keys(baseMealConfig).length === 0 && (
-        <div className="card" style={{ padding: 14, fontSize: 12.5, color: 'var(--text-hint)', textAlign: 'center', marginBottom: 8 }}>
-          Aucun repas activé. Active des repas depuis Profil.
+      <Collapsible label="Options avancées">
+        {/* Personnes */}
+        <SectionLabel>Personnes</SectionLabel>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <button className="btn-icon" onClick={() => setConfig({ people: Math.max(1, config.people - 1) })} aria-label="Moins">−</button>
+          <span style={{ fontSize: 15, fontWeight: 700, width: 24, textAlign: 'center' }}>{config.people}</span>
+          <button className="btn-icon" onClick={() => setConfig({ people: Math.min(12, config.people + 1) })} aria-label="Plus">+</button>
         </div>
-      )}
-      {Object.entries(baseMealConfig).map(([meal, slots]) => (
-        <MealSlotsEditor
-          key={meal}
-          meal={meal}
-          slots={slots}
-          included={!excluded.has(meal)}
-          onToggleIncluded={() => toggleMeal(meal)}
-          onChange={next => changeMealSlots(meal, next)}
-          pinOptionsFor={pinOptionsFor}
-        />
-      ))}
+        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 16 }}>Pour les quantités de la liste de courses.</div>
 
-      <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '10px 0 14px' }}>
+        {/* Saison */}
+        <SectionLabel>Saison</SectionLabel>
+        <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+          {SEASONS.map(s => (
+            <button key={s} onClick={() => setConfig({ season: config.season === s ? null : s })} style={segBtn(config.season === s)}>
+              {getSeasonIcon(s)} {s}
+            </button>
+          ))}
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 18 }}>
+          <input
+            type="checkbox"
+            checked={config.seasonMode === 'filter'}
+            onChange={e => setConfig({ seasonMode: e.target.checked ? 'filter' : 'bonus' })}
+            disabled={!config.season}
+          />
+          Saison stricte
+        </label>
+
+        {/* Temps de cuisine */}
+        <SectionLabel>Temps de cuisine max</SectionLabel>
+        <div style={{ display: 'flex', gap: 5, marginBottom: 18, flexWrap: 'wrap' }}>
+          {[null, 15, 30, 45, 60].map(v => (
+            <button
+              key={v ?? 'any'}
+              onClick={() => setConfig({ maxCookMinutes: v })}
+              style={segBtn((config.maxCookMinutes ?? null) === v)}
+            >
+              {v == null ? 'Peu importe' : `≤ ${v} min`}
+            </button>
+          ))}
+        </div>
+
+        {/* Bascules */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+          <input type="checkbox" checked={config.includeRepasTypes !== false} onChange={e => setConfig({ includeRepasTypes: e.target.checked })} />
+          Aussi mes repas types
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+          <input type="checkbox" checked={config.fillMicros !== false} onChange={e => setConfig({ fillMicros: e.target.checked })} />
+          Compléter vitamines &amp; minéraux
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+          <input type="checkbox" checked={config.allowDoublePortions !== false} onChange={e => setConfig({ allowDoublePortions: e.target.checked })} />
+          2 portions d'un même plat si utile
+        </label>
+
+        {/* Composition des repas */}
+        <SectionLabel>Repas &amp; composition</SectionLabel>
+        {Object.keys(baseMealConfig).length === 0 && (
+          <div className="card" style={{ padding: 14, fontSize: 12.5, color: 'var(--text-hint)', textAlign: 'center', marginBottom: 8 }}>
+            Aucun repas activé. Active des repas depuis Profil.
+          </div>
+        )}
+        {Object.entries(baseMealConfig).map(([meal, slots]) => (
+          <MealSlotsEditor
+            key={meal}
+            meal={meal}
+            slots={slots}
+            included={!excluded.has(meal)}
+            onToggleIncluded={() => toggleMeal(meal)}
+            onChange={next => changeMealSlots(meal, next)}
+            pinOptionsFor={pinOptionsFor}
+          />
+        ))}
+      </Collapsible>
+
+      <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '0 0 12px' }}>
         {recipeCount} recette{recipeCount > 1 ? 's' : ''} · {templateCount} repas type{templateCount > 1 ? 's' : ''} · {favoriteCount} favori{favoriteCount > 1 ? 's' : ''}
       </div>
 
@@ -655,8 +619,11 @@ function PreviewView({
 }) {
   const [allowConflicts, setAllowConflicts] = useState(false)
   const [editing, setEditing] = useState(null) // { di, meal, ii } | null
+  const [macroOpen, setMacroOpen] = useState(() => new Set()) // 'week' | `d${di}` dépliés
+  const toggleMacro = (k) => setMacroOpen(s => {
+    const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n
+  })
   useEffect(() => { setEditing(null) }, [plan])
-  const anyLocked = lockedKeys && lockedKeys.size > 0
   const batches = useMemo(
     () => batchSummary(plan, { recettesById, templatesById }),
     [plan, recettesById, templatesById],
@@ -677,12 +644,6 @@ function PreviewView({
         </button>
       </div>
 
-      {anyLocked && (
-        <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '-4px 0 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Lock size={11} /> Les repas verrouillés sont conservés à la régénération.
-        </div>
-      )}
-
       {plan.warnings?.length > 0 && (
         <div className="card" style={{ padding: '10px 12px', marginBottom: 12, background: 'var(--amber-light)', border: 'none' }}>
           {plan.warnings.map((w, i) => (
@@ -693,34 +654,62 @@ function PreviewView({
         </div>
       )}
 
-      {/* Niveau 3 : semaine */}
-      <div className="card" style={{ padding: '12px 14px', marginBottom: 12, borderLeft: '3px solid var(--green)' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>
-          Sur {plan.days.length} jour{plan.days.length > 1 ? 's' : ''}
-        </div>
-        <MacroRow totals={plan.weekTotals} target={plan.weekTarget} />
-      </div>
+      {/* Niveau 3 : semaine — compact, détail P/G/L/fibres au tap */}
+      {(() => {
+        const n = plan.days.length
+        const perDay = n ? plan.weekTotals.kcal / n : 0
+        const perDayTarget = n ? plan.weekTarget.kcal / n : 0
+        const open = macroOpen.has('week')
+        return (
+          <div className="card" style={{ padding: '12px 14px', marginBottom: 12, borderLeft: '3px solid var(--green)' }}>
+            <button
+              onClick={() => toggleMacro('week')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8, background: 'none', border: 'none', fontFamily: 'var(--font)', padding: 0 }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                Sur {n} jour{n > 1 ? 's' : ''}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <KcalPill kcal={perDay} target={perDayTarget} />
+                <span style={{ fontSize: 10, color: 'var(--text-hint)', fontWeight: 600 }}>/j</span>
+                <ChevronDown size={14} style={{ color: 'var(--text-hint)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+              </span>
+            </button>
+            {open && <div style={{ marginTop: 10 }}><MacroRow totals={plan.weekTotals} target={plan.weekTarget} /></div>}
+          </div>
+        )
+      })()}
 
       {/* Niveau 2 & 1 : jour puis repas */}
       {plan.days.map((day, di) => {
         const dayMealNames = day.meals.map(m => m.meal)
         const dayAllLocked = dayMealNames.length > 0 && dayMealNames.every(m => lockedKeys?.has(`${di}|${m}`))
+        const dayMacrosOpen = macroOpen.has(`d${di}`)
         return (
         <div key={di} className="card" style={{ padding: '10px 12px', marginBottom: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'capitalize' }}>{dayChipLabel(startDateStr, di)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => toggleMacro(`d${di}`)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, background: 'none', border: 'none', fontFamily: 'var(--font)', padding: 0, textAlign: 'left' }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'capitalize' }}>{dayChipLabel(startDateStr, di)}</span>
+              <KcalPill kcal={day.totals.kcal} target={day.target.kcal} />
+              <ChevronDown size={13} style={{ color: 'var(--text-hint)', flexShrink: 0, transform: dayMacrosOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+            </button>
             <button
               onClick={() => onToggleLockDay(di, dayMealNames)}
               className="btn-icon"
               aria-label={dayAllLocked ? 'Déverrouiller la journée' : 'Verrouiller la journée'}
-              style={{ width: 26, height: 26, color: dayAllLocked ? 'var(--green-dark)' : 'var(--text-hint)' }}
+              style={{ width: 26, height: 26, flexShrink: 0, color: dayAllLocked ? 'var(--green-dark)' : 'var(--text-hint)' }}
             >
               {dayAllLocked ? <Lock size={13} /> : <LockOpen size={13} />}
             </button>
           </div>
-          <div style={{ marginBottom: 8 }}>
-            <MacroRow totals={day.totals} target={day.target} />
-          </div>
+          {dayMacrosOpen && (
+            <div style={{ margin: '8px 0 2px' }}>
+              <MacroRow totals={day.totals} target={day.target} />
+            </div>
+          )}
 
           {day.meals.map((m, mi) => {
             const mealLocked = lockedKeys?.has(`${di}|${m.meal}`)
@@ -789,9 +778,8 @@ function PreviewView({
           {batches.map(b => (
             <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', gap: 8 }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.nom}</span>
-              <span style={{ color: 'var(--text-muted)', flexShrink: 0, textAlign: 'right' }}>
+              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
                 {b.portionsNeeded} portion{b.portionsNeeded > 1 ? 's' : ''}
-                <span style={{ color: 'var(--text-hint)' }}> · {factorLabel(b)}</span>
               </span>
             </div>
           ))}
@@ -909,10 +897,10 @@ function PreviewView({
           >
             <CalendarPlus size={16} /> {applying ? 'Ajout…' : replacing ? 'Remplacer le plan' : 'Appliquer au calendrier'}
           </button>
-          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8 }}>
             {replacing
-              ? "Ton plan actuel de cette semaine est retiré, puis remplacé par celui-ci. Les repas que tu as ajoutés à la main sur ces jours restent."
-              : "Crée un repas prévu par jour et par repas. Rien n'est écrasé ni supprimé. Ensuite tu pourras générer la liste de courses, ou retirer tout le plan d'un coup."}
+              ? "L'ancien plan de la semaine est retiré ; tes repas ajoutés à la main restent."
+              : "Un repas prévu par créneau. Rien n'est écrasé."}
           </div>
         </div>
       )}
@@ -935,6 +923,35 @@ function segBtn(active) {
     background: active ? 'var(--green-light)' : 'var(--white)',
     color: active ? 'var(--green-dark)' : 'var(--text-muted)',
   }
+}
+
+// Section repliée (défaut fermé) — pour ranger les réglages secondaires.
+function Collapsible({ label, children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ margin: '4px 0 16px', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}
+      >
+        {label}
+        <ChevronDown size={15} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {open && <div style={{ marginTop: 12 }}>{children}</div>}
+    </div>
+  )
+}
+
+// kcal courant / cible, coloré par l'écart. Remplace les 5 pastilles de macros
+// dans l'aperçu — le détail P/G/L/fibres s'ouvre au tap.
+function KcalPill({ kcal, target }) {
+  const level = deviationLevel(kcal, target)
+  return (
+    <span style={{ fontSize: 12.5, fontWeight: 700, color: LEVEL_COLOR[level], flexShrink: 0, whiteSpace: 'nowrap' }}>
+      {r0(kcal)}
+      {target > 0 && <span style={{ color: 'var(--text-hint)', fontWeight: 600 }}> / {r0(target)}</span>} kcal
+    </span>
+  )
 }
 
 export default function MealPlannerModal({ onClose, onApplied, defaultStartDate, initialLoadPlanId, replaceGroupId, replaceStartDate }) {

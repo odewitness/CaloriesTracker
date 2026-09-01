@@ -15,10 +15,10 @@ import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WeekMenuBoard (roadmap §M5) — plateau de menus de la semaine : 7 jours
-// empilés (lisible sur mobile, contrairement à une grille 7×4), chaque jour
-// avec ses lignes de repas activés. On y ajoute un repas planifié sur une case
-// précise ("+"), on le retire (menu ⋮), ou on ouvre la fiche de la recette /
-// du repas type en cliquant sur le plat. C'est une autre entrée sur les mêmes
+// empilés (lisible sur mobile, contrairement à une grille 7×4). Chaque jour
+// n'affiche que ses repas remplis + un lien « Ajouter un repas » qui ouvre le
+// choix du créneau. On ouvre la fiche recette / repas type en cliquant sur un
+// plat, on le retire via le menu ⋮. C'est une autre entrée sur les mêmes
 // données que le calendrier (repas_planifies), pas un stockage à part.
 //
 // Props :
@@ -38,6 +38,8 @@ function startOfWeek(d) {
 }
 
 const LEVEL_COLOR = { ok: 'var(--green-dark)', warn: 'var(--amber)', off: 'var(--coral)' }
+// Étiquette courte du repas devant les plats d'une journée.
+const MEAL_SHORT = { 'Petit-déjeuner': 'Petit-déj', 'Déjeuner': 'Déjeuner', 'Collation': 'Collation', 'Dîner': 'Dîner' }
 
 function rangeLabel(days) {
   const a = new Date(days[0] + 'T12:00:00')
@@ -53,6 +55,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
   const toast = useToast()
   const [planSlot, setPlanSlot] = useState(null)   // { date: 'YYYY-MM-DD', meal } | null
   const [menuFor, setMenuFor] = useState(null)     // repas.id dont le petit menu d'actions est ouvert
+  const [addFor, setAddFor] = useState(null)       // dateStr dont le menu « ajouter un repas » est ouvert
   const [sourceDetail, setSourceDetail] = useState(null) // { source_type, source_id } du plat dont on ouvre la fiche
   const [busyId, setBusyId] = useState(null)
   const [plannerOpen, setPlannerOpen] = useState(false)
@@ -171,54 +174,56 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
         </button>
       </div>
 
-      {/* Résumé de la semaine affichée */}
+      {/* Résumé de la semaine affichée : jours planifiés + moyenne kcal + barre */}
       {enabledMeals.length > 0 && (
-        <div className="card" style={{ padding: '10px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Repas planifiés</div>
-            <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 2 }}>
-              {weekStats.planned} <span style={{ color: 'var(--text-hint)', fontWeight: 600 }}>/ {weekStats.slots}</span>
-            </div>
+        <div className="card" style={{ padding: '10px 12px', marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700 }}>
+              {weekStats.plannedDays} jour{weekStats.plannedDays > 1 ? 's' : ''} sur 7
+              {weekStats.planned > 0 && (
+                <span style={{ color: 'var(--text-hint)', fontWeight: 600 }}> · {weekStats.planned} repas</span>
+              )}
+            </span>
+            {weekStats.avgKcal > 0 && dayKcalTarget > 0 && (
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: LEVEL_COLOR[deviationLevel(weekStats.avgKcal, dayKcalTarget)] }}>
+                ≈ {weekStats.avgKcal} kcal/j
+              </span>
+            )}
           </div>
-          {weekStats.avgKcal > 0 && dayKcalTarget > 0 && (
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Moy. / jour planifié</div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 2, color: LEVEL_COLOR[deviationLevel(weekStats.avgKcal, dayKcalTarget)] }}>
-                {weekStats.avgKcal} <span style={{ color: 'var(--text-hint)', fontWeight: 600 }}>/ {dayKcalTarget} kcal</span>
-              </div>
-            </div>
-          )}
+          <div style={{ height: 4, borderRadius: 2, background: 'var(--gray-bg)', marginTop: 8, overflow: 'hidden' }}>
+            <div style={{ width: `${Math.round((weekStats.plannedDays / 7) * 100)}%`, height: '100%', background: 'var(--green)', transition: 'width .2s' }} />
+          </div>
         </div>
       )}
 
-      {/* Barre d'actions. Générer un plan : uniquement quand la semaine n'en a
-          pas encore un (« Modifier mon plan » est en bas, près de « Retirer »).
-          « Ma fournée » : toujours dispo. */}
-      {!hasWeekPlan && (
+      {/* Barre d'actions sur une ligne. « Générer un plan » disparaît quand la
+          semaine en a déjà un (« Modifier mon plan » est alors en bas). */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {!hasWeekPlan && (
+          <button
+            onClick={() => setPlannerOpen(true)}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
+              fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+            }}
+          >
+            <Wand2 size={15} /> Générer un plan
+          </button>
+        )}
         <button
-          onClick={() => setPlannerOpen(true)}
+          onClick={() => setBatchOpen(true)}
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
-            padding: '11px 12px', marginBottom: 6, borderRadius: 'var(--radius-sm)',
-            background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
-            fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)',
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+            background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
+            fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
           }}
         >
-          <Wand2 size={15} /> Générer un plan de repas
+          <ChefHat size={14} /> Ma fournée
         </button>
-      )}
-
-      <button
-        onClick={() => setBatchOpen(true)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
-          padding: '8px 10px', marginBottom: 14, borderRadius: 'var(--radius-sm)',
-          background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
-          fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
-        }}
-      >
-        <ChefHat size={14} /> Ma fournée
-      </button>
+      </div>
 
       {enabledMeals.length === 0 && (
         <div className="card" style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: 'var(--text-hint)' }}>
@@ -259,82 +264,94 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
               )}
             </div>
 
-            {enabledMeals.map(meal => {
-              const list = byMeal[meal] || []
-              return (
-                <div key={meal} style={{ padding: '5px 0' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
-                    {meal}
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'flex-start' }}>
-                    {list.map(r => {
-                      const kcal = (r.items || []).reduce((s, i) => s + (i.energie_kcal || 0), 0)
-                      const hasSource = r.source_type === 'recette' || r.source_type === 'repas_type'
-                      return (
-                        <span key={r.id} style={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch', maxWidth: '100%' }}>
-                          <button
-                            onClick={() => hasSource && setSourceDetail({ source_type: r.source_type, source_id: r.source_id })}
-                            disabled={busyId === r.id}
-                            title={hasSource ? 'Voir la fiche' : undefined}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left',
-                              background: r.mange ? 'var(--green-light)' : 'var(--gray-bg)',
-                              color: r.mange ? 'var(--green-dark)' : 'var(--text)',
-                              border: 'none', borderRadius: '7px 0 0 7px', padding: '4px 8px',
-                              fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)',
-                              cursor: hasSource ? 'pointer' : 'default',
-                            }}
-                          >
-                            {r.mange && <Check size={11} style={{ flexShrink: 0 }} />}
-                            <span>{r.nom}</span>
-                            {kcal > 0 && <span style={{ color: 'var(--text-hint)', fontWeight: 500 }}>· {Math.round(kcal)}</span>}
-                          </button>
-                          <button
-                            onClick={() => setMenuFor(menuFor === r.id ? null : r.id)}
-                            disabled={busyId === r.id}
-                            aria-label="Actions"
-                            style={{
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                              background: r.mange ? 'var(--green-light)' : 'var(--gray-bg)',
-                              color: 'var(--text-hint)', border: 'none', borderRadius: '0 7px 7px 0',
-                              padding: '0 5px', marginLeft: 1,
-                            }}
-                          >
-                            <MoreVertical size={13} />
-                          </button>
+            {enabledMeals.filter(meal => (byMeal[meal] || []).length > 0).map(meal => (
+              <div key={meal} style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', padding: '4px 0' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3, flexShrink: 0 }}>
+                  {MEAL_SHORT[meal] || meal}
+                </span>
+                {byMeal[meal].map(r => {
+                  const kcal = (r.items || []).reduce((s, i) => s + (i.energie_kcal || 0), 0)
+                  const hasSource = r.source_type === 'recette' || r.source_type === 'repas_type'
+                  return (
+                    <span key={r.id} style={{ position: 'relative', display: 'inline-flex', alignItems: 'stretch', maxWidth: '100%' }}>
+                      <button
+                        onClick={() => hasSource && setSourceDetail({ source_type: r.source_type, source_id: r.source_id })}
+                        disabled={busyId === r.id}
+                        title={hasSource ? 'Voir la fiche' : undefined}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left',
+                          background: r.mange ? 'var(--green-light)' : 'var(--gray-bg)',
+                          color: r.mange ? 'var(--green-dark)' : 'var(--text)',
+                          border: 'none', borderRadius: '7px 0 0 7px', padding: '4px 8px',
+                          fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)',
+                          cursor: hasSource ? 'pointer' : 'default',
+                        }}
+                      >
+                        {r.mange && <Check size={11} style={{ flexShrink: 0 }} />}
+                        <span>{r.nom}</span>
+                        {kcal > 0 && <span style={{ color: 'var(--text-hint)', fontWeight: 500 }}>· {Math.round(kcal)}</span>}
+                      </button>
+                      <button
+                        onClick={() => setMenuFor(menuFor === r.id ? null : r.id)}
+                        disabled={busyId === r.id}
+                        aria-label="Actions"
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                          background: r.mange ? 'var(--green-light)' : 'var(--gray-bg)',
+                          color: 'var(--text-hint)', border: 'none', borderRadius: '0 7px 7px 0',
+                          padding: '0 5px', marginLeft: 1,
+                        }}
+                      >
+                        <MoreVertical size={13} />
+                      </button>
 
-                          {menuFor === r.id && (
-                            <>
-                              <div style={{ position: 'fixed', inset: 0, zIndex: 19 }} onClick={() => setMenuFor(null)} />
-                              <div className="card" style={{ position: 'absolute', top: 28, right: 0, zIndex: 20, padding: 4, minWidth: 140 }}>
-                                <button
-                                  onClick={() => handleDelete(r)}
-                                  style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--coral)', display: 'flex', alignItems: 'center', gap: 8 }}
-                                >
-                                  <Trash2 size={14} /> Retirer
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </span>
-                      )
-                    })}
+                      {menuFor === r.id && (
+                        <>
+                          <div style={{ position: 'fixed', inset: 0, zIndex: 19 }} onClick={() => setMenuFor(null)} />
+                          <div className="card" style={{ position: 'absolute', top: 28, right: 0, zIndex: 20, padding: 4, minWidth: 140 }}>
+                            <button
+                              onClick={() => handleDelete(r)}
+                              style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--coral)', display: 'flex', alignItems: 'center', gap: 8 }}
+                            >
+                              <Trash2 size={14} /> Retirer
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </span>
+                  )
+                })}
+              </div>
+            ))}
 
-                    <button
-                      onClick={() => setPlanSlot({ date: dateStr, meal })}
-                      aria-label={`Planifier ${meal} le ${dateStr}`}
-                      style={{
-                        width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                        background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >
-                      <Plus size={13} />
-                    </button>
+            {/* Ajouter un repas sur ce jour (choix du créneau dans un petit menu) */}
+            <div style={{ position: 'relative', marginTop: 6 }}>
+              <button
+                onClick={() => setAddFor(addFor === dateStr ? null : dateStr)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
+                  color: 'var(--green-dark)', fontSize: 11.5, fontWeight: 700, fontFamily: 'var(--font)', padding: '2px 0',
+                }}
+              >
+                <Plus size={13} /> Ajouter un repas
+              </button>
+              {addFor === dateStr && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 19 }} onClick={() => setAddFor(null)} />
+                  <div className="card" style={{ position: 'absolute', bottom: 24, left: 0, zIndex: 20, padding: 4, minWidth: 160 }}>
+                    {enabledMeals.map(meal => (
+                      <button
+                        key={meal}
+                        onClick={() => { setPlanSlot({ date: dateStr, meal }); setAddFor(null) }}
+                        style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'block' }}
+                      >
+                        {meal}
+                      </button>
+                    ))}
                   </div>
-                </div>
-              )
-            })}
+                </>
+              )}
+            </div>
           </div>
         )
       })}

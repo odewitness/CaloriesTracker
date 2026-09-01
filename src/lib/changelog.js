@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Menus & génération de plan : plus clair, moins chargé',
+    description: "L'onglet Menus est allégé : chaque jour ne montre que ses repas prévus (fini la liste de créneaux vides), avec un lien « Ajouter un repas » pour compléter, et un résumé de semaine avec une petite barre de progression. La génération de plan a été simplifiée : l'écran de réglages tient en trois choix (nombre de jours, date de début, générer), tout le reste est rangé sous « Options avancées ». Dans l'aperçu, chaque jour affiche juste ses calories, et le détail protéines / glucides / lipides s'ouvre d'un tap si tu veux le voir.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Menus : touche un plat pour voir sa fiche',
     description: "Dans « Menus », le nom entier de chaque plat prévu est visible, et si tu le touches ça ouvre directement la fiche de la recette ou du repas type. Pour retirer un plat, passe par les trois petits points à côté. « Modifier mon plan » est descendu en bas, juste avant le bouton rouge pour retirer le plan.",
   },
