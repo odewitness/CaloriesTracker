@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, History } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER } from '../lib/nutrients'
-import { deletePlannedMeal, deletePlannedMeals, markAsEaten } from '../hooks/usePlannedMeals'
+import { deletePlannedMeal, deletePlannedMeals, duplicatePlannedMeals, markAsEaten } from '../hooks/usePlannedMeals'
 import { fmt } from '../lib/dates'
-import { readAppliedPlans } from '../lib/mealPlannerApply'
+import { readAppliedPlans, stashAppliedPlan } from '../lib/mealPlannerApply'
 import PlanMealModal from './PlanMealModal'
 import MealPlannerModal from './MealPlannerModal'
 import BatchCookingModal from './BatchCookingModal'
@@ -43,7 +43,7 @@ function rangeLabel(days) {
   return `${fa} – ${fb}`
 }
 
-export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onChangeWeek, onGoToday, onRefetch }) {
+export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates, settings, onChangeWeek, onGoToday, onRefetch }) {
   const { user } = useAuth()
   const toast = useToast()
   const [planSlot, setPlanSlot] = useState(null)   // { date: 'YYYY-MM-DD', meal } | null
@@ -53,6 +53,7 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
   const [batchOpen, setBatchOpen] = useState(false)
   const [appliedGroupIds, setAppliedGroupIds] = useState(() => new Set(readAppliedPlans().map(p => p.groupId)))
   const [removingPlan, setRemovingPlan] = useState(false)
+  const [repeatingWeek, setRepeatingWeek] = useState(false)
 
   // Re-lit la liste des plans générés appliqués (stashée en localStorage par
   // MealPlannerModal) à la fermeture de la modale.
@@ -92,6 +93,46 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
     setRemovingPlan(false)
     if (error) { toast('Erreur'); return }
     toast('Plan retiré de cette semaine')
+    onRefetch()
+  }
+
+  // « Reprendre la semaine précédente » : les 7 jours qui précèdent la semaine
+  // affichée (déjà chargés dans plannedByDate — CalendarPage charge une plage
+  // élargie de ±7 jours).
+  const prevWeekRows = useMemo(() => {
+    const s = startOfWeek(anchorDate)
+    s.setDate(s.getDate() - 7)
+    const out = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(s); d.setDate(d.getDate() + i)
+      out.push(...(plannedByDate?.[fmt(d)] || []))
+    }
+    return out
+  }, [anchorDate, plannedByDate])
+
+  // Créneaux date|meal déjà occupés dans la semaine affichée (on ne réécrit
+  // jamais par-dessus).
+  const occupiedThisWeek = useMemo(() => {
+    const set = new Set()
+    for (const d of days) for (const r of (plannedByDate?.[d] || [])) set.add(`${d}|${r.meal}`)
+    return set
+  }, [days, plannedByDate])
+
+  const handleRepeatPrevWeek = async () => {
+    if (!prevWeekRows.length || repeatingWeek) return
+    setRepeatingWeek(true)
+    const { error, groupId, inserted } = await duplicatePlannedMeals(prevWeekRows, {
+      userId: user.id,
+      offsetDays: 7,
+      excludedDates: excludedDates || new Set(),
+      skipKeys: occupiedThisWeek,
+    })
+    setRepeatingWeek(false)
+    if (error) { toast('Erreur'); return }
+    if (!inserted) { toast('Rien à reprendre (créneaux déjà occupés ou jours exclus)'); return }
+    stashAppliedPlan({ groupId, startDateStr: days[0], days: 7, appliedAt: Date.now() })
+    setAppliedGroupIds(s => new Set(s).add(groupId))
+    toast(`✓ ${inserted} repas repris de la semaine précédente`)
     onRefetch()
   }
 
@@ -137,6 +178,24 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           <ChevronRight size={18} color="var(--text-muted)" />
         </button>
       </div>
+
+      {/* Reprendre les repas de la semaine précédente (décalés de 7 jours) —
+          proposé seulement quand la semaine d'avant en contient. */}
+      {prevWeekRows.length > 0 && (
+        <button
+          onClick={handleRepeatPrevWeek}
+          disabled={repeatingWeek}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+            padding: '6px 12px', marginBottom: 10, background: 'none', border: 'none',
+            color: 'var(--text-muted)', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)',
+            opacity: repeatingWeek ? 0.6 : 1,
+          }}
+        >
+          <History size={13} />
+          {repeatingWeek ? 'Reprise…' : `Reprendre la semaine précédente (${prevWeekRows.length} repas)`}
+        </button>
+      )}
 
       {/* Générateur automatique de plan (chantier planificateur de repas) */}
       <button

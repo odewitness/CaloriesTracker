@@ -191,6 +191,43 @@ export async function deletePlannedMealSeries(recurrenceGroupId, userId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// duplicatePlannedMeals — recopie un lot de repas planifiés en décalant leur
+// date de `offsetDays` jours (ex. « reprendre la semaine précédente » →
+// offsetDays = 7). Toutes les copies partagent UN nouveau recurrence_group_id
+// (retrait groupé, comme un plan généré). Les créneaux `date|meal` déjà
+// occupés (`skipKeys`) et les dates exclues (`excludedDates`) sont ignorés.
+// `mange` / `mange_at` ne sont pas recopiés : les repas repris sont « à faire ».
+// ─────────────────────────────────────────────────────────────────────────────
+function shiftDateStr(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + n)
+  return fmt(d)
+}
+
+export async function duplicatePlannedMeals(sourceRows, { userId, offsetDays, excludedDates = new Set(), skipKeys = new Set() }) {
+  const groupId = crypto.randomUUID()
+  const rows = []
+  for (const r of sourceRows || []) {
+    const date = shiftDateStr(r.date, offsetDays)
+    if (excludedDates.has(date)) continue
+    if (skipKeys.has(`${date}|${r.meal}`)) continue
+    rows.push({
+      user_id: userId,
+      date,
+      meal: r.meal,
+      nom: r.nom,
+      items: r.items,
+      source_type: r.source_type || null,
+      source_id: r.source_id || null,
+      recurrence_group_id: groupId,
+    })
+  }
+  if (!rows.length) return { data: [], error: null, groupId, inserted: 0 }
+  const { data, error } = await supabase.from('repas_planifies').insert(rows).select()
+  return { data, error, groupId, inserted: error ? 0 : rows.length }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // markAsEaten — copie les items du repas planifié dans `journal` (à sa date et
 // son repas) ET marque le repas planifié comme mangé, de façon ATOMIQUE via la
 // fonction SQL `mark_planned_meal_eaten` (voir

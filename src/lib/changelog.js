@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Reprendre la semaine précédente en un geste',
+    description: "Dans le Calendrier, onglet « Menus », quand la semaine d'avant contient des repas prévus, un bouton « Reprendre la semaine précédente » les recopie tous sur la semaine affichée. Les créneaux déjà occupés et les jours exclus sont laissés tranquilles, et tu peux tout retirer d'un coup comme un plan généré.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Ma fournée se remplit toute seule depuis ton plan',
     description: "Quand tu appliques un plan de repas au calendrier, ses recettes partent automatiquement dans « Ma fournée » avec le nombre de portions à préparer pour la semaine. Depuis l’aperçu du plan, un bouton « Ajouter à Ma fournée » fait la même chose sans passer par le calendrier.",
   },

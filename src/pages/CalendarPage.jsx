@@ -171,6 +171,7 @@ export default function CalendarPage() {
         <WeekMenuBoard
           anchorDate={anchorDate}
           plannedByDate={planifiesByDate}
+          excludedDates={excludedDates}
           settings={settings}
           onChangeWeek={changeWeek}
           onGoToday={isCurrentPeriod ? undefined : goToday}
