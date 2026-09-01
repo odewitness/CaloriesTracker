@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Tu choisis comment ta liste de recettes s\'affiche',
+    description: "Un nouveau bouton réglages, à côté du tri dans tes recettes, ouvre les options d'affichage. Tu peux masquer ce dont tu n'as pas besoin sur les cartes (saisons, type de recette, temps, pastille « riche en… »), montrer la photo en grande couverture plutôt qu'en petite vignette, et passer d'une liste à un affichage en grille sur deux colonnes. Tes choix sont gardés sur cet appareil.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Une photo pour tes recettes',
     description: "Quand tu crées ou modifies une recette, tu peux maintenant lui ajouter une photo. Elle s'affiche en haut de la fiche, en vignette dans ta liste de recettes, et sur la recette quand tu la partages avec tes amies.",
   },
