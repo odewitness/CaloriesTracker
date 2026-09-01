@@ -424,6 +424,8 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, excludedDates
           onApplied={onRefetch}
           defaultStartDate={days[0]}
           initialLoadPlanId={weekAppliedPlan?.savedPlanId || null}
+          replaceGroupId={weekAppliedPlan?.groupId || null}
+          replaceStartDate={weekAppliedPlan?.startDateStr || null}
         />
       )}
 

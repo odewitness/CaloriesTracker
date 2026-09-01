@@ -648,7 +648,7 @@ function PreviewView({
   lockedKeys, onToggleLock, onToggleLockDay,
   swapCandidates, onSwapItem, onRemoveItem, onSetItemPortions,
   onAddToBatch, batchState,
-  savedPlanId, savedPlanName, defaultPlanName, onSavePlan,
+  savedPlanId, savedPlanName, defaultPlanName, onSavePlan, replacing,
 }) {
   const [allowConflicts, setAllowConflicts] = useState(false)
   const [editing, setEditing] = useState(null) // { di, meal, ii } | null
@@ -874,7 +874,7 @@ function PreviewView({
         </div>
       ) : (
         <div className="card" style={{ padding: '12px 14px', marginTop: 4 }}>
-          <SectionLabel>Appliquer au calendrier</SectionLabel>
+          <SectionLabel>{replacing ? 'Remplacer le plan de la semaine' : 'Appliquer au calendrier'}</SectionLabel>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 8px' }}>
             {rangeLabel(startDateStr, plan.days.length)}
             <button
@@ -884,21 +884,24 @@ function PreviewView({
               changer
             </button>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 10 }}>
-            <input type="checkbox" checked={allowConflicts} onChange={e => setAllowConflicts(e.target.checked)} />
-            Ajouter même si un repas est déjà prévu sur le créneau
-          </label>
+          {!replacing && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 10 }}>
+              <input type="checkbox" checked={allowConflicts} onChange={e => setAllowConflicts(e.target.checked)} />
+              Ajouter même si un repas est déjà prévu sur le créneau
+            </label>
+          )}
           <button
             className="btn-primary"
             onClick={() => onApply({ startDateStr, conflictStrategy: allowConflicts ? 'add' : 'skip' })}
             disabled={applying}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: applying ? 0.5 : 1 }}
           >
-            <CalendarPlus size={16} /> {applying ? 'Ajout…' : 'Appliquer au calendrier'}
+            <CalendarPlus size={16} /> {applying ? 'Ajout…' : replacing ? 'Remplacer le plan' : 'Appliquer au calendrier'}
           </button>
           <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8, lineHeight: 1.5 }}>
-            Crée un repas prévu par jour et par repas. Rien n'est écrasé ni supprimé. Ensuite tu
-            pourras générer la liste de courses, ou retirer tout le plan d'un coup.
+            {replacing
+              ? "Ton plan actuel de cette semaine est retiré, puis remplacé par celui-ci. Les repas que tu as ajoutés à la main sur ces jours restent."
+              : "Crée un repas prévu par jour et par repas. Rien n'est écrasé ni supprimé. Ensuite tu pourras générer la liste de courses, ou retirer tout le plan d'un coup."}
           </div>
         </div>
       )}
@@ -923,7 +926,7 @@ function segBtn(active) {
   }
 }
 
-export default function MealPlannerModal({ onClose, onApplied, defaultStartDate, initialLoadPlanId }) {
+export default function MealPlannerModal({ onClose, onApplied, defaultStartDate, initialLoadPlanId, replaceGroupId, replaceStartDate }) {
   useBackButton(onClose)
   const planner = useMealPlanner({ defaultStartDate })
   const toast = useToast()
@@ -1043,8 +1046,17 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
     return { added }
   }
 
+  // Vrai quand on ré-applique un plan qu'on est en train de MODIFIER, sur la
+  // même semaine : on remplace l'ancien (on retire ses lignes avant d'écrire).
+  const replacingWeekPlan = !!replaceGroupId && planner.config.startDateStr === replaceStartDate
+
   const handleApply = async ({ startDateStr, conflictStrategy }) => {
     setApplying(true)
+    const replacing = !!replaceGroupId && startDateStr === replaceStartDate
+    if (replacing) {
+      await planner.removePlan(replaceGroupId)
+      removeAppliedPlan(replaceGroupId)
+    }
     const res = await planner.applyToCalendar({ startDateStr, conflictStrategy })
     setApplying(false)
     if (res.error) { toast('Erreur à l\'enregistrement'); return }
@@ -1052,13 +1064,15 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
     setApplyResult(res)
     setShoppingState('idle')
 
-    // Enregistre le plan (s'il ne l'est pas déjà) pour que « Modifier mon
-    // plan » de la vue Menus puisse le rouvrir tel quel. On garde le lien
-    // groupId ↔ savedPlanId dans le stash.
+    // Enregistre le plan (s'il ne l'est pas déjà), sinon met à jour le
+    // snapshot enregistré — pour que « Modifier mon plan » rouvre bien la
+    // version qui est sur le calendrier. Lien groupId ↔ savedPlanId dans le stash.
     let planId = savedPlanId
     if (!planId) {
       const { data } = await savePlan({ nom: defaultPlanName, config: planner.config, plan: planner.plan })
       if (data) { planId = data.id; setSavedPlanId(data.id) }
+    } else {
+      updatePlan(planId, { config: planner.config, plan: planner.plan })
     }
 
     if (res.groupId) {
@@ -1152,6 +1166,7 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
             savedPlanName={savedPlans.find(p => p.id === savedPlanId)?.nom}
             defaultPlanName={defaultPlanName}
             onSavePlan={handleSavePlan}
+            replacing={replacingWeekPlan}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
             onApply={handleApply}

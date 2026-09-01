@@ -9,7 +9,7 @@ export const CHANGELOG = [
   {
     date: '2026-09-01',
     title: 'Menus : « Modifier mon plan » et retrait plus clair',
-    description: "Quand une semaine a déjà un plan généré, le bouton du haut devient « Modifier mon plan » et rouvre ton plan tel quel pour l'ajuster. Le bouton « Retirer le plan généré » est descendu tout en bas, bien visible en rouge. Et la moyenne kcal/jour du résumé ne compte plus les jours encore vides.",
+    description: "Quand une semaine a déjà un plan généré, le bouton du haut devient « Modifier mon plan » et rouvre ton plan tel quel pour l'ajuster ; en le ré-appliquant, l'ancien est retiré et remplacé automatiquement (tes repas ajoutés à la main restent). Le bouton « Retirer le plan généré » est descendu tout en bas, bien visible en rouge. Et la moyenne kcal/jour du résumé ne compte plus les jours encore vides.",
   },
   {
     date: '2026-09-01',
