@@ -162,7 +162,7 @@ function ItemRow({ item, onToggle, onDelete }) {
           textDecoration: item.checked ? 'line-through' : 'none',
           color: item.checked ? 'var(--text-hint)' : 'var(--text)',
         }}>
-          {item.nom}{item.qty_g ? ` — ${item.qty_g}g` : ''}
+          {item.nom}{item.qty_g ? ` — ${Math.round(item.qty_g)} g` : ''}
         </div>
         {item.recette_noms?.length > 0 && (
           <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2 }}>
