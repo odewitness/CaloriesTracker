@@ -176,6 +176,18 @@ export function useMealPlanner({ defaultStartDate } = {}) {
 
   const reset = useCallback(() => { setPlan(null); setLockedKeys(new Set()) }, [])
 
+  // Recharge un plan enregistré (table plans_repas) : restaure sa config et son
+  // aperçu tels quels. `recomputePlanAggregates` rafraîchit les totaux/scores au
+  // cas où des recettes auraient changé depuis l'enregistrement.
+  const loadSavedPlan = useCallback((saved) => {
+    if (!saved) return false
+    const hasPlan = Array.isArray(saved.plan?.days) && saved.plan.days.length > 0
+    setConfigState(c => ({ ...c, ...(saved.config || {}) }))
+    setLockedKeys(new Set())
+    setPlan(hasPlan ? recomputePlanAggregates(saved.plan) : null)
+    return hasPlan
+  }, [])
+
   // ── Édition manuelle d'une brique dans l'aperçu ─────────────────────────
   // Toute édition manuelle VERROUILLE le repas concerné (sinon la régénération
   // suivante l'écraserait sans prévenir).
@@ -365,6 +377,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     generating,
     generate,
     regenerate,
+    loadSavedPlan,
     reset,
     lockedKeys,
     toggleLock,

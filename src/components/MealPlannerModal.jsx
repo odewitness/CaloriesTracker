@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown } from 'lucide-react'
+import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown, Save, FolderOpen, Pencil } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner } from '../hooks/useMealPlanner'
+import { useMealPlans } from '../hooks/useMealPlans'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useToast } from '../lib/toast'
@@ -209,8 +210,132 @@ function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange, pi
   )
 }
 
+// "8 sept."
+function shortDate(dateStr) {
+  if (!dateStr) return ''
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+// ── Liste des plans enregistrés (vue configuration) ───────────────────────
+function SavedPlansSection({ plans, onLoad, onRename, onDelete }) {
+  const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [draft, setDraft] = useState('')
+  if (!plans.length) return null
+
+  const startEdit = (p) => { setEditingId(p.id); setDraft(p.nom) }
+  const commitEdit = () => {
+    if (editingId && draft.trim()) onRename(editingId, draft.trim())
+    setEditingId(null)
+  }
+
+  return (
+    <div className="card" style={{ padding: '10px 12px', marginBottom: 16 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'space-between', background: 'none', border: 'none', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)' }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <FolderOpen size={14} /> Mes plans enregistrés ({plans.length})
+        </span>
+        <ChevronDown size={15} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          {plans.map(p => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderTop: '1px solid var(--border)' }}>
+              {editingId === p.id ? (
+                <input
+                  className="input"
+                  value={draft}
+                  autoFocus
+                  onChange={e => setDraft(e.target.value)}
+                  onBlur={commitEdit}
+                  onKeyDown={e => { if (e.key === 'Enter') commitEdit() }}
+                  style={{ flex: 1, fontSize: 12.5, padding: '5px 8px' }}
+                />
+              ) : (
+                <button
+                  onClick={() => onLoad(p.id)}
+                  style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '2px 0' }}
+                >
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nom}</span>
+                  <span style={{ fontSize: 10.5, color: 'var(--text-hint)' }}>
+                    {(p.plan?.days?.length || 0)} j · modifié le {shortDate((p.updated_at || '').slice(0, 10))}
+                  </span>
+                </button>
+              )}
+              <button className="btn-icon" style={{ width: 26, height: 26, color: 'var(--text-hint)', flexShrink: 0 }} onClick={() => startEdit(p)} aria-label="Renommer">
+                <Pencil size={12} />
+              </button>
+              <button className="btn-icon" style={{ width: 26, height: 26, color: 'var(--coral)', flexShrink: 0 }} onClick={() => onDelete(p.id)} aria-label="Supprimer">
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Enregistrer le plan courant (vue aperçu) ──────────────────────────────
+function SavePlanCard({ savedPlanId, savedPlanName, defaultName, onSave }) {
+  const [name, setName] = useState(defaultName)
+  const [asNew, setAsNew] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { setName(defaultName) }, [defaultName])
+
+  const isUpdate = savedPlanId && !asNew
+  const submit = async () => {
+    if (busy) return
+    setBusy(true)
+    await onSave(name, { asNew })
+    setBusy(false)
+    setAsNew(false)
+  }
+
+  return (
+    <div className="card" style={{ padding: '12px 14px', marginBottom: 8 }}>
+      <SectionLabel>Enregistrer ce plan</SectionLabel>
+      {savedPlanId && !asNew ? (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 8px' }}>
+          Chargé depuis « <strong style={{ color: 'var(--text)' }}>{savedPlanName}</strong> ».
+        </div>
+      ) : (
+        <input
+          className="input"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Nom du plan"
+          style={{ fontSize: 12.5, marginBottom: 8 }}
+        />
+      )}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button
+          onClick={submit}
+          disabled={busy || (!isUpdate && !name.trim())}
+          className="btn-primary"
+          style={{ width: 'auto', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: busy ? 0.6 : 1 }}
+        >
+          <Save size={15} />
+          {busy ? 'Enregistrement…' : isUpdate ? `Mettre à jour « ${savedPlanName} »` : 'Enregistrer'}
+        </button>
+        {savedPlanId && !asNew && (
+          <button
+            onClick={() => setAsNew(true)}
+            style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--gray-bg)', border: 'none', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font)' }}
+          >
+            Nouveau
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Vue configuration ─────────────────────────────────────────────────────
-function ConfigView({ planner, onGenerate }) {
+function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan, onDeletePlan }) {
   const {
     config, mealConfig, baseMealConfig, excludedMeals, setConfig, setMealConfig, toggleMeal,
     recipeCount, templateCount, favoriteCount, recettes, repasTypes,
@@ -256,6 +381,13 @@ function ConfigView({ planner, onGenerate }) {
         chaque repas avec un ou deux aliments piochés dans tes favoris. Rien n'est ajouté au
         calendrier sans que tu valides l'aperçu.
       </div>
+
+      <SavedPlansSection
+        plans={savedPlans}
+        onLoad={onLoadPlan}
+        onRename={onRenamePlan}
+        onDelete={onDeletePlan}
+      />
 
       {/* Jours */}
       <SectionLabel>Nombre de jours</SectionLabel>
@@ -516,6 +648,7 @@ function PreviewView({
   lockedKeys, onToggleLock, onToggleLockDay,
   swapCandidates, onSwapItem, onRemoveItem, onSetItemPortions,
   onAddToBatch, batchState,
+  savedPlanId, savedPlanName, defaultPlanName, onSavePlan,
 }) {
   const [allowConflicts, setAllowConflicts] = useState(false)
   const [editing, setEditing] = useState(null) // { di, meal, ii } | null
@@ -684,6 +817,13 @@ function PreviewView({
         </div>
       )}
 
+      <SavePlanCard
+        savedPlanId={savedPlanId}
+        savedPlanName={savedPlanName}
+        defaultName={defaultPlanName}
+        onSave={onSavePlan}
+      />
+
       {/* Appliquer au calendrier */}
       {result?.inserted > 0 ? (
         <div className="card" style={{ padding: '14px', marginTop: 4, background: 'var(--green-light)', border: 'none' }}>
@@ -794,6 +934,10 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
   const [batchState, setBatchState] = useState('idle') // 'idle' | 'busy' | 'done'
   const [removing, setRemoving] = useState(false)
   const [creatingList, setCreatingList] = useState(false)
+  // Plan enregistré actuellement chargé (table plans_repas), ou null.
+  const [savedPlanId, setSavedPlanId] = useState(null)
+
+  const { plans: savedPlans, savePlan, updatePlan, renamePlan, deletePlan } = useMealPlans()
 
   // Fournée de la semaine du 1er jour du plan (les recettes / repas types du
   // plan appliqué y sont versés).
@@ -827,8 +971,44 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
   }
 
   const resetApply = () => { setApplyResult(null); setShoppingState('idle'); setBatchState('idle') }
-  const handleGenerate = () => { planner.generate(); resetApply(); setStep('preview') }
+  // « Générer » depuis les réglages = plan neuf → on le détache du plan
+  // enregistré éventuellement chargé. « Régénérer » depuis l'aperçu garde le
+  // rattachement (on continue d'éditer le même plan enregistré).
+  const handleGenerate = () => { planner.generate(); setSavedPlanId(null); resetApply(); setStep('preview') }
   const handleRegenerate = () => { planner.regenerate(); resetApply() }
+
+  const defaultPlanName = `Plan du ${shortDate(planner.config.startDateStr)} · ${planner.config.days} j`
+
+  const handleLoadPlan = (id) => {
+    const saved = savedPlans.find(p => p.id === id)
+    if (!saved) return
+    const ok = planner.loadSavedPlan(saved)
+    if (!ok) { toast('Ce plan enregistré est vide'); return }
+    setSavedPlanId(id)
+    resetApply()
+    setStep('preview')
+  }
+
+  const handleSavePlan = async (name, { asNew } = {}) => {
+    const payload = { nom: name, config: planner.config, plan: planner.plan }
+    if (savedPlanId && !asNew) {
+      const { error } = await updatePlan(savedPlanId, payload)
+      if (error) { toast('Erreur à l’enregistrement'); return }
+      toast('✓ Plan mis à jour')
+    } else {
+      const { data, error } = await savePlan(payload)
+      if (error || !data) { toast('Erreur à l’enregistrement'); return }
+      setSavedPlanId(data.id)
+      toast('✓ Plan enregistré')
+    }
+  }
+
+  const handleDeletePlan = async (id) => {
+    const { error } = await deletePlan(id)
+    if (error) { toast('Erreur'); return }
+    if (id === savedPlanId) setSavedPlanId(null)
+    toast('Plan supprimé')
+  }
 
   // Verse les recettes ET repas types du plan (récap « À préparer ») dans la
   // page « Ma fournée », avec le nombre de portions à préparer. Appelé
@@ -920,7 +1100,14 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
         {planner.dataLoading ? (
           <Loader />
         ) : step === 'config' ? (
-          <ConfigView planner={planner} onGenerate={handleGenerate} />
+          <ConfigView
+            planner={planner}
+            onGenerate={handleGenerate}
+            savedPlans={savedPlans}
+            onLoadPlan={handleLoadPlan}
+            onRenamePlan={renamePlan}
+            onDeletePlan={handleDeletePlan}
+          />
         ) : (
           <PreviewView
             plan={planner.plan}
@@ -938,6 +1125,10 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate 
             onSetItemPortions={planner.setItemPortions}
             onAddToBatch={() => addPlanRecipesToBatch()}
             batchState={batchState}
+            savedPlanId={savedPlanId}
+            savedPlanName={savedPlans.find(p => p.id === savedPlanId)?.nom}
+            defaultPlanName={defaultPlanName}
+            onSavePlan={handleSavePlan}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
             onApply={handleApply}
