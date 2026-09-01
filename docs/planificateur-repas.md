@@ -183,9 +183,16 @@ C1 de `docs/analyse-et-roadmap.md`).
    à confirmer — autoriser 0,5 / 1 / 1,5 / 2 portions pour se rapprocher de la
    cible sans étirer le grammage brut (voir §6, zone d'ombre A).
 5. **Aliments « en + »** par repas (voir §3.3) sur le reste à cibler.
-6. **Recherche locale** : quelques passes de swap (remplacer une recette par une
-   autre du vivier, re-répartir, recompter) ; on garde le meilleur score.
-   Plafonner les itérations (tourne en JS sur mobile).
+6. **Recherche locale** (améliorée le 2026-09-01, branche `feat-planner-fit`) :
+   (a) **balayage glouton** — pour chaque position libre d'un pool, essayer les
+   `SWEEP_MAX_ALTS` meilleures alternatives du vivier et garder la meilleure ;
+   (b) `LOCAL_SEARCH_ROUNDS` passes **aléatoires** (alternative tirée au hasard,
+   plus seulement la première du vivier — corrige une limite de la V1) pour
+   sortir des optima locaux. `vivierScored` (candidats triés) mémorisé en
+   phase 1 et réutilisé.
+7. **Meilleur de N** (`useMealPlanner`, `BEST_OF = 4`) : chaque « Générer » /
+   « Régénérer » tire N plans (seeds décalés de `0x9e3779b9`) et garde le
+   `weekScore` le plus bas — évite de devoir régénérer à la main.
 
 ### 4.2 Fonction de score
 
@@ -193,8 +200,17 @@ Distance pondérée aux cibles, agrégée par jour **et** sur la période :
 
 ```
 score = Σ_jours Σ_macros  w_macro × |apport - cible| / cible
-      + pénalités (répétition, collision intra-jour, dépassement kcal, slot non rempli)
+      + pénalité de DÉPASSEMENT asymétrique (jour + semaine) :
+          OVERSHOOT_KCAL_WEIGHT × max(0, apport−cible)/cible sur kcal (1,5)
+          OVERSHOOT_MACRO_WEIGHT × idem sur prot/gluc/lip       (0,6)
+      + pénalités (répétition, restes/portions, slot non rempli)
 ```
+
+- Le terme de **dépassement** (2026-09-01) répond au constat « ça dépasse
+  souvent les calories/macros » : le solveur ne sait qu'ajouter, jamais retirer,
+  donc on rend le dépassement plus coûteux que le déficit. Les candidats de
+  pool sont aussi pénalisés si leur portion dépasse déjà la part de cible
+  calorique du slot.
 
 - Pondérer la **protéine** plus fort : c'est la contrainte serrée (objectif type
   100 g sur 1800 kcal ≈ 22 % des calories).
