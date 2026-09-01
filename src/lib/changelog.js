@@ -9,7 +9,7 @@ export const CHANGELOG = [
   {
     date: '2026-09-01',
     title: 'Ma fournée : ouvrir une recette d’un tap',
-    description: "Dans « Ma fournée », touche le nom d’une recette pour ouvrir sa fiche (ingrédients, étapes, valeurs) sans quitter ta liste.",
+    description: "Dans « Ma fournée », touche le nom d’une recette pour ouvrir sa fiche (ingrédients, étapes, valeurs) sans quitter ta liste. Elle s’ouvre directement au nombre de portions que tu as noté à préparer, donc les quantités d’ingrédients sont déjà les bonnes.",
   },
   {
     date: '2026-09-01',

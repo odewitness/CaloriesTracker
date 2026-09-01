@@ -99,7 +99,7 @@ const SCALE_SEGMENTS = [
 //                                    journal" est masqué. items = ingrédients
 //                                    mis à l'échelle actuellement affichée.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailModal({ recette, ingredients, ingredientsLoading, onEdit, onDelete, onShare, onClose, onUpdateIngredient, onPlan, onAddToJournal }) {
+export default function RecipeDetailModal({ recette, ingredients, ingredientsLoading, onEdit, onDelete, onShare, onClose, onUpdateIngredient, onPlan, onAddToJournal, initialPortions }) {
   useBackButton(onClose)
   const [selectedIngredient, setSelectedIngredient] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -128,8 +128,11 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
   // ── Échelle de lecture unifiée : un seul multiplicateur pilote tout
   // l'écran (macros, micronutriments, grammages d'ingrédients, grammages
   // annotés dans les instructions) ────────────────────────────────────────
+  // Nombre de portions à afficher par défaut : celui demandé par l'appelant
+  // (ex. « portions à préparer » d'une recette de Ma fournée), sinon 1.
+  const defaultPortions = Number(initialPortions) > 0 ? Number(initialPortions) : 1
   const [scale, setScale] = useState('portion') // '100g' | 'portion' | 'plat' | 'libre'
-  const [portionsSouhaitees, setPortionsSouhaitees] = useState(1)
+  const [portionsSouhaitees, setPortionsSouhaitees] = useState(defaultPortions)
   const [customQty, setCustomQty] = useState('')
 
   // Ajustements ponctuels de grammage, juste pour l'ajout au journal ou la
@@ -141,11 +144,11 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
 
   useEffect(() => {
     setScale('portion')
-    setPortionsSouhaitees(1)
+    setPortionsSouhaitees(defaultPortions)
     setCustomQty('')
     setActiveTab('ingredients')
     setOverrides({})
-  }, [recette.id])
+  }, [recette.id, defaultPortions])
 
   // Un changement d'échelle de lecture remet tout à l'échelle : les
   // ajustements ponctuels précédents n'ont plus de sens.

@@ -24,7 +24,7 @@ import Loader from './Loader'
 //   onAddToJournal(items, recette) — optionnel ; si absent, le bouton
 //                   "Ajouter au journal" est masqué
 // ─────────────────────────────────────────────────────────────────────────────
-export default function RecipeDetailWrapper({ recetteId, initialRecette, onEdit, onDelete, onShare, onClose, onPlan, onAddToJournal }) {
+export default function RecipeDetailWrapper({ recetteId, initialRecette, onEdit, onDelete, onShare, onClose, onPlan, onAddToJournal, initialPortions }) {
   const { recette, ingredients, loading, updateIngredient } = useRecetteDetail(recetteId)
   const displayRecette = recette || initialRecette
 
@@ -53,6 +53,7 @@ export default function RecipeDetailWrapper({ recetteId, initialRecette, onEdit,
       onUpdateIngredient={updateIngredient}
       onPlan={onPlan}
       onAddToJournal={onAddToJournal}
+      initialPortions={initialPortions}
     />
   )
 }

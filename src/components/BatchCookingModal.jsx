@@ -109,7 +109,7 @@ export default function BatchCookingModal({ onClose }) {
   const { items, loading, addRecipes, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking()
   const { recettes, loading: loadingRecipes } = useRecipes()
   const [picking, setPicking] = useState(false)
-  const [detailRecette, setDetailRecette] = useState(null) // recette dont on affiche la fiche
+  const [detail, setDetail] = useState(null) // { recette, portions } dont on affiche la fiche
 
   const recetteById = useMemo(() => new Map(recettes.map(r => [r.id, r])), [recettes])
   const excludeIds = useMemo(() => new Set(items.map(i => i.recette_id).filter(Boolean)), [items])
@@ -181,7 +181,7 @@ export default function BatchCookingModal({ onClose }) {
                 />
                 {rec ? (
                   <button
-                    onClick={() => setDetailRecette(rec)}
+                    onClick={() => setDetail({ recette: rec, portions: it.portions })}
                     style={{
                       flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 4,
                       background: 'none', border: 'none', padding: 0, fontFamily: 'var(--font)',
@@ -268,11 +268,12 @@ export default function BatchCookingModal({ onClose }) {
       </div>
     </div>
 
-    {detailRecette && (
+    {detail && (
       <RecipeDetailWrapper
-        recetteId={detailRecette.id}
-        initialRecette={detailRecette}
-        onClose={() => setDetailRecette(null)}
+        recetteId={detail.recette.id}
+        initialRecette={detail.recette}
+        initialPortions={detail.portions}
+        onClose={() => setDetail(null)}
       />
     )}
     </>
