@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Liste de courses : quantités enfin correctes',
+    description: "Correction d'un bug : quand une recette revenait plusieurs fois dans la semaine, ou qu'un ingrédient était partagé entre plusieurs recettes, la liste de courses ne comptait que la première fois. Les grammages sont maintenant bien additionnés sur tout ce que tu prévois.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Calendrier & Menus : réorganisation',
     description: "Deux onglets au lieu de trois : « Calendrier » (avec un bouton Mois / Semaine à l'intérieur) et « Menus ». Dans « Menus », un résumé de semaine en haut (repas planifiés, moyenne kcal/jour vs ton objectif avec code couleur), les boutons d'action regroupés, les noms de repas ne se coupent plus sur deux lignes, et chaque jour affiche ses calories planifiées par rapport à ta cible.",
   },

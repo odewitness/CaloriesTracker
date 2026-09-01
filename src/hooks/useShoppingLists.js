@@ -131,17 +131,41 @@ export function useShoppingListItems(listeId) {
   const addItems = async (articlesToAdd) => {
     if (!user || !listeId || articlesToAdd.length === 0) return { error: null }
 
+    // 1. Pré-agrège le lot lui-même par identité : plusieurs occurrences du
+    //    même ingrédient dans un même appel (recette utilisée N fois dans la
+    //    semaine, ingrédient partagé entre recettes…) → grammages additionnés,
+    //    noms de recette fusionnés. Sans ça, seule la 1ʳᵉ occurrence était
+    //    insérée (la fusion des suivantes tentait un update sur une ligne pas
+    //    encore créée → total perdu, « une seule portion »).
+    const batch = new Map()
+    for (const art of articlesToAdd) {
+      const key = itemIdentity(art)
+      const cur = batch.get(key)
+      if (cur) {
+        cur.qty_g = (cur.qty_g == null && art.qty_g == null) ? null : (cur.qty_g || 0) + (art.qty_g || 0)
+        if (art.recetteNom) cur.noms.add(art.recetteNom)
+      } else {
+        batch.set(key, {
+          nom: art.nom,
+          categorie: art.categorie,
+          qty_g: art.qty_g ?? null,
+          food_source: art.food_source || null,
+          food_ref_id: art.food_ref_id || null,
+          noms: new Set(art.recetteNom ? [art.recetteNom] : []),
+        })
+      }
+    }
+
+    // 2. Fusionne avec les lignes déjà présentes dans la liste.
     const existingByKey = new Map(items.map(it => [itemIdentity(it), it]))
     const toInsert = []
     const toUpdate = []
 
-    for (const art of articlesToAdd) {
-      const key = itemIdentity(art)
+    for (const [key, art] of batch) {
+      const artNoms = [...art.noms]
       const existing = existingByKey.get(key)
       if (existing) {
-        const mergedNoms = art.recetteNom && !existing.recette_noms.includes(art.recetteNom)
-          ? [...existing.recette_noms, art.recetteNom]
-          : existing.recette_noms
+        const mergedNoms = [...new Set([...(existing.recette_noms || []), ...artNoms])]
         // Grammages arrondis au gramme : une liste de courses n'a pas besoin
         // de décimales, et la mise à l'échelle d'ingrédients de recette
         // (1 / nb_portions) produit sinon des "33,3333…".
@@ -149,22 +173,18 @@ export function useShoppingListItems(listeId) {
           ? null
           : Math.round((existing.qty_g || 0) + (art.qty_g || 0))
         toUpdate.push({ id: existing.id, qty_g: mergedQty, recette_noms: mergedNoms })
-        // Pour fusionner correctement plusieurs ajouts identiques dans le même lot
-        existingByKey.set(key, { ...existing, qty_g: mergedQty, recette_noms: mergedNoms })
       } else {
-        const newItem = {
+        toInsert.push({
           liste_id: listeId,
           user_id: user.id,
           nom: art.nom,
           categorie: art.categorie || 'Autre',
           qty_g: art.qty_g == null ? null : Math.round(art.qty_g),
-          food_source: art.food_source || null,
-          food_ref_id: art.food_ref_id || null,
-          recette_noms: art.recetteNom ? [art.recetteNom] : [],
+          food_source: art.food_source,
+          food_ref_id: art.food_ref_id,
+          recette_noms: artNoms,
           checked: false,
-        }
-        toInsert.push(newItem)
-        existingByKey.set(key, newItem)
+        })
       }
     }
 
