@@ -375,9 +375,18 @@ l'édition de brique couvrent le besoin « garder la main »).
   `supabase/sql/batch_cooking_setup.sql`), hook `useBatchCooking`, composant
   `BatchCookingModal`. Entrée : Calendrier → Menus → « Ma fournée ». V1 = une
   liste courante, ajout de recettes via un sélecteur interne.
-  Reste (palier ultérieur) : alimentation depuis l'aperçu du planificateur (le
-  récap interne « À préparer » est conservé tel quel pour l'instant), sélection
-  multiple depuis la liste des recettes, sessions nommées / historique.
+- ✅ **Raccordement planificateur → fournée** (2026-09-01, branche
+  `feat-planner-to-batch`) : « Appliquer au calendrier » verse aussi les
+  recettes du plan (récap `batchSummary`, `kind === 'recette'` seulement) dans
+  `batch_cooking_items` avec `portions = portionsNeeded`, silencieusement (un
+  seul toast). Bouton « Ajouter à Ma fournée » dans le récap « À préparer » pour
+  le faire sans appliquer au calendrier. Dédoublonné (`upsert` ON CONFLICT DO
+  NOTHING sur `unique(user_id, recette_id)` — l'état « fait » d'une recette déjà
+  présente n'est pas écrasé). Le récap interne « À préparer » de
+  `MealPlannerModal` est **conservé** (pas remplacé).
+  Reste (palier ultérieur) : sélection multiple depuis la liste des recettes,
+  sessions nommées / historique ; repas types dans la fournée (aujourd'hui
+  ignorés).
 - Contraintes alimentaires (tags simples).
 
 ---
