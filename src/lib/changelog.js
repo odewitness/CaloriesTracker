@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Un plantage n’efface plus tout l’écran',
+    description: "Si un écran ou une fenêtre bugue, tu vois maintenant un petit message avec un bouton « Réessayer » au lieu d’une page blanche — et le reste de l’app continue de fonctionner. Le message affiche aussi un « détail technique » : si tu me le copies, ça m’aide à corriger.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Plan de repas : des menus qui collent mieux du premier coup',
     description: "La génération a été retravaillée : le plan cherche maintenant à ne pas dépasser tes calories et tes macros (mieux vaut un peu en dessous qu'au dessus), essaie plusieurs combinaisons en coulisse et garde la meilleure, et privilégie les recettes qui laissent de la marge. Tu devrais avoir besoin de « régénérer » beaucoup moins souvent. Si une catégorie a peu de recettes, un message te le signale — c'est ce qui limite le plus le résultat.",
   },

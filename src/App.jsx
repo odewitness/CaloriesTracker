@@ -333,13 +333,15 @@ function AppShell() {
 
       {/* overflow visible ici — c'est page-content qui scroll en interne */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflowY: 'auto', overscrollBehavior: 'contain' }} onScrollCapture={handleScroll}>
-        <Routes location={backgroundLocation || location}>
-          <Route path="/today" element={<TodayPage key={journalVersion} />} />
-          <Route path="/manual" element={<ManualPage />} />
-          <Route path="/courses" element={<ShoppingListPage />} />
-          <Route path="/history" element={<HistoryPage key={journalVersion} />} />
-          <Route path="*" element={<Navigate to="/today" replace />} />
-        </Routes>
+        <ErrorBoundary label="cet écran" resetKey={activePath}>
+          <Routes location={backgroundLocation || location}>
+            <Route path="/today" element={<TodayPage key={journalVersion} />} />
+            <Route path="/manual" element={<ManualPage />} />
+            <Route path="/courses" element={<ShoppingListPage />} />
+            <Route path="/history" element={<HistoryPage key={journalVersion} />} />
+            <Route path="*" element={<Navigate to="/today" replace />} />
+          </Routes>
+        </ErrorBoundary>
       </div>
 
       <nav className="bottom-nav">
@@ -356,6 +358,7 @@ function AppShell() {
       </nav>
 
       {backgroundLocation && (
+        <ErrorBoundary label="cette fenêtre" overlay onClose={closeOverlay} resetKey={location.pathname}>
         <Routes>
           <Route path="/profile" element={
             <div className="page-modal">
@@ -454,6 +457,7 @@ function AppShell() {
             </div>
           } />
         </Routes>
+        </ErrorBoundary>
       )}
     </div>
     </TodayHeaderProvider>
