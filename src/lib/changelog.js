@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-01',
+    title: 'Plan de repas : 2 portions d’un même plat quand ça aide',
+    description: "Quand un repas reste bien en-dessous de tes objectifs, le plan peut maintenant te proposer d’en manger 2 portions du plat plutôt que d’empiler des aliments en plus. Dans l’aperçu, ouvre un plat pour régler toi-même 1 ou 2 portions. Le plan évite aussi de te faire cuisiner des quantités bancales (une recette prévue pour 4 utilisée 5 fois). Tu peux désactiver le tout avec la case « Autoriser 2 portions d’un même plat » dans les réglages.",
+  },
+  {
     date: '2026-08-31',
     title: 'Plan de repas : liste de courses dans une nouvelle liste',
     description: "Au moment de générer la liste de courses depuis ton plan de repas, tu peux maintenant créer une nouvelle liste sur place (avec le nom que tu veux) au lieu de devoir choisir parmi tes listes existantes.",

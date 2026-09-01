@@ -10,7 +10,7 @@ import { todayStr } from '../lib/dates'
 import { getCurrentSeason } from '../lib/seasons'
 import {
   buildMealPlan, defaultMealConfig, buildVivier, recomputePlanAggregates,
-  recipePortionMacros, templateServingMacros,
+  recipePortionMacros, templateServingMacros, scaleMacros,
 } from '../lib/mealPlanner'
 import { planToPlannedRows, addDaysStr } from '../lib/mealPlannerApply'
 
@@ -46,6 +46,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     includeRepasTypes: true, // inclure les repas types dans les viviers
     maxCookMinutes: null, // temps prépa + cuisson max (min) ; null = pas de filtre
     fillMicros: true,     // compléter les manques vitamines / minéraux du jour
+    allowDoublePortions: true, // autoriser 2 portions d'un même plat sur un repas
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
   }))
@@ -143,6 +144,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
         includeRepasTypes: config.includeRepasTypes !== false,
         maxCookMinutes: config.maxCookMinutes || null,
         fillMicros: config.fillMicros !== false,
+        allowDoublePortions: config.allowDoublePortions !== false,
         settings,
         options: { seasonMode: config.seasonMode, seed },
         locked,
@@ -219,12 +221,27 @@ export function useMealPlanner({ defaultStartDate } = {}) {
       portions: 1,
       portionG: macros._portionG || null,
       macros: { ...macros },
+      unitMacros: { ...macros },
     }))
   }, [recettes, repasTypes])
 
   const removeItem = useCallback((dayIndex, meal, itemIndex) => {
     applyItemsEdit(dayIndex, meal, items => items.filter((_, i) => i !== itemIndex))
   }, [])
+
+  // Règle à la main le nombre de portions (1 ou 2) d'une brique dans l'aperçu.
+  // Verrouille le repas (via applyItemsEdit) comme toute édition manuelle.
+  const setItemPortions = useCallback((dayIndex, meal, itemIndex, n) => {
+    applyItemsEdit(dayIndex, meal, items => items.map((x, i) => {
+      if (i !== itemIndex) return x
+      if (x.kind !== 'recette' && x.kind !== 'repas_type') return x
+      const cur = x.portions || 1
+      const next = Math.max(1, Math.min(2, n))
+      if (next === cur) return x
+      const unit = x.unitMacros || scaleMacros(x.macros, 1 / cur)
+      return { ...x, portions: next, unitMacros: unit, macros: scaleMacros(unit, next) }
+    }))
+  }, [applyItemsEdit])
 
   // ── Appliquer au calendrier ─────────────────────────────────────────────
   // Charge les données manquantes (ingrédients des recettes du plan, jours
@@ -342,6 +359,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     swapCandidates,
     swapItem,
     removeItem,
+    setItemPortions,
     applyToCalendar,
     removePlan,
   }

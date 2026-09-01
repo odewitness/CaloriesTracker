@@ -3,9 +3,10 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-08-31.
 
-**État au 2026-08-31 : cadrage.** Rien de développé. Ce document fixe le
-périmètre, les décisions prises avec l'utilisatrice, l'algorithme envisagé, les
-zones d'ombre et le découpage en paliers.
+**État au 2026-09-01 : Palier 1 + Palier 2 livrés et en prod.** Ce document fixe
+le périmètre, les décisions prises avec l'utilisatrice, l'algorithme, les zones
+d'ombre et le découpage en paliers. Reste le Palier 3 (historique / reconduction /
+page batch cooking / contraintes alimentaires).
 
 ---
 
@@ -249,12 +250,19 @@ plans appliqués avant cette date (items déjà explosés, `food_source`
 
 ## 6. Zones d'ombre
 
-- **A. Nombre de portions comme levier — TRANCHÉ (2026-08-31) : non.** L'app
-  n'incrémente les portions que de +1 et une recette fait un nombre fixe de
-  portions ; une mise à l'échelle fractionnaire serait pénible à présenter. À la
-  place : **récap « À préparer »** (batch cooking) dans l'aperçu — nombre de
-  fournées entières par recette, portions utilisées, reste. Page batch cooking
-  dédiée = piste Palier 3.
+- **A. Nombre de portions comme levier — TRANCHÉ.** Pas de mise à l'échelle
+  fractionnaire (pénible à présenter). Mais depuis le Palier 2 (2026-09-01) le
+  solveur peut poser **1 ou 2 portions** (entières, plafond 2) d'une brique
+  éligible (`Plat` / `Petit-déjeuner` / `Collation`) quand le repas reste loin
+  sous sa cible et qu'un doublement s'en rapproche sans faire déborder les
+  calories (`DOUBLE_KCAL_CEILING`) — une seule brique doublée par repas,
+  activable via `allowDoublePortions` (case « Autoriser 2 portions… »).
+  Réglage manuel 1 / 2 par brique dans l'aperçu (`setItemPortions`). Une
+  pénalité légère en recherche locale (`leftoverPortionPenalty`,
+  `LEFTOVER_PORTION_WEIGHT`) privilégie les plans où le total de portions d'une
+  recette tombe sur un multiple propre de son rendement. Le récap **« À
+  préparer »** (portions exactes + facteur) et une page batch cooking dédiée
+  (Palier 3) restent le complément.
 - **B. Saison : filtre dur ou bonus ? — TRANCHÉ (2026-08-31) : bonus.** Bonus de
   score, recettes sans saison utilisables. Case « filtre strict » dispo dans la
   config.
@@ -343,9 +351,17 @@ l'édition de brique couvrent le besoin « garder la main »).
 - ✅ **Filtre temps de cuisine** (`temps_preparation_min` + `temps_cuisson_min`,
   le repos ne compte pas) : segmenté Peu importe / ≤ 15 / 30 / 45 / 60 min.
   Recette sans temps renseigné, ou imposée → passe quand même.
-- Solveur : autoriser **2 portions/jour** d'un même plat (portions entières) pour
-  mieux coller aux cibles + privilégier les usages tombant sur un multiple propre
-  des portions d'une recette. **(reporté — pas encore fait)**
+- ✅ **2 portions/jour d'un même plat** (portions entières, plafond 2) : passe de
+  doublement par repas dans `buildMealPlan` (`allowDoublePortions`,
+  `DOUBLE_ELIGIBLE_CATEGORIES`, `DOUBLE_KCAL_CEILING`) — on double la brique
+  éligible qui rapproche le plus le repas de sa cible sans déborder les calories.
+  Réglage manuel 1 / 2 dans l'aperçu (`useMealPlanner.setItemPortions`, stepper
+  dans `ItemEditor`). La ligne « recette » écrite dans `repas_planifies.items`
+  porte le grammage de N portions + une clé `portions` (relue par
+  `addPlannedItems` pour la liste de courses). Pénalité anti-restes légère en
+  recherche locale (`leftoverPortionPenalty` / `LEFTOVER_PORTION_WEIGHT`) :
+  privilégie les totaux de portions multiples du rendement d'une recette.
+**Palier 2 : terminé** (2026-09-01).
 
 ### Palier 3 — Historique, reconduction & batch cooking
 

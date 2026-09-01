@@ -252,7 +252,10 @@ export function useShoppingListItems(listeId) {
       for (const it of (repas.items || [])) {
         if (it.food_source === 'recette' && ingByRecipe[it.food_ref_id]) {
           const parts = recipeMeta[it.food_ref_id]?.portions || 1
-          const f = parts > 0 ? 1 / parts : 1
+          // `it.portions` (planificateur) : 2 = plat servi en double ce jour-là
+          // → deux portions d'ingrédients dans la liste. Absent = 1 (plans
+          // appliqués avant cette option, ajouts manuels).
+          const f = (parts > 0 ? 1 / parts : 1) * (it.portions || 1)
           for (const ing of ingByRecipe[it.food_ref_id]) {
             flat.push({
               food_name: ing.food_name,
