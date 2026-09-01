@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Plan de repas : garde tes plans favoris',
+    description: "Dans l’aperçu d’un plan généré, « Enregistrer ce plan » le sauvegarde sous un nom. Tu retrouves tes plans enregistrés en haut des réglages du planificateur : un tap pour rouvrir l’aperçu, le modifier, le ré-appliquer à la semaine que tu veux, ou repartir de lui. Tu peux les renommer et les supprimer.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Ma fournée : les repas types aussi',
     description: "Tu peux maintenant ajouter des repas types à « Ma fournée », pas seulement des recettes — dans le sélecteur d’ajout comme depuis un plan de repas appliqué. Ils apparaissent dans la liste avec la mention « repas type », et leurs ingrédients (mis à l’échelle des portions à préparer) s’affichent dans le Plan de cuisine.",
   },

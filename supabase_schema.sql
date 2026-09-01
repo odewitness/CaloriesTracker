@@ -1060,6 +1060,22 @@ create table if not exists batch_cooking_steps (
 );
 create index if not exists idx_batch_cooking_steps_user_semaine on batch_cooking_steps (user_id, semaine, ordre);
 
+-- 36. TABLE PLANS_REPAS (plans de repas enregistrés — historique du
+-- planificateur, Palier 3. Écrit le 2026-09-01, voir
+-- supabase/sql/plans_repas_setup.sql). UNE LIGNE = UN PLAN nommé : `config`
+-- (objet de config du planificateur) + `plan` (sortie de buildMealPlan).
+-- RLS « own » s/i/u/d ; update = renommer / réenregistrer par-dessus.
+create table if not exists plans_repas (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  nom text not null,
+  config jsonb not null default '{}',
+  plan jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_plans_repas_user on plans_repas (user_id, updated_at desc);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -1196,6 +1212,11 @@ alter table batch_cooking_items enable row level security;
 -- select/insert/update/delete "own" (auth.uid() = user_id) — voir
 -- supabase/sql/batch_cooking_steps_setup.sql. update = réordonner + cocher.
 alter table batch_cooking_steps enable row level security;
+
+-- RLS activé sur plans_repas dès sa création (2026-09-01), policies
+-- select/insert/update/delete "own" (auth.uid() = user_id) — voir
+-- supabase/sql/plans_repas_setup.sql.
+alter table plans_repas enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

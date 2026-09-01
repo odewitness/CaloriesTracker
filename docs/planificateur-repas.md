@@ -393,7 +393,18 @@ l'édition de brique couvrent le besoin « garder la main »).
   via le bouton « Retirer le plan… » existant. Affiché seulement quand la
   semaine d'avant contient des repas (données déjà dans `plannedByDate`,
   CalendarPage charge ±7 j).
-- Historique de plusieurs plans nommés (table dédiée) — pas fait.
+- ✅ **Historique de plusieurs plans nommés** (2026-09-01, branche
+  `feat-saved-meal-plans`) : table `plans_repas` (RLS own ; `nom`, `config`
+  jsonb, `plan` jsonb = sortie `buildMealPlan`), hook `useMealPlans`
+  (`savePlan` / `updatePlan` / `renamePlan` / `deletePlan`). Dans
+  `MealPlannerModal` : `SavePlanCard` dans l'aperçu (« Enregistrer » / « Mettre
+  à jour » si un plan est chargé / « Nouveau »), `SavedPlansSection` en tête des
+  réglages (liste dépliable, ouvrir / renommer inline / supprimer).
+  `useMealPlanner.loadSavedPlan(saved)` restaure `config` + `plan` (via
+  `recomputePlanAggregates` pour rafraîchir les totaux si des recettes ont
+  changé). « Générer » depuis les réglages détache du plan chargé, « Régénérer »
+  le garde. Le plan rechargé passe par tous les chemins existants (éditer,
+  appliquer à n'importe quelle semaine, liste de courses, fournée).
 - ✅ **Page batch cooking** — **V1 livrée le 2026-09-01** (branche
   `feat-batch-cooking`). Page « Ma fournée » indépendante du planificateur
   (`docs/analyse-et-roadmap.md` §M9) : check-list de recettes à cuisiner,
