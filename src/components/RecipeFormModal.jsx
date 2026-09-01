@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react'
-import { ArrowLeft, ChevronDown, Scale } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { ArrowLeft, ChevronDown, Scale, ImagePlus, Trash2 } from 'lucide-react'
 import { useToast } from '../lib/toast'
 import { useAuth } from '../lib/AuthContext'
 import { saveRecette, sumIngredients, calcPer100g } from '../hooks/useRecipes'
+import { uploadRecipePhoto, removeRecipePhoto, recipePhotoUrl } from '../lib/recipePhoto'
 import { useBackButton } from '../hooks/useBackButton'
 import FoodPicker from './FoodPicker'
 import EditableFoodRow from './EditableFoodRow'
@@ -51,6 +52,48 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
   const [ingredients, setIngredients] = useState(initIngredients)
   const [showSearch,  setShowSearch]  = useState(false)
   const [saving,      setSaving]      = useState(false)
+
+  // ── Photo de la recette ───────────────────────────────────────────────────
+  // Édition : upload immédiat (l'id existe). Création : on garde le fichier de
+  // côté et on l'envoie juste après le 1ᵉʳ enregistrement, quand l'id est connu.
+  const photoInputRef = useRef(null)
+  const [photoVersion, setPhotoVersion] = useState(recette?.photo_updated_at || null)
+  const [pendingPhotoFile, setPendingPhotoFile] = useState(null)
+  const [pendingPreview, setPendingPreview] = useState(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
+
+  useEffect(() => () => { if (pendingPreview) URL.revokeObjectURL(pendingPreview) }, [pendingPreview])
+
+  const photoSrc = pendingPreview
+    || (photoVersion ? recipePhotoUrl(recette?.id, photoVersion) : null)
+
+  const handlePickPhoto = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (recette?.id) {
+      setPhotoBusy(true)
+      const { error, photoUpdatedAt } = await uploadRecipePhoto(recette.id, file, user.id)
+      setPhotoBusy(false)
+      if (error) { toast('Photo : envoi impossible'); return }
+      setPhotoVersion(photoUpdatedAt)
+    } else {
+      setPendingPhotoFile(file)
+      setPendingPreview(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(file) })
+    }
+  }
+
+  const handleRemovePhoto = async () => {
+    if (recette?.id && photoVersion) {
+      setPhotoBusy(true)
+      const { error } = await removeRecipePhoto(recette.id, user.id)
+      setPhotoBusy(false)
+      if (error) { toast('Photo : suppression impossible'); return }
+    }
+    setPhotoVersion(null)
+    setPendingPhotoFile(null)
+    setPendingPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+  }
   const [openWeighing, setOpenWeighing] = useState(false)
   const weighingRef = useRef(null)
 
@@ -113,14 +156,21 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
       sourcePage: parseInt(sourcePage, 10) || null,
       ingredients,
     })
-    setSaving(false)
-    if (!error) {
-      toast(recette ? '✓ Recette modifiée !' : '✓ Recette sauvegardée !')
-      onSaved(id)
-    } else {
+    if (error) {
+      setSaving(false)
       toast('Erreur lors de la sauvegarde')
       console.error(error)
+      return
     }
+    // Photo choisie avant le 1ᵉʳ enregistrement : on l'envoie maintenant que
+    // l'id est connu. Échec non bloquant — la recette est déjà sauvegardée.
+    if (pendingPhotoFile && id) {
+      const { error: photoErr } = await uploadRecipePhoto(id, pendingPhotoFile, user.id)
+      if (photoErr) toast('Recette sauvegardée, mais la photo n\'a pas pu être envoyée')
+    }
+    setSaving(false)
+    toast(recette ? '✓ Recette modifiée !' : '✓ Recette sauvegardée !')
+    onSaved(id)
   }
 
   // ── Rendu : vue "recherche d'ingrédient" ──────────────────────────────────
@@ -217,6 +267,52 @@ export default function RecipeFormModal({ recette, ingredients: initIngredients 
               ))}
             </div>
           </div>
+        </div>
+
+        {/* ── Photo de la recette ── */}
+        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+          <FieldLabel>Photo</FieldLabel>
+          <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePickPhoto} style={{ display: 'none' }} />
+          {photoSrc ? (
+            <div style={{ position: 'relative' }}>
+              <img
+                src={photoSrc}
+                alt=""
+                style={{ width: '100%', aspectRatio: '16 / 10', objectFit: 'cover', borderRadius: 12, display: 'block', opacity: photoBusy ? 0.5 : 1 }}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => !photoBusy && photoInputRef.current?.click()}
+                  style={{ flex: 1, padding: '8px 0', borderRadius: 8, background: 'var(--gray-bg)', fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)', color: 'var(--text-muted)' }}
+                >
+                  Changer
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  disabled={photoBusy}
+                  style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--coral-light)', color: 'var(--coral)', fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Trash2 size={14} /> Retirer
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => !photoBusy && photoInputRef.current?.click()}
+              style={{
+                width: '100%', aspectRatio: '16 / 10', borderRadius: 12, background: 'var(--gray-bg)',
+                border: '1px dashed var(--border-md)', color: 'var(--text-muted)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+                fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600,
+              }}
+            >
+              <ImagePlus size={22} />
+              {photoBusy ? 'Envoi…' : 'Ajouter une photo'}
+            </button>
+          )}
         </div>
 
         {/* ── Liste des ingrédients ── */}

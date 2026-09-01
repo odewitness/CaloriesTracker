@@ -89,6 +89,11 @@ export function useFeed() {
       auteur_pseudo: myProfile?.pseudo || null,
       auteur_prenom: myProfile?.prenom || null,
       recette_id: recette.id,
+      // Copie dénormalisée : indique qu'il y avait une photo au moment du
+      // partage (le fichier lui-même est relu depuis recette_id, cf.
+      // lib/recipePhoto.js). Peut devenir périmé si l'auteure change/retire
+      // la photo ensuite — acceptable pour un fil entre amies.
+      photo_updated_at: recette.photo_updated_at || null,
       nom: recette.nom,
       portions: recette.portions || 1,
       poids_cru_g: recette.poids_cru_g || null,

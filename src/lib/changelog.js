@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Une photo pour tes recettes',
+    description: "Quand tu crées ou modifies une recette, tu peux maintenant lui ajouter une photo. Elle s'affiche en haut de la fiche, en vignette dans ta liste de recettes, et sur la recette quand tu la partages avec tes amies.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Ta photo de profil',
     description: "Dans « Profil », touche ta pastille tout en haut (ou la petite icône appareil photo) pour choisir une photo. Elle apparaît partout où on te voit : le bouton rond en haut de l'app, tes partages dans le fil, tes commentaires, et la liste de tes amies — qui peuvent elles aussi mettre la leur. Un bouton « Retirer la photo » revient à l'affichage avec tes initiales.",
   },
