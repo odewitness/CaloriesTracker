@@ -3,11 +3,13 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-08-31.
 
-**État au 2026-09-01 : Palier 1 + Palier 2 livrés et en prod ; Palier 3 entamé
-(page batch cooking « Ma fournée » V1 livrée).** Ce document fixe le périmètre,
-les décisions prises avec l'utilisatrice, l'algorithme, les zones d'ombre et le
-découpage en paliers. Reste du Palier 3 : historique / reconduction de plans,
-contraintes alimentaires, et le raccordement planificateur → fournée.
+**État au 2026-09-01 : Palier 1 + Palier 2 livrés et en prod ; Palier 3 bien
+avancé** — page batch cooking « Ma fournée » V1, raccordement planificateur →
+fournée, et « reprendre la semaine précédente » livrés. Ce document fixe le
+périmètre, les décisions prises avec l'utilisatrice, l'algorithme, les zones
+d'ombre et le découpage en paliers. Reste du Palier 3 : historique de plusieurs
+plans nommés, contraintes alimentaires (tags), sélection multiple de recettes
+depuis la liste.
 
 ---
 
@@ -366,7 +368,16 @@ l'édition de brique couvrent le besoin « garder la main »).
 
 ### Palier 3 — Historique, reconduction & batch cooking
 
-- Plusieurs plans conservés, « reconduire / repartir de la semaine dernière ».
+- ✅ **« Reprendre la semaine précédente »** (2026-09-01, branche
+  `feat-repeat-week`) : bouton dans la vue Menus qui recopie les
+  `repas_planifies` des 7 jours précédant la semaine affichée, décalés de +7 j
+  (`duplicatePlannedMeals` dans `usePlannedMeals.js` — nouveau
+  `recurrence_group_id`, `mange` non recopié, créneaux occupés + jours exclus
+  ignorés). Stashé comme un plan généré (`stashAppliedPlan`) → retrait groupé
+  via le bouton « Retirer le plan… » existant. Affiché seulement quand la
+  semaine d'avant contient des repas (données déjà dans `plannedByDate`,
+  CalendarPage charge ±7 j).
+- Historique de plusieurs plans nommés (table dédiée) — pas fait.
 - ✅ **Page batch cooking** — **V1 livrée le 2026-09-01** (branche
   `feat-batch-cooking`). Page « Ma fournée » indépendante du planificateur
   (`docs/analyse-et-roadmap.md` §M9) : check-list de recettes à cuisiner,
