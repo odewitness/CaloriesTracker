@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { MoreVertical, Trash2, MessageCircle, UtensilsCrossed } from 'lucide-react'
 import MacroPillsRow from './MacroPillsRow'
 import ReactionBar from './ReactionBar'
+import Avatar from './Avatar'
 
 function formatDate(iso) {
   const d = new Date(iso)
@@ -27,13 +28,16 @@ export default function JournalPartageCard({ partage, isOwn, commentCount, react
   return (
     <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16, cursor: 'pointer' }} onClick={() => onOpen(partage)}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', fontWeight: 600 }}>
-            {auteurLabel} · {formatDate(partage.created_at)}
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2, textTransform: 'capitalize' }}>{formatJournalDate(partage.date)}</div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-            <UtensilsCrossed size={12} /> {label}
+        <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+          <Avatar userId={partage.auteur_id} name={auteurLabel} size={30} style={{ marginTop: 1 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', fontWeight: 600 }}>
+              {auteurLabel} · {formatDate(partage.created_at)}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2, textTransform: 'capitalize' }}>{formatJournalDate(partage.date)}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+              <UtensilsCrossed size={12} /> {label}
+            </div>
           </div>
         </div>
         {isOwn && (

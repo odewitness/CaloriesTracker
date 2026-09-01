@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
@@ -8,10 +8,11 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import {
   User, Scale, Target, UtensilsCrossed, Droplet, Bell, Lightbulb,
-  LogOut, ChevronRight, ChevronDown, Info, HeartPulse, Dumbbell,
+  LogOut, ChevronRight, ChevronDown, Info, HeartPulse, Dumbbell, Camera,
 } from 'lucide-react'
 import { litres } from '../lib/water'
 import Loader from '../components/Loader'
+import Avatar from '../components/Avatar'
 import { NavRow } from '../components/profile/primitives'
 import InfosSection from '../components/profile/InfosSection'
 import GoalsSection from '../components/profile/GoalsSection'
@@ -34,7 +35,7 @@ export default function ProfilePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, signOut } = useAuth()
-  const { profile, loading: profileLoading, updateProfile } = useProfile()
+  const { profile, loading: profileLoading, updateProfile, uploadAvatar, removeAvatar } = useProfile()
   const { settings, loading: settingsLoading, update: updateSettings } = useSettings()
   const { entries: measurementEntries } = useMeasurements()
   const { supported: pushSupported, permission: pushPermission, subscribed: pushSubscribed, loading: pushLoading, subscribe: subscribePush } = usePushSubscription()
@@ -138,11 +139,32 @@ export default function ProfilePage() {
 
   const handleSignOut = async () => { await signOut() }
 
+  // ── Photo de profil ─────────────────────────────────────────────────────
+  const fileInputRef = useRef(null)
+  const [avatarBusy, setAvatarBusy] = useState(false)
+
+  const handlePickAvatar = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permet de re-sélectionner le même fichier plus tard
+    if (!file) return
+    setAvatarBusy(true)
+    const { error } = await uploadAvatar(file)
+    setAvatarBusy(false)
+    toast(error ? 'Impossible de mettre à jour la photo' : '✓ Photo mise à jour !')
+  }
+
+  const handleRemoveAvatar = async () => {
+    setAvatarBusy(true)
+    const { error } = await removeAvatar()
+    setAvatarBusy(false)
+    toast(error ? 'Impossible de retirer la photo' : 'Photo retirée')
+  }
+
   const [aboutOpen, setAboutOpen] = useState(false)
 
   if (profileLoading || settingsLoading || !goals) return <Loader />
 
-  const initials = ((prenom?.[0] || '') + (nom?.[0] || '')).toUpperCase() || (user?.email?.[0] || '?').toUpperCase()
+  const displayName = (prenom || nom) ? `${prenom} ${nom}`.trim() : (user?.email || 'Mon profil')
   const back = () => setSection(null)
 
   // ── Écrans de détail ─────────────────────────────────────────────────────
@@ -286,11 +308,44 @@ export default function ProfilePage() {
   return (
     <div className="page-content">
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
-        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--green-light)', color: 'var(--green-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, marginBottom: 10 }}>
-          {initials}
+        <div style={{ position: 'relative', marginBottom: 10, opacity: avatarBusy ? 0.5 : 1 }}>
+          <button
+            onClick={() => !avatarBusy && fileInputRef.current?.click()}
+            style={{ display: 'block', borderRadius: '50%', background: 'none', padding: 0 }}
+            aria-label="Changer la photo de profil"
+          >
+            <Avatar userId={user?.id} name={displayName} size={72} version={profile?.avatar_updated_at} />
+          </button>
+          <button
+            onClick={() => !avatarBusy && fileInputRef.current?.click()}
+            style={{
+              position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: '50%',
+              background: 'var(--green)', color: 'white', border: '2px solid var(--gray-bg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-label="Changer la photo de profil"
+          >
+            <Camera size={13} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handlePickAvatar}
+            style={{ display: 'none' }}
+          />
         </div>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>{prenom || nom ? `${prenom} ${nom}`.trim() : 'Mon profil'}</div>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>{(prenom || nom) ? `${prenom} ${nom}`.trim() : 'Mon profil'}</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{user?.email}</div>
+        {profile?.avatar_updated_at && (
+          <button
+            onClick={handleRemoveAvatar}
+            disabled={avatarBusy}
+            style={{ marginTop: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-hint)', background: 'none' }}
+          >
+            Retirer la photo
+          </button>
+        )}
       </div>
 
       <div className="section-title">Profil &amp; objectifs</div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { MoreVertical, Trash2, MessageCircle, Dumbbell, CalendarDays } from 'lucide-react'
 import ReactionBar from './ReactionBar'
+import Avatar from './Avatar'
 import {
   sportTypeEmoji, sportTypeLabel, sportIntensiteLabel, formatDuree,
 } from '../lib/sport'
@@ -41,15 +42,18 @@ export default function SportPartageCard({ partage, isOwn, commentCount, reactio
   return (
     <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16, cursor: 'pointer' }} onClick={() => onOpen(partage)}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', fontWeight: 600 }}>
-            {auteurLabel} · {formatWhen(partage.created_at)}
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>{isWeek ? '📅' : sportTypeEmoji(partage.type)}</span> {title}
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
-            {isWeek ? <CalendarDays size={12} /> : <Dumbbell size={12} />} {sportSummaryLine(partage)}
+        <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+          <Avatar userId={partage.auteur_id} name={auteurLabel} size={30} style={{ marginTop: 1 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', fontWeight: 600 }}>
+              {auteurLabel} · {formatWhen(partage.created_at)}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>{isWeek ? '📅' : sportTypeEmoji(partage.type)}</span> {title}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+              {isWeek ? <CalendarDays size={12} /> : <Dumbbell size={12} />} {sportSummaryLine(partage)}
+            </div>
           </div>
         </div>
         {isOwn && (

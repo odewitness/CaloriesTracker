@@ -4,6 +4,7 @@ import { MacroGrid } from './RecipeDetailModal'
 import { useBackButton } from '../hooks/useBackButton'
 import { MEALS_ORDER } from '../lib/nutrients'
 import Loader from './Loader'
+import Avatar from './Avatar'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // JournalPartageDetailModal — vue en lecture seule d'un partage de
@@ -56,6 +57,7 @@ export default function JournalPartageDetailModal({ partage, aliments, loading, 
     <div className="page-modal">
       <div className="page-modal-header">
         <button className="btn-icon" onClick={onClose} style={{ flexShrink: 0 }}><ArrowLeft size={20} color="var(--text-muted)" /></button>
+        <Avatar userId={partage.auteur_id} name={auteurLabel} size={30} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize' }}>{dateLabel}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
