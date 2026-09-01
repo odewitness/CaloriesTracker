@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Planificateur de semaine : plusieurs réglages plus clairs',
+    description: "Quand tu demandes 2 ou 3 recettes différentes pour un repas sur la semaine, tu les obtiens vraiment toutes (avant, une ou deux ne sortaient parfois jamais). Dans l'aperçu, la liste « À préparer » est maintenant rangée par type (plats, desserts, petits-déjeuners…). Les réglages avancés s'ouvrent d'emblée dans « Générer un plan », et le bouton pour enregistrer le plan est plus discret pour ne plus être confondu avec « Appliquer au calendrier ».",
+  },
+  {
+    date: '2026-09-01',
     title: 'Ajout d\'ingrédients : la page ne remonte plus en haut',
     description: "Quand tu crées une recette et que tu ajoutes tes ingrédients un par un, la page reste maintenant là où tu en étais au lieu de repartir tout en haut à chaque ajout.",
   },

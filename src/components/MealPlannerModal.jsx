@@ -37,6 +37,19 @@ const MACRO_ROWS = [
 
 function r0(n) { return Math.round(n || 0) }
 
+// Récap « À préparer » : ordre d'affichage des catégories + libellé pluriel de
+// chaque groupe.
+const BATCH_CAT_ORDER = ['Petit-déjeuner', 'Collation', 'Plat', 'Accompagnement', 'Boisson', 'Dessert', 'Pain / pâtes']
+const BATCH_CAT_PLURAL = {
+  'Petit-déjeuner': 'Petits-déjeuners',
+  'Collation': 'Collations',
+  'Plat': 'Plats',
+  'Accompagnement': 'Accompagnements',
+  'Boisson': 'Boissons',
+  'Dessert': 'Desserts',
+  'Pain / pâtes': 'Pain / pâtes',
+}
+
 // "lun. 8 sept."
 function dayChipLabel(startStr, dayIndex) {
   const d = new Date(addDaysStr(startStr, dayIndex) + 'T12:00:00')
@@ -276,56 +289,85 @@ function SavedPlansSection({ plans, onLoad, onRename, onDelete }) {
 }
 
 // ── Enregistrer le plan courant (vue aperçu) ──────────────────────────────
+// Volontairement DISCRET : un lien texte, pas un gros bouton plein — pour ne
+// pas entrer en concurrence avec « Appliquer au calendrier », qui est l'action
+// principale de cet écran. Le champ « nom » ne se déplie qu'au clic.
 function SavePlanCard({ savedPlanId, savedPlanName, defaultName, onSave }) {
   const [name, setName] = useState(defaultName)
+  const [mode, setMode] = useState('idle') // 'idle' | 'form'
   const [asNew, setAsNew] = useState(false)
   const [busy, setBusy] = useState(false)
   useEffect(() => { setName(defaultName) }, [defaultName])
 
-  const isUpdate = savedPlanId && !asNew
   const submit = async () => {
     if (busy) return
     setBusy(true)
     await onSave(name, { asNew })
     setBusy(false)
     setAsNew(false)
+    setMode('idle')
   }
 
+  const ghostBtn = {
+    display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700,
+    color: 'var(--text-muted)', background: 'none', border: 'none',
+    fontFamily: 'var(--font)', padding: '6px 4px',
+  }
+  const tinyLink = {
+    fontSize: 11, fontWeight: 700, color: 'var(--text-hint)', background: 'none',
+    border: 'none', fontFamily: 'var(--font)', padding: '2px 4px',
+  }
+
+  // Déjà rattaché à un plan enregistré → « Mettre à jour » discret + option
+  // « enregistrer comme nouveau ».
+  if (savedPlanId && mode === 'idle' && !asNew) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, margin: '14px 0 2px' }}>
+        <button onClick={submit} disabled={busy} style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }}>
+          <Save size={13} /> {busy ? 'Enregistrement…' : `Mettre à jour « ${savedPlanName} »`}
+        </button>
+        <button onClick={() => { setAsNew(true); setMode('form') }} style={tinyLink}>
+          enregistrer comme nouveau plan
+        </button>
+      </div>
+    )
+  }
+
+  // Pas encore enregistré, replié.
+  if (mode === 'idle') {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '14px 0 2px' }}>
+        <button onClick={() => setMode('form')} style={ghostBtn}>
+          <Save size={13} /> Enregistrer ce plan pour le réutiliser
+        </button>
+      </div>
+    )
+  }
+
+  // Formulaire nom déplié.
   return (
-    <div className="card" style={{ padding: '12px 14px', marginBottom: 8 }}>
-      <SectionLabel>Enregistrer ce plan</SectionLabel>
-      {savedPlanId && !asNew ? (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 8px' }}>
-          Chargé depuis « <strong style={{ color: 'var(--text)' }}>{savedPlanName}</strong> ».
-        </div>
-      ) : (
+    <div style={{ margin: '14px 0 2px' }}>
+      <div style={{ display: 'flex', gap: 6 }}>
         <input
           className="input"
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="Nom du plan"
-          style={{ fontSize: 12.5, marginBottom: 8 }}
+          autoFocus
+          onKeyDown={e => { if (e.key === 'Enter' && name.trim()) submit() }}
+          style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
         />
-      )}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
           onClick={submit}
-          disabled={busy || (!isUpdate && !name.trim())}
-          className="btn-primary"
-          style={{ width: 'auto', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: busy ? 0.6 : 1 }}
+          disabled={busy || !name.trim()}
+          style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 8, padding: '6px 12px', fontFamily: 'var(--font)', opacity: (busy || !name.trim()) ? 0.6 : 1 }}
         >
-          <Save size={15} />
-          {busy ? 'Enregistrement…' : isUpdate ? `Mettre à jour « ${savedPlanName} »` : 'Enregistrer'}
+          {busy ? '…' : 'Enregistrer'}
         </button>
-        {savedPlanId && !asNew && (
-          <button
-            onClick={() => setAsNew(true)}
-            style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--gray-bg)', border: 'none', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font)' }}
-          >
-            Nouveau
-          </button>
-        )}
       </div>
+      <button onClick={() => { setMode('idle'); setAsNew(false) }} style={{ ...tinyLink, marginTop: 4 }}>
+        annuler
+      </button>
     </div>
   )
 }
@@ -628,6 +670,21 @@ function PreviewView({
     () => batchSummary(plan, { recettesById, templatesById }),
     [plan, recettesById, templatesById],
   )
+  // Regroupé par catégorie (plats / desserts / petits-déj…), dans l'ordre de
+  // BATCH_CAT_ORDER — pour lire le récap d'un coup d'œil.
+  const groupedBatches = useMemo(() => {
+    const groups = new Map()
+    for (const b of batches) {
+      const k = b.categorie || 'Autres'
+      if (!groups.has(k)) groups.set(k, [])
+      groups.get(k).push(b)
+    }
+    return [...groups.entries()].sort(([a], [b]) => {
+      const ia = BATCH_CAT_ORDER.indexOf(a)
+      const ib = BATCH_CAT_ORDER.indexOf(b)
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+    })
+  }, [batches])
 
   return (
     <>
@@ -775,12 +832,21 @@ function PreviewView({
             <ChefHat size={14} color="var(--green-dark)" />
             <SectionLabel>À préparer</SectionLabel>
           </div>
-          {batches.map(b => (
-            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', gap: 8 }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.nom}</span>
-              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
-                {b.portionsNeeded} portion{b.portionsNeeded > 1 ? 's' : ''}
-              </span>
+          {groupedBatches.map(([cat, items]) => (
+            <div key={cat} style={{ marginBottom: 2 }}>
+              {groupedBatches.length > 1 && (
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 1px' }}>
+                  {BATCH_CAT_PLURAL[cat] || cat}
+                </div>
+              )}
+              {items.map(b => (
+                <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', gap: 8 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.nom}</span>
+                  <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {b.portionsNeeded} portion{b.portionsNeeded > 1 ? 's' : ''}
+                  </span>
+                </div>
+              ))}
             </div>
           ))}
           {people > 1 && (
@@ -807,13 +873,6 @@ function PreviewView({
           )}
         </div>
       )}
-
-      <SavePlanCard
-        savedPlanId={savedPlanId}
-        savedPlanName={savedPlanName}
-        defaultName={defaultPlanName}
-        onSave={onSavePlan}
-      />
 
       {/* Appliquer au calendrier */}
       {result?.inserted > 0 ? (
@@ -904,6 +963,13 @@ function PreviewView({
           </div>
         </div>
       )}
+
+      <SavePlanCard
+        savedPlanId={savedPlanId}
+        savedPlanName={savedPlanName}
+        defaultName={defaultPlanName}
+        onSave={onSavePlan}
+      />
     </>
   )
 }
@@ -925,9 +991,10 @@ function segBtn(active) {
   }
 }
 
-// Section repliée (défaut fermé) — pour ranger les réglages secondaires.
-function Collapsible({ label, children }) {
-  const [open, setOpen] = useState(false)
+// Section repliable — dépliée par défaut ici (réglages « avancés » visibles
+// d'emblée), repliable pour dégager la vue.
+function Collapsible({ label, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={{ margin: '4px 0 16px', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
       <button

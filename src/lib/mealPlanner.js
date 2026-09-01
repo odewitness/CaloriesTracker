@@ -738,9 +738,14 @@ export function buildMealPlan(p) {
           if (!pool || !pool.length) return
           const cur = groupCursor[key] || 0
           groupCursor[key] = cur + 1
-          // + d : décale d'un cran chaque jour → midi/soir permutent d'un jour
-          // à l'autre au lieu de rester figés (midi=A, soir=B tous les jours).
-          let cand = pool[(cur + d) % pool.length]
+          // Round-robin sur le pool : chaque bloc de `pool.length` occurrences
+          // consécutives est une permutation complète du pool → les
+          // `nbDifferentes` recettes demandées apparaissent TOUTES. Le
+          // + floor(cur / pool.length) décale la permutation d'un cran à chaque
+          // cycle, pour que midi/soir ne restent pas figés sur la même recette
+          // tous les jours (ce que faisait l'ancien « + d », mais celui-ci
+          // avançait en même temps que `cur` et sautait des entrées du pool).
+          let cand = pool[(cur + Math.floor(cur / pool.length)) % pool.length]
           if (usedRecipeIds.has(cand.id)) {
             // collision dans la journée : autre entrée du pool, sinon n'importe
             // quel candidat du vivier non encore utilisé aujourd'hui. En dernier
@@ -939,7 +944,10 @@ export function batchSummary(plan, { recettesById = {}, templatesById = {} } = {
     for (const meal of day.meals) {
       for (const it of meal.items) {
         if (it.kind !== 'recette' && it.kind !== 'repas_type') continue
-        const cur = map.get(it.id) || { id: it.id, nom: it.nom, kind: it.kind, portionsNeeded: 0 }
+        const cur = map.get(it.id) || {
+          id: it.id, nom: it.nom, kind: it.kind,
+          categorie: it.categorie || null, portionsNeeded: 0,
+        }
         cur.portionsNeeded += it.portions || 1
         map.set(it.id, cur)
       }
