@@ -386,6 +386,18 @@ l'édition de brique couvrent le besoin « garder la main »).
   `supabase/sql/batch_cooking_setup.sql`), hook `useBatchCooking`, composant
   `BatchCookingModal`. Entrée : Calendrier → Menus → « Ma fournée ». V1 = une
   liste courante, ajout de recettes via un sélecteur interne.
+- ✅ **« Plan de cuisine »** (2026-09-01, branche `feat-cooking-plan`) : depuis
+  Ma fournée, bouton qui met bout à bout **toutes les étapes** des recettes de
+  la fournée (`parseInstructionSteps` sur `recette.instructions`), réordonnables
+  à la main (flèches ↑↓) + cochables. Chaque étape porte un badge couleur de sa
+  recette. Grammages ré-injectés dans le texte (`annotateInstructionSteps`) à
+  l'échelle des portions à préparer ; panneau dépliable « Ingrédients par
+  recette » (idem échelle). Table dédiée `batch_cooking_steps` (RLS own,
+  `supabase/sql/batch_cooking_steps_setup.sql`), hook `useBatchCookingSteps`,
+  composant `CookingPlanModal`. V1 = un plan courant, `texte` snapshoté, bouton
+  « Régénérer depuis les recettes ». C'est **l'utilisatrice qui fait
+  l'entrelacement** (pas d'ordonnancement automatique — voir §8 / paliers
+  suivants). Dépend de la qualité des `instructions` (une action par ligne).
 - ✅ **Raccordement planificateur → fournée** (2026-09-01, branche
   `feat-planner-to-batch`) : « Appliquer au calendrier » verse aussi les
   recettes du plan (récap `batchSummary`, `kind === 'recette'` seulement) dans

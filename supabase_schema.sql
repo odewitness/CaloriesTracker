@@ -1034,6 +1034,25 @@ create table if not exists batch_cooking_items (
 );
 create index if not exists idx_batch_cooking_items_user on batch_cooking_items (user_id, created_at);
 
+-- 35. TABLE BATCH_COOKING_STEPS (« Plan de cuisine » de Ma fournée — roadmap
+-- §M9. Toutes les étapes d'instructions des recettes de la fournée, mises bout
+-- à bout puis réorganisées à la main par l'utilisatrice + cochées au fur et à
+-- mesure. Écrit le 2026-09-01, voir supabase/sql/batch_cooking_steps_setup.sql).
+-- V1 : UN plan courant par utilisatrice. UNE LIGNE = UNE ÉTAPE (texte = snapshot,
+-- reconstruit via un bouton « Régénérer »). RLS « own » s/i/u/d ; update sert à
+-- réordonner (`ordre`) et cocher (`fait`).
+create table if not exists batch_cooking_steps (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  recette_id uuid references recettes(id) on delete set null,
+  recette_nom text not null,
+  texte text not null,
+  ordre integer not null default 0,
+  fait boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_batch_cooking_steps_user on batch_cooking_steps (user_id, ordre);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -1165,6 +1184,11 @@ alter table collation_jours enable row level security;
 -- supabase/sql/batch_cooking_setup.sql. La policy update sert à cocher `fait`
 -- et à éditer `portions` sur la ligne existante.
 alter table batch_cooking_items enable row level security;
+
+-- RLS activé sur batch_cooking_steps dès sa création (2026-09-01), policies
+-- select/insert/update/delete "own" (auth.uid() = user_id) — voir
+-- supabase/sql/batch_cooking_steps_setup.sql. update = réordonner + cocher.
+alter table batch_cooking_steps enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

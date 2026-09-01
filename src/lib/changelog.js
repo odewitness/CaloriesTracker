@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-01',
+    title: 'Ma fournée : un plan de cuisine à réorganiser',
+    description: "Depuis « Ma fournée », le bouton « Plan de cuisine » met bout à bout toutes les étapes de tes recettes. Tu les remontes ou descends avec les flèches pour les faire dans l’ordre qui t’arrange, tu coches au fur et à mesure, et chaque étape garde la couleur de sa recette pour t’y retrouver. Les grammages sont écrits dans les étapes, à l’échelle des portions à préparer, et un panneau dépliable liste les ingrédients de chaque recette.",
+  },
+  {
+    date: '2026-09-01',
     title: 'Ma fournée : ouvrir une recette d’un tap',
     description: "Dans « Ma fournée », touche le nom d’une recette pour ouvrir sa fiche (ingrédients, étapes, valeurs) sans quitter ta liste. Elle s’ouvre directement au nombre de portions que tu as noté à préparer, donc les quantités d’ingrédients sont déjà les bonnes.",
   },

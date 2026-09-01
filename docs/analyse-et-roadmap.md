@@ -524,8 +524,16 @@ Fonctionnalité déjà présente dans l'app (confirmé par l'utilisatrice le
     « Ajouter à Ma fournée » dans le récap « À préparer ». Dédoublonné (upsert
     ON CONFLICT DO NOTHING). Le récap interne « À préparer » est conservé, pas
     remplacé.
-  - Non fait (palier ultérieur) : sélection multiple depuis la liste des
-    recettes ; sessions / historique ; repas types dans la fournée (ignorés).
+  - **« Plan de cuisine » fait** (2026-09-01, branche `feat-cooking-plan`) :
+    toutes les étapes des recettes de la fournée mises bout à bout, réordonnées
+    à la main (flèches) + cochées ; badge couleur par recette ; grammages dans
+    le texte + ingrédients par recette, à l'échelle des portions à préparer.
+    Table `batch_cooking_steps`, `useBatchCookingSteps`, `CookingPlanModal`.
+    Pas d'ordonnancement auto : l'utilisatrice fait l'entrelacement elle-même.
+  - Non fait (palier ultérieur) : ordonnancement assisté (durées + équipement
+    + four → suggestions « pendant ce temps », voir `docs/planificateur-repas.md`
+    §8) ; sélection multiple depuis la liste des recettes ; sessions /
+    historique ; repas types dans la fournée (ignorés).
 - **Quoi (cadrage initial).** Un écran dédié qui regroupe au même endroit toutes
   les recettes à cuisiner, avec pour chacune une case « faite / à faire ».
   Utilisable seule, sans passer par un plan de repas généré.

@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react'
-import { X, Plus, Trash2, ChefHat, Search, Check, ChevronRight } from 'lucide-react'
+import { X, Plus, Trash2, ChefHat, Search, Check, ChevronRight, ListChecks } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useRecipes } from '../hooks/useRecipes'
 import { useToast } from '../lib/toast'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
+import CookingPlanModal from './CookingPlanModal'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
 
@@ -110,6 +111,7 @@ export default function BatchCookingModal({ onClose }) {
   const { recettes, loading: loadingRecipes } = useRecipes()
   const [picking, setPicking] = useState(false)
   const [detail, setDetail] = useState(null) // { recette, portions } dont on affiche la fiche
+  const [planOpen, setPlanOpen] = useState(false)
 
   const recetteById = useMemo(() => new Map(recettes.map(r => [r.id, r])), [recettes])
   const excludeIds = useMemo(() => new Set(items.map(i => i.recette_id).filter(Boolean)), [items])
@@ -153,6 +155,20 @@ export default function BatchCookingModal({ onClose }) {
               <div style={{ height: '100%', width: `${pct}%`, background: 'var(--green)', transition: 'width .2s' }} />
             </div>
           </div>
+        )}
+
+        {items.length > 0 && (
+          <button
+            onClick={() => setPlanOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
+              padding: '9px 12px', marginBottom: 12, borderRadius: 'var(--radius-sm)',
+              background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
+              fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+            }}
+          >
+            <ListChecks size={15} /> Plan de cuisine
+          </button>
         )}
 
         {loading ? (
@@ -276,6 +292,8 @@ export default function BatchCookingModal({ onClose }) {
         onClose={() => setDetail(null)}
       />
     )}
+
+    {planOpen && <CookingPlanModal onClose={() => setPlanOpen(false)} />}
     </>
   )
 }
