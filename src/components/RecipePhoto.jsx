@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { recipePhotoUrl } from '../lib/recipePhoto'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -10,29 +10,44 @@ import { recipePhotoUrl } from '../lib/recipePhoto'
 //   <RecipePhoto recetteId={r.id} version={r.photo_updated_at} />
 //
 // `eager` : tente de charger la photo même sans `version` (utile là où on veut
-// être sûr de l'afficher quoi qu'il arrive, ex. la fiche recette — `version`
-// peut manquer une fraction de seconde après un ajout). Sinon on n'essaie que
-// si `version` est renseigné (évite un 404 par carte dans les listes).
+// être sûr de l'afficher, ex. la fiche recette). Sinon on n'essaie que si
+// `version` est renseigné (évite un 404 par carte dans les listes).
+//
+// L'URL est FIGÉE pour toute la durée de vie de la fiche : on retient le
+// premier `version` non vide vu pour cette recette et on ne le « rétrograde »
+// jamais (quand la ligne se recharge, `photo_updated_at` peut manquer une
+// fraction de seconde, ou être sérialisé différemment). Sans ça, la photo
+// clignotait « visible → vide → visible » à l'ouverture.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function RecipePhoto({ recetteId, version, eager = false, ratio = '16 / 10', radius = 14, style }) {
-  const shouldShow = eager ? !!recetteId : !!version
-  const url = shouldShow ? recipePhotoUrl(recetteId, version || undefined) : null
+  const pinned = useRef({ id: null, v: null })
+  if (pinned.current.id !== recetteId) {
+    pinned.current = { id: recetteId, v: version || null }
+  } else if (version && !pinned.current.v) {
+    pinned.current.v = version
+  }
+  const effectiveVersion = pinned.current.v
 
-  // Identité stable par recette : on ne remet `failed` à zéro que si on change
-  // de recette, pas sur un simple changement de cache-buster (`?v=…`) — sinon
-  // la fiche clignote « photo → vide → photo » quand la ligne se recharge.
-  const [failedId, setFailedId] = useState(null)
-  useEffect(() => { setFailedId(null) }, [recetteId])
+  const [loadedOk, setLoadedOk] = useState(false)
+  const [errored, setErrored] = useState(false)
+  useEffect(() => { setLoadedOk(false); setErrored(false) }, [recetteId])
 
-  if (!url || failedId === recetteId) return null
+  const shouldShow = eager ? !!recetteId : !!effectiveVersion
+  if (!shouldShow) return null
+  if (errored && !loadedOk) return null
+
+  const url = recipePhotoUrl(recetteId, effectiveVersion || undefined)
+  if (!url) return null
 
   return (
-    <div style={{ width: '100%', aspectRatio: ratio, borderRadius: radius, overflow: 'hidden', background: 'var(--gray-bg)', ...style }}>
+    <div style={{ width: '100%', aspectRatio: ratio, flexShrink: 0, borderRadius: radius, overflow: 'hidden', background: 'var(--gray-bg)', ...style }}>
       <img
+        key={recetteId}
         src={url}
         alt=""
         loading="lazy"
-        onError={() => setFailedId(recetteId)}
+        onLoad={() => setLoadedOk(true)}
+        onError={() => setErrored(true)}
         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
       />
     </div>
