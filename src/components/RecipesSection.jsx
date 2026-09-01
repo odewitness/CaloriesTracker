@@ -58,13 +58,13 @@ function RecipeCard({ recette, ingredients, prefs, onOpen, onEdit, onDelete, onS
   const chipStyle = { background: 'var(--gray-bg)', color: 'var(--text-muted)', borderRadius: 6, padding: '2px 8px', fontSize: 10.5, fontWeight: 600 }
 
   return (
-    <div className="card" style={{ marginBottom: compact ? 0 : 10, padding: '13px 14px', borderRadius: 16 }}>
+    <div className="card" style={{ marginBottom: 10, padding: '13px 14px', borderRadius: 16 }}>
       {coverMode && hasPhoto && (
         <div style={{ cursor: 'pointer' }} onClick={() => onOpen(recette)}>
           <RecipePhoto
             recetteId={recette.id}
             version={recette.photo_updated_at}
-            ratio="16 / 10"
+            ratio={compact ? '16 / 9' : '16 / 6'}
             radius={16}
             style={{ margin: '-13px -14px 10px', width: 'auto', borderRadius: '16px 16px 0 0' }}
           />
@@ -436,11 +436,27 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
                   <ChevronDown size={16} color="var(--text-hint)" style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }} />
                 </button>
                 {!collapsed && (
-                  <div style={displayPrefs.layout === 'grid'
-                    ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'start' }
-                    : undefined}
-                  >
-                    {items.map(r => (
+                  displayPrefs.layout === 'grid' ? (
+                    // Disposition en maçonnerie (style Pinterest) : colonnes CSS
+                    // — les cartes s'empilent avec le même écart partout, sans
+                    // s'étirer pour aligner les rangées.
+                    <div style={{ columnCount: 2, columnGap: 10 }}>
+                      {items.map(r => (
+                        <div key={r.id} style={{ breakInside: 'avoid' }}>
+                          <RecipeCard
+                            recette={r}
+                            ingredients={ingredientsByRecette[r.id]}
+                            prefs={displayPrefs}
+                            onOpen={(rec) => setRecipeModal({ type: 'detail', recette: rec })}
+                            onEdit={(rec) => setRecipeModal({ type: 'edit', recette: rec })}
+                            onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
+                            onShare={handleShareFromCard}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    items.map(r => (
                       <RecipeCard
                         key={r.id}
                         recette={r}
@@ -451,8 +467,8 @@ const RecipesSection = forwardRef(function RecipesSection({ active }, ref) {
                         onDelete={async (id) => { await deleteRecette(id); toast('Supprimé') }}
                         onShare={handleShareFromCard}
                       />
-                    ))}
-                  </div>
+                    ))
+                  )
                 )}
               </div>
             )
