@@ -308,7 +308,15 @@ create table if not exists settings (
   -- complements_reminder_state : anti-doublon écrit par l'Edge Function
   -- complements-reminder, jamais lu côté client —
   -- { "<aliment_id>|<heure>": "YYYY-MM-DD" } = dernier envoi de chaque créneau.
-  complements_reminder_state jsonb not null default '{}'::jsonb
+  complements_reminder_state jsonb not null default '{}'::jsonb,
+  -- Ajoutée le 2026-09-05 (chantier « Objectif de poids », Palier 1 — voir
+  -- supabase/sql/poids_objectif_setup.sql et docs/objectif-poids.md). Poids
+  -- désiré + date visée, saisis une fois et conservés (avant : le
+  -- calculateur de calories de Profil > Objectifs demandait déjà ces deux
+  -- valeurs, mais seulement pour un calcul ponctuel, jamais persisté).
+  -- { poids_desire: number | null, date_objectif: "YYYY-MM-DD" | null }.
+  -- Fusionné côté client avec GOAL_WEIGHT_DEFAULTS (src/lib/poidsObjectif.js).
+  poids_objectif jsonb not null default '{"poids_desire":null,"date_objectif":null}'::jsonb
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;

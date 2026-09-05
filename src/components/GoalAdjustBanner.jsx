@@ -2,10 +2,11 @@ import React from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GoalAdjustBanner (roadmap §M3) — proposition d'ajustement de l'objectif
-// calorique, à partir de la tendance réelle du poids. L'utilisatrice valide
-// ou reporte ; rien ne change sans son accord. Affiché seulement sur la page
-// du jour "aujourd'hui", au plus une fois par semaine (throttle côté hook).
+// GoalAdjustBanner (roadmap §M3 ; Palier 2 du chantier « Objectif de poids »)
+// — proposition d'ajustement de l'objectif calorique, à partir de la
+// tendance réelle du poids. L'utilisatrice valide ou reporte ; rien ne
+// change sans son accord. Affiché seulement sur la page du jour
+// "aujourd'hui", au plus une fois par semaine (throttle côté hook).
 // ─────────────────────────────────────────────────────────────────────────────
 function paceLabel(kgWeek) {
   const v = Math.abs(kgWeek)
@@ -14,9 +15,17 @@ function paceLabel(kgWeek) {
   return `${sign}${v.toFixed(1).replace('.', ',')} kg/sem`
 }
 
+function longDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00')
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return d.toLocaleDateString('fr-FR', {
+    day: 'numeric', month: 'long', ...(sameYear ? {} : { year: 'numeric' }),
+  })
+}
+
 export default function GoalAdjustBanner({ suggestion, onApply, onDismiss }) {
   if (!suggestion) return null
-  const { currentGoal, newGoal, diff, observedKgWeek, intendedKgWeek, spanDays } = suggestion
+  const { currentGoal, newGoal, diff, observedKgWeek, intendedKgWeek, spanDays, source, poidsDesire, dateObjectif } = suggestion
   const down = diff < 0
   const Icon = down ? TrendingDown : TrendingUp
   const weeks = Math.round(spanDays / 7)
@@ -33,9 +42,12 @@ export default function GoalAdjustBanner({ suggestion, onApply, onDismiss }) {
 
       <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 12 }}>
         Sur ~{weeks} semaine{weeks > 1 ? 's' : ''}, ton poids évolue à{' '}
-        <strong style={{ color: 'var(--text)' }}>{paceLabel(observedKgWeek)}</strong>. Ton objectif
-        actuel ({currentGoal} kcal) vise plutôt{' '}
-        <strong style={{ color: 'var(--text)' }}>{paceLabel(intendedKgWeek)}</strong>.
+        <strong style={{ color: 'var(--text)' }}>{paceLabel(observedKgWeek)}</strong>.{' '}
+        {source === 'poids_objectif'
+          ? <>Pour être à {poidsDesire} kg le {longDate(dateObjectif)}, il te faudrait plutôt{' '}
+              <strong style={{ color: 'var(--text)' }}>{paceLabel(intendedKgWeek)}</strong>.</>
+          : <>Ton objectif actuel ({currentGoal} kcal) vise plutôt{' '}
+              <strong style={{ color: 'var(--text)' }}>{paceLabel(intendedKgWeek)}</strong>.</>}
         {' '}
         {down
           ? `Réduire l'objectif à ${newGoal} kcal (${diff}) pour t'en rapprocher ?`

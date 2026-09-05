@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-09-05',
+    title: 'Poids objectif : la suite quand l\'échéance passe',
+    description: "Si la date de ton poids objectif est dépassée ou que tu l'as atteint, l'app te propose maintenant clairement de garder le cap sans date, de repousser l'échéance, ou de repartir sur un nouvel objectif — rien ne change tout seul. Si tu suis ton cycle, l'ajustement automatique des calories attend maintenant un cycle complet avant de se fier à ta tendance de poids, pour ne pas confondre rétention d'eau et vraie évolution.",
+  },
+  {
+    date: '2026-09-05',
+    title: 'Un poids objectif, avec une date',
+    description: "Dans Profil › Objectifs nutritionnels, tu peux maintenant indiquer le poids que tu vises et une date. L'app compare le rythme qu'il te faudrait tenir à ta tendance de poids réelle, te dit si tu es dans les clous, en avance ou en retard, et peut recalculer tes calories en un clic — tu gardes toujours la main pour enregistrer ou non. Si tu as activé « Ajuster selon mon poids », la proposition hebdomadaire se base maintenant sur cet objectif plutôt que de le deviner.",
+  },
+  {
+    date: '2026-09-05',
     title: 'Ton IMC dans Poids et mensurations',
     description: "Si tu as renseigné ta taille dans Profil, un nouvel onglet « IMC » apparaît dans le graphique de Poids et mensurations. Tu vois ta courbe se situer par rapport aux zones maigreur / normal / surpoids / obésité.",
   },

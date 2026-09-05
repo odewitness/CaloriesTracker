@@ -366,6 +366,21 @@ export function phaseForDate(dateStr, days, cfg) {
   return cycleInfo(dateStr, days, cfg).phase
 }
 
+// Élargit une fenêtre d'observation de poids (jours) à au moins un cycle
+// complet quand le suivi du cycle est actif (chantier « Objectif de poids »,
+// voir docs/objectif-poids.md §3) — sinon renvoie `baseWindowDays` tel quel.
+// Seule source de vérité pour ce calcul : useGoalAdjustment et GoalWeightCard
+// l'appellent tous les deux avant de lire useWeightProjection, pour que les
+// deux régressent sur exactement la même fenêtre de relevés et affichent le
+// même rythme observé.
+export function cycleAwareWindowDays(baseWindowDays, days, cfg, today) {
+  const s = mergeCycleSettings(cfg)
+  if (!s.enabled || s.sous_contraception) return baseWindowDays
+  const info = cycleInfo(today, days, cfg)
+  const cycleLen = info?.predictedLen || null
+  return cycleLen ? Math.max(baseWindowDays, cycleLen + 3) : baseWindowDays
+}
+
 // { 'YYYY-MM-DD': { phase, isPeriod } } pour toutes les dates d'une plage
 // inclusive — pratique pour une grille de calendrier.
 export function phasesForRange(startStr, endStr, days, cfg) {

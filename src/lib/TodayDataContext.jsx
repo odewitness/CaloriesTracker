@@ -43,6 +43,7 @@ export function TodayDataProvider({ children }) {
     measurementEntries: measurements.entries,
     settings: settings.settings,
     updateSettings: settings.update,
+    cycleDays: cycle.days,
   })
 
   const value = { cycle, measurements, profile, favorites, settings, ciqual, feed, waterStreak, goalAdjust }
