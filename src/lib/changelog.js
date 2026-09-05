@@ -7,6 +7,16 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-05',
+    title: 'Ton IMC dans Poids et mensurations',
+    description: "Si tu as renseigné ta taille dans Profil, un nouvel onglet « IMC » apparaît dans le graphique de Poids et mensurations. Tu vois ta courbe se situer par rapport aux zones maigreur / normal / surpoids / obésité.",
+  },
+  {
+    date: '2026-09-05',
+    title: 'Un historique quand tu ajoutes un aliment',
+    description: "Quand tu ajoutes un aliment à ton journal, une section « Historique » te rappelle les quantités que tu as déjà pesées pour ce même aliment (les 30 dernières fois). Pratique si un jour tu n'as pas ta balance sous la main.",
+  },
+  {
     date: '2026-09-01',
     title: 'Planificateur de semaine : plusieurs réglages plus clairs',
     description: "Quand tu demandes 2 ou 3 recettes différentes pour un repas sur la semaine, tu les obtiens vraiment toutes (avant, une ou deux ne sortaient parfois jamais). Dans l'aperçu, la liste « À préparer » est maintenant rangée par type (plats, desserts, petits-déjeuners…). Les réglages avancés s'ouvrent d'emblée dans « Générer un plan », et le bouton pour enregistrer le plan est plus discret pour ne plus être confondu avec « Appliquer au calendrier ».",

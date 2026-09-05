@@ -4,11 +4,13 @@ import { useMeasurements } from '../hooks/useMeasurements'
 import { useCycle } from '../hooks/useCycle'
 import { useSettings } from '../hooks/useSettings'
 import { useSportRange } from '../hooks/useSport'
+import { useProfile } from '../hooks/useProfile'
 import { useToast } from '../lib/toast'
 import { todayStr } from '../lib/dates'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
 import MetricChart from '../components/MetricChart'
+import ImcChart from '../components/ImcChart'
 import WeightProjectionCard from '../components/WeightProjectionCard'
 import { useWeightProjection } from '../hooks/useWeightProjection'
 
@@ -28,6 +30,12 @@ const METRICS = [
   { key: 'poids_kg', label: 'Poids', unit: 'kg', color: 'var(--green)' },
   ...MEASURE_FIELDS.map(f => ({ ...f, unit: 'cm' })),
 ]
+
+// L'IMC n'est pas un champ brut de `mensurations` (calculé à la volée depuis
+// poids_kg + taille_cm du profil) — il a des données dès que poids_kg en a.
+function hasMetricData(entries, key) {
+  return entries.some(e => e[key === 'imc' ? 'poids_kg' : key] != null)
+}
 
 function emptyForm(date) {
   const f = { date, poids_kg: '' }
@@ -114,6 +122,15 @@ export default function MeasurementsPage() {
   const { entries, loading, save, deleteEntry } = useMeasurements()
   const { days: cycleDays } = useCycle()
   const { settings } = useSettings()
+  const { profile } = useProfile()
+  const heightCm = profile?.taille_cm || null
+  // IMC = 19e métrique du sélecteur, juste après le poids, uniquement si la
+  // taille (hauteur) est renseignée dans le profil — sinon le calcul est
+  // impossible (voir profiles.taille_cm, distinct de mensurations.taille_cm
+  // qui est le tour de taille).
+  const metrics = useMemo(() => (
+    heightCm ? [METRICS[0], { key: 'imc', label: 'IMC', unit: '', color: 'var(--purple)' }, ...METRICS.slice(1)] : METRICS
+  ), [heightCm])
   // Jours de séance, sur la fenêtre couverte par les relevés — pour annoter la
   // courbe de poids (tiret vert). Chargé seulement si le suivi sport est actif.
   const sportFrom = entries.length ? entries[entries.length - 1].date : todayStr()
@@ -136,8 +153,8 @@ export default function MeasurementsPage() {
   // première métrique qui en a — évite un graphique vide au premier chargement.
   useEffect(() => {
     if (entries.length === 0) return
-    if (entries.some(e => e[selectedMetric] != null)) return
-    const firstWithData = METRICS.find(m => entries.some(e => e[m.key] != null))
+    if (hasMetricData(entries, selectedMetric)) return
+    const firstWithData = metrics.find(m => hasMetricData(entries, m.key))
     if (firstWithData) setSelectedMetric(firstWithData.key)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries])
@@ -231,9 +248,14 @@ export default function MeasurementsPage() {
         </div>
       ) : (
         <>
+          {!heightCm && hasMetricData(entries, 'poids_kg') && (
+            <div style={{ fontSize: 12, color: 'var(--text-hint)', marginBottom: 10 }}>
+              Renseigne ta taille dans Profil → Infos pour voir apparaître ton IMC ici.
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
-            {METRICS.map(m => {
-              const hasData = entries.some(e => e[m.key] != null)
+            {metrics.map(m => {
+              const hasData = hasMetricData(entries, m.key)
               const active = selectedMetric === m.key
               return (
                 <button
@@ -253,8 +275,10 @@ export default function MeasurementsPage() {
               )
             })}
           </div>
-          {(() => {
-            const m = METRICS.find(x => x.key === selectedMetric)
+          {selectedMetric === 'imc' ? (
+            <ImcChart entries={entries} heightCm={heightCm} />
+          ) : (() => {
+            const m = metrics.find(x => x.key === selectedMetric)
             return (
               <MetricChart
                 entries={entries} fieldKey={m.key} label={m.label} unit={m.unit} color={m.color}

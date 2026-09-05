@@ -16,6 +16,7 @@ import { getComplementNutrients } from '../lib/complementNutrients'
 import MacroPreview from './MacroPreview'
 import ComplementNutrientPills from './ComplementNutrientPills'
 import RecipeQuantityAdjustModal from './RecipeQuantityAdjustModal'
+import FoodHistorySection from './FoodHistorySection'
 import FoodRow from './FoodRow'
 import FavSortToggle from './FavSortToggle'
 import Loader from './Loader'
@@ -1054,6 +1055,10 @@ const setDoseCount = (text) => {
                 <MacroPreview food={selected} qty={qty} />
               </>
             )}
+
+            {/* Historique des quantités déjà loguées pour cet aliment — repère
+                si un jour la balance n'est pas sous la main */}
+            <FoodHistorySection food={selected} />
 
             {/* Contexte (ex: repas ciblé — non modifiable, déjà choisi via le "+") */}
             {contextLabel && (
