@@ -6,6 +6,7 @@ import { MEAL_ENABLED_DEFAULTS } from '../lib/nutrients'
 import { WATER_DEFAULTS, mergeWaterSettings } from '../lib/water'
 import { CYCLE_DEFAULTS, mergeCycleSettings } from '../lib/cycle'
 import { SPORT_DEFAULTS, mergeSportSettings } from '../lib/sport'
+import { GOAL_WEIGHT_DEFAULTS, mergeGoalWeightSettings } from '../lib/poidsObjectif'
 import { DEFAULT_TODAY_SECTIONS_ORDER, normalizeTodaySectionsOrder } from '../lib/todaySections'
 
 export const GOAL_AUTO_ADJUST_DEFAULTS = { enabled: false, last_prompt: null }
@@ -23,6 +24,7 @@ const DEFAULTS = {
   water: { ...WATER_DEFAULTS },
   cycle: { ...CYCLE_DEFAULTS },
   sport: { ...SPORT_DEFAULTS },
+  poids_objectif: { ...GOAL_WEIGHT_DEFAULTS },
 }
 
 // Applique le même traitement que meal_enabled/meal_overrides aux blocs `water`,
@@ -30,7 +32,7 @@ const DEFAULTS = {
 // si la colonne `settings.water` / `settings.cycle` / `settings.sport` est
 // absente (base pas encore migrée) ou partielle.
 function withWater(row) {
-  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), goal_auto_adjust: { ...GOAL_AUTO_ADJUST_DEFAULTS, ...(row?.goal_auto_adjust && typeof row.goal_auto_adjust === 'object' ? row.goal_auto_adjust : {}) }, water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle), sport: mergeSportSettings(row?.sport) }
+  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), goal_auto_adjust: { ...GOAL_AUTO_ADJUST_DEFAULTS, ...(row?.goal_auto_adjust && typeof row.goal_auto_adjust === 'object' ? row.goal_auto_adjust : {}) }, water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle), sport: mergeSportSettings(row?.sport), poids_objectif: mergeGoalWeightSettings(row?.poids_objectif) }
 }
 
 export function useSettings() {

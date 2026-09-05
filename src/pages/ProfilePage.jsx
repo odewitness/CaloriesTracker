@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
 import { useMeasurements } from '../hooks/useMeasurements'
+import { useCycle } from '../hooks/useCycle'
 import { usePushSubscription } from '../hooks/usePushSubscription'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
@@ -38,6 +39,7 @@ export default function ProfilePage() {
   const { profile, loading: profileLoading, updateProfile, uploadAvatar, removeAvatar } = useProfile()
   const { settings, loading: settingsLoading, update: updateSettings } = useSettings()
   const { entries: measurementEntries } = useMeasurements()
+  const { days: cycleDays } = useCycle()
   const { supported: pushSupported, permission: pushPermission, subscribed: pushSubscribed, loading: pushLoading, subscribe: subscribePush } = usePushSubscription()
 
   // ── Navigation interne (hub ↔ écran de détail) ─────────────────────────────
@@ -189,6 +191,11 @@ export default function ProfilePage() {
         onToggleAutoAdjust={() => updateSettings({
           goal_auto_adjust: { ...settings?.goal_auto_adjust, enabled: !(settings?.goal_auto_adjust?.enabled === true) },
         })}
+        poidsObjectif={settings.poids_objectif}
+        onPatchPoidsObjectif={(patch) => updateSettings({ poids_objectif: { ...settings.poids_objectif, ...patch } })}
+        measurementEntries={measurementEntries}
+        cycleDays={cycleDays}
+        cycleSettings={settings.cycle}
         calc={{
           sexe, tailleCm, niveauActivite, onActivite: handleActivite,
           objective: calcObjective, onObjective: setCalcObjective,

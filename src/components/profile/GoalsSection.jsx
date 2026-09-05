@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Flame, Dumbbell, Wheat, Droplets, Leaf, Calculator, ChevronRight, ChevronDown, TrendingDown } from 'lucide-react'
 import { computeCalorieNeeds, ACTIVITY_LEVELS, CALORIE_OBJECTIVES } from '../../lib/nutrients'
 import { GoalField, SectionScreen, SaveBar, Row, ToggleSwitch } from './primitives'
+import GoalWeightCard from './GoalWeightCard'
 
 // ── Calculateur de besoins caloriques ────────────────────────────────────────
 // Déplié à la demande depuis l'écran Objectifs (bouton « Calculer mes besoins »).
@@ -129,8 +130,8 @@ function CalorieCalculatorCard({ sexe, tailleCm, niveauActivite, onActivite, obj
             <div style={{ fontSize: 11, color: needs.unsafePace ? 'var(--coral)' : 'var(--text-hint)', marginTop: 2 }}>
               Rythme : ≈ {needs.paceKgPerWeek > 0 ? '+' : ''}{needs.paceKgPerWeek.toFixed(2)} kg/semaine
               {needs.unsafePace && (objective === 'perte'
-                ? ' — plus rapide que recommandé (max ~1 kg/semaine), risque de fonte musculaire et de reprise'
-                : ' — plus rapide que recommandé (max ~0,5 kg/semaine), au-delà c\'est surtout du gras')}
+                ? ` — plus rapide que recommandé (max ~1 % de ton poids/semaine, soit ≈${(poidsKg * 0.01).toFixed(1).replace('.', ',')} kg ici), risque de fonte musculaire et de reprise`
+                : ` — plus rapide que recommandé (max ~0,5 % de ton poids/semaine, soit ≈${(poidsKg * 0.005).toFixed(1).replace('.', ',')} kg ici), au-delà c'est surtout du gras`)}
             </div>
           )}
         </div>
@@ -151,6 +152,7 @@ function CalorieCalculatorCard({ sexe, tailleCm, niveauActivite, onActivite, obj
 export default function GoalsSection({
   goals, setGoal, dirty, saving, onSave, onBack,
   autoAdjustEnabled = false, onToggleAutoAdjust,
+  poidsObjectif, onPatchPoidsObjectif, measurementEntries, cycleDays, cycleSettings,
   calc, // { sexe, tailleCm, niveauActivite, onActivite, objective, onObjective, targetWeight, onTargetWeight, weeks, onWeeks, poidsKg, age, onOpenMeasurements, onApply }
 }) {
   const [showCalc, setShowCalc] = useState(false)
@@ -176,6 +178,18 @@ export default function GoalsSection({
             Une fois par semaine, si ta tendance de poids s'éloigne de ce que ton objectif calorique vise, l'app te proposera un petit ajustement (±100 kcal max). Tu valides toujours — rien ne change tout seul.
           </div>
         </div>
+      )}
+
+      {onPatchPoidsObjectif && (
+        <GoalWeightCard
+          poidsObjectif={poidsObjectif}
+          onPatch={onPatchPoidsObjectif}
+          measurementEntries={measurementEntries}
+          calc={calc}
+          cycleDays={cycleDays}
+          cycleSettings={cycleSettings}
+          currentGoal={goals.goal_kcal}
+        />
       )}
 
       <button

@@ -333,19 +333,35 @@ export const ACTIVITY_LEVELS = [
 
 const KCAL_PER_KG = 7700 // équivalence énergétique usuelle d'1 kg de masse grasse
 
-// `maxSafePaceKg` : rythme hebdomadaire au-delà duquel on avertit (perte trop
-// rapide = risque de fonte musculaire, prise trop rapide = surtout du gras).
+// `maxSafePacePct` : rythme hebdomadaire au-delà duquel on avertit, en % du
+// poids ACTUEL/semaine plutôt qu'un forfait en kg fixe (chantier « Objectif
+// de poids » Palier 2, voir docs/objectif-poids.md §2 — repères ACSM/RED-S :
+// perte "substantielle" = 5-10 %/mois est déjà un signal d'alerte). Un même
+// 1 kg/semaine n'a pas le même poids relatif pour 55 kg ou 95 kg ; en %, le
+// seuil s'adapte à la corpulence. Perte trop rapide = risque de fonte
+// musculaire ; prise trop rapide = surtout du gras.
 export const CALORIE_OBJECTIVES = [
-  { key: 'perte',    label: 'Perte de poids',   protPerKg: 2.0, fatShare: 0.25, maxSafePaceKg: 1 },
-  { key: 'maintien', label: 'Maintien',         protPerKg: 1.6, fatShare: 0.30, maxSafePaceKg: null },
-  { key: 'prise',    label: 'Prise de muscle',  protPerKg: 1.8, fatShare: 0.25, maxSafePaceKg: 0.5 },
+  { key: 'perte',    label: 'Perte de poids',   protPerKg: 2.0, fatShare: 0.25, maxSafePacePct: 1 },
+  { key: 'maintien', label: 'Maintien',         protPerKg: 1.6, fatShare: 0.30, maxSafePacePct: null },
+  { key: 'prise',    label: 'Prise de muscle',  protPerKg: 1.8, fatShare: 0.25, maxSafePacePct: 0.5 },
 ]
 
 // `sexe` : 'H' ou 'F'. Retourne null si sexe/âge/taille/poids manquent.
 // Pour perte/prise, sans `objectiveWeightKg`+`objectiveWeeks` renseignés,
 // retourne quand même bmr/tdee mais targetKcal/macros/paceKgPerWeek à null
 // (rien à appliquer tant que l'objectif de poids n'est pas précisé).
-export function computeCalorieNeeds({ sexe, age, tailleCm, poidsKg, activityKey, objectiveKey, objectiveWeightKg, objectiveWeeks }) {
+//
+// `overrideTargetKcal` (optionnel) : remplace le targetKcal théorique
+// (tdee + delta, formule de Mifflin-St Jeor) par une valeur déjà calculée
+// ailleurs — sert à GoalWeightCard pour aligner son bouton "Appliquer" sur
+// la même formule empirique que useGoalAdjustment (courbe de poids réelle +
+// objectif de poids) quand assez d'historique existe, au lieu de la formule
+// théorique qui peut diverger de plusieurs centaines de kcal si le
+// métabolisme réel de la personne s'écarte de l'estimation Mifflin. Les
+// macros sont recalculées à partir de cette valeur ; paceKgPerWeek/unsafePace
+// restent dérivés de objectiveWeightKg/objectiveWeeks (l'objectif réel), pas
+// de la valeur substituée.
+export function computeCalorieNeeds({ sexe, age, tailleCm, poidsKg, activityKey, objectiveKey, objectiveWeightKg, objectiveWeeks, overrideTargetKcal }) {
   if (!sexe || !age || !tailleCm || !poidsKg) return null
   const activity  = ACTIVITY_LEVELS.find(a => a.key === activityKey) || ACTIVITY_LEVELS[1]
   const objective = CALORIE_OBJECTIVES.find(o => o.key === objectiveKey) || CALORIE_OBJECTIVES[1]
@@ -363,10 +379,10 @@ export function computeCalorieNeeds({ sexe, age, tailleCm, poidsKg, activityKey,
     const diffKg = objectiveWeightKg - poidsKg
     paceKgPerWeek = diffKg / objectiveWeeks
     delta = (diffKg * KCAL_PER_KG) / (objectiveWeeks * 7)
-    unsafePace = objective.maxSafePaceKg != null && Math.abs(paceKgPerWeek) > objective.maxSafePaceKg
+    unsafePace = objective.maxSafePacePct != null && Math.abs(paceKgPerWeek) > (objective.maxSafePacePct / 100) * poidsKg
   }
 
-  const targetKcal = Math.max(1200, tdee + delta)
+  const targetKcal = Math.max(1200, overrideTargetKcal != null ? overrideTargetKcal : tdee + delta)
   const prot = objective.protPerKg * poidsKg
   const lip  = (targetKcal * objective.fatShare) / 9
   const gluc = Math.max(0, (targetKcal - prot * 4 - lip * 9) / 4)
