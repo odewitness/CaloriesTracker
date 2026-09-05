@@ -45,13 +45,20 @@ function addDaysStr(dateStr, n) {
   return fmt(d)
 }
 
-export function useWeightProjection(measurementEntries, horizonDays = DEFAULT_HORIZON_DAYS) {
+// `windowDays` (optionnel, défaut 42 = ~6 semaines) : fenêtre de relevés
+// prise en compte pour la régression. Paramétrable pour que useGoalAdjustment
+// et GoalWeightCard (chantier « Objectif de poids ») puissent élargir la
+// fenêtre à un cycle complet quand le suivi du cycle est actif, TOUT EN
+// PARTAGEANT la même régression — évite que les deux calculent chacun leur
+// tendance et affichent des chiffres différents pour le même poids réel
+// (retour utilisatrice du 2026-09-05).
+export function useWeightProjection(measurementEntries, horizonDays = DEFAULT_HORIZON_DAYS, windowDays = WINDOW_DAYS) {
   const today = fmt(new Date())
 
   return useMemo(() => {
     const none = (reason) => ({ ok: false, reason })
 
-    const cutoff = fmt(new Date(Date.now() - WINDOW_DAYS * 86400000))
+    const cutoff = fmt(new Date(Date.now() - windowDays * 86400000))
     const pts = (measurementEntries || [])
       .filter(e => e.poids_kg != null && e.date >= cutoff && e.date <= today)
       .map(e => ({ date: e.date, y: Number(e.poids_kg) }))
@@ -121,5 +128,5 @@ export function useWeightProjection(measurementEntries, horizonDays = DEFAULT_HO
       lowKg: round1(predicted - margin),
       highKg: round1(predicted + margin),
     }
-  }, [measurementEntries, horizonDays, today])
+  }, [measurementEntries, horizonDays, windowDays, today])
 }

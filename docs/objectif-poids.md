@@ -374,9 +374,53 @@ idée s'ajoute ici plutôt que d'être codée à la volée.
 
 ## 9. Journal des décisions
 
-- **2026-09-05** — **Correctif de cohérence** (retour utilisatrice après test
-  du Palier 3, sur la branche `objectif-poids`) : le bandeau d'ajustement
-  hebdo (page du jour) et le bouton "Appliquer à mes objectifs"
+- **2026-09-05** — **Troisième correctif** (retour utilisatrice : « 28 jours
+  c'est trop peu, il faut se baser sur l'historique entier », proposition de
+  baisse jugée « trop drastique »). Deux changements distincts :
+  - `PACE_WINDOW_DAYS` passé de 28 à **90 jours**. Raison : un plateau de
+    perte de poids (2-4 semaines sans baisse malgré un vrai déficit —
+    phénomène courant, documenté) tombant dans une fenêtre de 28 j peut à lui
+    seul faire croire à un rythme réel bien plus lent qu'il ne l'est
+    vraiment, et donc déclencher une correction inutilement lourde. Sur 90 j,
+    un plateau de quelques semaines pèse moins dans la pente globale. Pas
+    littéralement « tout l'historique » : au-delà de quelques mois, le mode
+    de vie a pu changer, une moyenne trop longue refléterait un passé peu
+    pertinent aujourd'hui — mais pour qui trace depuis moins de 90 j, la
+    fenêtre se réduit d'elle-même à ce qui existe (le filtre par date), donc
+    ça revient déjà à « tout l'historique » dans ce cas.
+  - Le bouton "Appliquer" de `GoalWeightCard` plafonne maintenant sa
+    correction à ±`MAX_MANUAL_DELTA_KCAL` (200 kcal), au lieu d'appliquer
+    l'écart réel/nécessaire en entier quel que soit son ampleur. Raison : un
+    gros écart se traduisait par une correction en un clic pouvant dépasser
+    -300/-400 kcal — un changement brutal, à l'opposé de l'esprit du reste
+    de l'app (jamais de changement brutal, toujours par petits pas). Si le
+    véritable écart dépasse ce plafond, un message le signale et invite à
+    revenir ajuster à nouveau dans quelques semaines plutôt que de tout
+    changer d'un coup.
+  `npm run build` OK. En attente de retest.
+- **2026-09-05** — **Deuxième correctif de cohérence, plus profond** (retour
+  utilisatrice : « sur quel poids se base-t-il ? », après le premier
+  correctif jugé insuffisant). Analyse : même après avoir unifié la formule
+  de conversion rythme→kcal, `useGoalAdjustment` et `GoalWeightCard`
+  calculaient chacun leur PROPRE tendance de poids, à partir de DEUX bases
+  différentes — `useGoalAdjustment` réimplémentait sa propre régression sur
+  le dernier relevé BRUT (`pts[pts.length-1].y`) sur une fenêtre de 28 j (ou
+  plus si cycle actif) ; `GoalWeightCard` utilisait `useWeightProjection`
+  (tendance LISSÉE, régression) sur une fenêtre fixe de 42 j. Deux bases de
+  poids différentes + deux fenêtres différentes ⇒ deux rythmes réels
+  différents, même avec la même formule de conversion. Correctif : fenêtre
+  paramétrable ajoutée à `useWeightProjection` (`windowDays`), nouvelle
+  constante partagée `PACE_WINDOW_DAYS` (28 j) + fonction `cycleAwareWindowDays`
+  (`cycle.js`, élargit à un cycle complet si le suivi est actif) — les DEUX
+  appellent maintenant exactement le même hook avec exactement la même
+  fenêtre, donc régressent sur EXACTEMENT les mêmes relevés. `useGoalAdjustment`
+  ne réimplémente plus sa propre régression. Seule différence assumée et
+  documentée : le bandeau plafonne l'ajustement à ±100 kcal/semaine (douceur),
+  le bouton applique la correction complète en une fois (action volontaire).
+  `npm run build` OK. En attente de retest par l'utilisatrice.
+- **2026-09-05** — **Premier correctif de cohérence** (retour utilisatrice
+  après test du Palier 3, sur la branche `objectif-poids`) : le bandeau
+  d'ajustement hebdo (page du jour) et le bouton "Appliquer à mes objectifs"
   (`GoalWeightCard`) proposaient deux nombres différents pour le même
   objectif de poids (ex. 1760 vs 2010 kcal) — l'un basé sur la vraie tendance
   de poids (`useGoalAdjustment`), l'autre sur la formule théorique de
@@ -389,7 +433,9 @@ idée s'ajoute ici plutôt que d'être codée à la volée.
   (`observedKgWeek`), et ne retombe sur la formule théorique que tant qu'il
   n'y a pas encore assez d'historique (statut `pas_assez_de_donnees`) — donc
   un vrai calcul de démarrage à froid, pas un second avis contradictoire.
-  `npm run build` OK.
+  `npm run build` OK. **Insuffisant** : réglait la formule de conversion mais
+  pas la tendance de poids elle-même, encore calculée deux fois différemment
+  (voir correctif suivant, plus haut).
 - **2026-09-05** — Palier 3 codé sur la branche `objectif-poids` (même jour,
   après validation du Palier 2). Fenêtre d'observation de `useGoalAdjustment`
   élargie à un cycle complet (`cycleInfo`) quand le suivi du cycle est actif,

@@ -21,6 +21,28 @@
 
 export const KCAL_PER_KG = 7700 // équivalence énergétique usuelle d'1 kg de masse grasse
 
+// Fenêtre (jours) de relevés de poids utilisée pour calculer le rythme réel
+// dans le cadre d'un objectif de poids — partagée par useGoalAdjustment et
+// GoalWeightCard (chacun via useWeightProjection + cycleAwareWindowDays,
+// cycle.js) pour qu'ils régressent sur EXACTEMENT les mêmes points et
+// affichent le même rythme observé.
+//
+// Correctif 2026-09-05 (retour utilisatrice : 28 j donnait une correction
+// trop drastique) : passé à 90 j (~3 mois). Un plateau de perte de poids
+// (2 à 4 semaines sans baisse malgré un vrai déficit, phénomène courant et
+// documenté) sur une fenêtre de 28 j pouvait à lui seul faire croire à un
+// rythme réel bien plus lent que la réalité récente, et donc suggérer un
+// gros coup de collier inutile. Sur 90 j, un plateau de quelques semaines
+// pèse moins dans la pente globale. On ne prend pas TOUT l'historique
+// (potentiellement des années) : au-delà de quelques mois, le poids/le
+// mode de vie a pu changer (autre activité, autre phase), et une moyenne
+// très longue durée refléterait un passé qui ne dit plus grand chose
+// d'aujourd'hui. Si l'historique dispo est plus court que 90 j, la fenêtre
+// se réduit d'elle-même à ce qui existe (le filtre par date ne trouve
+// simplement rien avant) — donc pour qui trace depuis peu, ça revient déjà
+// à « tout l'historique ».
+export const PACE_WINDOW_DAYS = 90
+
 // Bloc `settings.poids_objectif` — même principe que `settings.cycle` :
 // fusionné côté client avec ces défauts, robuste si la colonne est absente.
 export const GOAL_WEIGHT_DEFAULTS = {
@@ -77,6 +99,15 @@ export function goalKcalDeltaForPace({ observedKgWeek, requiredKgWeek }) {
   if (observedKgWeek == null || requiredKgWeek == null) return null
   return ((requiredKgWeek - observedKgWeek) * KCAL_PER_KG) / 7
 }
+
+// Plafond du correctif appliqué EN UNE FOIS par le bouton "Appliquer" de
+// GoalWeightCard (à la différence du bandeau hebdo, plafonné ±100/semaine —
+// voir useGoalAdjustment.js). Sans plafond, un gros écart réel/nécessaire se
+// traduisait par une correction en un clic pouvant dépasser -300/-400 kcal,
+// à l'opposé de l'esprit "jamais de changement brutal" du reste de l'app
+// (retour utilisatrice du 2026-09-05). 200 kcal reste un vrai geste (plus
+// qu'un ajustement hebdo doux) sans être un choc.
+export const MAX_MANUAL_DELTA_KCAL = 200
 
 // Compare l'objectif (poids désiré + date) à la tendance réelle.
 // `trendKg` : poids actuel le plus fiable dont on dispose (tendance lissée de

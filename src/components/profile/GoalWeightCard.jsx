@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { Target } from 'lucide-react'
 import { useWeightProjection } from '../../hooks/useWeightProjection'
-import { goalWeightProgress, goalKcalDeltaForPace } from '../../lib/poidsObjectif'
+import { goalWeightProgress, goalKcalDeltaForPace, PACE_WINDOW_DAYS, MAX_MANUAL_DELTA_KCAL } from '../../lib/poidsObjectif'
 import { computeCalorieNeeds } from '../../lib/nutrients'
-import { amenorrheaNotice } from '../../lib/cycle'
+import { amenorrheaNotice, cycleAwareWindowDays } from '../../lib/cycle'
 import { fmt, todayStr } from '../../lib/dates'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,7 +116,11 @@ function renderStatus(progress) {
 }
 
 export default function GoalWeightCard({ poidsObjectif, onPatch, measurementEntries, calc, cycleDays, cycleSettings, currentGoal }) {
-  const projection = useWeightProjection(measurementEntries)
+  // Même fenêtre que useGoalAdjustment (PACE_WINDOW_DAYS + cycleAwareWindowDays)
+  // pour régresser sur EXACTEMENT les mêmes relevés et afficher le même
+  // rythme réel — voir la note de correctif en tête de useGoalAdjustment.js.
+  const windowDays = cycleAwareWindowDays(PACE_WINDOW_DAYS, cycleDays, cycleSettings, todayStr())
+  const projection = useWeightProjection(measurementEntries, undefined, windowDays)
 
   const [poidsText, setPoidsText] = useState(poidsObjectif?.poids_desire != null ? String(poidsObjectif.poids_desire) : '')
   useEffect(() => {
@@ -163,15 +167,27 @@ export default function GoalWeightCard({ poidsObjectif, onPatch, measurementEntr
   // pour le même objectif) : dès qu'on a assez d'historique de poids pour
   // connaître un rythme réel (`observedKgWeek`), on calcule le nouveau
   // goal_kcal à partir de LÀ OÙ EST DÉJÀ `currentGoal` + l'écart réel/nécessaire
-  // (`goalKcalDeltaForPace`, même formule que useGoalAdjustment, juste sans
-  // le plafond ±100/semaine puisque c'est une action volontaire et pas une
-  // proposition douce hebdomadaire) — pas la formule théorique de Mifflin-St
-  // Jeor, qui peut diverger de plusieurs centaines de kcal si le métabolisme
-  // réel de la personne s'écarte de l'estimation. La formule théorique ne
-  // sert plus que de première estimation, tant qu'il n'y a pas encore de
-  // tendance de poids réelle à exploiter (statut 'pas_assez_de_donnees').
-  const overrideTargetKcal = (canApply && currentGoal != null && observedKgWeek != null && progress.requiredKgWeek != null)
-    ? Math.max(1200, Math.round((currentGoal + goalKcalDeltaForPace({ observedKgWeek, requiredKgWeek: progress.requiredKgWeek })) / 10) * 10)
+  // (`goalKcalDeltaForPace`, même formule que useGoalAdjustment) — pas la
+  // formule théorique de Mifflin-St Jeor, qui peut diverger de plusieurs
+  // centaines de kcal si le métabolisme réel de la personne s'écarte de
+  // l'estimation. La formule théorique ne sert plus que de première
+  // estimation, tant qu'il n'y a pas encore de tendance de poids réelle à
+  // exploiter (statut 'pas_assez_de_donnees').
+  //
+  // Plafonné à ±MAX_MANUAL_DELTA_KCAL (200) même si l'écart réel/nécessaire
+  // est plus grand : un gros écart en un clic ressemblait à un changement
+  // brutal (retour utilisatrice), contraire à l'esprit du reste de l'app.
+  // Si le vrai écart dépasse ce plafond, `deltaClamped` le signale pour
+  // qu'on l'affiche plutôt que de le cacher.
+  const rawManualDelta = (canApply && currentGoal != null && observedKgWeek != null && progress.requiredKgWeek != null)
+    ? goalKcalDeltaForPace({ observedKgWeek, requiredKgWeek: progress.requiredKgWeek })
+    : null
+  const clampedManualDelta = rawManualDelta != null
+    ? Math.max(-MAX_MANUAL_DELTA_KCAL, Math.min(MAX_MANUAL_DELTA_KCAL, rawManualDelta))
+    : null
+  const deltaClamped = rawManualDelta != null && Math.abs(rawManualDelta) > MAX_MANUAL_DELTA_KCAL
+  const overrideTargetKcal = clampedManualDelta != null
+    ? Math.max(1200, Math.round((currentGoal + clampedManualDelta) / 10) * 10)
     : null
 
   const needs = canApply ? computeCalorieNeeds({
@@ -266,6 +282,14 @@ export default function GoalWeightCard({ poidsObjectif, onPatch, measurementEntr
               {objective === 'perte'
                 ? `Rythme plus rapide que recommandé (max ~1 % de ton poids/semaine, soit ≈${(trendKg * 0.01).toFixed(1).replace('.', ',')} kg ici) — risque de fonte musculaire et de reprise.`
                 : `Rythme plus rapide que recommandé (max ~0,5 % de ton poids/semaine, soit ≈${(trendKg * 0.005).toFixed(1).replace('.', ',')} kg ici), au-delà c'est surtout du gras.`}
+            </div>
+          )}
+          {deltaClamped && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', marginTop: 10, lineHeight: 1.5 }}>
+              L'écart entre ton rythme réel et le rythme nécessaire suggère un
+              ajustement plus important — on le limite à {MAX_MANUAL_DELTA_KCAL} kcal
+              à la fois pour rester prudent. Reviens dans quelques semaines
+              pour continuer à ajuster si l'écart persiste.
             </div>
           )}
           <button className="btn-primary" onClick={() => calc.onApply(needs)} style={{ marginTop: 10 }}>
