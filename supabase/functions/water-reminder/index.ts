@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
       ? `Plus que ${litres(goalMl - totalMl)} L pour atteindre ton objectif`
       : `${litres(totalMl)} L sur ${litres(goalMl)} L aujourd'hui`
 
-    await sendToUser(row.user_id, { title: 'Pense à boire 💧', body, url: '/today' })
+    await sendToUser(row.user_id, { title: 'Pense à boire 💧', body, url: '/today?focus=water' })
     await supabaseAdmin.from('settings').update({ water_last_reminder_at: new Date().toISOString() }).eq('user_id', row.user_id)
     sent++
   }

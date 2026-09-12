@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, ChevronDown, Share2, MoreVertical, BookOpen, BookmarkPlus } from 'lucide-react'
+import { Plus, ChevronDown, Share2, MoreVertical, BookOpen, BookmarkPlus, CalendarDays } from 'lucide-react'
 import EditableFoodRow from './EditableFoodRow'
 import PlannedMealCard from './PlannedMealCard'
 
@@ -36,7 +36,9 @@ function EnabledToggle({ enabled, onToggle, label }) {
 // ajouter directement à ce repas (voir TodayPage).
 // onCreateTemplate(name) — optionnel ; crée un nouveau repas type à partir
 // des aliments déjà enregistrés dans ce repas (masqué si le repas est vide).
-export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare, onAddFromTemplate, onCreateTemplate, onToggleEnabled }) {
+// onCopyFromDay(name) — optionnel ; ouvre le choix d'un jour + repas dont on
+// copie les aliments directement dans ce repas de ce jour.
+export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare, onAddFromTemplate, onCreateTemplate, onCopyFromDay, onToggleEnabled }) {
   const enabled = target?.enabled !== false
   const toggleLabel = enabled ? `Désactiver ${name} ce jour` : `Réactiver ${name} ce jour`
   const storageKey = `meal-collapsed:${name}`
@@ -45,7 +47,7 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
     catch { return false }
   })
   const [menuOpen, setMenuOpen] = useState(false)
-  const showTemplateMenu = !!(onAddFromTemplate || onCreateTemplate)
+  const showTemplateMenu = !!(onAddFromTemplate || onCreateTemplate || onCopyFromDay)
 
   const toggleCollapsed = () => {
     setCollapsed(c => {
@@ -169,6 +171,14 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
                       style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
                     >
                       <BookmarkPlus size={14} /> Créer un repas type
+                    </button>
+                  )}
+                  {onCopyFromDay && (
+                    <button
+                      onClick={() => { setMenuOpen(false); onCopyFromDay(name) }}
+                      style={{ width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      <CalendarDays size={14} /> Copier depuis un autre jour
                     </button>
                   )}
                 </div>

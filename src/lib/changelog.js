@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-09-12',
+    title: 'Raccourcis sur l\'icône de l\'app, notif eau qui t\'amène au bon endroit',
+    description: "Un appui long sur l'icône de l'app (écran d'accueil) propose « Ajouter de l'eau » et « Ajouter un aliment », qui ouvrent directement l'action sans passer par la page du jour. Et quand tu touches une notif « Pense à boire », tu arrives maintenant directement sur la section Eau au lieu du haut de la page.",
+  },
+  {
+    date: '2026-09-12',
+    title: 'Annuler une suppression, copier un repas d\'un autre jour',
+    description: "Si tu supprimes un aliment par erreur, un bouton « Annuler » apparaît quelques secondes pour le remettre instantanément. Et sur un repas, le menu « ⋮ » propose maintenant « Copier depuis un autre jour » pour reprendre les aliments d'un repas déjà enregistré (hier, la semaine dernière...) sans tout retaper.",
+  },
+  {
+    date: '2026-09-12',
     title: 'Aller plus vite pour saisir un grammage',
     description: "Dans l'ajout d'aliment, cliquer sur une ligne de l'historique reprend directement ce grammage. Et quand tu choisis une portion définie (« 1 tranche », « 100g »...), un petit + / − apparaît pour doubler, tripler... la quantité en un clic.",
   },

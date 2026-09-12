@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import TodayOverviewCard from '../components/TodayOverviewCard'
 import NutrientPanel from '../components/NutrientPanel'
 import MealSection from '../components/MealSection'
 import AddFoodModal from '../components/AddFoodModal'
 import AddFromMealModal from '../components/AddFromMealModal'
+import ImportFromDayModal from '../components/ImportFromDayModal'
 import EditMealTemplatePage from '../components/EditMealTemplatePage'
 import FoodDetailModal from '../components/FoodDetailModal'
 import EditSupplementModal from '../components/EditSupplementModal'
@@ -57,8 +59,19 @@ function parseYmdLocal(s) {
   return new Date(y, m - 1, d, 12, 0, 0, 0)
 }
 
+// Repas par défaut selon l'heure — sert au raccourci d'app "Ajouter un
+// aliment" (appui long sur l'icône), qui n'a pas de "+" d'origine à partir
+// duquel déduire le repas visé.
+function mealForCurrentHour() {
+  const h = new Date().getHours()
+  if (h < 10) return 'Petit-déjeuner'
+  if (h < 15) return 'Déjeuner'
+  if (h < 19) return 'Collation'
+  return 'Dîner'
+}
+
 // ── Contenu d'un slot jour ─────────────────────────────────────────────────
-function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) {
+function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, focusParam }) {
   const toast = useToast()
   const { user } = useAuth()
   const dateStr = fmt(date)
@@ -84,6 +97,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
   const [shareSportTarget, setShareSportTarget] = useState(null) // { payload, title, subtitle } | null
   const [templateAddMeal, setTemplateAddMeal] = useState(null)    // nom du repas | null — ajout d'un repas type à ce repas
   const [templateCreateMeal, setTemplateCreateMeal] = useState(null) // nom du repas | null — création d'un repas type depuis ce repas
+  const [copyFromDayMeal, setCopyFromDayMeal] = useState(null)    // nom du repas | null — copie depuis un autre jour vers ce repas
   const [waterSheetOpen, setWaterSheetOpen] = useState(false)
   const [sportSheet, setSportSheet] = useState(null) // { initial: activite|null } | null
   const [pasSheet, setPasSheet] = useState(false)
@@ -327,10 +341,42 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
     else toast("Erreur lors de l'ajout")
   }
 
+  // Point d'entrée des raccourcis d'app (appui long sur l'icône) et des
+  // notifications qui pointent vers une section précise de la page du jour
+  // (ex. rappel d'eau → `/today?focus=water`). Seul le slot "aujourd'hui" y
+  // répond ; consommé une seule fois via la ref (le param reste dans l'URL
+  // jusqu'au remplacement fait par le composant parent).
+  const focusHandledRef = useRef(false)
+  useEffect(() => {
+    if (!focusParam || !isToday || focusHandledRef.current) return
+    focusHandledRef.current = true
+    if (focusParam === 'water') {
+      setTimeout(() => {
+        document.getElementById('today-water-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+    } else if (focusParam === 'add') {
+      onOpenModal({ meal: mealForCurrentHour(), addEntry: handleAdd, top10Gaps })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusParam, isToday])
+
   const handleDelete = async (id) => {
+    const entry = entries.find(e => e.id === id)
     await deleteEntry(id)
     hapticRemove()
-    toast('Supprimé')
+    if (!entry) { toast('Supprimé'); return }
+    // Réinsertion avec les mêmes valeurs (id/date/user_id/created_at régénérés).
+    const { id: _id, date: _d, user_id: _u, created_at: _c, ...rest } = entry
+    toast('Aliment supprimé', {
+      duration: 5000,
+      action: {
+        label: 'Annuler',
+        onClick: async () => {
+          const { error } = await addEntry(rest)
+          if (!error) { hapticTap(); toast('✓ Restauré') }
+        },
+      },
+    })
   }
 
   const handleUpdate = async (id, patch) => {
@@ -488,6 +534,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
             onShare={(meal) => setShareTarget({ meal, entries: entries.filter(e => e.meal === meal) })}
             onAddFromTemplate={setTemplateAddMeal}
             onCreateTemplate={setTemplateCreateMeal}
+            onCopyFromDay={setCopyFromDayMeal}
           />
         ))}
       </div>
@@ -563,7 +610,11 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
         {sectionsOrder
           .filter(k => sectionNodes[k] != null)
           .map((k, i) => (
-            <div key={k} style={i === 0 ? undefined : { marginTop: 16 }}>
+            <div
+              key={k}
+              id={k === 'eau' && isToday ? 'today-water-section' : undefined}
+              style={i === 0 ? undefined : { marginTop: 16 }}
+            >
               {sectionNodes[k]}
             </div>
           ))}
@@ -677,6 +728,18 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate }) 
           onClose={() => setTemplateCreateMeal(null)}
         />
       )}
+
+      {copyFromDayMeal && createPortal(
+        <ImportFromDayModal
+          title={`Copier dans « ${copyFromDayMeal} »`}
+          onImport={async (items) => {
+            await handleAddFromTemplate(copyFromDayMeal, items)
+            setCopyFromDayMeal(null)
+          }}
+          onClose={() => setCopyFromDayMeal(null)}
+        />,
+        document.body
+      )}
     </div>
   )
 }
@@ -693,6 +756,19 @@ export default function TodayPage() {
     setDate(parseYmdLocal(requestedDate))
     setRequestedDate(null)
   }, [requestedDate, setRequestedDate])
+
+  // Deep-link depuis une notification ou un raccourci d'app (`/today?focus=water`
+  // ou `/today?focus=add`) — lu une fois au montage, puis retiré de l'URL tout
+  // de suite pour ne pas se redéclencher (ex. remontage via `journalVersion`).
+  const location = useLocation()
+  const navigateTo = useNavigate()
+  const [focusParam] = useState(() => new URLSearchParams(location.search).get('focus'))
+  useEffect(() => {
+    if (!focusParam) return
+    navigateTo('/today', { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // modal = { meal, addEntry } | null
   const [modal, setModal] = useState(null)
   const [detailEntry, setDetailEntry] = useState(null)
@@ -863,7 +939,7 @@ export default function TodayPage() {
           }}
         >
           <DaySlot date={datePrev} onOpenModal={setModal} onOpenDetail={setDetailEntry} onOpenSource={setSourceDetail} onNavigate={navigate} />
-          <DaySlot date={date}     onOpenModal={setModal} onOpenDetail={setDetailEntry} onOpenSource={setSourceDetail} onNavigate={navigate} />
+          <DaySlot date={date}     onOpenModal={setModal} onOpenDetail={setDetailEntry} onOpenSource={setSourceDetail} onNavigate={navigate} focusParam={focusParam} />
           <DaySlot date={dateNext} onOpenModal={setModal} onOpenDetail={setDetailEntry} onOpenSource={setSourceDetail} onNavigate={navigate} />
         </div>
       </div>
