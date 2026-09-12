@@ -9,7 +9,8 @@ function formatDate(dateStr) {
 // Rappel des anciennes quantités logguées pour CET aliment (voir
 // useFoodHistory) — repère utile si un jour la balance n'est pas sous la
 // main : on peut se recaler sur ce qui a été pesé les fois précédentes.
-export default function FoodHistorySection({ food }) {
+// Cliquer sur une ligne reprend directement ce grammage (onSelect).
+export default function FoodHistorySection({ food, onSelect }) {
   const { history, loading } = useFoodHistory(food)
 
   if (loading || history.length === 0) return null
@@ -26,11 +27,13 @@ export default function FoodHistorySection({ food }) {
         {history.map((h, i) => (
           <div
             key={h.id}
+            onClick={() => onSelect?.(h.qty_g)}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '7px 10px',
               borderTop: i > 0 ? '0.5px solid var(--border)' : 'none',
               fontSize: 12.5,
+              cursor: onSelect ? 'pointer' : 'default',
             }}
           >
             <span style={{ color: 'var(--text-muted)' }}>{formatDate(h.date)}</span>

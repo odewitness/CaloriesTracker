@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-12',
+    title: 'Aller plus vite pour saisir un grammage',
+    description: "Dans l'ajout d'aliment, cliquer sur une ligne de l'historique reprend directement ce grammage. Et quand tu choisis une portion définie (« 1 tranche », « 100g »...), un petit + / − apparaît pour doubler, tripler... la quantité en un clic.",
+  },
+  {
     date: '2026-09-05',
     title: 'Poids objectif : la suite quand l\'échéance passe',
     description: "Si la date de ton poids objectif est dépassée ou que tu l'as atteint, l'app te propose maintenant clairement de garder le cap sans date, de repousser l'échéance, ou de repartir sur un nouvel objectif — rien ne change tout seul. Si tu suis ton cycle, l'ajustement automatique des calories attend maintenant un cycle complet avant de se fier à ta tendance de poids, pour ne pas confondre rétention d'eau et vraie évolution.",

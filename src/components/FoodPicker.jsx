@@ -96,6 +96,13 @@ export default function FoodPicker({
   // grammes (utilisée par scaleFood/MacroPreview), mais ce texte séparé porte
   // la saisie du nombre de doses, synchronisée avec `qty` via `doseUnitG`.
   const [doseCountText, setDoseCountText] = useState('1')
+  // Pour un aliment normal, cliquer sur une portion définie (chip "1 tranche",
+  // "100g"...) mémorise son grammage unitaire : un stepper −/+ apparaît alors
+  // pour ajuster par multiples de cette portion (ex: ×2 = "2 tranches"),
+  // même mécanique que doseCount/doseCountText pour les compléments plus haut.
+  // Repasse à null dès que la saisie en grammes est modifiée à la main.
+  const [portionUnit, setPortionUnit] = useState(null) // { label, g } | null
+  const [portionCountText, setPortionCountText] = useState('1')
   const [subtractMode, setSubtractMode] = useState(false)
   const [grossWeight, setGrossWeight] = useState("")
   const [wasteWeight, setWasteWeight] = useState("")
@@ -431,6 +438,8 @@ const selectFood = async (food) => {
   setSubtractMode(false)
   setGrossWeight("")
   setWasteWeight("")
+  setPortionUnit(null)
+  setPortionCountText('1')
   setEditingPortions(false)
   setStep('configure')
 }
@@ -486,6 +495,22 @@ const setDoseCount = (text) => {
   setDoseCountText(text)
   const n = parseFloat(text)
   if (!isNaN(n) && n >= 0) setQty(String(n * doseUnitG))
+}
+
+// Équivalent de setDoseCount pour un aliment normal, une fois une portion
+// définie sélectionnée (voir portionUnit) : recalcule `qty` en grammes à
+// partir du nombre de portions.
+const setPortionCount = (text) => {
+  setPortionCountText(text)
+  const n = parseFloat(text)
+  if (!isNaN(n) && n >= 0 && portionUnit) setQty(String(Math.round(n * portionUnit.g * 100) / 100))
+}
+
+// Reprend le grammage d'une entrée de l'historique — pas une "portion" au
+// sens propre, donc on masque le stepper ×portions s'il était affiché.
+const selectHistoryQty = (g) => {
+  setQty(String(g))
+  setPortionUnit(null)
 }
 
   const handleScanDetected = (code) => {
@@ -867,11 +892,18 @@ const setDoseCount = (text) => {
                     {!editingPortions ? (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {selected.portions.map((p, i) => (
-                          <button key={i} className="chip" onClick={() => setQty(String(p.g))}>
+                          <button
+                            key={i}
+                            className="chip"
+                            onClick={() => { setQty(String(p.g)); setPortionUnit(p); setPortionCountText('1') }}
+                          >
                             {p.label} · {p.g}g
                           </button>
                         ))}
-                        <button className="chip" onClick={() => setQty('100')}>100g</button>
+                        <button
+                          className="chip"
+                          onClick={() => { setQty('100'); setPortionUnit({ label: '100g', g: 100 }); setPortionCountText('1') }}
+                        >100g</button>
                       </div>
                     ) : (
                       <>
@@ -1039,16 +1071,45 @@ const setDoseCount = (text) => {
                   </div>
                 ) : (
                   /* Mode normal */
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                    <input
-                      className="input-sm"
-                      type="text"
-                      inputMode="decimal"
-                      value={qty}
-                      onChange={e => setQty(e.target.value)}
-                    />
-                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
-                  </div>
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: portionUnit ? 8 : 14 }}>
+                      <input
+                        className="input-sm"
+                        type="text"
+                        inputMode="decimal"
+                        value={qty}
+                        onChange={e => { setQty(e.target.value); setPortionUnit(null) }}
+                      />
+                      <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>grammes</span>
+                    </div>
+
+                    {/* Stepper ×portions — apparaît après avoir choisi une portion
+                        définie (chip ci-dessus) ; même mécanique que le nombre de
+                        doses des compléments. */}
+                    {portionUnit && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>× {portionUnit.label}</span>
+                        <button
+                          className="btn-icon"
+                          style={{ background: 'var(--gray-bg)' }}
+                          onClick={() => setPortionCount(String(Math.max(0, (parseFloat(portionCountText) || 0) - 1)))}
+                        >−</button>
+                        <input
+                          className="input-sm"
+                          type="text"
+                          inputMode="decimal"
+                          value={portionCountText}
+                          onChange={e => setPortionCount(e.target.value)}
+                          style={{ width: 50, textAlign: 'center' }}
+                        />
+                        <button
+                          className="btn-icon"
+                          style={{ background: 'var(--gray-bg)' }}
+                          onClick={() => setPortionCount(String((parseFloat(portionCountText) || 0) + 1))}
+                        >+</button>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Macro preview */}
@@ -1058,7 +1119,7 @@ const setDoseCount = (text) => {
 
             {/* Historique des quantités déjà loguées pour cet aliment — repère
                 si un jour la balance n'est pas sous la main */}
-            <FoodHistorySection food={selected} />
+            <FoodHistorySection food={selected} onSelect={selectHistoryQty} />
 
             {/* Contexte (ex: repas ciblé — non modifiable, déjà choisi via le "+") */}
             {contextLabel && (
