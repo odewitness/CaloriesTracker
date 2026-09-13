@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-09-13',
+    title: 'Ma fournée : reprendre la semaine dernière, filtrer par catégorie',
+    description: "Quand la fournée d'une semaine est vide, un bouton te propose de reprendre ce qui n'était pas fait la semaine d'avant. Pour ajouter une recette, tu peux maintenant filtrer par catégorie en plus de la recherche. Et le bouton « Ma fournée » affiche désormais combien il te reste à faire, sans avoir à l'ouvrir. Le « Plan de cuisine » se met aussi à jour tout seul quand tu changes la fournée, sans effacer ce que tu avais déjà coché.",
+  },
+  {
+    date: '2026-09-13',
+    title: 'Le planificateur retient tes réglages',
+    description: "Générer un nouveau plan repart maintenant de tes derniers réglages (composition des repas, temps de cuisson, saison...) au lieu de tout redemander à chaque fois. Et dans l'aperçu d'un plan, tu peux régler jusqu'à 6 portions d'un même plat au lieu de 2, pratique pour cuisiner en une fois pour plusieurs jours.",
+  },
+  {
+    date: '2026-09-13',
     title: 'Retirer un plan de la semaine vide aussi Ma fournée',
     description: "Quand tu retires le plan de repas d'une semaine (ou que tu le régénères), la check-list « Ma fournée » de cette semaine se vide en même temps au lieu de garder des recettes qui n'ont plus lieu d'être.",
   },

@@ -3,13 +3,13 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-08-31.
 
-**État au 2026-09-01 : Palier 1 + Palier 2 livrés et en prod ; Palier 3 bien
-avancé** — page batch cooking « Ma fournée » V1, raccordement planificateur →
-fournée, et « reprendre la semaine précédente » livrés. Ce document fixe le
+**État au 2026-09-13 : Paliers 1 à 3 livrés et en prod (historique de plans,
+batch cooking, plan de cuisine) ; Palier 4 (corrections de synchronisation
+fournée/plan de cuisine + confort d'usage) livré.** Ce document fixe le
 périmètre, les décisions prises avec l'utilisatrice, l'algorithme, les zones
-d'ombre et le découpage en paliers. Reste du Palier 3 : historique de plusieurs
-plans nommés, contraintes alimentaires (tags), sélection multiple de recettes
-depuis la liste.
+d'ombre et le découpage en paliers. Reste : contraintes alimentaires (tags),
+sélection multiple de recettes depuis la liste pour la fournée. Voir §7 pour le
+détail palier par palier.
 
 ---
 
@@ -384,15 +384,14 @@ l'édition de brique couvrent le besoin « garder la main »).
 
 ### Palier 3 — Historique, reconduction & batch cooking
 
-- ✅ **« Reprendre la semaine précédente »** (2026-09-01, branche
-  `feat-repeat-week`) : bouton dans la vue Menus qui recopie les
-  `repas_planifies` des 7 jours précédant la semaine affichée, décalés de +7 j
-  (`duplicatePlannedMeals` dans `usePlannedMeals.js` — nouveau
-  `recurrence_group_id`, `mange` non recopié, créneaux occupés + jours exclus
-  ignorés). Stashé comme un plan généré (`stashAppliedPlan`) → retrait groupé
-  via le bouton « Retirer le plan… » existant. Affiché seulement quand la
-  semaine d'avant contient des repas (données déjà dans `plannedByDate`,
-  CalendarPage charge ±7 j).
+- ⚠️ **« Reprendre la semaine précédente » — RETIRÉ (2026-09-01, commit
+  `8d81b71`)**, jugé cassé et inutile après coup. La fonction
+  `duplicatePlannedMeals` reste dans `usePlannedMeals.js` (code mort, plus
+  appelée nulle part) mais le bouton n'existe plus dans `WeekMenuBoard`. Chemin
+  actuel le plus proche pour « reconduire une semaine » : réglages du
+  planificateur → « Reprendre un plan enregistré » → charger un plan →
+  « Régénérer » (même config, nouveaux tirages) → l'appliquer à la semaine
+  voulue. Rien de plus rapide en un seul geste aujourd'hui.
 - ✅ **Historique de plusieurs plans nommés** (2026-09-01, branche
   `feat-saved-meal-plans`) : table `plans_repas` (RLS own ; `nom`, `config`
   jsonb, `plan` jsonb = sortie `buildMealPlan`), hook `useMealPlans`
@@ -438,17 +437,70 @@ l'édition de brique couvrent le besoin « garder la main »).
   suivants). Dépend de la qualité des `instructions` (une action par ligne).
 - ✅ **Raccordement planificateur → fournée** (2026-09-01, branche
   `feat-planner-to-batch`) : « Appliquer au calendrier » verse aussi les
-  recettes du plan (récap `batchSummary`, `kind === 'recette'` seulement) dans
+  recettes ET repas types du plan (récap `batchSummary`) dans
   `batch_cooking_items` avec `portions = portionsNeeded`, silencieusement (un
   seul toast). Bouton « Ajouter à Ma fournée » dans le récap « À préparer » pour
-  le faire sans appliquer au calendrier. Dédoublonné (`upsert` ON CONFLICT DO
-  NOTHING sur `unique(user_id, recette_id)` — l'état « fait » d'une recette déjà
-  présente n'est pas écrasé). Le récap interne « À préparer » de
-  `MealPlannerModal` est **conservé** (pas remplacé).
-  Reste (palier ultérieur) : sélection multiple depuis la liste des recettes,
-  sessions nommées / historique ; repas types dans la fournée (aujourd'hui
-  ignorés).
+  le faire sans appliquer au calendrier — visible dès que le récap contient au
+  moins un élément, recette ou repas type (corrigé le 2026-09-13, voir Palier 4 :
+  la condition ne filtrait qu'aux recettes, cachant le bouton pour un plan
+  100 % repas types). Dédoublonné (`upsert` ON CONFLICT DO NOTHING sur
+  `unique(user_id, recette_id)` — l'état « fait » d'une recette déjà présente
+  n'est pas écrasé). Le récap interne « À préparer » de `MealPlannerModal` est
+  **conservé** (pas remplacé).
+  Reste (palier ultérieur) : sélection multiple depuis la liste des recettes.
 - Contraintes alimentaires (tags simples).
+
+### Palier 4 — Corrections & confort d'usage (2026-09-13)
+
+Suite à un retour utilisatrice (« ce n'est pas toujours pratique ») sur le
+planificateur + Ma fournée. Trois bugs de désynchronisation fournée/plan de
+cuisine/plan de repas + six améliorations de confort.
+
+- ✅ **Retirer/remplacer le plan de la semaine vide aussi Ma fournée**
+  (`batch_cooking_items`) **et le plan de cuisine** (`batch_cooking_steps`) de
+  cette semaine. Les trois tables sont indexées indépendamment sur `semaine` /
+  `recurrence_group_id`, sans clé étrangère entre elles — sans ce nettoyage
+  explicite à chaque point de retrait (`WeekMenuBoard.handleRemovePlan`,
+  `MealPlannerModal.handleRemovePlan` et la branche `replacing` de
+  `handleApply`), les deux restaient orphelins.
+- ✅ **« Plan de cuisine » se resynchronise sans tout casser.** Nouvelle méthode
+  `sync` dans `useBatchCookingSteps` : ajoute les étapes des recettes
+  nouvellement présentes dans la fournée, retire celles des recettes qui n'y
+  sont plus, **sans toucher à l'ordre ni aux cases déjà cochées** des étapes
+  qui restent. Appelée automatiquement (`CookingPlanModal`) dès que la
+  composition de la fournée change après une première génération. « Régénérer
+  depuis les recettes » (reset complet, perd tout) reste disponible pour un
+  vrai nouveau départ (ex. instructions d'une recette réécrites).
+- ✅ **Bouton « Ajouter à Ma fournée » visible pour un plan 100 % repas types**
+  (voir correction ci-dessus, §7 Palier 3).
+- ✅ **Réglages du planificateur mémorisés** (`localStorage`,
+  `meal-planner:last-config`) : composition des repas, temps de cuisson,
+  saison, bascules… sont repris tels quels à la prochaine ouverture (hors date
+  de début, toujours celle de la semaine ouverte). Avant : configuration
+  entièrement à refaire à chaque nouveau plan, sauf à recharger un plan
+  enregistré.
+- ✅ **Plafond de portions manuelles relevé** (`MAX_MANUAL_PORTIONS = 6` dans
+  `useMealPlanner.js`, contre 2 avant) : le réglage manuel d'une brique dans
+  l'aperçu (`ItemEditor`) va au-delà du plafond du solveur automatique (qui
+  reste à 2, voir zone d'ombre A) — pour une vraie session de batch cooking
+  (« je cuisine ce plat une fois pour 5 jours »).
+- ✅ **Ma fournée propose de reprendre les éléments non faits de la semaine
+  précédente** quand la fournée de la semaine affichée est vide
+  (`BatchCookingModal`, requête sur `batch_cooking_items` de `semaine - 7j`
+  filtrée `fait = false`). Remplace en pratique l'ancien « Reprendre la semaine
+  précédente » du plan de repas (retiré, voir §7 Palier 3) pour le cas d'usage
+  fournée.
+- ✅ **Filtre par catégorie dans le sélecteur d'ajout à la fournée**
+  (`SourcePicker`) : chips de catégories réellement présentes parmi les
+  options restantes, en plus de la recherche texte.
+- ✅ **Compteur sur le bouton « Ma fournée »** dans la vue Menus (`fait / total`)
+  — savoir d'un coup d'œil s'il y a quelque chose en attente sans ouvrir la
+  modale.
+- ✅ **Écran de configuration : « Options avancées » repliée par défaut**
+  (`Collapsible defaultOpen={false}`) — cohérent avec la mémorisation des
+  réglages ci-dessus : une utilisatrice qui revient n'a plus besoin de la
+  rouvrir à chaque fois, et un premier essai voit d'abord l'essentiel (jours,
+  date de début).
 
 ---
 

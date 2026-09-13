@@ -1,11 +1,15 @@
-import React, { useMemo, useState } from 'react'
-import { X, Plus, Trash2, ChefHat, Search, Check, ChevronRight, ListChecks } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { X, Plus, Trash2, ChefHat, Search, Check, ChevronRight, ListChecks, History } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
+import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabase'
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useRecipes } from '../hooks/useRecipes'
 import { useMealTemplatesList } from '../hooks/useMealTemplates'
 import { useToast } from '../lib/toast'
 import { getRecipeCategoryIcon } from '../lib/categoryIcons'
+import { addDaysStr } from '../lib/mealPlannerApply'
+import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 import CookingPlanModal from './CookingPlanModal'
@@ -29,16 +33,25 @@ const keyOf = (kind, id) => `${kind}:${id}`
 // pas encore dans la fournée. `options` : [{ id, nom, kind, categorie }].
 function SourcePicker({ options, loading, excludeKeys, onAdd, onCancel }) {
   const [q, setQ] = useState('')
+  const [cat, setCat] = useState(null) // catégorie filtrée, ou null = toutes
   const [sel, setSel] = useState(() => new Set()) // set de keyOf(kind, id)
   const [adding, setAdding] = useState(false)
+
+  // Catégories réellement présentes dans les options restantes — inutile de
+  // proposer un filtre sur une catégorie vide.
+  const availableCats = useMemo(() => {
+    const present = new Set(options.filter(o => !excludeKeys.has(keyOf(o.kind, o.id))).map(o => o.categorie).filter(Boolean))
+    return RECIPE_CATEGORIES.filter(c => present.has(c))
+  }, [options, excludeKeys])
 
   const list = useMemo(() => {
     const nq = normalize(q)
     return options
       .filter(o => !excludeKeys.has(keyOf(o.kind, o.id)))
+      .filter(o => !cat || o.categorie === cat)
       .filter(o => !nq || normalize(o.nom).includes(nq))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-  }, [options, excludeKeys, q])
+  }, [options, excludeKeys, q, cat])
 
   const toggle = (k) => setSel(s => {
     const n = new Set(s)
@@ -70,11 +83,44 @@ function SourcePicker({ options, loading, excludeKeys, onAdd, onCancel }) {
         />
       </div>
 
+      {availableCats.length > 1 && (
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+          <button
+            onClick={() => setCat(null)}
+            style={{
+              fontSize: 11.5, fontWeight: 700, fontFamily: 'var(--font)', padding: '4px 9px', borderRadius: 999,
+              border: `1px solid ${!cat ? 'var(--green)' : 'var(--border)'}`,
+              background: !cat ? 'var(--green-light)' : 'var(--white)',
+              color: !cat ? 'var(--green-dark)' : 'var(--text-muted)',
+            }}
+          >
+            Toutes
+          </button>
+          {availableCats.map(c => (
+            <button
+              key={c}
+              onClick={() => setCat(cat === c ? null : c)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 11.5, fontWeight: 700, fontFamily: 'var(--font)', padding: '4px 9px', borderRadius: 999,
+                border: `1px solid ${cat === c ? 'var(--green)' : 'var(--border)'}`,
+                background: cat === c ? 'var(--green-light)' : 'var(--white)',
+                color: cat === c ? 'var(--green-dark)' : 'var(--text-muted)',
+              }}
+            >
+              {getRecipeCategoryIcon(c)} {c}
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <Loader />
       ) : list.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--text-hint)', padding: '6px 2px' }}>
-          {options.length ? 'Tout est déjà dans la fournée.' : 'Aucune recette ni repas type pour l’instant.'}
+          {!options.length ? 'Aucune recette ni repas type pour l’instant.'
+            : (q || cat) ? 'Aucun résultat.'
+            : 'Tout est déjà dans la fournée.'}
         </div>
       ) : (
         <div style={{ maxHeight: 240, overflowY: 'auto', margin: '0 -2px' }}>
@@ -116,6 +162,7 @@ function SourcePicker({ options, loading, excludeKeys, onAdd, onCancel }) {
 
 export default function BatchCookingModal({ onClose, semaine }) {
   useBackButton(onClose)
+  const { user } = useAuth()
   const toast = useToast()
   const { items, loading, addSources, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking(semaine)
   const { recettes, loading: loadingRecipes } = useRecipes()
@@ -127,6 +174,46 @@ export default function BatchCookingModal({ onClose, semaine }) {
   const loadingSources = loadingRecipes || loadingTemplates
   const recetteById = useMemo(() => new Map(recettes.map(r => [r.id, r])), [recettes])
   const templateById = useMemo(() => new Map(repasTypes.map(t => [t.id, t])), [repasTypes])
+
+  // Reprendre ce qui restait « à faire » la semaine précédente : proposé
+  // seulement quand la fournée de cette semaine est vide, pour ne pas
+  // ressusciter à répétition des recettes déjà traitées entre-temps.
+  const prevSemaine = useMemo(() => semaine ? addDaysStr(semaine, -7) : null, [semaine])
+  const [prevItems, setPrevItems] = useState([])
+  const [loadingPrev, setLoadingPrev] = useState(false)
+  const [carrying, setCarrying] = useState(false)
+  useEffect(() => {
+    if (!user || !prevSemaine || loading || items.length > 0) { setPrevItems([]); return }
+    let cancelled = false
+    setLoadingPrev(true)
+    ;(async () => {
+      const { data } = await supabase
+        .from('batch_cooking_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('semaine', prevSemaine)
+        .eq('fait', false)
+      if (!cancelled) { setPrevItems(data || []); setLoadingPrev(false) }
+    })()
+    return () => { cancelled = true }
+  }, [user, prevSemaine, loading, items.length])
+
+  const handleCarryOver = async () => {
+    if (!prevItems.length || carrying) return
+    setCarrying(true)
+    const sources = prevItems.map(i => ({
+      id: i.recette_id || i.repas_type_id,
+      nom: i.nom,
+      kind: i.repas_type_id ? 'repas_type' : 'recette',
+      portions: i.portions,
+    }))
+    const portionsById = Object.fromEntries(sources.filter(s => s.portions != null).map(s => [s.id, s.portions]))
+    const { error, added } = await addSources(sources, { portionsById })
+    setCarrying(false)
+    if (error) { toast('Erreur'); return }
+    toast(added ? `✓ ${added} repris de la semaine dernière` : 'Rien à reprendre')
+    setPrevItems([])
+  }
 
   const pickerOptions = useMemo(() => [
     ...recettes.map(r => ({ id: r.id, nom: r.nom, kind: 'recette', categorie: r.categories?.[0] })),
@@ -197,11 +284,30 @@ export default function BatchCookingModal({ onClose, semaine }) {
         {loading ? (
           <Loader />
         ) : items.length === 0 && !picking ? (
-          <EmptyState
-            icon={<ChefHat size={28} />}
-            title="Rien dans la fournée"
-            description="Ajoute les recettes et repas types que tu comptes préparer."
-          />
+          <>
+            <EmptyState
+              icon={<ChefHat size={28} />}
+              title="Rien dans la fournée"
+              description="Ajoute les recettes et repas types que tu comptes préparer."
+            />
+            {!loadingPrev && prevItems.length > 0 && (
+              <button
+                onClick={handleCarryOver}
+                disabled={carrying}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
+                  padding: '10px 12px', marginTop: 4, marginBottom: 12, borderRadius: 'var(--radius-sm)',
+                  background: 'var(--green-light)', color: 'var(--green-dark)', border: 'none',
+                  fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)', opacity: carrying ? 0.6 : 1,
+                }}
+              >
+                <History size={15} />
+                {carrying
+                  ? 'Reprise…'
+                  : `Reprendre les ${prevItems.length} non fait${prevItems.length > 1 ? 's' : ''} de la semaine dernière`}
+              </button>
+            )}
+          </>
         ) : (
           <div style={{ marginBottom: 12 }}>
             {items.map(it => {

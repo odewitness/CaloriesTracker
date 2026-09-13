@@ -51,6 +51,49 @@ export function useBatchCookingSteps(semaine) {
     return { error }
   }, [user, semaine, load])
 
+  // Resynchronise les étapes avec la fournée actuelle SANS tout réinitialiser :
+  // contrairement à `generate` (reset complet, perd l'ordre et les cases
+  // cochées), on ne touche qu'à ce qui a changé — étapes d'une recette retirée
+  // de la fournée supprimées, étapes d'une recette nouvellement ajoutée
+  // ajoutées à la fin. `flat` : [{ recette_id, recette_nom, texte }] pour
+  // l'état courant de la fournée.
+  const sync = useCallback(async (flat) => {
+    if (!user || !semaine) return { error: null, changed: false }
+    const stepKey = (recette_id, texte) => `${recette_id || ''}|${texte}`
+    const currentKeys = new Set(steps.map(s => stepKey(s.recette_id, s.texte)))
+    const flatKeys = new Set(flat.map(s => stepKey(s.recette_id, s.texte)))
+
+    const toRemove = steps.filter(s => !flatKeys.has(stepKey(s.recette_id, s.texte)))
+    const toAdd = flat.filter(s => !currentKeys.has(stepKey(s.recette_id, s.texte)))
+    if (!toRemove.length && !toAdd.length) return { error: null, changed: false }
+
+    const maxOrdre = steps.reduce((m, s) => Math.max(m, s.ordre), -1)
+    const addRows = toAdd.map((s, i) => ({
+      user_id: user.id,
+      semaine,
+      recette_id: s.recette_id || null,
+      recette_nom: s.recette_nom || 'Recette',
+      texte: s.texte,
+      ordre: maxOrdre + 1 + i,
+      fait: false,
+    }))
+
+    if (toRemove.length) {
+      const { error } = await supabase
+        .from('batch_cooking_steps')
+        .delete()
+        .in('id', toRemove.map(s => s.id))
+        .eq('user_id', user.id)
+      if (error) return { error, changed: false }
+    }
+    if (addRows.length) {
+      const { error } = await supabase.from('batch_cooking_steps').insert(addRows)
+      if (error) return { error, changed: false }
+    }
+    await load()
+    return { error: null, changed: true, added: addRows.length, removed: toRemove.length }
+  }, [user, semaine, steps, load])
+
   const clear = useCallback(async () => {
     if (!user || !semaine) return { error: null }
     setSteps([])
@@ -92,5 +135,5 @@ export function useBatchCookingSteps(semaine) {
     if (r1.error || r2.error) load()
   }, [steps, user, load])
 
-  return { steps, loading, generate, clear, toggleFait, move, refetch: load }
+  return { steps, loading, generate, sync, clear, toggleFait, move, refetch: load }
 }

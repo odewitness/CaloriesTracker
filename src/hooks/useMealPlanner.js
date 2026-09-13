@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { useRecipes, sumIngredients, calcPer100g } from './useRecipes'
@@ -24,6 +24,34 @@ import { planToPlannedRows, addDaysStr } from '../lib/mealPlannerApply'
 // `applyToCalendar` / `addToShoppingList` une fois l'aperçu validé.
 //
 // Voir docs/planificateur-repas.md.
+// Mémorise les derniers réglages utilisés (hors date de début, toujours
+// contextuelle à la semaine ouverte) pour que « Générer un plan » reparte des
+// habitudes de l'utilisatrice plutôt que des valeurs par défaut à chaque fois.
+const CONFIG_STORAGE_KEY = 'meal-planner:last-config'
+
+function loadStoredConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function saveStoredConfig(config) {
+  try {
+    const { startDateStr, ...rest } = config
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(rest))
+  } catch {
+    // localStorage indisponible (navigation privée…) : tant pis, pas bloquant.
+  }
+}
+
+// Plafond du réglage manuel de portions dans l'aperçu (ItemEditor). Plus haut
+// que le plafond du solveur automatique (2) pour couvrir un vrai batch
+// cooking (« je cuisine ce plat une fois pour toute la semaine »).
+export const MAX_MANUAL_PORTIONS = 6
+
 // ─────────────────────────────────────────────────────────────────────────────
 export function useMealPlanner({ defaultStartDate } = {}) {
   const { user } = useAuth()
@@ -37,6 +65,8 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   const mealTargets = useMemo(() => computeMealTargets(settings), [settings])
 
   // ── Configuration ────────────────────────────────────────────────────────
+  // Repart des derniers réglages utilisés (localStorage) quand ils existent —
+  // seule `startDateStr` reste toujours celle de la semaine qu'on ouvre.
   const [config, setConfigState] = useState(() => ({
     days: 7,
     people: 1,
@@ -46,10 +76,16 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     includeRepasTypes: true, // inclure les repas types dans les viviers
     maxCookMinutes: null, // temps prépa + cuisson max (min) ; null = pas de filtre
     fillMicros: true,     // compléter les manques vitamines / minéraux du jour
-    allowDoublePortions: true, // autoriser 2 portions d'un même plat sur un repas
+    allowDoublePortions: true, // autoriser plusieurs portions d'un même plat sur un repas
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
+    ...loadStoredConfig(),
+    startDateStr: defaultStartDate || todayStr(),
   }))
+
+  // Persiste tout changement de réglage (hors date de début) comme « derniers
+  // réglages utilisés » pour la prochaine ouverture du planificateur.
+  useEffect(() => { saveStoredConfig(config) }, [config])
 
   // mealConfig par défaut dès que les cibles par repas sont connues (repas
   // actifs), sauf si l'utilisatrice l'a déjà personnalisé. Les repas exclus de
@@ -261,7 +297,11 @@ export function useMealPlanner({ defaultStartDate } = {}) {
       if (i !== itemIndex) return x
       if (x.kind !== 'recette' && x.kind !== 'repas_type') return x
       const cur = x.portions || 1
-      const next = Math.max(1, Math.min(2, n))
+      // Le solveur automatique ne double jamais au-delà de 2 (voir
+      // DOUBLE_KCAL_CEILING dans mealPlanner.js), mais le réglage manuel ici va
+      // plus loin : pour une vraie session de batch cooking (« je cuisine un
+      // gros plat pour toute la semaine en une fois »), 2 était trop bas.
+      const next = Math.max(1, Math.min(MAX_MANUAL_PORTIONS, n))
       if (next === cur) return x
       const unit = x.unitMacros || scaleMacros(x.macros, 1 / cur)
       return { ...x, portions: next, unitMacros: unit, macros: scaleMacros(unit, next) }

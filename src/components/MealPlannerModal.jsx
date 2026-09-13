@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown, Save, FolderOpen, Pencil } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
-import { useMealPlanner } from '../hooks/useMealPlanner'
+import { useMealPlanner, MAX_MANUAL_PORTIONS } from '../hooks/useMealPlanner'
 import { useMealPlans } from '../hooks/useMealPlans'
 import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingLists'
 import { useBatchCooking } from '../hooks/useBatchCooking'
+import { useBatchCookingSteps } from '../hooks/useBatchCookingSteps'
 import { useToast } from '../lib/toast'
 import { deviationLevel, batchSummary, slotGroupKey, buildVivier } from '../lib/mealPlanner'
 import { addDaysStr, stashAppliedPlan, removeAppliedPlan } from '../lib/mealPlannerApply'
@@ -442,7 +443,7 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
         {rangeLabel(config.startDateStr, config.days)}
       </div>
 
-      <Collapsible label="Options avancées">
+      <Collapsible label="Options avancées" defaultOpen={false}>
         {/* Personnes */}
         <SectionLabel>Personnes</SectionLabel>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -549,7 +550,7 @@ function ItemEditor({ item, candidates, onSwap, onRemove, onSetPortions }) {
             </span>
             <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions - 1)} disabled={portions <= 1} aria-label="Moins de portions">−</button>
             <span style={{ fontSize: 12.5, fontWeight: 700, width: 16, textAlign: 'center' }}>{portions}</span>
-            <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions + 1)} disabled={portions >= 2} aria-label="Plus de portions">+</button>
+            <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions + 1)} disabled={portions >= MAX_MANUAL_PORTIONS} aria-label="Plus de portions">+</button>
           </div>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3, margin: '2px 0 4px' }}>
             Remplacer par
@@ -854,7 +855,7 @@ function PreviewView({
               Quantités pour 1 personne. Pour {people}, multiplie par {people}.
             </div>
           )}
-          {batches.some(b => b.kind === 'recette') && (
+          {batches.length > 0 && (
             <button
               onClick={onAddToBatch}
               disabled={batchState === 'busy' || batchState === 'done'}
@@ -1044,6 +1045,10 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
   // Fournée de la semaine du 1er jour du plan (les recettes / repas types du
   // plan appliqué y sont versés).
   const { addSources: addBatchSources, clearAll: clearBatchForWeek } = useBatchCooking(mondayOf(planner.config.startDateStr))
+  // Plan de cuisine de cette même semaine : indexé sur `semaine` comme la
+  // fournée, indépendamment du plan → à vider avec elle (sinon il référence
+  // des recettes qui ne sont plus dans la fournée).
+  const { clear: clearCookingStepsForWeek } = useBatchCookingSteps(mondayOf(planner.config.startDateStr))
 
   // Liste de courses cible (la plus récente par défaut).
   const { listes: shoppingLists, createListe } = useShoppingLists()
@@ -1156,10 +1161,11 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
     if (replacing) {
       await planner.removePlan(replaceGroupId)
       removeAppliedPlan(replaceGroupId)
-      // La fournée n'est pas liée par clé étrangère au plan : sans ce
-      // nettoyage, régénérer le plan de la semaine laisse l'ancienne fournée
-      // à côté de celle qu'on revient (silencieusement) de verser ensuite.
-      await clearBatchForWeek()
+      // La fournée et le plan de cuisine ne sont pas liés par clé étrangère au
+      // plan : sans ce nettoyage, régénérer le plan de la semaine laisse
+      // l'ancienne fournée à côté de celle qu'on revient (silencieusement) de
+      // verser ensuite, et un plan de cuisine référençant des recettes disparues.
+      await Promise.all([clearBatchForWeek(), clearCookingStepsForWeek()])
     }
     const res = await planner.applyToCalendar({ startDateStr, conflictStrategy })
     setApplying(false)
@@ -1230,7 +1236,7 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
     if (!applyResult?.groupId) return
     setRemoving(true)
     const { error } = await planner.removePlan(applyResult.groupId)
-    if (!error) await clearBatchForWeek()
+    if (!error) await Promise.all([clearBatchForWeek(), clearCookingStepsForWeek()])
     setRemoving(false)
     if (error) { toast('Erreur au retrait'); return }
     removeAppliedPlan(applyResult.groupId)

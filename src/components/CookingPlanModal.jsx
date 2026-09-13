@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { X, ChevronUp, ChevronDown, RefreshCw, ListChecks, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -43,7 +43,7 @@ export default function CookingPlanModal({ onClose, semaine }) {
   const { items: fourneeItems, loading: loadingF } = useBatchCooking(semaine)
   const { recettes, loading: loadingR } = useRecipes()
   const { repasTypes, loading: loadingT } = useMealTemplatesList()
-  const { steps, loading: loadingS, generate, toggleFait, move } = useBatchCookingSteps(semaine)
+  const { steps, loading: loadingS, generate, sync, toggleFait, move } = useBatchCookingSteps(semaine)
 
   const [ingByRecette, setIngByRecette] = useState({})
   const [loadingIng, setLoadingIng] = useState(true)
@@ -151,20 +151,49 @@ export default function CookingPlanModal({ onClose, semaine }) {
 
   const loading = loadingF || loadingR || loadingT || loadingS
 
-  const handleGenerate = async () => {
-    setBusy(true)
+  // Étapes attendues pour l'état ACTUEL de la fournée (indépendamment de ce
+  // qui est déjà enregistré dans batch_cooking_steps).
+  const currentFlatSteps = useMemo(() => {
     const flat = []
     for (const { rec } of planRecipes) {
       for (const s of parseInstructionSteps(rec.instructions)) {
         flat.push({ recette_id: rec.id, recette_nom: rec.nom, texte: s })
       }
     }
-    const { error } = await generate(flat)
+    return flat
+  }, [planRecipes])
+
+  const handleGenerate = async () => {
+    setBusy(true)
+    const { error } = await generate(currentFlatSteps)
     setBusy(false)
     setConfirmRegen(false)
     if (error) { toast('Erreur'); return }
-    if (!flat.length) toast('Aucune de tes recettes n’a d’instructions saisies')
+    if (!currentFlatSteps.length) toast('Aucune de tes recettes n’a d’instructions saisies')
   }
+
+  // Resynchronise automatiquement dès que la fournée change APRÈS un premier
+  // plan de cuisine généré : on ajoute les étapes des recettes nouvellement
+  // ajoutées et on retire celles des recettes retirées, sans toucher à l'ordre
+  // ni aux cases déjà cochées des étapes qui restent (contrairement à
+  // « Régénérer », qui repart de zéro). Attend que tout soit chargé pour ne
+  // pas synchroniser sur un état partiel.
+  const autoSyncedKeyRef = useRef(null)
+  useEffect(() => {
+    if (loading) return
+    if (orderedSteps.length === 0) return // rien à préserver, l'action « Générer » suffit
+    const key = recipeIdsKey
+    if (autoSyncedKeyRef.current === key) return
+    autoSyncedKeyRef.current = key
+    ;(async () => {
+      const { changed, added, removed } = await sync(currentFlatSteps)
+      if (!changed) return
+      if (added && removed) toast(`Plan de cuisine mis à jour (+${added} / −${removed} étapes)`)
+      else if (added) toast(`+${added} étape${added > 1 ? 's' : ''} ajoutée${added > 1 ? 's' : ''} au plan de cuisine`)
+      else if (removed) toast(`${removed} étape${removed > 1 ? 's' : ''} retirée${removed > 1 ? 's' : ''} du plan de cuisine`)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, recipeIdsKey])
 
   const segmentsFor = (step) => meta[step.recette_id]?.annotated.get(step.texte) || [{ text: step.texte }]
   const badgeFor = (step) => meta[step.recette_id]?.badge || RECIPE_BADGES[0]

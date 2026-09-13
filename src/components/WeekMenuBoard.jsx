@@ -6,6 +6,7 @@ import { useToast } from '../lib/toast'
 import { MEALS_ORDER, computeTotals } from '../lib/nutrients'
 import { deviationLevel } from '../lib/mealPlanner'
 import { deletePlannedMeal, deletePlannedMeals } from '../hooks/usePlannedMeals'
+import { useBatchCooking } from '../hooks/useBatchCooking'
 import { fmt } from '../lib/dates'
 import { readAppliedPlans } from '../lib/mealPlannerApply'
 import PlanMealModal from './PlanMealModal'
@@ -122,6 +123,12 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
     })
   }, [anchorDate])
 
+  // Compteur sur le bouton « Ma fournée » — juste pour savoir d'un coup d'œil
+  // s'il y a quelque chose en attente, sans ouvrir la modale.
+  const { items: batchItems, refetch: refetchBatch } = useBatchCooking(days[0])
+  useEffect(() => { if (!batchOpen) refetchBatch() }, [batchOpen, refetchBatch])
+  const batchDoneCount = batchItems.filter(i => i.fait).length
+
   const enabledMeals = useMemo(
     () => MEALS_ORDER.filter(m => settings?.meal_enabled?.[m] !== false),
     [settings?.meal_enabled],
@@ -182,11 +189,15 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
     setRemovingPlan(true)
     const { error } = await deletePlannedMeals(weekPlanRows.map(r => r.id), user.id)
     if (!error) {
-      // La fournée (batch_cooking_items) n'est pas liée par clé étrangère aux
-      // repas_planifies : elle est indexée sur `semaine` (lundi) indépendamment
+      // La fournée (batch_cooking_items) ET le plan de cuisine
+      // (batch_cooking_steps) ne sont pas liés par clé étrangère aux
+      // repas_planifies : ils sont indexés sur `semaine` (lundi) indépendamment
       // du plan. Sans ce nettoyage, retirer le plan de la semaine laisse les
-      // recettes de la fournée orphelines.
-      await supabase.from('batch_cooking_items').delete().eq('user_id', user.id).eq('semaine', days[0])
+      // recettes de la fournée et ses étapes orphelines.
+      await Promise.all([
+        supabase.from('batch_cooking_items').delete().eq('user_id', user.id).eq('semaine', days[0]),
+        supabase.from('batch_cooking_steps').delete().eq('user_id', user.id).eq('semaine', days[0]),
+      ])
     }
     setRemovingPlan(false)
     if (error) { toast('Erreur'); return }
@@ -286,6 +297,14 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
           }}
         >
           <ChefHat size={14} /> Ma fournée
+          {batchItems.length > 0 && (
+            <span style={{
+              fontSize: 10.5, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)',
+              borderRadius: 999, padding: '1px 6px', marginLeft: 2,
+            }}>
+              {batchDoneCount}/{batchItems.length}
+            </span>
+          )}
         </button>
       </div>
 
