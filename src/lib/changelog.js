@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-13',
+    title: 'Retirer un plan de la semaine vide aussi Ma fournée',
+    description: "Quand tu retires le plan de repas d'une semaine (ou que tu le régénères), la check-list « Ma fournée » de cette semaine se vide en même temps au lieu de garder des recettes qui n'ont plus lieu d'être.",
+  },
+  {
     date: '2026-09-12',
     title: 'Raccourcis sur l\'icône de l\'app, notif eau qui t\'amène au bon endroit',
     description: "Un appui long sur l'icône de l'app (écran d'accueil) propose « Ajouter de l'eau » et « Ajouter un aliment », qui ouvrent directement l'action sans passer par la page du jour. Et quand tu touches une notif « Pense à boire », tu arrives maintenant directement sur la section Eau au lieu du haut de la page.",

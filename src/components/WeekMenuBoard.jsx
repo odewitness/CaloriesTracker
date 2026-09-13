@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, CornerUpLeft, Plus, Check, Trash2, Wand2, ChefHat, Pencil, MoreVertical } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
 import { MEALS_ORDER, computeTotals } from '../lib/nutrients'
 import { deviationLevel } from '../lib/mealPlanner'
@@ -180,6 +181,13 @@ export default function WeekMenuBoard({ anchorDate, plannedByDate, settings, onC
     if (!weekPlanRows.length) return
     setRemovingPlan(true)
     const { error } = await deletePlannedMeals(weekPlanRows.map(r => r.id), user.id)
+    if (!error) {
+      // La fournée (batch_cooking_items) n'est pas liée par clé étrangère aux
+      // repas_planifies : elle est indexée sur `semaine` (lundi) indépendamment
+      // du plan. Sans ce nettoyage, retirer le plan de la semaine laisse les
+      // recettes de la fournée orphelines.
+      await supabase.from('batch_cooking_items').delete().eq('user_id', user.id).eq('semaine', days[0])
+    }
     setRemovingPlan(false)
     if (error) { toast('Erreur'); return }
     toast('Plan retiré de cette semaine')

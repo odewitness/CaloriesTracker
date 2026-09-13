@@ -1043,7 +1043,7 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
 
   // Fournée de la semaine du 1er jour du plan (les recettes / repas types du
   // plan appliqué y sont versés).
-  const { addSources: addBatchSources } = useBatchCooking(mondayOf(planner.config.startDateStr))
+  const { addSources: addBatchSources, clearAll: clearBatchForWeek } = useBatchCooking(mondayOf(planner.config.startDateStr))
 
   // Liste de courses cible (la plus récente par défaut).
   const { listes: shoppingLists, createListe } = useShoppingLists()
@@ -1156,6 +1156,10 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
     if (replacing) {
       await planner.removePlan(replaceGroupId)
       removeAppliedPlan(replaceGroupId)
+      // La fournée n'est pas liée par clé étrangère au plan : sans ce
+      // nettoyage, régénérer le plan de la semaine laisse l'ancienne fournée
+      // à côté de celle qu'on revient (silencieusement) de verser ensuite.
+      await clearBatchForWeek()
     }
     const res = await planner.applyToCalendar({ startDateStr, conflictStrategy })
     setApplying(false)
@@ -1226,6 +1230,7 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
     if (!applyResult?.groupId) return
     setRemoving(true)
     const { error } = await planner.removePlan(applyResult.groupId)
+    if (!error) await clearBatchForWeek()
     setRemoving(false)
     if (error) { toast('Erreur au retrait'); return }
     removeAppliedPlan(applyResult.groupId)
