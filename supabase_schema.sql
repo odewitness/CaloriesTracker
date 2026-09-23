@@ -48,6 +48,11 @@
 -- `settings` échouaient en PGRST204), settings.notif_complements_enabled et
 -- settings.complements_reminder_state, ainsi que recettes/repas_types/
 -- partages_recettes.saisons.
+-- Complété le 2026-09-23 : table 37 (selles) — tracker de transit (Bristol,
+-- couleur, remarques), visible uniquement pour un seul compte côté client
+-- (src/lib/featureFlags.js) mais RLS "own" comme les autres données santé de
+-- l'app. Voir supabase/sql/selles_setup.sql. Pas encore confirmé appliqué en
+-- base au moment de l'écriture de ce fichier.
 -- =============================================
 
 -- 1. TABLE CIQUAL (aliments de référence)
@@ -1117,6 +1122,30 @@ create table if not exists plans_repas (
 );
 create index if not exists idx_plans_repas_user on plans_repas (user_id, updated_at desc);
 
+-- 37. TABLE SELLES (tracker de transit — échelle de Bristol, couleur,
+-- remarques — saisi à la main. Écrit le 2026-09-23, voir
+-- supabase/sql/selles_setup.sql). UNE LIGNE = UN PASSAGE (plusieurs par jour
+-- possibles). Fonctionnalité affichée uniquement pour un seul compte côté
+-- client (STOOL_TRACKER_USER_ID, src/lib/featureFlags.js) — RLS "own" stricte
+-- quand même, comme mensurations/activites_sport. `remarques` (text[]) : même
+-- pattern multi-sélection que regles.symptomes — clés dans STOOL_REMARQUES
+-- (src/lib/stool.js).
+create table if not exists selles (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date date not null default current_date,
+  heure time,
+  lieu text,
+  bristol smallint not null, -- 1-7, check (bristol between 1 and 7)
+  couleur text, -- clé de STOOL_COULEURS
+  effort text, -- 'facile' | 'normal' | 'difficile'
+  evacuation_complete boolean,
+  remarques text[] not null default '{}',
+  note text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_selles_user_date on selles (user_id, date desc);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -1258,6 +1287,11 @@ alter table batch_cooking_steps enable row level security;
 -- select/insert/update/delete "own" (auth.uid() = user_id) — voir
 -- supabase/sql/plans_repas_setup.sql.
 alter table plans_repas enable row level security;
+
+-- RLS activé sur selles dès sa création (2026-09-23), policies
+-- select/insert/update/delete "own" (auth.uid() = user_id) — voir
+-- supabase/sql/selles_setup.sql.
+alter table selles enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)
