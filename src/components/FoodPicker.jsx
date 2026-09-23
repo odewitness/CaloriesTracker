@@ -6,6 +6,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useFavorites, foodIdentity } from '../hooks/useFavorites'
 import { useRecentFoods } from '../hooks/useRecentFoods'
 import { useMealSuggestions } from '../hooks/useMealSuggestions'
+import { useComplementFoodIds } from '../hooks/useComplementFoodIds'
 import { patchCachedPortions } from '../hooks/useCiqualCatalog'
 import BarcodeScanner from './BarcodeScanner'
 import { useBackButton } from '../hooks/useBackButton'
@@ -46,6 +47,11 @@ import EmptyState from './EmptyState'
 //                    portion habituelle de CET aliment couvre le mieux (voir
 //                    portionGapCoverage). Absent pour RecipeFormModal (pas de
 //                    notion de jour/manque).
+//   onlyComplements — OPTIONNEL : si vrai, restreint recherche/favoris/
+//                    récents/suggestions aux aliments perso catégorisés
+//                    « Compléments alimentaires » (Ciqual/OFF/recettes n'ayant
+//                    jamais cette catégorie, ils sont exclus). Utilisé par
+//                    AddFoodModal quand meal === SUPPLEMENT_MEAL.
 //   onConfirm(food, qty) — appelé à la validation ; le CALLER se charge de
 //                          transformer (food, qty) en objet persistable via
 //                          scaleFood() de lib/nutrients.js, avec ses propres
@@ -76,6 +82,7 @@ export default function FoodPicker({
   includeRecipes = true,
   meal,
   top10Gaps,
+  onlyComplements = false,
   onConfirm,
   onClose,
 }) {
@@ -85,6 +92,7 @@ export default function FoodPicker({
   const { favorites, isFavorite, toggleFavorite } = useFavorites()
   const { recents } = useRecentFoods()
   const { suggestions: mealSuggestions } = useMealSuggestions(meal)
+  const complementFoodIds = useComplementFoodIds()
   const [step, setStep] = useState('search') // search | configure
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -139,6 +147,16 @@ export default function FoodPicker({
   const favoriteByKey = new Map(favorites.map(f => [`${f.food_source}:${f.food_ref_id ?? f.food_name}`, f]))
   const recentByKey = new Map(recents.map(r => [foodIdentity(r).key, r]))
 
+  // onlyComplements : recents/suggestions perdent leur vraie `categorie` en
+  // route (entryToFood la force à 'Récent', voir lib/journalEntry.js) — on
+  // recoupe donc avec useComplementFoodIds (source de vérité) plutôt que de
+  // filtrer sur un champ périmé.
+  const isComplementItem = (item) => item._source === 'custom' && item.id != null && complementFoodIds.has(item.id)
+  const displayFavorites = onlyComplements
+    ? favorites.filter(f => f.food_source === 'custom' && complementFoodIds.has(f.food_ref_id))
+    : favorites
+  const displayMealSuggestions = onlyComplements ? mealSuggestions.filter(isComplementItem) : mealSuggestions
+
   // Fusionne deux jeux de portions sans dupliquer les grammages déjà présents.
   // Le premier jeu passé garde la priorité, donc devient la portion par
   // défaut à l'ouverture de l'étape "configure" (cf. selectFood → portions[0]).
@@ -153,7 +171,7 @@ export default function FoodPicker({
   // sens "naturel" par défaut (recent/most = décroissant, alpha = A→Z) ;
   // favSortDir permet de l'inverser sans changer de mode.
   const sortedFavorites = useMemo(() => {
-    const arr = [...favorites]
+    const arr = [...displayFavorites]
     const mult = favSortDir === 'asc' ? 1 : -1
     if (favSort === 'alpha') {
       arr.sort((a, b) => mult * (a.food_name || '').localeCompare(b.food_name || '', 'fr'))
@@ -163,7 +181,7 @@ export default function FoodPicker({
       arr.sort((a, b) => mult * (new Date(a.last_used_at || a.created_at) - new Date(b.last_used_at || b.created_at)))
     }
     return arr
-  }, [favorites, favSort, favSortDir])
+  }, [displayFavorites, favSort, favSortDir])
 
   // Cliquer sur le mode déjà actif inverse son sens ; changer de mode
   // repart sur le sens naturel de ce nouveau mode.
@@ -187,7 +205,7 @@ export default function FoodPicker({
     return { ...f.food_data, portions: mergePortions(recent.portions, f.food_data.portions) }
   })
 
-  const recentsMerged = recents.map(r => {
+  const recentsMerged = (onlyComplements ? recents.filter(isComplementItem) : recents).map(r => {
     const fav = favoriteByKey.get(foodIdentity(r).key)
     if (!fav) return r
     return { ...r, portions: mergePortions(r.portions, fav.food_data.portions) }
@@ -211,6 +229,29 @@ export default function FoodPicker({
     const seq = ++searchSeq.current
     if (!q || q.length < 2) { setResults([]); return }
     setSearching(true)
+
+    // onlyComplements : ni Ciqual ni Open Food Facts n'ont d'aliment catégorisé
+    // « Compléments alimentaires » — seuls les aliments perso peuvent l'être
+    // (voir lib/foodCategories.js), donc on cherche uniquement là.
+    if (onlyComplements) {
+      const { data } = await supabase
+        .from('aliments_custom')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('categorie', COMPLEMENT_CATEGORY)
+        .ilike('nom', `%${q}%`)
+        .limit(25)
+      if (seq !== searchSeq.current) return
+      setResults((data || []).map(c => ({
+        ...c,
+        alim_nom: c.nom,
+        categorie: c.categorie,
+        _source: 'custom',
+        _fresh: true,
+      })))
+      setSearching(false)
+      return
+    }
 
     if (searchSource === 'off') {
       try {
@@ -290,7 +331,7 @@ export default function FoodPicker({
     const ciqualResults = ciqualRes.data || []
     setResults([...ciqualResults, ...customMapped, ...recettesMapped])
     setSearching(false)
-  }, [user, searchSource, includeRecipes])
+  }, [user, searchSource, includeRecipes, onlyComplements])
 
   const handleQuery = (v) => {
     setQuery(v)
@@ -561,7 +602,7 @@ const selectHistoryQty = (g) => {
                 ref={searchRef}
                 className="input"
                 style={{ paddingLeft: 36 }}
-                placeholder={searchSource === 'off' ? 'Nutella, Activia, Président...' : 'Poulet, riz, pomme...'}
+                placeholder={onlyComplements ? 'Vitamine D, Magnésium...' : (searchSource === 'off' ? 'Nutella, Activia, Président...' : 'Poulet, riz, pomme...')}
                 value={query}
                 onChange={e => handleQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
@@ -570,7 +611,9 @@ const selectHistoryQty = (g) => {
               />
             </div>
 
-            {/* Source toggle */}
+            {/* Source toggle — inutile en mode compléments : ni Ciqual ni OFF
+                n'ont d'aliment catégorisé « Compléments alimentaires » */}
+            {!onlyComplements && (
             <div style={{
               display: 'flex',
               background: 'var(--gray-bg)',
@@ -615,8 +658,11 @@ const selectHistoryQty = (g) => {
                 )
               })}
             </div>
+            )}
 
-            {/* Barcode row */}
+            {/* Barcode row — un produit scanné (OFF) n'a jamais la catégorie
+                « Compléments alimentaires », donc hors-sujet ici */}
+            {!onlyComplements && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexShrink: 0 }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <ScanLine size={16} color="var(--text-hint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
@@ -651,6 +697,7 @@ const selectHistoryQty = (g) => {
                 {barcodeLoading ? '...' : 'OK'}
               </button>
             </div>
+            )}
 
             {/* Results — scrollable, prend tout l'espace restant */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -689,9 +736,11 @@ const selectHistoryQty = (g) => {
 
               {!searching && query.length >= 2 && results.length === 0 && (
                 <EmptyState>
-                  {searchSource === 'off'
-                    ? `Aucun résultat dans Open Food Facts pour « ${query} »`
-                    : `Aucun résultat pour « ${query} »`}
+                  {onlyComplements
+                    ? `Aucun complément pour « ${query} » — crée-le depuis l'onglet Aliments`
+                    : searchSource === 'off'
+                      ? `Aucun résultat dans Open Food Facts pour « ${query} »`
+                      : `Aucun résultat pour « ${query} »`}
                 </EmptyState>
               )}
 
@@ -712,7 +761,7 @@ const selectHistoryQty = (g) => {
 
               {!searching && query.length < 2 && (
                 <>
-                  {searchSource === 'ciqual' && favorites.length > 0 && (
+                  {searchSource === 'ciqual' && displayFavorites.length > 0 && (
                     <>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 8 }}>
                         <button
@@ -721,13 +770,13 @@ const selectHistoryQty = (g) => {
                         >
                           <span className="section-title" style={{ margin: 0 }}>★ Favoris</span>
                           <span style={{ fontSize: 12, color: 'var(--text-hint)', fontWeight: 600 }}>
-                            {favorites.length}
+                            {displayFavorites.length}
                           </span>
                           <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
                             {favoritesCollapsed ? '▸' : '▾'}
                           </span>
                         </button>
-                        {!favoritesCollapsed && favorites.length > 1 && (
+                        {!favoritesCollapsed && displayFavorites.length > 1 && (
                           <FavSortToggle value={favSort} dir={favSortDir} onChange={handleFavSortChange} />
                         )}
                       </div>
@@ -753,21 +802,21 @@ const selectHistoryQty = (g) => {
                     </>
                   )}
 
-                  {searchSource === 'ciqual' && meal && mealSuggestions.length > 0 && (
+                  {searchSource === 'ciqual' && meal && displayMealSuggestions.length > 0 && (
                     <>
                       <button
                         onClick={() => setSuggestionsCollapsed(c => !c)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginTop: favorites.length > 0 ? 16 : 4 }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginTop: displayFavorites.length > 0 ? 16 : 4 }}
                       >
                         <span className="section-title" style={{ margin: 0 }}>Suggestions pour {meal}</span>
                         <span style={{ fontSize: 12, color: 'var(--text-hint)', fontWeight: 600 }}>
-                          {mealSuggestions.length}
+                          {displayMealSuggestions.length}
                         </span>
                         <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>
                           {suggestionsCollapsed ? '▸' : '▾'}
                         </span>
                       </button>
-                      {!suggestionsCollapsed && mealSuggestions.map((food, i) => (
+                      {!suggestionsCollapsed && displayMealSuggestions.map((food, i) => (
                         <FoodRow
                           key={foodIdentity(food).key}
                           food={food}
@@ -782,7 +831,7 @@ const selectHistoryQty = (g) => {
 
                   {searchSource === 'ciqual' && recentsMerged.length > 0 && (
                     <>
-                      <div className="section-title" style={{ marginTop: (favorites.length > 0 || (meal && mealSuggestions.length > 0)) ? 16 : 4 }}>Récents (100 dernières entrées)</div>
+                      <div className="section-title" style={{ marginTop: (displayFavorites.length > 0 || (meal && displayMealSuggestions.length > 0)) ? 16 : 4 }}>Récents (100 dernières entrées)</div>
                       {recentsMerged.map((food) => (
                         <FoodRow
                           key={foodIdentity(food).key}
@@ -796,11 +845,13 @@ const selectHistoryQty = (g) => {
                     </>
                   )}
 
-                  {(searchSource === 'off' || (favorites.length === 0 && recentsMerged.length === 0 && mealSuggestions.length === 0)) && (
+                  {(searchSource === 'off' || (displayFavorites.length === 0 && recentsMerged.length === 0 && displayMealSuggestions.length === 0)) && (
                     <EmptyState>
-                      {searchSource === 'off'
-                        ? 'Tape le nom d\'un produit emballé (marque, référence…)'
-                        : 'Tape au moins 2 caractères'}
+                      {onlyComplements
+                        ? 'Tape le nom d\'un complément (au moins 2 caractères)'
+                        : searchSource === 'off'
+                          ? 'Tape le nom d\'un produit emballé (marque, référence…)'
+                          : 'Tape au moins 2 caractères'}
                     </EmptyState>
                   )}
                 </>

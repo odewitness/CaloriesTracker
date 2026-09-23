@@ -1,6 +1,7 @@
 import React from 'react'
 import FoodPicker from './FoodPicker'
 import { scaleFood } from '../lib/nutrients'
+import { SUPPLEMENT_MEAL } from './SupplementSection'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AddFoodModal — ajoute un aliment au journal du jour.
@@ -17,14 +18,17 @@ export default function AddFoodModal({ initialMeal, top10Gaps, onAdd, onClose })
     await onAdd(entry)
   }
 
+  const isSupplement = meal === SUPPLEMENT_MEAL
+
   return (
     <FoodPicker
-      title="Ajouter un aliment"
+      title={isSupplement ? 'Ajouter un complément' : 'Ajouter un aliment'}
       confirmLabel="Ajouter au journal"
       contextLabel={<>Ajout à : <strong style={{ color: 'var(--text)' }}>{meal}</strong></>}
-      includeRecipes={true}
+      includeRecipes={!isSupplement}
       meal={meal}
       top10Gaps={top10Gaps}
+      onlyComplements={isSupplement}
       onConfirm={handleConfirm}
       onClose={onClose}
     />

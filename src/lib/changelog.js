@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-23',
+    title: 'Ajouter un complément ne montre plus que tes compléments',
+    description: "Quand tu ajoutes un complément depuis la page du jour, la recherche ne propose plus que les aliments que tu as rangés dans la catégorie « Compléments alimentaires » — plus besoin de chercher parmi tous tes aliments ou dans Open Food Facts.",
+  },
+  {
     date: '2026-09-13',
     title: 'Ma fournée : reprendre la semaine dernière, filtrer par catégorie',
     description: "Quand la fournée d'une semaine est vide, un bouton te propose de reprendre ce qui n'était pas fait la semaine d'avant. Pour ajouter une recette, tu peux maintenant filtrer par catégorie en plus de la recherche. Et le bouton « Ma fournée » affiche désormais combien il te reste à faire, sans avoir à l'ouvrir. Le « Plan de cuisine » se met aussi à jour tout seul quand tu changes la fournée, sans effacer ce que tu avais déjà coché.",
