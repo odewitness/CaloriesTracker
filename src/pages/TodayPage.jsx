@@ -34,7 +34,7 @@ import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCollationDay } from '../hooks/useCollationDay'
 import { useSport } from '../hooks/useSport'
-import { useSelles } from '../hooks/useSelles'
+import { useSelles, useLieuxSelles } from '../hooks/useSelles'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
 import { saveMealTemplate } from '../hooks/useMealTemplates'
@@ -86,6 +86,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   const { activites: sportActivites, week: sportWeek, pasJour, setPas, add: addSport, update: updateSport, remove: removeSport } = useSport(dateStr)
   const isStoolTracker = user?.id === STOOL_TRACKER_USER_ID
   const { entries: stoolEntries, add: addStool, update: updateStool, remove: removeStool } = useSelles(dateStr)
+  const { lieux: stoolLieux, ensureLieu: ensureStoolLieu } = useLieuxSelles()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
 
   // Données non datées, montées une seule fois pour les 3 slots (voir
@@ -173,6 +174,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   }
 
   const handleSaveStool = async (payload) => {
+    if (payload.lieu) await ensureStoolLieu(payload.lieu)
     if (stoolSheet?.initial) {
       const { error } = await updateStool(stoolSheet.initial.id, payload)
       if (!error) toast('✓ Passage modifié !'); else toast('Erreur')
@@ -679,6 +681,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
         <StoolEntrySheet
           date={date}
           initial={stoolSheet.initial}
+          lieux={stoolLieux}
           onSave={handleSaveStool}
           onDelete={handleDeleteStool}
           onClose={() => setStoolSheet(null)}

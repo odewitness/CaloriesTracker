@@ -4,6 +4,9 @@ import { Droplets, Trash2 } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { dateLabel } from '../lib/dates'
 import { BRISTOL_TYPES, STOOL_COULEURS, STOOL_EFFORTS, STOOL_REMARQUES, nowHeure } from '../lib/stool'
+import BrandCombobox from './BrandCombobox'
+
+const DEFAULT_LIEUX = ['Maison', 'Extérieur']
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StoolEntrySheet — feuille « Ajouter / modifier un passage » (page du jour).
@@ -18,7 +21,7 @@ import { BRISTOL_TYPES, STOOL_COULEURS, STOOL_EFFORTS, STOOL_REMARQUES, nowHeure
 //   onDelete(id)     — seulement en édition
 //   onClose()
 // ─────────────────────────────────────────────────────────────────────────────
-export default function StoolEntrySheet({ date, initial = null, onSave, onDelete, onClose }) {
+export default function StoolEntrySheet({ date, initial = null, lieux = [], onSave, onDelete, onClose }) {
   useBackButton(onClose)
   const editing = !!initial
 
@@ -156,28 +159,9 @@ export default function StoolEntrySheet({ date, initial = null, onSave, onDelete
         />
 
         <SheetLabel>Lieu <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--text-hint)' }}>· facultatif</span></SheetLabel>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          {['Maison', 'Extérieur'].map((l) => (
-            <button
-              key={l}
-              onClick={() => setLieu(lieu === l ? '' : l)}
-              className="chip"
-              style={lieu === l
-                ? { background: 'var(--amber)', color: 'white' }
-                : { background: 'var(--gray-bg)', color: 'var(--text-muted)' }}
-            >
-              {l}
-            </button>
-          ))}
+        <div style={{ marginBottom: 16 }}>
+          <BrandCombobox value={lieu} onChange={setLieu} options={lieux.length ? lieux : DEFAULT_LIEUX} />
         </div>
-        <input
-          className="input"
-          type="text"
-          placeholder="Autre lieu…"
-          value={['Maison', 'Extérieur'].includes(lieu) ? '' : lieu}
-          onChange={(e) => setLieu(e.target.value)}
-          style={{ width: '100%', boxSizing: 'border-box', marginBottom: 16 }}
-        />
 
         {/* ── Remarques ── */}
         <SheetLabel>Remarques <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--text-hint)' }}>· facultatif</span></SheetLabel>

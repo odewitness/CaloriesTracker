@@ -1146,6 +1146,20 @@ create table if not exists selles (
 );
 create index if not exists idx_selles_user_date on selles (user_id, date desc);
 
+-- 38. TABLE LIEUX_SELLES (lieux déjà saisis sur le tracker de transit,
+-- réutilisables via menu déroulant — même principe que `marques` pour
+-- aliments_custom.marque. Écrit le 2026-09-23, voir
+-- supabase/sql/lieux_selles_setup.sql). `selles.lieu` reste du texte libre
+-- (pas de FK), cette table sert uniquement à peupler le menu déroulant côté
+-- client (BrandCombobox réutilisé, voir StoolEntrySheet.jsx).
+create table if not exists lieux_selles (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  nom text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, nom)
+);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -1292,6 +1306,11 @@ alter table plans_repas enable row level security;
 -- select/insert/update/delete "own" (auth.uid() = user_id) — voir
 -- supabase/sql/selles_setup.sql.
 alter table selles enable row level security;
+
+-- RLS activé sur lieux_selles dès sa création (2026-09-23), policy unique
+-- "own" (for all) — voir supabase/sql/lieux_selles_setup.sql, même pattern
+-- que marques.
+alter table lieux_selles enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

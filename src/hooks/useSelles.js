@@ -74,3 +74,36 @@ export function useSelles(dateStr) {
 
   return { entries: sortSelles(rows), loading, add, update, remove, refetch: load }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useLieuxSelles() — lieux déjà saisis sur le tracker (table `lieux_selles`),
+// réutilisables via menu déroulant. Même principe que `marques` pour
+// aliments_custom.marque (voir CustomFoodsSection.load/ensureMarque) :
+// `selles.lieu` reste du texte libre, cette table peuple juste les
+// suggestions.
+//   lieux            : noms connus, triés
+//   ensureLieu(nom)   : enregistre `nom` s'il est nouveau (silencieux sinon)
+// ─────────────────────────────────────────────────────────────────────────────
+export function useLieuxSelles() {
+  const { user } = useAuth()
+  const allowed = user?.id === STOOL_TRACKER_USER_ID
+  const [lieux, setLieux] = useState([])
+
+  useEffect(() => {
+    if (!allowed) { setLieux([]); return }
+    let cancelled = false
+    supabase.from('lieux_selles').select('nom').eq('user_id', user.id).order('nom')
+      .then(({ data }) => { if (!cancelled) setLieux((data || []).map(l => l.nom)) })
+    return () => { cancelled = true }
+  }, [allowed, user?.id])
+
+  const ensureLieu = async (nom) => {
+    if (!allowed || !nom || lieux.some(l => l.toLowerCase() === nom.toLowerCase())) return
+    const { error } = await supabase
+      .from('lieux_selles')
+      .upsert([{ nom, user_id: user.id }], { onConflict: 'user_id,nom', ignoreDuplicates: true })
+    if (!error) setLieux(l => [...l, nom].sort((a, b) => a.localeCompare(b, 'fr')))
+  }
+
+  return { lieux, ensureLieu }
+}
