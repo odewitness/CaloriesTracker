@@ -76,6 +76,41 @@ export function useSelles(dateStr) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// useSellesRange(start, end) — passages sur une plage de dates (bornes
+// incluses), pour l'onglet « Digestion » de l'Historique
+// (src/components/history/DigestionSection.jsx). Même garde-fou
+// STOOL_TRACKER_USER_ID que useSelles ; pas de pagination fetchAllRows comme
+// pour `journal`, le volume de passages reste très en dessous du plafond
+// PostgREST même sur une année.
+// ─────────────────────────────────────────────────────────────────────────────
+export function useSellesRange(start, end) {
+  const { user } = useAuth()
+  const allowed = user?.id === STOOL_TRACKER_USER_ID
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!allowed || !start || !end) { setRows([]); setLoading(false); return }
+      setLoading(true)
+      const { data } = await supabase
+        .from('selles')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('date', start)
+        .lte('date', end)
+        .order('date', { ascending: true })
+      if (!cancelled) { setRows(data || []); setLoading(false) }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [allowed, user?.id, start, end])
+
+  return { entries: sortSelles(rows), loading }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // useLieuxSelles() — lieux déjà saisis sur le tracker (table `lieux_selles`),
 // réutilisables via menu déroulant. Même principe que `marques` pour
 // aliments_custom.marque (voir CustomFoodsSection.load/ensureMarque) :

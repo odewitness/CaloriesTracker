@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-23',
+    title: 'Un onglet Digestion dans l\'historique',
+    description: "Dans Historique, un nouvel onglet Digestion résume tes passages sur la période : régularité, répartition des types, effort à l'évacuation. Il te montre aussi ce qui semble jouer sur ton transit (fibres, hydratation, sport, cycle) et te signale à part si tu as noté du sang ou du mucus, pour ne jamais le noyer dans une moyenne.",
+  },
+  {
+    date: '2026-09-23',
     title: 'Ajouter un complément ne montre plus que tes compléments',
     description: "Quand tu ajoutes un complément depuis la page du jour, la recherche ne propose plus que les aliments que tu as rangés dans la catégorie « Compléments alimentaires » — plus besoin de chercher parmi tous tes aliments ou dans Open Food Facts.",
   },

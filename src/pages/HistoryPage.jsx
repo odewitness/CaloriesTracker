@@ -8,6 +8,8 @@ import { useMeasurements } from '../hooks/useMeasurements'
 import { useCycle } from '../hooks/useCycle'
 import { useSportRange, useSportStreak } from '../hooks/useSport'
 import { useProfile } from '../hooks/useProfile'
+import { useSellesRange } from '../hooks/useSelles'
+import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { dayActivityKcal } from '../lib/sport'
 import { phaseForDate } from '../lib/cycle'
 import { TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -32,6 +34,7 @@ import DayCard from '../components/history/DayCard'
 import MonthCard from '../components/history/MonthCard'
 import SportHistorySection from '../components/history/SportHistorySection'
 import SportPhaseSection from '../components/history/SportPhaseSection'
+import DigestionSection from '../components/history/DigestionSection'
 
 const TABS = [
   { key: 'semaine', label: 'Semaine' },
@@ -46,6 +49,7 @@ const VIEWS = [
   { key: 'nutrition', label: 'Nutrition' },
   { key: 'activite', label: 'Activité', need: 'sport' },
   { key: 'cycle', label: 'Cycle', need: 'cycle' },
+  { key: 'digestion', label: 'Digestion', need: 'stool' },
 ]
 
 const HIST_WINDOW = 365 // jours remontés pour la série en cours + le record
@@ -98,6 +102,12 @@ export default function HistoryPage() {
   const sportActs = useMemo(() => Object.values(sportByDate).flat(), [sportByDate])
   const sportDates = useMemo(() => new Set(Object.keys(sportByDate)), [sportByDate])
   const hasSport = !!settings.sport?.enabled && (sportActs.length > 0 || Object.keys(pasByDate).length > 0)
+
+  // Passages de transit de la période affichée (onglet Digestion) — vide et
+  // sans requête pour tout compte autre que STOOL_TRACKER_USER_ID. On garde
+  // l'onglet accessible pour ce compte même sans repas/sport loggés ce jour-là.
+  const isStoolUser = user?.id === STOOL_TRACKER_USER_ID
+  const { entries: sellesEntries } = useSellesRange(bounds.start, bounds.end)
 
   // ── Chargement du journal (période affichée + précédente) ─────────────────
   useEffect(() => {
@@ -207,6 +217,13 @@ export default function HistoryPage() {
   const periodDays = useMemo(
     () => eachDay(bounds.start, bounds.end < today ? bounds.end : today).length,
     [bounds.start, bounds.end, today],
+  )
+
+  // Mêmes jours, en liste et jours exclus retirés — onglet Digestion (fréquence,
+  // corrélations fibres/eau/sport/cycle).
+  const digestionDayKeys = useMemo(
+    () => eachDay(bounds.start, bounds.end < today ? bounds.end : today).filter(d => !excludedDates.has(d)),
+    [bounds.start, bounds.end, today, excludedDates],
   )
 
   // Moyenne / jour sur les jours loggés ET non exclus (même construction que le
@@ -435,9 +452,10 @@ export default function HistoryPage() {
     () => VIEWS.filter(v =>
       v.need === 'sport' ? !!settings.sport?.enabled
         : v.need === 'cycle' ? cycleView
+        : v.need === 'stool' ? user?.id === STOOL_TRACKER_USER_ID
         : true,
     ),
-    [settings.sport?.enabled, cycleView],
+    [settings.sport?.enabled, cycleView, user?.id],
   )
   const activeView = availableViews.some(v => v.key === view) ? view : 'resume'
 
@@ -499,11 +517,11 @@ export default function HistoryPage() {
 
       {loading && <Loader />}
 
-      {!loading && !hasEntries && !hasSport && (
+      {!loading && !hasEntries && !hasSport && !isStoolUser && (
         <EmptyState icon={<TrendingDown size={40} />} title="Aucune donnée sur cette période" description="Logge tes repas pour voir tes stats ici" />
       )}
 
-      {!loading && (hasEntries || hasSport) && (
+      {!loading && (hasEntries || hasSport || isStoolUser) && (
         <>
           {/* Onglets thématiques (2ᵉ rangée) — un seul thème visible à la fois. */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
@@ -711,6 +729,19 @@ export default function HistoryPage() {
                 : "Pas encore assez de jours notés sur cette période pour comparer ta phase lutéale au reste du cycle."}
             </div>
           ))}
+
+          {/* ── Digestion : fréquence, Bristol, corrélations transit ──────── */}
+          {activeView === 'digestion' && (
+            <DigestionSection
+              tab={tab}
+              selles={sellesEntries}
+              periodDayKeys={digestionDayKeys}
+              days={days}
+              cycleDays={cycleDays}
+              cycleSettings={settings.cycle}
+              sportDates={settings.sport?.enabled ? sportDates : undefined}
+            />
+          )}
         </>
       )}
     </div>
