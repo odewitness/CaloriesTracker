@@ -24,6 +24,7 @@ import ComplementRemindersSection from '../components/profile/ComplementReminder
 import TodaySection from '../components/profile/TodaySection'
 import CycleSection from '../components/profile/CycleSection'
 import SportSection from '../components/profile/SportSection'
+import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 
 // Champs de `settings` réellement pilotés par les écrans Objectifs / Répartition.
 // `goals` est une copie figée de `settings` prise au chargement : ne renvoyer que
@@ -262,11 +263,19 @@ export default function ProfilePage() {
   }
 
   if (section === 'jour') {
+    // « Transit » n'existe que pour STOOL_TRACKER_USER_ID (voir featureFlags.js)
+    // — masqué de la liste réordonnable pour l'autre compte, comme le reste du
+    // tracker de transit. Si on le laisse de côté, normalizeTodaySectionsOrder
+    // le réinsère tout seul à sa position par défaut au prochain chargement.
+    const isStoolTracker = user?.id === STOOL_TRACKER_USER_ID
+    const sectionsOrder = isStoolTracker
+      ? settings.ordre_sections_jour
+      : settings.ordre_sections_jour.filter((k) => k !== 'transit')
     return (
       <TodaySection
         manquesEnabled={settings.afficher_manques_jour !== false}
         onToggleManques={() => updateSettings({ afficher_manques_jour: !(settings.afficher_manques_jour !== false) })}
-        sectionsOrder={settings.ordre_sections_jour}
+        sectionsOrder={sectionsOrder}
         onReorder={(next) => updateSettings({ ordre_sections_jour: next })}
         onBack={back}
       />

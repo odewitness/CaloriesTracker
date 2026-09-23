@@ -601,6 +601,13 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
         onShareWeek={handleShareWeek}
       />
     ) : null,
+    transit: isStoolTracker ? (
+      <StoolSection
+        entries={stoolEntries}
+        onOpenSheet={() => setStoolSheet({ initial: null })}
+        onOpenEntry={(s) => setStoolSheet({ initial: s })}
+      />
+    ) : null,
   }
 
   return (
@@ -643,15 +650,6 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
               {sectionNodes[k]}
             </div>
           ))}
-        {isStoolTracker && (
-          <div style={{ marginTop: 16 }}>
-            <StoolSection
-              entries={stoolEntries}
-              onOpenSheet={() => setStoolSheet({ initial: null })}
-              onOpenEntry={(s) => setStoolSheet({ initial: s })}
-            />
-          </div>
-        )}
       </>
 
       {waterSheetOpen && (
