@@ -16,6 +16,8 @@ import WaterSection from '../components/WaterSection'
 import AddWaterSheet from '../components/AddWaterSheet'
 import SportSection from '../components/SportSection'
 import SportEntrySheet from '../components/SportEntrySheet'
+import StoolSection from '../components/StoolSection'
+import StoolEntrySheet from '../components/StoolEntrySheet'
 import StepsSheet from '../components/StepsSheet'
 import SportEnergySheet from '../components/SportEnergySheet'
 import ShareSportModal from '../components/ShareSportModal'
@@ -32,6 +34,8 @@ import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCollationDay } from '../hooks/useCollationDay'
 import { useSport } from '../hooks/useSport'
+import { useSelles, useLieuxSelles } from '../hooks/useSelles'
+import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
 import { saveMealTemplate } from '../hooks/useMealTemplates'
 import { TodayDataProvider, useTodayData } from '../lib/TodayDataContext'
@@ -80,6 +84,9 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   const { excluded, toggle: toggleExcluded } = useExcludedDay(dateStr)
   const { override: collationOverride, setOverride: setCollationOverride } = useCollationDay(dateStr)
   const { activites: sportActivites, week: sportWeek, pasJour, setPas, add: addSport, update: updateSport, remove: removeSport } = useSport(dateStr)
+  const isStoolTracker = user?.id === STOOL_TRACKER_USER_ID
+  const { entries: stoolEntries, add: addStool, update: updateStool, remove: removeStool } = useSelles(dateStr)
+  const { lieux: stoolLieux, ensureLieu: ensureStoolLieu } = useLieuxSelles()
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
 
   // Données non datées, montées une seule fois pour les 3 slots (voir
@@ -100,6 +107,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   const [copyFromDayMeal, setCopyFromDayMeal] = useState(null)    // nom du repas | null — copie depuis un autre jour vers ce repas
   const [waterSheetOpen, setWaterSheetOpen] = useState(false)
   const [sportSheet, setSportSheet] = useState(null) // { initial: activite|null } | null
+  const [stoolSheet, setStoolSheet] = useState(null) // { initial: passage|null } | null
   const [pasSheet, setPasSheet] = useState(false)
   const [energyInfoOpen, setEnergyInfoOpen] = useState(false)
   const [planMealOpen, setPlanMealOpen] = useState(false)
@@ -163,6 +171,23 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
     await removeSport(id)
     toast('Supprimé')
     setSportSheet(null)
+  }
+
+  const handleSaveStool = async (payload) => {
+    if (payload.lieu) await ensureStoolLieu(payload.lieu)
+    if (stoolSheet?.initial) {
+      const { error } = await updateStool(stoolSheet.initial.id, payload)
+      if (!error) toast('✓ Passage modifié !'); else toast('Erreur')
+    } else {
+      const { error } = await addStool(payload)
+      if (!error) toast('✓ Passage ajouté !'); else toast("Erreur lors de l'ajout")
+    }
+    setStoolSheet(null)
+  }
+  const handleDeleteStool = async (id) => {
+    await removeStool(id)
+    toast('Supprimé')
+    setStoolSheet(null)
   }
   const handleShareSeance = (a) => {
     setSportSheet(null)
@@ -618,6 +643,15 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
               {sectionNodes[k]}
             </div>
           ))}
+        {isStoolTracker && (
+          <div style={{ marginTop: 16 }}>
+            <StoolSection
+              entries={stoolEntries}
+              onOpenSheet={() => setStoolSheet({ initial: null })}
+              onOpenEntry={(s) => setStoolSheet({ initial: s })}
+            />
+          </div>
+        )}
       </>
 
       {waterSheetOpen && (
@@ -640,6 +674,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
           onDelete={handleDeleteSport}
           onShare={handleShareSeance}
           onClose={() => setSportSheet(null)}
+        />
+      )}
+
+      {stoolSheet && (
+        <StoolEntrySheet
+          date={date}
+          initial={stoolSheet.initial}
+          lieux={stoolLieux}
+          onSave={handleSaveStool}
+          onDelete={handleDeleteStool}
+          onClose={() => setStoolSheet(null)}
         />
       )}
 
