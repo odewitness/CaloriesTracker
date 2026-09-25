@@ -290,18 +290,17 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     applyItemsEdit(dayIndex, meal, items => items.filter((_, i) => i !== itemIndex))
   }, [])
 
-  // Règle à la main le nombre de portions (1 ou 2) d'une brique dans l'aperçu.
-  // Verrouille le repas (via applyItemsEdit) comme toute édition manuelle.
+  // Règle à la main le nombre de portions d'une brique dans l'aperçu (le
+  // solveur automatique s'arrête à 3×, voir PORTION_SCALE_OPTIONS dans
+  // mealPlanner.js). Verrouille le repas (via applyItemsEdit) comme toute
+  // édition manuelle. Pour une vraie session de batch cooking (« je cuisine un
+  // gros plat pour toute la semaine en une fois »), 3 était encore trop bas.
   const setItemPortions = useCallback((dayIndex, meal, itemIndex, n) => {
     applyItemsEdit(dayIndex, meal, items => items.map((x, i) => {
       if (i !== itemIndex) return x
       if (x.kind !== 'recette' && x.kind !== 'repas_type') return x
       const cur = x.portions || 1
-      // Le solveur automatique ne double jamais au-delà de 2 (voir
-      // DOUBLE_KCAL_CEILING dans mealPlanner.js), mais le réglage manuel ici va
-      // plus loin : pour une vraie session de batch cooking (« je cuisine un
-      // gros plat pour toute la semaine en une fois »), 2 était trop bas.
-      const next = Math.max(1, Math.min(MAX_MANUAL_PORTIONS, n))
+      const next = Math.max(0.5, Math.min(MAX_MANUAL_PORTIONS, n))
       if (next === cur) return x
       const unit = x.unitMacros || scaleMacros(x.macros, 1 / cur)
       return { ...x, portions: next, unitMacros: unit, macros: scaleMacros(unit, next) }

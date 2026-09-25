@@ -497,7 +497,7 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
           <input type="checkbox" checked={config.allowDoublePortions !== false} onChange={e => setConfig({ allowDoublePortions: e.target.checked })} />
-          2 portions d'un même plat si utile
+          Ajuster les portions (demi, double...) pour mieux coller aux macros
         </label>
 
         {/* Composition des repas */}
@@ -548,9 +548,9 @@ function ItemEditor({ item, candidates, onSwap, onRemove, onSetPortions }) {
             <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
               Portions
             </span>
-            <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions - 1)} disabled={portions <= 1} aria-label="Moins de portions">−</button>
-            <span style={{ fontSize: 12.5, fontWeight: 700, width: 16, textAlign: 'center' }}>{portions}</span>
-            <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions + 1)} disabled={portions >= MAX_MANUAL_PORTIONS} aria-label="Plus de portions">+</button>
+            <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions - 0.5)} disabled={portions <= 0.5} aria-label="Moins de portions">−</button>
+            <span style={{ fontSize: 12.5, fontWeight: 700, width: 24, textAlign: 'center' }}>{portions}</span>
+            <button className="btn-icon" style={{ width: 24, height: 24 }} onClick={() => onSetPortions(portions + 0.5)} disabled={portions >= MAX_MANUAL_PORTIONS} aria-label="Plus de portions">+</button>
           </div>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: 0.3, margin: '2px 0 4px' }}>
             Remplacer par

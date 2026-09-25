@@ -66,17 +66,25 @@ Sorties :
 - **Saison = préférence, pas filtre strict.** Décidé le 2026-08-31 (zone d'ombre B
   close) : bonus de score, les recettes sans saison restent utilisables. Une
   option « filtre strict » existe dans l'écran de config pour qui veut.
-- **Pas de mise à l'échelle fractionnaire dans le solveur** (décidé le
-  2026-08-31, zone d'ombre A) : le solveur pose des portions entières. **Mais
-  pas de « rab » non plus** — planifier sert à avoir le bon nombre. Le récap
-  **« À préparer »** affiche donc, par recette, le **nombre exact de portions**
-  que le plan consomme et le **facteur** à appliquer aux ingrédients pour y
-  tomber pile (`portionsNeeded / recette.portions` : « recette telle quelle »,
-  « 2× la recette », « ×1,25 (prévue pour 4) »). La liste de courses est déjà
-  exacte (ingrédients mis à l'échelle au prorata des portions utilisées). Une
-  **page batch cooking dédiée** (recettes regroupées, cases à cocher) est une
-  piste Palier 3. Piste Palier 2 : que le solveur préfère les combinaisons où
-  l'usage de chaque recette tombe sur un multiple propre de ses portions.
+- **Pas de grammage libre dans le solveur, mais des multiples de demi-portion.**
+  Décidé le 2026-08-31 (zone d'ombre A) : le solveur pose des portions entières
+  (1×, 2×) et ne réduit jamais (« mange 143 g de gratin » est absurde). **Révisé
+  le 2026-09-25** : la contrainte « jamais de baisse, jamais de fraction » se
+  traduisait par un vivier trop restreint — une recette trop calorique ou trop
+  légère pour la cible d'un repas n'était quasi jamais retenue, même avec
+  beaucoup de recettes en base. Le solveur peut désormais ajuster UNE brique
+  éligible par repas par **demi-portion, à la hausse ou à la baisse** (0,5× à
+  3×, voir `PORTION_SCALE_OPTIONS` dans `mealPlanner.js`) — reste concret à
+  servir (« une demi-part », « une part et demie ») sans être un grammage libre
+  continu. Le récap **« À préparer »** affiche donc, par recette, le **nombre
+  exact de portions** que le plan consomme (désormais possiblement fractionnaire)
+  et le **facteur** à appliquer aux ingrédients pour y tomber pile
+  (`portionsNeeded / recette.portions` : « recette telle quelle », « 2× la
+  recette », « ×1,25 (prévue pour 4) »). La liste de courses est déjà exacte
+  (ingrédients mis à l'échelle au prorata des portions utilisées). Une **page
+  batch cooking dédiée** (recettes regroupées, cases à cocher) est une piste
+  Palier 3. Le solveur préfère aussi les combinaisons où l'usage de chaque
+  recette tombe sur un multiple propre de ses portions (`leftoverPortionPenalty`).
 - **On avance par paliers** (voir §7). Palier 1 = macros seulement.
 - **Le plan s'écrit dans `repas_planifies`** (pas de nouvelle table de « plans »
   au palier 1), après un écran d'aperçu et validation. Voir §4.4.

@@ -78,16 +78,37 @@ function overshootPenalty(total, target) {
   return p
 }
 
-// ── Portions doublées (PALIER 2) ───────────────────────────────────────────
-// Le solveur peut poser 1 OU 2 portions (jamais fractionnaire, jamais plus)
-// d'une brique quand un repas reste loin sous sa cible et qu'une brique
-// éligible s'en rapproche en doublant.
-const MAX_MEAL_PORTIONS = 2
-// Catégories dont une brique peut être doublée (pas un Accompagnement / Dessert
-// / Boisson : doubler la garniture ou le dessert n'a pas de sens).
-const DOUBLE_ELIGIBLE_CATEGORIES = new Set(['Plat', 'Petit-déjeuner', 'Collation'])
-// On ne double pas si le repas dépasse alors ce multiple de sa cible kcal.
-const DOUBLE_KCAL_CEILING = 1.10
+// ── Ajustement de portion (PALIER 2, étendu) ───────────────────────────────
+// Le solveur peut ajuster la portion d'UNE brique éligible par repas, à la
+// hausse OU à la baisse, par demi-portion (jamais un grammage libre continu —
+// « une demi-part », « une part et demie » restent concrets à servir). Sert à
+// la fois à resserrer un repas sur ses cibles ET à élargir le vivier réellement
+// exploitable : une recette trop calorique ou trop légère pour tenir dans un
+// repas telle quelle peut désormais y matcher via une demi ou une double part,
+// au lieu d'être quasi jamais retenue.
+const PORTION_SCALE_OPTIONS = [0.5, 1.5, 2, 2.5, 3]
+// Catégories dont une brique peut être ajustée (pas un Accompagnement / Dessert
+// / Boisson : resservir la moitié ou le double de la garniture ou du dessert
+// n'a pas de sens).
+const PORTION_SCALE_CATEGORIES = new Set(['Plat', 'Petit-déjeuner', 'Collation'])
+// On n'ajuste pas à la hausse si le repas dépasse alors ce multiple de sa
+// cible kcal.
+const PORTION_SCALE_KCAL_CEILING = 1.10
+
+// Meilleur multiple de portion (1× ou une option de PORTION_SCALE_OPTIONS) pour
+// UNE brique face à une cible donnée — 1× reste la référence si rien de mieux.
+// Sert au choix des candidats (élargit ce qui peut « matcher ») ET à l'ajustement
+// par repas dans build().
+function bestPortionScale(unitMacros, target) {
+  let best = { scale: 1, macros: unitMacros, dist: macroDistance(unitMacros, target) }
+  for (const scale of PORTION_SCALE_OPTIONS) {
+    if (target.kcal > 0 && (unitMacros.kcal || 0) * scale > target.kcal * PORTION_SCALE_KCAL_CEILING) continue
+    const macros = scaleMacros(unitMacros, scale)
+    const dist = macroDistance(macros, target)
+    if (dist < best.dist - 1e-6) best = { scale, macros, dist }
+  }
+  return best
+}
 // Poids de la pénalité « portions gâchées » (recherche locale, niveau semaine) :
 // privilégie les plans où le nombre total de portions d'une recette tombe sur un
 // multiple propre de son rendement (moins de restes / de facteurs bâtards).
@@ -600,7 +621,7 @@ function leftoverPortionPenalty(dayList, recettesById, templatesById) {
  * @param {boolean} [p.includeRepasTypes=true]  inclure les repas types dans les viviers
  * @param {number|null} [p.maxCookMinutes=null]  temps prépa + cuisson max (min) ; null = pas de filtre
  * @param {boolean} [p.fillMicros=true]  compléter les manques vitamines / minéraux du jour avec des favoris
- * @param {boolean} [p.allowDoublePortions=true]  autoriser 2 portions d'un même plat sur un repas quand ça rapproche des cibles
+ * @param {boolean} [p.allowDoublePortions=true]  autoriser l'ajustement de portion (demi/double/triple) d'une brique sur un repas quand ça rapproche des cibles
  * @param {object} [p.settings]      settings (pour getNutrientGaps : goal_proteines / goal_fibres ; VNR micro = fixes)
  * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number }
  * @param {object} [p.locked]        { `${dayIndex}|${meal}`: <objet repas figé de l'aperçu> }
@@ -667,17 +688,22 @@ export function buildMealPlan(p) {
     }
     const avgTarget = averageTargets(entries.map(e => e.target))
     // Note d'un candidat : distance macro à la part de cible du slot, moins le
-    // bonus saison, PLUS une pénalité si sa portion dépasse déjà la cible
-    // calorique du slot (on préfère des recettes qui laissent de la marge).
+    // bonus saison. Pour les catégories ajustables (Plat / Petit-déjeuner /
+    // Collation), la distance est calculée au MEILLEUR multiple de portion
+    // (bestPortionScale) plutôt qu'à 1 portion fixe — une recette trop calorique
+    // ou trop légère pour la cible n'est plus écartée si une demi ou une double
+    // part la rapproche. Pour les autres catégories, pénalité si la portion
+    // dépasse déjà la cible (le solveur ne peut pas les ajuster).
+    const scaleEligible = PORTION_SCALE_CATEGORIES.has(key)
     const scored = viv
-      .map(c => ({
-        c,
-        dist: macroDistance(c.macros, avgTarget)
-          - seasonBonus(c.entity, season)
-          + (avgTarget.kcal > 0 && c.macros.kcal > avgTarget.kcal
-            ? 0.6 * (c.macros.kcal - avgTarget.kcal) / avgTarget.kcal
-            : 0),
-      }))
+      .map(c => {
+        const fit = scaleEligible ? bestPortionScale(c.macros, avgTarget) : null
+        const dist = fit ? fit.dist : macroDistance(c.macros, avgTarget)
+        const overshoot = !scaleEligible && avgTarget.kcal > 0 && c.macros.kcal > avgTarget.kcal
+          ? 0.6 * (c.macros.kcal - avgTarget.kcal) / avgTarget.kcal
+          : 0
+        return { c, dist: dist - seasonBonus(c.entity, season) + overshoot }
+      })
       .sort((a, b) => a.dist - b.dist)
     vivierScored[key] = scored
     // Il faut au moins autant de recettes différentes que d'imposées.
@@ -765,25 +791,31 @@ export function buildMealPlan(p) {
           })
         })
 
-        // 2 portions d'un même plat (PALIER 2) : si le repas reste loin sous sa
-        // cible, on double la brique éligible qui l'en rapproche le plus — une
-        // seule par repas, portions entières, sans faire déborder les calories.
+        // Ajustement de portion (PALIER 2, étendu) : si le repas reste loin de
+        // sa cible, on ajuste À LA HAUSSE OU À LA BAISSE (demi-portions, voir
+        // PORTION_SCALE_OPTIONS) la brique éligible qui l'en rapproche le
+        // plus — une seule par repas, sans faire déborder les calories.
         if (allowDoublePortions && items.length) {
           const base1 = items.reduce((acc, it) => addMacros(acc, it.macros), { ...EMPTY_MACROS })
           const dist1 = macroDistance(base1, target)
-          let best = null // { idx, dist }
+          let best = null // { idx, scale, dist }
           items.forEach((it, idx) => {
             if (it.kind !== 'recette' && it.kind !== 'repas_type') return
-            if (!DOUBLE_ELIGIBLE_CATEGORIES.has(it.categorie)) return
-            const trial = addMacros(base1, it.macros) // brique comptée 2×
-            if (trial.kcal > target.kcal * DOUBLE_KCAL_CEILING) return
-            const d = macroDistance(trial, target)
-            if (d < dist1 - 1e-6 && (!best || d < best.dist)) best = { idx, dist: d }
+            if (!PORTION_SCALE_CATEGORIES.has(it.categorie)) return
+            for (const scale of PORTION_SCALE_OPTIONS) {
+              // base1 contient déjà la brique à 1× : on retire cette part de
+              // référence et on ajoute sa version à `scale` pour obtenir le
+              // total du repas SI cette brique passait à `scale` portions.
+              const trial = addMacros(base1, scaleMacros(it.unitMacros, scale - 1))
+              if (target.kcal > 0 && trial.kcal > target.kcal * PORTION_SCALE_KCAL_CEILING) continue
+              const d = macroDistance(trial, target)
+              if (d < dist1 - 1e-6 && (!best || d < best.dist)) best = { idx, scale, dist: d }
+            }
           })
           if (best) {
             const it = items[best.idx]
-            it.portions = MAX_MEAL_PORTIONS
-            it.macros = scaleMacros(it.unitMacros, MAX_MEAL_PORTIONS)
+            it.portions = best.scale
+            it.macros = scaleMacros(it.unitMacros, best.scale)
           }
         }
 

@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-25',
+    title: 'Le planificateur ajuste les portions pour coller à tes macros',
+    description: "Une recette un peu trop calorique ou trop légère pour un repas n'est plus systématiquement écartée : le planificateur peut maintenant proposer une demi-portion, une portion et demie, le double ou le triple d'un plat pour mieux tomber sur tes objectifs — ce qui ouvre la sélection à beaucoup plus de tes recettes. Tu retrouves ce réglage dans Options avancées, et tu peux aussi l'ajuster toi-même par demi-portion dans l'aperçu d'un plan.",
+  },
+  {
+    date: '2026-09-25',
     title: 'Le planificateur propose plus de plats différents',
     description: "Par défaut, un plan sur 7 jours vise maintenant jusqu'à 7 plats différents pour chaque type de repas, au lieu de 2 seulement. Si tu préfères cuisiner le même plat plusieurs jours de suite, tu peux toujours redescendre ce réglage dans Options avancées > Repas & composition.",
   },
