@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-25',
+    title: 'Un réglage « Précision macros » pour le planificateur',
+    description: "Dans Options avancées du planificateur, un nouveau réglage à 3 niveaux (Stricte / Équilibrée / Souple) contrôle à quel point le plan doit coller pile à tes calories et macros. En Souple, tu tolères un peu plus d'écart aux cibles, ce qui permet au planificateur de piocher dans beaucoup plus de tes recettes au lieu d'écarter celles qui ne collaient pas exactement.",
+  },
+  {
+    date: '2026-09-25',
     title: 'Le planificateur ajuste les portions pour coller à tes macros',
     description: "Une recette un peu trop calorique ou trop légère pour un repas n'est plus systématiquement écartée : le planificateur peut maintenant proposer une demi-portion, une portion et demie, le double ou le triple d'un plat pour mieux tomber sur tes objectifs — ce qui ouvre la sélection à beaucoup plus de tes recettes. Tu retrouves ce réglage dans Options avancées, et tu peux aussi l'ajuster toi-même par demi-portion dans l'aperçu d'un plan.",
   },

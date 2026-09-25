@@ -65,17 +65,35 @@ const SWEEP_MAX_ALTS = 6
 const OVERSHOOT_KCAL_WEIGHT = 1.5
 const OVERSHOOT_MACRO_WEIGHT = 0.6
 
-function overshootPenalty(total, target) {
+function overshootPenalty(total, target, { kcalWeight = OVERSHOOT_KCAL_WEIGHT, macroWeight = OVERSHOOT_MACRO_WEIGHT } = {}) {
   let p = 0
   if (target.kcal > 0 && total.kcal > target.kcal) {
-    p += OVERSHOOT_KCAL_WEIGHT * (total.kcal - target.kcal) / target.kcal
+    p += kcalWeight * (total.kcal - target.kcal) / target.kcal
   }
   for (const k of ['prot', 'gluc', 'lip']) {
     if (target[k] > 0 && total[k] > target[k]) {
-      p += OVERSHOOT_MACRO_WEIGHT * (total[k] - target[k]) / target[k]
+      p += macroWeight * (total[k] - target[k]) / target[k]
     }
   }
   return p
+}
+
+// ── Précision macros (réglage utilisateur) ─────────────────────────────────
+// « Stricte » colle fort aux cibles (quitte à écarter des recettes qui ne
+// rentrent pas bien) ; « Souple » tolère davantage d'écart pour élargir encore
+// le vivier réellement exploitable — moins de pénalité de dépassement, plafond
+// de portion plus haut, tirage des candidats moins concentré sur les mieux
+// notés. Réglage utilisateur : `config.macroStrictness` (UI : Options avancées
+// > Précision macros), passé en `options.strictness` à buildMealPlan.
+export const MACRO_STRICTNESS_LEVELS = ['strict', 'normal', 'loose']
+export const MACRO_STRICTNESS_LABELS = { strict: 'Stricte', normal: 'Équilibrée', loose: 'Souple' }
+const STRICTNESS_PRESETS = {
+  strict: { overshootScale: 1.3, kcalCeiling: 1.05, pickPower: 1.5 },
+  normal: { overshootScale: 1.0, kcalCeiling: 1.10, pickPower: 1.0 },
+  loose: { overshootScale: 0.45, kcalCeiling: 1.30, pickPower: 0.4 },
+}
+function resolveStrictness(key) {
+  return STRICTNESS_PRESETS[key] || STRICTNESS_PRESETS.normal
 }
 
 // ── Ajustement de portion (PALIER 2, étendu) ───────────────────────────────
@@ -99,10 +117,10 @@ const PORTION_SCALE_KCAL_CEILING = 1.10
 // UNE brique face à une cible donnée — 1× reste la référence si rien de mieux.
 // Sert au choix des candidats (élargit ce qui peut « matcher ») ET à l'ajustement
 // par repas dans build().
-function bestPortionScale(unitMacros, target) {
+function bestPortionScale(unitMacros, target, { kcalCeiling = PORTION_SCALE_KCAL_CEILING } = {}) {
   let best = { scale: 1, macros: unitMacros, dist: macroDistance(unitMacros, target) }
   for (const scale of PORTION_SCALE_OPTIONS) {
-    if (target.kcal > 0 && (unitMacros.kcal || 0) * scale > target.kcal * PORTION_SCALE_KCAL_CEILING) continue
+    if (target.kcal > 0 && (unitMacros.kcal || 0) * scale > target.kcal * kcalCeiling) continue
     const macros = scaleMacros(unitMacros, scale)
     const dist = macroDistance(macros, target)
     if (dist < best.dist - 1e-6) best = { scale, macros, dist }
@@ -623,7 +641,9 @@ function leftoverPortionPenalty(dayList, recettesById, templatesById) {
  * @param {boolean} [p.fillMicros=true]  compléter les manques vitamines / minéraux du jour avec des favoris
  * @param {boolean} [p.allowDoublePortions=true]  autoriser l'ajustement de portion (demi/double/triple) d'une brique sur un repas quand ça rapproche des cibles
  * @param {object} [p.settings]      settings (pour getNutrientGaps : goal_proteines / goal_fibres ; VNR micro = fixes)
- * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number }
+ * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number, strictness:'strict'|'normal'|'loose' }
+ *                                   strictness (voir STRICTNESS_PRESETS) règle la précision aux macros :
+ *                                   'loose' tolère plus d'écart pour élargir le vivier de recettes exploitables.
  * @param {object} [p.locked]        { `${dayIndex}|${meal}`: <objet repas figé de l'aperçu> }
  *                                   — repas verrouillés, repris tels quels à la régénération.
  * @returns {{ days:Array, weekTotals:object, weekScore:number, picks:object, warnings:Array }}
@@ -638,6 +658,16 @@ export function buildMealPlan(p) {
   const seasonMode = options.seasonMode === 'filter' ? 'filter' : 'bonus'
   const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes, maxCookMinutes }
   const rng = makeRng(options.seed || 1)
+  // Précision macros demandée (voir STRICTNESS_PRESETS) : mêmes fonctions,
+  // tolérances différentes — capturées ici en closures pour éviter de faire
+  // porter le réglage par chaque appel.
+  const strictness = resolveStrictness(options.strictness)
+  const scoreOvershoot = (total, target) => overshootPenalty(total, target, {
+    kcalWeight: OVERSHOOT_KCAL_WEIGHT * strictness.overshootScale,
+    macroWeight: OVERSHOOT_MACRO_WEIGHT * strictness.overshootScale,
+  })
+  const scaleFit = (unitMacros, target) => bestPortionScale(unitMacros, target, { kcalCeiling: strictness.kcalCeiling })
+  const mealOvershootRatio = strictness.kcalCeiling + 0.02
   const warnings = []
   const foods = favoriteFoods(favorites)
   const recettesById = Object.fromEntries((recettes || []).map(r => [r.id, r]))
@@ -697,10 +727,10 @@ export function buildMealPlan(p) {
     const scaleEligible = PORTION_SCALE_CATEGORIES.has(key)
     const scored = viv
       .map(c => {
-        const fit = scaleEligible ? bestPortionScale(c.macros, avgTarget) : null
+        const fit = scaleEligible ? scaleFit(c.macros, avgTarget) : null
         const dist = fit ? fit.dist : macroDistance(c.macros, avgTarget)
         const overshoot = !scaleEligible && avgTarget.kcal > 0 && c.macros.kcal > avgTarget.kcal
-          ? 0.6 * (c.macros.kcal - avgTarget.kcal) / avgTarget.kcal
+          ? 0.6 * strictness.overshootScale * (c.macros.kcal - avgTarget.kcal) / avgTarget.kcal
           : 0
         return { c, dist: dist - seasonBonus(c.entity, season) + overshoot }
       })
@@ -720,7 +750,7 @@ export function buildMealPlan(p) {
     while (chosen.length < n && cpool.length) {
       const cand = pickWeighted(
         cpool.filter(c => !chosen.some(x => x.id === c.id)),
-        c => 1 / (1 + (scored.find(s => s.c.id === c.id)?.dist ?? 1)),
+        c => 1 / (1 + (scored.find(s => s.c.id === c.id)?.dist ?? 1) * strictness.pickPower),
         rng,
       )
       if (!cand) break
@@ -807,7 +837,7 @@ export function buildMealPlan(p) {
               // référence et on ajoute sa version à `scale` pour obtenir le
               // total du repas SI cette brique passait à `scale` portions.
               const trial = addMacros(base1, scaleMacros(it.unitMacros, scale - 1))
-              if (target.kcal > 0 && trial.kcal > target.kcal * PORTION_SCALE_KCAL_CEILING) continue
+              if (target.kcal > 0 && trial.kcal > target.kcal * strictness.kcalCeiling) continue
               const d = macroDistance(trial, target)
               if (d < dist1 - 1e-6 && (!best || d < best.dist)) best = { idx, scale, dist: d }
             }
@@ -833,7 +863,7 @@ export function buildMealPlan(p) {
         const totals = allItems.reduce((acc, it) => addMacros(acc, it.macros), { ...EMPTY_MACROS })
         dayMeals.push({
           meal, target, items: allItems, totals,
-          score: macroDistance(totals, target) + (totals.kcal > target.kcal * 1.12 ? 0.5 : 0),
+          score: macroDistance(totals, target) + (totals.kcal > target.kcal * mealOvershootRatio ? 0.5 * strictness.overshootScale : 0),
         })
       }
 
@@ -877,11 +907,11 @@ export function buildMealPlan(p) {
     let wkT = { ...EMPTY_MACROS }
     let wkTgt = { ...EMPTY_MACROS }
     for (const d of dl) {
-      s += d.score + overshootPenalty(d.totals, d.target)
+      s += d.score + scoreOvershoot(d.totals, d.target)
       wkT = addMacros(wkT, d.totals)
       wkTgt = addMacros(wkTgt, d.target)
     }
-    return s + overshootPenalty(wkT, wkTgt)
+    return s + scoreOvershoot(wkT, wkTgt)
   }
 
   let dayList = build()

@@ -77,6 +77,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     maxCookMinutes: null, // temps prépa + cuisson max (min) ; null = pas de filtre
     fillMicros: true,     // compléter les manques vitamines / minéraux du jour
     allowDoublePortions: true, // autoriser plusieurs portions d'un même plat sur un repas
+    macroStrictness: 'normal', // 'strict' | 'normal' | 'loose' — précision aux macros, voir mealPlanner.js
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
     ...loadStoredConfig(),
@@ -185,7 +186,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
       fillMicros: config.fillMicros !== false,
       allowDoublePortions: config.allowDoublePortions !== false,
       settings,
-      options: { seasonMode: config.seasonMode, seed },
+      options: { seasonMode: config.seasonMode, seed, strictness: config.macroStrictness },
       locked,
     })
   }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings, plan, lockedKeys])

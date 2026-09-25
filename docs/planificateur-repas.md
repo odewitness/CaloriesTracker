@@ -85,6 +85,17 @@ Sorties :
   batch cooking dédiée** (recettes regroupées, cases à cocher) est une piste
   Palier 3. Le solveur préfère aussi les combinaisons où l'usage de chaque
   recette tombe sur un multiple propre de ses portions (`leftoverPortionPenalty`).
+- **Réglage « Précision macros » (ajouté le 2026-09-25).** Trois niveaux
+  (`config.macroStrictness` → `options.strictness` de `buildMealPlan`, voir
+  `STRICTNESS_PRESETS` dans `mealPlanner.js`) : Stricte / Équilibrée (défaut,
+  = comportement historique) / Souple. Le niveau agit sur trois leviers à la
+  fois — pénalité de dépassement (`overshootPenalty`), plafond kcal autorisé
+  pour ajuster une portion (`PORTION_SCALE_KCAL_CEILING`), et le biais du
+  tirage pondéré qui choisit les recettes candidates d'une catégorie (moins
+  concentré sur les mieux notées en mode Souple). Complète le réglage
+  « nbDifferentes » : l'un élargit le NOMBRE de recettes différentes visées,
+  l'autre élargit lesquelles PEUVENT matcher en tolérant plus d'écart aux
+  cibles.
 - **On avance par paliers** (voir §7). Palier 1 = macros seulement.
 - **Le plan s'écrit dans `repas_planifies`** (pas de nouvelle table de « plans »
   au palier 1), après un écran d'aperçu et validation. Voir §4.4.

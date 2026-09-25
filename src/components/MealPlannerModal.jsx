@@ -7,7 +7,7 @@ import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingList
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useBatchCookingSteps } from '../hooks/useBatchCookingSteps'
 import { useToast } from '../lib/toast'
-import { deviationLevel, batchSummary, slotGroupKey, buildVivier } from '../lib/mealPlanner'
+import { deviationLevel, batchSummary, slotGroupKey, buildVivier, MACRO_STRICTNESS_LEVELS, MACRO_STRICTNESS_LABELS } from '../lib/mealPlanner'
 import { addDaysStr, stashAppliedPlan, removeAppliedPlan } from '../lib/mealPlannerApply'
 import { mondayOf } from '../lib/dates'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
@@ -484,6 +484,23 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
               {v == null ? 'Peu importe' : `≤ ${v} min`}
             </button>
           ))}
+        </div>
+
+        {/* Précision macros */}
+        <SectionLabel>Précision macros</SectionLabel>
+        <div style={{ display: 'flex', gap: 5, marginBottom: 6, flexWrap: 'wrap' }}>
+          {MACRO_STRICTNESS_LEVELS.map(v => (
+            <button
+              key={v}
+              onClick={() => setConfig({ macroStrictness: v })}
+              style={segBtn((config.macroStrictness || 'normal') === v)}
+            >
+              {MACRO_STRICTNESS_LABELS[v]}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 18 }}>
+          « Souple » tolère plus d'écart aux cibles pour piocher dans davantage de tes recettes ; « Stricte » colle fort aux calories/macros quitte à en écarter certaines.
         </div>
 
         {/* Bascules */}
