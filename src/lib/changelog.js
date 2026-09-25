@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-25',
+    title: 'Choisis ta fournée en connaissance de cause',
+    description: "Quand tu ajoutes des recettes ou des repas types à « Ma fournée », tu retrouves la même vue que dans « Mes aliments » : recherche (même par ingrédient), tri et filtres par catégorie, saison ou temps, et les calories et macros d'une portion sur chaque carte. Tu vois le total de ta sélection avant de valider, et en haut de ta fournée, un récap te montre quelle part de tes objectifs de la semaine elle couvre.",
+  },
+  {
+    date: '2026-09-25',
     title: 'Un réglage « Précision macros » pour le planificateur',
     description: "Dans Options avancées du planificateur, un nouveau réglage à 3 niveaux (Stricte / Équilibrée / Souple) contrôle à quel point le plan doit coller pile à tes calories et macros. En Souple, tu tolères un peu plus d'écart aux cibles, ce qui permet au planificateur de piocher dans beaucoup plus de tes recettes au lieu d'écarter celles qui ne collaient pas exactement.",
   },
