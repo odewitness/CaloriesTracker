@@ -466,7 +466,8 @@ l'édition de brique couvrent le besoin « garder la main »).
   `unique(user_id, recette_id)` — l'état « fait » d'une recette déjà présente
   n'est pas écrasé). Le récap interne « À préparer » de `MealPlannerModal` est
   **conservé** (pas remplacé).
-  Reste (palier ultérieur) : sélection multiple depuis la liste des recettes.
+  ~~Reste : sélection multiple depuis la liste des recettes~~ → fait, voir
+  Palier 5.
 - Contraintes alimentaires (tags simples).
 
 ### Palier 4 — Corrections & confort d'usage (2026-09-13)
@@ -520,6 +521,34 @@ cuisine/plan de repas + six améliorations de confort.
   réglages ci-dessus : une utilisatrice qui revient n'a plus besoin de la
   rouvrir à chaque fois, et un premier essai voit d'abord l'essentiel (jours,
   date de début).
+
+### Palier 5 — Sélecteur de fournée façon « Mes aliments » (2026-09-25)
+
+Branche `feature/fournee-selecteur`. Le mini-sélecteur (liste de 240 px, nom +
+puces de catégorie) est remplacé pour choisir ses recettes « intelligemment ».
+
+- ✅ **`BatchSourcePicker`** : page plein écran, onglets Recettes / Repas types.
+  Recherche (nom + ingrédients), feuille « Trier & filtrer » réutilisée
+  (`SortModal` pour les recettes : catégorie, saison, temps, tri macros ;
+  `MealTemplateSortModal` pour les repas types), regroupement repliable par
+  catégorie, cartes cochables avec macros d'une portion, badge nutritionnel,
+  saison, temps, détail des ingrédients dépliable. Pied de page : nombre de
+  sélectionnés + total kcal / protéines d'UNE portion de chacun. Sélection
+  conservée en changeant d'onglet. Les éléments déjà dans la fournée sont
+  masqués. Macros par portion via `recipePortionMacros` /
+  `templateServingMacros` (`mealPlanner.js`). Le picker duplique volontairement
+  la carte de `RecipesSection` plutôt que de la refactorer (pas de risque de
+  régression sur « Mes aliments »).
+- ✅ **Bandeau « Ce que ça représente »** en haut de la fournée : total
+  kcal / protéines des portions à préparer (1 par défaut si non renseigné),
+  moyenne par jour, et part des objectifs **de la semaine** (`goal_* × 7`,
+  sans ajustement cycle/sport) couverte par la fournée. Ton neutre, pas de feu
+  tricolore : la fournée ne couvre qu'une partie des repas.
+- ✅ **Macros sur chaque ligne** de la fournée (par portion + total si
+  portions > 1).
+- Pas fait (idées) : filtres rapides « riche en protéines / léger / de saison /
+  rapide », stepper de portions au pas de 0,5, « Compléter la fournée »
+  (suggestions du solveur).
 
 ---
 

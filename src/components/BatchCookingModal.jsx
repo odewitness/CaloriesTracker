@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Plus, Trash2, ChefHat, Search, Check, ChevronRight, ListChecks, History } from 'lucide-react'
+import { X, Plus, Trash2, ChefHat, Check, ChevronRight, ListChecks, History } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useRecipes } from '../hooks/useRecipes'
 import { useMealTemplatesList } from '../hooks/useMealTemplates'
+import { useSettings } from '../hooks/useSettings'
 import { useToast } from '../lib/toast'
-import { getRecipeCategoryIcon } from '../lib/categoryIcons'
 import { addDaysStr } from '../lib/mealPlannerApply'
-import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
+import { recipePortionMacros, templateServingMacros } from '../lib/mealPlanner'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 import CookingPlanModal from './CookingPlanModal'
+import BatchSourcePicker from './BatchSourcePicker'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
 
@@ -26,147 +27,16 @@ import EmptyState from './EmptyState'
 // Props : onClose(), semaine (lundi 'YYYY-MM-DD')
 // ─────────────────────────────────────────────────────────────────────────────
 
-const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
 const keyOf = (kind, id) => `${kind}:${id}`
-
-// Panneau d'ajout : recherche + cases à cocher sur les recettes / repas types
-// pas encore dans la fournée. `options` : [{ id, nom, kind, categorie }].
-function SourcePicker({ options, loading, excludeKeys, onAdd, onCancel }) {
-  const [q, setQ] = useState('')
-  const [cat, setCat] = useState(null) // catégorie filtrée, ou null = toutes
-  const [sel, setSel] = useState(() => new Set()) // set de keyOf(kind, id)
-  const [adding, setAdding] = useState(false)
-
-  // Catégories réellement présentes dans les options restantes — inutile de
-  // proposer un filtre sur une catégorie vide.
-  const availableCats = useMemo(() => {
-    const present = new Set(options.filter(o => !excludeKeys.has(keyOf(o.kind, o.id))).map(o => o.categorie).filter(Boolean))
-    return RECIPE_CATEGORIES.filter(c => present.has(c))
-  }, [options, excludeKeys])
-
-  const list = useMemo(() => {
-    const nq = normalize(q)
-    return options
-      .filter(o => !excludeKeys.has(keyOf(o.kind, o.id)))
-      .filter(o => !cat || o.categorie === cat)
-      .filter(o => !nq || normalize(o.nom).includes(nq))
-      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-  }, [options, excludeKeys, q, cat])
-
-  const toggle = (k) => setSel(s => {
-    const n = new Set(s)
-    n.has(k) ? n.delete(k) : n.add(k)
-    return n
-  })
-
-  const confirm = async () => {
-    if (!sel.size || adding) return
-    setAdding(true)
-    // On n'envoie que l'identité : pas de préremplissage des portions.
-    await onAdd(
-      options.filter(o => sel.has(keyOf(o.kind, o.id))).map(o => ({ id: o.id, nom: o.nom, kind: o.kind })),
-    )
-    setAdding(false)
-  }
-
-  return (
-    <div className="card" style={{ padding: '10px 12px', marginBottom: 12 }}>
-      <div style={{ position: 'relative', marginBottom: 8 }}>
-        <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }} />
-        <input
-          className="input"
-          placeholder="Rechercher une recette ou un repas type"
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          style={{ paddingLeft: 28, fontSize: 12.5 }}
-          autoFocus
-        />
-      </div>
-
-      {availableCats.length > 1 && (
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
-          <button
-            onClick={() => setCat(null)}
-            style={{
-              fontSize: 11.5, fontWeight: 700, fontFamily: 'var(--font)', padding: '4px 9px', borderRadius: 999,
-              border: `1px solid ${!cat ? 'var(--green)' : 'var(--border)'}`,
-              background: !cat ? 'var(--green-light)' : 'var(--white)',
-              color: !cat ? 'var(--green-dark)' : 'var(--text-muted)',
-            }}
-          >
-            Toutes
-          </button>
-          {availableCats.map(c => (
-            <button
-              key={c}
-              onClick={() => setCat(cat === c ? null : c)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: 11.5, fontWeight: 700, fontFamily: 'var(--font)', padding: '4px 9px', borderRadius: 999,
-                border: `1px solid ${cat === c ? 'var(--green)' : 'var(--border)'}`,
-                background: cat === c ? 'var(--green-light)' : 'var(--white)',
-                color: cat === c ? 'var(--green-dark)' : 'var(--text-muted)',
-              }}
-            >
-              {getRecipeCategoryIcon(c)} {c}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {loading ? (
-        <Loader />
-      ) : list.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'var(--text-hint)', padding: '6px 2px' }}>
-          {!options.length ? 'Aucune recette ni repas type pour l’instant.'
-            : (q || cat) ? 'Aucun résultat.'
-            : 'Tout est déjà dans la fournée.'}
-        </div>
-      ) : (
-        <div style={{ maxHeight: 240, overflowY: 'auto', margin: '0 -2px' }}>
-          {list.map(o => {
-            const k = keyOf(o.kind, o.id)
-            return (
-              <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', fontSize: 12.5, cursor: 'pointer' }}>
-                <input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} />
-                <span style={{ flexShrink: 0 }}>{getRecipeCategoryIcon(o.categorie)}</span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {o.nom}
-                  {o.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · repas type</span>}
-                </span>
-              </label>
-            )
-          })}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-        <button
-          onClick={confirm}
-          disabled={!sel.size || adding}
-          className="btn-primary"
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: !sel.size || adding ? 0.5 : 1 }}
-        >
-          <Plus size={15} /> {adding ? 'Ajout…' : `Ajouter${sel.size ? ` (${sel.size})` : ''}`}
-        </button>
-        <button
-          onClick={onCancel}
-          style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--gray-bg)', border: 'none', borderRadius: 8, padding: '0 14px', fontFamily: 'var(--font)' }}
-        >
-          Fermer
-        </button>
-      </div>
-    </div>
-  )
-}
 
 export default function BatchCookingModal({ onClose, semaine }) {
   useBackButton(onClose)
   const { user } = useAuth()
   const toast = useToast()
   const { items, loading, addSources, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking(semaine)
-  const { recettes, loading: loadingRecipes } = useRecipes()
+  const { recettes, ingredientsByRecette, loading: loadingRecipes } = useRecipes()
   const { repasTypes, loading: loadingTemplates } = useMealTemplatesList()
+  const { settings } = useSettings()
   const [picking, setPicking] = useState(false)
   const [detail, setDetail] = useState(null) // { kind, entity, portions } | null
   const [planOpen, setPlanOpen] = useState(false)
@@ -215,14 +85,40 @@ export default function BatchCookingModal({ onClose, semaine }) {
     setPrevItems([])
   }
 
-  const pickerOptions = useMemo(() => [
-    ...recettes.map(r => ({ id: r.id, nom: r.nom, kind: 'recette', categorie: r.categories?.[0] })),
-    ...repasTypes.map(t => ({ id: t.id, nom: t.nom, kind: 'repas_type', categorie: t.categories?.[0] })),
-  ], [recettes, repasTypes])
-
   const excludeKeys = useMemo(() => new Set(
     items.map(i => i.recette_id ? keyOf('recette', i.recette_id) : (i.repas_type_id ? keyOf('repas_type', i.repas_type_id) : null)).filter(Boolean),
   ), [items])
+
+  // Macros d'une portion, par ligne de la fournée (null si la source a été
+  // supprimée ou n'est pas dimensionnable).
+  const macrosByItem = useMemo(() => {
+    const m = new Map()
+    for (const it of items) {
+      const entity = it.recette_id ? recetteById.get(it.recette_id) : it.repas_type_id ? templateById.get(it.repas_type_id) : null
+      const macros = !entity ? null : it.recette_id ? recipePortionMacros(entity) : templateServingMacros(entity)
+      m.set(it.id, macros)
+    }
+    return m
+  }, [items, recetteById, templateById])
+
+  // Bilan de la fournée : totaux pour les portions à préparer (1 par défaut si
+  // non renseigné), rapportés aux objectifs de la semaine (7 jours).
+  const totals = useMemo(() => {
+    let kcal = 0, prot = 0, portions = 0, unknownMacros = 0, defaultedPortions = 0
+    for (const it of items) {
+      const p = it.portions != null && Number(it.portions) > 0 ? Number(it.portions) : 1
+      if (it.portions == null) defaultedPortions++
+      portions += p
+      const macros = macrosByItem.get(it.id)
+      if (!macros) { unknownMacros++; continue }
+      kcal += macros.kcal * p
+      prot += macros.prot * p
+    }
+    return { kcal, prot, portions, unknownMacros, defaultedPortions }
+  }, [items, macrosByItem])
+
+  const weekKcalGoal = (settings.goal_kcal || 0) * 7
+  const weekProtGoal = (settings.goal_proteines || 0) * 7
 
   const doneCount = items.filter(i => i.fait).length
   const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0
@@ -268,6 +164,45 @@ export default function BatchCookingModal({ onClose, semaine }) {
         )}
 
         {items.length > 0 && (
+          <div className="card" style={{ padding: '10px 14px', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, fontSize: 12.5, fontWeight: 700 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Ce que ça représente</span>
+              <span style={{ color: 'var(--text-hint)', fontSize: 11.5, fontWeight: 600 }}>
+                {totals.portions % 1 === 0 ? totals.portions : totals.portions.toFixed(1)} portion{totals.portions > 1 ? 's' : ''}
+              </span>
+            </div>
+            {[
+              { label: 'Calories', value: totals.kcal, goal: weekKcalGoal, unit: 'kcal', color: 'var(--green)' },
+              { label: 'Protéines', value: totals.prot, goal: weekProtGoal, unit: 'g', color: 'var(--purple, #8b5cf6)' },
+            ].map(row => {
+              const share = row.goal > 0 ? Math.round((row.value / row.goal) * 100) : null
+              return (
+                <div key={row.label} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700 }}>
+                      {row.label} : {Math.round(row.value).toLocaleString('fr-FR')} {row.unit}
+                      <span style={{ fontWeight: 500, color: 'var(--text-hint)' }}> · ≈ {Math.round(row.value / 7).toLocaleString('fr-FR')} {row.unit}/jour</span>
+                    </span>
+                    {share != null && <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{share} %</span>}
+                  </div>
+                  {share != null && (
+                    <div style={{ height: 6, borderRadius: 3, background: 'var(--gray-bg)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(100, share)}%`, background: row.color, transition: 'width .2s' }} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.45 }}>
+              Part de tes objectifs de la semaine (7 jours) couverte par cette fournée — le reste
+              viendra de tes autres repas.
+              {totals.defaultedPortions > 0 && ` ${totals.defaultedPortions} élément${totals.defaultedPortions > 1 ? 's' : ''} sans portions renseignées compte${totals.defaultedPortions > 1 ? 'nt' : ''} pour 1.`}
+              {totals.unknownMacros > 0 && ` ${totals.unknownMacros} élément${totals.unknownMacros > 1 ? 's' : ''} sans valeurs nutritionnelles n’${totals.unknownMacros > 1 ? 'ont' : 'a'} pas pu être compté${totals.unknownMacros > 1 ? 's' : ''}.`}
+            </div>
+          </div>
+        )}
+
+        {items.length > 0 && (
           <button
             onClick={() => setPlanOpen(true)}
             style={{
@@ -283,7 +218,7 @@ export default function BatchCookingModal({ onClose, semaine }) {
 
         {loading ? (
           <Loader />
-        ) : items.length === 0 && !picking ? (
+        ) : items.length === 0 ? (
           <>
             <EmptyState
               icon={<ChefHat size={28} />}
@@ -327,11 +262,12 @@ export default function BatchCookingModal({ onClose, semaine }) {
                   onChange={e => toggleFait(it.id, e.target.checked)}
                   style={{ width: 18, height: 18, flexShrink: 0 }}
                 />
+                <div style={{ flex: 1, minWidth: 0 }}>
                 {entity ? (
                   <button
                     onClick={() => setDetail({ kind, entity, portions: it.portions })}
                     style={{
-                      flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 4,
+                      width: '100%', minWidth: 0, display: 'flex', alignItems: 'center', gap: 4,
                       background: 'none', border: 'none', padding: 0, fontFamily: 'var(--font)',
                       fontSize: 13, fontWeight: 600, textAlign: 'left',
                       color: it.fait ? 'var(--text-hint)' : 'var(--text)',
@@ -347,7 +283,7 @@ export default function BatchCookingModal({ onClose, semaine }) {
                 ) : (
                   <span
                     style={{
-                      flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
+                      display: 'block', fontSize: 13, fontWeight: 600,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       color: loadingSources && !it.fait ? 'var(--text)' : 'var(--text-hint)',
                       textDecoration: it.fait ? 'line-through' : 'none',
@@ -357,6 +293,17 @@ export default function BatchCookingModal({ onClose, semaine }) {
                     {it.nom}
                   </span>
                 )}
+                {macrosByItem.get(it.id) && (() => {
+                  const m = macrosByItem.get(it.id)
+                  const p = it.portions != null && Number(it.portions) > 1 ? Number(it.portions) : null
+                  return (
+                    <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2, opacity: it.fait ? 0.6 : 1 }}>
+                      {Math.round(m.kcal)} kcal · {Math.round(m.prot)} g P /portion
+                      {p && <> · <strong style={{ color: 'var(--text-muted)' }}>{Math.round(m.kcal * p)} kcal au total</strong></>}
+                    </div>
+                  )
+                })()}
+                </div>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -390,25 +337,15 @@ export default function BatchCookingModal({ onClose, semaine }) {
           </div>
         )}
 
-        {picking ? (
-          <SourcePicker
-            options={pickerOptions}
-            loading={loadingSources}
-            excludeKeys={excludeKeys}
-            onAdd={handleAdd}
-            onCancel={() => setPicking(false)}
-          />
-        ) : (
-          <button
-            onClick={() => setPicking(true)}
-            className="btn-primary"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-          >
-            <Plus size={16} /> Ajouter recettes / repas types
-          </button>
-        )}
+        <button
+          onClick={() => setPicking(true)}
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+        >
+          <Plus size={16} /> Ajouter recettes / repas types
+        </button>
 
-        {doneCount > 0 && !picking && (
+        {doneCount > 0 && (
           <button
             onClick={handleClearDone}
             style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12, fontWeight: 700, color: 'var(--coral)', background: 'none', border: 'none', fontFamily: 'var(--font)' }}
@@ -435,6 +372,18 @@ export default function BatchCookingModal({ onClose, semaine }) {
     )}
 
     {planOpen && <CookingPlanModal semaine={semaine} onClose={() => setPlanOpen(false)} />}
+
+    {picking && (
+      <BatchSourcePicker
+        recettes={recettes}
+        ingredientsByRecette={ingredientsByRecette}
+        repasTypes={repasTypes}
+        loading={loadingSources}
+        excludeKeys={excludeKeys}
+        onAdd={handleAdd}
+        onClose={() => setPicking(false)}
+      />
+    )}
     </>
   )
 }
