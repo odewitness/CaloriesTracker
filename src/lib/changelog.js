@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-25',
+    title: 'Le planificateur propose plus de plats différents',
+    description: "Par défaut, un plan sur 7 jours vise maintenant jusqu'à 7 plats différents pour chaque type de repas, au lieu de 2 seulement. Si tu préfères cuisiner le même plat plusieurs jours de suite, tu peux toujours redescendre ce réglage dans Options avancées > Repas & composition.",
+  },
+  {
     date: '2026-09-23',
     title: 'Un onglet Digestion dans l\'historique',
     description: "Dans Historique, un nouvel onglet Digestion résume tes passages sur la période : régularité, répartition des types, effort à l'évacuation. Il te montre aussi ce qui semble jouer sur ton transit (fibres, hydratation, sport, cycle) et te signale à part si tu as noté du sang ou du mucus, pour ne jamais le noyer dans une moyenne.",

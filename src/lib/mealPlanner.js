@@ -967,12 +967,19 @@ export function batchSummary(plan, { recettesById = {}, templatesById = {} } = {
 // Config de repas par défaut : une brique par repas actif, catégorie déduite du
 // repas. Les repas types de chaque catégorie sont inclus par défaut dans les
 // viviers (interrupteur `includeRepasTypes`).
-export function defaultMealConfig(mealTargets) {
+//
+// `nbDifferentes` par défaut = nombre de jours du plan (plafonné à 7, le max de
+// l'UI) : par défaut on vise un plat différent par jour plutôt qu'une
+// contrainte de batch-cooking — quelqu'un avec beaucoup de recettes ne veut pas
+// revoir les 2 mêmes plats toute la semaine. Qui veut du batch-cooking peut
+// redescendre le curseur « N× » dans Options avancées.
+export function defaultMealConfig(mealTargets, days = 7) {
+  const n = Math.max(1, Math.min(7, days || 7))
   const map = {
-    'Petit-déjeuner': { categorie: 'Petit-déjeuner', nbDifferentes: 2 },
-    'Déjeuner': { categorie: 'Plat', nbDifferentes: 2 },
-    'Dîner': { categorie: 'Plat', nbDifferentes: 2 },
-    'Collation': { categorie: 'Collation', nbDifferentes: 1 },
+    'Petit-déjeuner': { categorie: 'Petit-déjeuner', nbDifferentes: n },
+    'Déjeuner': { categorie: 'Plat', nbDifferentes: n },
+    'Dîner': { categorie: 'Plat', nbDifferentes: n },
+    'Collation': { categorie: 'Collation', nbDifferentes: n },
   }
   const cfg = {}
   for (const [meal, slot] of Object.entries(map)) {

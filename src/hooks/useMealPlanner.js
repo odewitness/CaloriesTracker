@@ -91,16 +91,16 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   // actifs), sauf si l'utilisatrice l'a déjà personnalisé. Les repas exclus de
   // ce plan (config.excludedMeals) sont retirés.
   const effectiveMealConfig = useMemo(() => {
-    const base = config.mealConfig || defaultMealConfig(mealTargets)
+    const base = config.mealConfig || defaultMealConfig(mealTargets, config.days)
     const excluded = new Set(config.excludedMeals || [])
     return Object.fromEntries(Object.entries(base).filter(([meal]) => !excluded.has(meal)))
-  }, [config.mealConfig, config.excludedMeals, mealTargets])
+  }, [config.mealConfig, config.excludedMeals, config.days, mealTargets])
 
   // Config complète (repas exclus INCLUS) pour l'écran de configuration —
   // chaque repas y a une case « inclure ».
   const baseMealConfig = useMemo(
-    () => config.mealConfig || defaultMealConfig(mealTargets),
-    [config.mealConfig, mealTargets],
+    () => config.mealConfig || defaultMealConfig(mealTargets, config.days),
+    [config.mealConfig, config.days, mealTargets],
   )
 
   // ── Plan généré ─────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     setConfigState(c => ({
       ...c,
       mealConfig: typeof updater === 'function'
-        ? updater(c.mealConfig || defaultMealConfig(mealTargets))
+        ? updater(c.mealConfig || defaultMealConfig(mealTargets, c.days))
         : updater,
     }))
     setLockedKeys(new Set())
