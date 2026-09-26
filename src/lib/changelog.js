@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
+    title: 'Note tes symptômes et vois le lien avec les FODMAP',
+    description: "Dans la carte Transit de la page du jour, le + te propose maintenant « Passage » ou « Symptôme sans passage » : tu peux noter un ballonnement, une douleur, des gaz ou une urgence, avec son intensité et l'heure, même sans aller aux toilettes. Dans Historique > Digestion, tu retrouves ces symptômes, et si l'affichage des FODMAP est activé, une comparaison entre les jours où tu as mangé des repas chargés en FODMAP et les autres : ton transit et tes symptômes le jour même et le lendemain. C'est une observation, pas un diagnostic.",
+  },
+  {
+    date: '2026-09-26',
     title: 'Précise les FODMAP de tes aliments perso',
     description: "Quand l'affichage des FODMAP est activé, le formulaire de tes aliments perso a une nouvelle section « FODMAP » : pour chaque famille, tu peux laisser le calcul automatique ou indiquer que l'aliment n'en contient pas (un yaourt sans lactose, un pain sans blé…) ou qu'il en contient. Et quand tu scannes un produit, ses sucres détaillés (lactose, fructose, polyols) sont repris s'il les indique.",
   },

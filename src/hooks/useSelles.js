@@ -142,3 +142,80 @@ export function useLieuxSelles() {
 
   return { lieux, ensureLieu }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useSymptomesDigestifs(dateStr) — symptômes notés sans passage ce jour-là
+// (table `symptomes_digestifs`, chantier FODMAP Palier 4). Même garde-fou
+// STOOL_TRACKER_USER_ID et même API que useSelles.
+// ─────────────────────────────────────────────────────────────────────────────
+export function useSymptomesDigestifs(dateStr) {
+  const { user } = useAuth()
+  const allowed = user?.id === STOOL_TRACKER_USER_ID
+  const [rows, setRows] = useState([])
+  const d = fmt(dateStr)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!allowed || !d) { setRows([]); return }
+    supabase.from('symptomes_digestifs').select('*').eq('user_id', user.id).eq('date', d)
+      .then(({ data }) => { if (!cancelled) setRows(data || []) })
+    return () => { cancelled = true }
+  }, [allowed, user?.id, d])
+
+  const add = async (payload) => {
+    if (!allowed) return { error: 'Non disponible' }
+    const { data, error } = await supabase
+      .from('symptomes_digestifs')
+      .insert([{ ...payload, date: payload.date || d, user_id: user.id }])
+      .select()
+      .single()
+    if (!error && data) setRows(r => [...r, data])
+    return { data, error }
+  }
+
+  const update = async (id, patch) => {
+    if (!allowed) return { error: 'Non disponible' }
+    const { data, error } = await supabase
+      .from('symptomes_digestifs')
+      .update(patch)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single()
+    if (!error && data) setRows(r => r.map(x => (x.id === id ? data : x)))
+    return { data, error }
+  }
+
+  const remove = async (id) => {
+    if (!allowed) return { error: 'Non disponible' }
+    const prev = rows
+    setRows(r => r.filter(x => x.id !== id))
+    const { error } = await supabase
+      .from('symptomes_digestifs')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+    if (error) setRows(prev)
+    return { error }
+  }
+
+  return { entries: sortSelles(rows), add, update, remove }
+}
+
+// Symptômes sur une plage de dates (onglet Digestion de l'Historique).
+export function useSymptomesDigestifsRange(start, end) {
+  const { user } = useAuth()
+  const allowed = user?.id === STOOL_TRACKER_USER_ID
+  const [rows, setRows] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!allowed || !start || !end) { setRows([]); return }
+    supabase.from('symptomes_digestifs').select('*').eq('user_id', user.id)
+      .gte('date', start).lte('date', end).order('date', { ascending: true })
+      .then(({ data }) => { if (!cancelled) setRows(data || []) })
+    return () => { cancelled = true }
+  }, [allowed, user?.id, start, end])
+
+  return { entries: sortSelles(rows) }
+}

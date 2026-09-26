@@ -35,7 +35,7 @@ import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCollationDay } from '../hooks/useCollationDay'
 import { useSport } from '../hooks/useSport'
-import { useSelles, useLieuxSelles } from '../hooks/useSelles'
+import { useSelles, useLieuxSelles, useSymptomesDigestifs } from '../hooks/useSelles'
 import { useDayFodmap } from '../hooks/useFodmapProfile'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
@@ -89,6 +89,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   const isStoolTracker = user?.id === STOOL_TRACKER_USER_ID
   const { entries: stoolEntries, add: addStool, update: updateStool, remove: removeStool } = useSelles(dateStr)
   const { lieux: stoolLieux, ensureLieu: ensureStoolLieu } = useLieuxSelles()
+  const { entries: symptomEntries, add: addSymptom, update: updateSymptom, remove: removeSymptom } = useSymptomesDigestifs(dateStr)
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
 
   // Données non datées, montées une seule fois pour les 3 slots (voir
@@ -188,6 +189,23 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   }
   const handleDeleteStool = async (id) => {
     await removeStool(id)
+    toast('Supprimé')
+    setStoolSheet(null)
+  }
+  // Symptômes sans passage (chantier FODMAP, Palier 4) — même feuille que les
+  // passages, table `symptomes_digestifs`.
+  const handleSaveSymptom = async (payload) => {
+    if (stoolSheet?.initial) {
+      const { error } = await updateSymptom(stoolSheet.initial.id, payload)
+      if (!error) toast('✓ Symptôme modifié !'); else toast('Erreur')
+    } else {
+      const { error } = await addSymptom(payload)
+      if (!error) toast('✓ Symptôme noté !'); else toast("Erreur lors de l'ajout")
+    }
+    setStoolSheet(null)
+  }
+  const handleDeleteSymptom = async (id) => {
+    await removeSymptom(id)
     toast('Supprimé')
     setStoolSheet(null)
   }
@@ -614,6 +632,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
     transit: isStoolTracker ? (
       <StoolSection
         entries={stoolEntries}
+        symptoms={symptomEntries}
         onOpenSheet={() => setStoolSheet({ initial: null })}
         onOpenEntry={(s) => setStoolSheet({ initial: s })}
       />
@@ -692,6 +711,8 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
           lieux={stoolLieux}
           onSave={handleSaveStool}
           onDelete={handleDeleteStool}
+          onSaveSymptom={handleSaveSymptom}
+          onDeleteSymptom={handleDeleteSymptom}
           onClose={() => setStoolSheet(null)}
         />
       )}
