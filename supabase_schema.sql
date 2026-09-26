@@ -1186,6 +1186,23 @@ create table if not exists lieux_selles (
   unique (user_id, nom)
 );
 
+-- 39. TABLE SYMPTOMES_DIGESTIFS (symptômes notés sans passage dans le tracker
+-- de transit — chantier FODMAP, Palier 4, écrit le 2026-09-26, voir
+-- supabase/sql/symptomes_digestifs_setup.sql). UNE LIGNE = UN ÉPISODE.
+-- Séparée de `selles` pour ne pas fausser les stats « une ligne = un
+-- passage ». Même réservation STOOL_TRACKER_USER_ID côté client.
+create table if not exists symptomes_digestifs (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date date not null default current_date,
+  heure time,
+  symptomes text[] not null default '{}', -- clés de DIGESTIVE_SYMPTOMS (src/lib/stool.js) : 'ballonnement' | 'douleur' | 'gaz' | 'urgence'
+  intensite smallint, -- 1 légère | 2 moyenne | 3 forte, check (intensite between 1 and 3), nullable
+  note text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_symptomes_digestifs_user_date on symptomes_digestifs (user_id, date desc);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -1337,6 +1354,10 @@ alter table selles enable row level security;
 -- "own" (for all) — voir supabase/sql/lieux_selles_setup.sql, même pattern
 -- que marques.
 alter table lieux_selles enable row level security;
+
+-- RLS activé sur symptomes_digestifs dès sa création (2026-09-26), policies
+-- « own » select/insert/update/delete — voir supabase/sql/symptomes_digestifs_setup.sql.
+alter table symptomes_digestifs enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

@@ -84,3 +84,28 @@ export function sortSelles(list) {
 export function nowHeure() {
   return new Date().toTimeString().slice(0, 5)
 }
+
+// ── Symptômes sans passage (table `symptomes_digestifs`, chantier FODMAP
+// Palier 4). Une ligne = un épisode, multi-sélection de symptômes + intensité.
+export const DIGESTIVE_SYMPTOMS = [
+  { key: 'ballonnement', label: 'Ballonnement' },
+  { key: 'douleur', label: 'Douleur au ventre' },
+  { key: 'gaz', label: 'Gaz' },
+  { key: 'urgence', label: 'Urgence' },
+]
+export function digestiveSymptomLabel(key) {
+  return DIGESTIVE_SYMPTOMS.find(s => s.key === key)?.label || key
+}
+
+export const SYMPTOM_INTENSITIES = [
+  { value: 1, label: 'Légère' },
+  { value: 2, label: 'Moyenne' },
+  { value: 3, label: 'Forte' },
+]
+export function symptomIntensityLabel(value) {
+  return SYMPTOM_INTENSITIES.find(i => i.value === Number(value))?.label || null
+}
+
+// Remarques de passage qui comptent aussi comme un symptôme digestif dans
+// les corrélations (onglet Digestion).
+export const STOOL_SYMPTOM_REMARQUES = ['douleur', 'ballonnement']

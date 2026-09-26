@@ -8,7 +8,8 @@ import { useMeasurements } from '../hooks/useMeasurements'
 import { useCycle } from '../hooks/useCycle'
 import { useSportRange, useSportStreak } from '../hooks/useSport'
 import { useProfile } from '../hooks/useProfile'
-import { useSellesRange } from '../hooks/useSelles'
+import { useSellesRange, useSymptomesDigestifsRange } from '../hooks/useSelles'
+import { usePeriodFodmap } from '../hooks/useFodmapProfile'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { dayActivityKcal } from '../lib/sport'
 import { phaseForDate } from '../lib/cycle'
@@ -17,7 +18,7 @@ import MacroBar from '../components/MacroBar'
 import CalorieRing from '../components/CalorieRing'
 import NutrientPanel from '../components/NutrientPanel'
 import { SUPPLEMENT_MEAL } from '../components/SupplementSection'
-import { ALL_NUTRIENT_KEYS, computeCalorieNeeds } from '../lib/nutrients'
+import { ALL_NUTRIENT_KEYS, computeCalorieNeeds, MEALS_ORDER } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getPeriodBounds, shiftAnchor, dayStatus, eachDay } from '../lib/history'
 import { useRequestTodayDate } from '../lib/TodayHeaderContext'
@@ -108,6 +109,7 @@ export default function HistoryPage() {
   // l'onglet accessible pour ce compte même sans repas/sport loggés ce jour-là.
   const isStoolUser = user?.id === STOOL_TRACKER_USER_ID
   const { entries: sellesEntries } = useSellesRange(bounds.start, bounds.end)
+  const { entries: symptomEntries } = useSymptomesDigestifsRange(bounds.start, bounds.end)
 
   // ── Chargement du journal (période affichée + précédente) ─────────────────
   useEffect(() => {
@@ -464,6 +466,15 @@ export default function HistoryPage() {
     if (!availableViews.some(v => v.key === view)) setView('resume')
   }, [availableViews, view])
 
+  // FODMAP par jour de la période, pour les corrélations FODMAP ↔ transit de
+  // l'onglet Digestion (chantier FODMAP, Palier 4) — calculé seulement quand
+  // cet onglet est affiché, hors vue Année, et si l'affichage FODMAP est activé.
+  const { byDate: fodmapByDate } = usePeriodFodmap(
+    days,
+    MEALS_ORDER,
+    !!settings.fodmap?.enabled && isStoolUser && activeView === 'digestion' && tab !== 'annee',
+  )
+
   // Période sans repas mais avec de l'activité → on ouvre d'emblée sur Activité.
   useEffect(() => {
     if (!loading && !hasEntries && hasSport && (view === 'resume' || view === 'nutrition')) {
@@ -740,6 +751,8 @@ export default function HistoryPage() {
               cycleDays={cycleDays}
               cycleSettings={settings.cycle}
               sportDates={settings.sport?.enabled ? sportDates : undefined}
+              symptoms={symptomEntries}
+              fodmapByDate={fodmapByDate}
             />
           )}
         </>

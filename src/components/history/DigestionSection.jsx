@@ -3,7 +3,9 @@ import { AlertTriangle } from 'lucide-react'
 import {
   regularityStats, bristolHistogram, effortStats, alertEntries, remarqueCounts,
   bucketDaysByMetric, dayMeanBristol, dayDifficileRate, medianSplit,
+  symptomStats, symptomDates, fodmapTransitStats, fodmapLutealShare,
 } from '../../lib/digestion'
+import { FODMAP_GROUPS } from '../../lib/fodmap'
 import { bristolType, stoolRemarqueLabel, formatHeureSelle } from '../../lib/stool'
 import { waterTotalMl } from '../../lib/water'
 import { phaseForDate } from '../../lib/cycle'
@@ -36,6 +38,44 @@ function CorrelationCard({ color, title, labelA, labelB, stats, effortA, effortB
   )
 }
 
+// Carte FODMAP & transit (chantier FODMAP, Palier 4) : jours chargés en
+// FODMAP vs autres jours, type Bristol et symptômes le jour même et le
+// lendemain, phase lutéale en regard. Formulation d'observation uniquement.
+function FodmapTransitCard({ title, stats, luteal }) {
+  if (!stats) return null
+  const fmt1 = (v) => (Math.round(v * 10) / 10).toString().replace('.', ',')
+  const pct = (v) => `${Math.round(v * 100)} %`
+  const line = (label, j, j1, f) => {
+    if (!j && !j1) return null
+    return (
+      <div>
+        {label} :{' '}
+        {j && <>le jour même <strong>{f(j.meanA)}</strong> vs <strong>{f(j.meanB)}</strong></>}
+        {j && j1 && ' ; '}
+        {j1 && <>le lendemain <strong>{f(j1.meanA)}</strong> vs <strong>{f(j1.meanB)}</strong></>}.
+      </div>
+    )
+  }
+  return (
+    <div className="card" style={{ padding: '12px 14px', marginBottom: 12, borderLeft: '3px solid var(--green)' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>{title}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+        <div style={{ marginBottom: 2 }}>Jours chargés vs autres jours :</div>
+        {line('Type Bristol moyen', stats.bristolJ, stats.bristolJ1, fmt1)}
+        {line('Jours avec symptômes', stats.symptomJ, stats.symptomJ1, pct)}
+        {luteal && (
+          <div>
+            En phase lutéale : <strong>{luteal.loaded} %</strong> des jours chargés vs <strong>{luteal.other} %</strong> des autres.
+          </div>
+        )}
+      </div>
+      <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 6, lineHeight: 1.4 }}>
+        Simple observation, pas une relation de cause à effet : stress, sommeil, cycle et bien d'autres choses jouent aussi. Sur {stats.nLoaded} + {stats.nOther} jours avec repas notés.
+      </div>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DigestionSection — onglet « Digestion » de l'Historique. Réservé au compte
 // STOOL_TRACKER_USER_ID (gardé par l'appelant, HistoryPage.jsx).
@@ -46,8 +86,11 @@ function CorrelationCard({ color, title, labelA, labelB, stats, effortA, effortB
 //   periodDayKeys   — jours calendaires de la période, jours exclus déjà retirés
 //   days            — { dateStr: entrées journal[] } de la période (fibres, eau)
 //   cycleDays, cycleSettings, sportDates — mêmes données que le reste d'Historique
+//   symptoms        — symptômes sans passage de la période (symptomes_digestifs)
+//   fodmapByDate    — usePeriodFodmap(...).byDate, null si l'affichage FODMAP
+//                     est désactivé ou en chargement
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DigestionSection({ tab, selles, periodDayKeys, days, cycleDays, cycleSettings, sportDates }) {
+export default function DigestionSection({ tab, selles, periodDayKeys, days, cycleDays, cycleSettings, sportDates, symptoms = [], fodmapByDate = null }) {
   const regularity = useMemo(() => regularityStats(selles, periodDayKeys), [selles, periodDayKeys])
   const histogram = useMemo(() => bristolHistogram(selles), [selles])
   const maxCount = Math.max(1, ...histogram.map((h) => h.count))
@@ -112,10 +155,31 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
     [hasCycle, selles, periodDayKeys, cycleDays, cycleSettings],
   )
 
-  if (!selles.length) {
+  const symptomSummary = useMemo(() => symptomStats(symptoms, periodDayKeys), [symptoms, periodDayKeys])
+  const symptomDays = useMemo(() => symptomDates(symptoms, selles), [symptoms, selles])
+
+  // ── FODMAP & transit : toutes familles puis famille par famille ──────────
+  const fodmapCards = useMemo(() => {
+    if (!showCorrelations || !fodmapByDate) return []
+    const isLuteal = hasCycle ? (d) => phaseForDate(d, cycleDays, cycleSettings) === 'luteale' : null
+    const keys = [
+      { key: 'any', title: 'FODMAP (toutes familles) & transit' },
+      ...FODMAP_GROUPS.map((g) => ({ key: g.key, title: `${g.label} & transit` })),
+    ]
+    return keys
+      .map(({ key, title }) => ({
+        key,
+        title,
+        stats: fodmapTransitStats({ fodmapByDate, key, selles, symptomDays, periodDayKeys }),
+        luteal: isLuteal ? fodmapLutealShare({ fodmapByDate, key, periodDayKeys, isLuteal }) : null,
+      }))
+      .filter((c) => c.stats)
+  }, [showCorrelations, fodmapByDate, hasCycle, cycleDays, cycleSettings, selles, symptomDays, periodDayKeys])
+
+  if (!selles.length && !symptoms.length) {
     return (
       <div style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 2px 16px' }}>
-        Aucun passage noté sur cette période. Note tes passages depuis la carte <strong>Transit</strong> de la page du jour pour voir tes stats ici.
+        Aucun passage ni symptôme noté sur cette période. Note-les depuis la carte <strong>Transit</strong> de la page du jour pour voir tes stats ici.
       </div>
     )
   }
@@ -123,6 +187,7 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
   return (
     <>
       {/* ── Fréquence & régularité ──────────────────────────────────────── */}
+      {regularity && (<>
       <div className="section-title">Fréquence & régularité</div>
       <div className="card" style={{ padding: '12px 14px', marginBottom: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, fontSize: 12.5 }}>
@@ -154,8 +219,10 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
           </div>
         )}
       </div>
+      </>)}
 
       {/* ── Distribution Bristol ────────────────────────────────────────── */}
+      {selles.length > 0 && (<>
       <div className="section-title">Distribution des types (échelle de Bristol)</div>
       <div className="card" style={{ padding: '12px 14px', marginBottom: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -178,6 +245,7 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
           Types 1-2 = tendance constipation, 3-4 = idéal, 5-7 = tendance diarrhéique.
         </div>
       </div>
+      </>)}
 
       {/* ── Effort & évacuation ─────────────────────────────────────────── */}
       {effort && (effort.pctDifficile != null || effort.pctIncomplete != null) && (
@@ -212,6 +280,41 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
                 {r.label} · {r.count}
               </span>
             ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Symptômes sans passage (FODMAP Palier 4) ────────────────────── */}
+      {symptomSummary && (
+        <>
+          <div className="section-title">Symptômes sans passage</div>
+          <div className="card" style={{ padding: '12px 14px', marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, fontSize: 12.5 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--amber)' }}>{symptomSummary.episodes}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Épisodes notés</div>
+              </div>
+              {symptomSummary.pctDays != null && (
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--amber)' }}>{symptomSummary.pctDays} %</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Jours avec au moins un symptôme</div>
+                </div>
+              )}
+            </div>
+            {symptomSummary.counts.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                {symptomSummary.counts.map((c) => (
+                  <span key={c.key} className="chip" style={{ background: 'var(--amber-light)', color: 'var(--amber)', fontWeight: 600 }}>
+                    {c.label} · {c.count}
+                  </span>
+                ))}
+              </div>
+            )}
+            {symptomSummary.meanIntensity != null && (
+              <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 8 }}>
+                Intensité moyenne : {symptomSummary.meanIntensity < 1.5 ? 'plutôt légère' : symptomSummary.meanIntensity < 2.5 ? 'plutôt moyenne' : 'plutôt forte'}.
+              </div>
+            )}
           </div>
         </>
       )}
@@ -284,7 +387,19 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
         effortB={cycleEffort?.meanB}
         disclaimer="La progestérone ralentit le transit en lutéale — un petit écart est attendu."
       />
-      {showCorrelations && !fibresBristol && !waterBristol && !sportBristol && !cycleBristol && (
+      {fodmapCards.length > 0 && (
+        <>
+          <div className="section-title">FODMAP & transit</div>
+          {fodmapCards.map((c) => (
+            <FodmapTransitCard key={c.key} title={c.title} stats={c.stats} luteal={c.luteal} />
+          ))}
+          <div style={{ fontSize: 10.5, color: 'var(--text-hint)', margin: '-4px 2px 16px', lineHeight: 1.4 }}>
+            Un jour « chargé » a au moins un repas modéré, élevé ou probablement élevé en FODMAP. Les symptômes
+            comptent les épisodes notés sans passage et les passages avec douleur ou ballonnement.
+          </div>
+        </>
+      )}
+      {showCorrelations && !fibresBristol && !waterBristol && !sportBristol && !cycleBristol && !fodmapCards.length && (
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 2px 16px' }}>
           Pas encore assez de jours notés à la fois côté transit et côté alimentation/sport/cycle sur cette période pour dégager une tendance.
         </div>

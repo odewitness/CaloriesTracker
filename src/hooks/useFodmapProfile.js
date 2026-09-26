@@ -192,17 +192,12 @@ export function useRecipeFodmap(recipeId, enabled = true) {
   return state
 }
 
-// ── Journal d'un jour (Palier 2, recettes au Palier 3) ──────────────────────
-// Profils FODMAP de toutes les entrées des repas d'un jour — requêtes Ciqual
-// et recettes groupées — puis cumul par repas. Une recette compte pour ses
-// ingrédients (chacun à sa part de la portion mangée). Renvoie
-// { meals: { [repas]: evaluateMeal(...) }, loading } ; meals = null tant que
-// c'est désactivé ou en chargement.
-export function useDayFodmap(entries, mealNames, enabled) {
-  const mealEntries = useMemo(
-    () => (enabled ? entries.filter(e => mealNames.includes(e.meal)) : []),
-    [entries, mealNames, enabled],
-  )
+
+// ── Journal : chargement groupé + cumul par repas ───────────────────────────
+// Charge en une fois tout ce qu'il faut pour évaluer une liste d'entrées de
+// journal : lignes Ciqual, réglages des aliments perso, recettes et leurs
+// ingrédients. Renvoie { loading, recipes }.
+function useFodmapSources(mealEntries, enabled) {
   const codes = useMemo(() => [...new Set(
     mealEntries.filter(e => e.food_source === 'ciqual' && e.food_ref_id != null).map(e => String(e.food_ref_id)),
   )].sort(), [mealEntries])
@@ -230,36 +225,81 @@ export function useDayFodmap(entries, mealNames, enabled) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadKey, enabled])
 
-  const loading = enabled && loaded.key !== loadKey
+  return { loading: enabled && loaded.key !== loadKey, recipes: loaded.recipes }
+}
 
-  const meals = useMemo(() => {
-    if (!enabled || loading) return null
-    const out = {}
-    for (const meal of mealNames) {
-      const rows = mealEntries.filter(e => e.meal === meal)
-      if (!rows.length) continue
-      const items = []
-      const recipeLevels = {}
-      for (const e of rows) {
-        if (e.food_source !== 'recette') {
-          items.push({ id: e.id, name: e.food_name, qtyG: e.qty_g, profile: profileForRow(e) })
-          continue
-        }
-        const recipeItems = recipeFodmapItems(loaded.recipes[e.food_ref_id], e.qty_g, e.ingredients_detail)
-          .map(it => ({ ...it, id: `${e.id}:${it.id}`, name: `${it.name} (${e.food_name})` }))
-        const ev = recipeItems.length ? evaluateMeal(recipeItems) : null
-        if (!ev?.overall) {
-          items.push({ id: e.id, name: e.food_name, qtyG: e.qty_g, profile: null })
-          continue
-        }
-        items.push(...recipeItems)
-        recipeLevels[e.id] = { overall: ev.overall }
+// Cumul par repas d'entrées de journal (sources déjà chargées). Une recette
+// compte pour ses ingrédients (chacun à sa part de la portion mangée).
+function evaluateMeals(mealEntries, mealNames, recipes) {
+  const out = {}
+  for (const meal of mealNames) {
+    const rows = mealEntries.filter(e => e.meal === meal)
+    if (!rows.length) continue
+    const items = []
+    const recipeLevels = {}
+    for (const e of rows) {
+      if (e.food_source !== 'recette') {
+        items.push({ id: e.id, name: e.food_name, qtyG: e.qty_g, profile: profileForRow(e) })
+        continue
       }
-      const ev = evaluateMeal(items)
-      out[meal] = { ...ev, byId: { ...ev.byId, ...recipeLevels } }
+      const recipeItems = recipeFodmapItems(recipes[e.food_ref_id], e.qty_g, e.ingredients_detail)
+        .map(it => ({ ...it, id: `${e.id}:${it.id}`, name: `${it.name} (${e.food_name})` }))
+      const ev = recipeItems.length ? evaluateMeal(recipeItems) : null
+      if (!ev?.overall) {
+        items.push({ id: e.id, name: e.food_name, qtyG: e.qty_g, profile: null })
+        continue
+      }
+      items.push(...recipeItems)
+      recipeLevels[e.id] = { overall: ev.overall }
+    }
+    const ev = evaluateMeal(items)
+    out[meal] = { ...ev, byId: { ...ev.byId, ...recipeLevels } }
+  }
+  return out
+}
+
+// Journal d'un jour (Palier 2, recettes au Palier 3). Renvoie
+// { meals: { [repas]: evaluateMeal(...) }, loading } ; meals = null tant que
+// c'est désactivé ou en chargement.
+export function useDayFodmap(entries, mealNames, enabled) {
+  const mealEntries = useMemo(
+    () => (enabled ? entries.filter(e => mealNames.includes(e.meal)) : []),
+    [entries, mealNames, enabled],
+  )
+  const { loading, recipes } = useFodmapSources(mealEntries, enabled)
+  const meals = useMemo(
+    () => (!enabled || loading ? null : evaluateMeals(mealEntries, mealNames, recipes)),
+    [enabled, loading, mealEntries, mealNames, recipes],
+  )
+  return { meals, loading }
+}
+
+// Journal d'une période (Palier 4, corrélations de l'onglet Digestion).
+// `days` : { 'YYYY-MM-DD': entrées journal[] }. Renvoie
+// { byDate: { [date]: { any, groups: { oligo, fructose, polyols, lactose } } }, loading } :
+// pour chaque jour avec au moins un aliment dans un repas, si au moins un
+// repas est modéré, élevé ou probablement élevé — toutes familles (`any`) et
+// famille par famille.
+const CHARGED = new Set(['likely-high', 'moderate', 'high'])
+export function usePeriodFodmap(days, mealNames, enabled) {
+  const mealEntries = useMemo(
+    () => (enabled ? Object.values(days || {}).flat().filter(e => mealNames.includes(e.meal)) : []),
+    [days, mealNames, enabled],
+  )
+  const { loading, recipes } = useFodmapSources(mealEntries, enabled)
+  const byDate = useMemo(() => {
+    if (!enabled || loading) return null
+    const byDay = {}
+    for (const e of mealEntries) (byDay[e.date] ||= []).push(e)
+    const out = {}
+    for (const [date, rows] of Object.entries(byDay)) {
+      const meals = Object.values(evaluateMeals(rows, mealNames, recipes)).filter(m => m.overall)
+      if (!meals.length) continue
+      const groups = {}
+      for (const m of meals) for (const r of m.rows) groups[r.key] = groups[r.key] || CHARGED.has(r.level)
+      out[date] = { any: meals.some(m => CHARGED.has(m.overall)), groups }
     }
     return out
-  }, [enabled, loading, mealEntries, mealNames, loaded])
-
-  return { meals, loading }
+  }, [enabled, loading, mealEntries, mealNames, recipes])
+  return { byDate, loading }
 }

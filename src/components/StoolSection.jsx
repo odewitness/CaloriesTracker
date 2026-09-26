@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Plus, ChevronDown, ChevronRight, Droplets } from 'lucide-react'
-import { bristolType, stoolCouleur, formatHeureSelle } from '../lib/stool'
+import { Plus, ChevronDown, ChevronRight, Droplets, Activity } from 'lucide-react'
+import { bristolType, stoolCouleur, formatHeureSelle, sortSelles, digestiveSymptomLabel, symptomIntensityLabel } from '../lib/stool'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StoolSection — carte « Transit » de la page du jour, même esprit que
@@ -10,11 +10,23 @@ import { bristolType, stoolCouleur, formatHeureSelle } from '../lib/stool'
 //
 // Props :
 //   entries       — passages du jour (déjà triés)
+//   symptoms      — symptômes sans passage du jour (table
+//                   `symptomes_digestifs`, chantier FODMAP Palier 4),
+//                   mêlés aux passages par heure
 //   onOpenSheet() — ouvre la feuille « Ajouter un passage »
-//   onOpenEntry(entry) — ouvre la feuille en édition
+//   onOpenEntry(entry) — ouvre la feuille en édition (passage ou symptôme)
 // ─────────────────────────────────────────────────────────────────────────────
-export default function StoolSection({ entries = [], onOpenSheet, onOpenEntry }) {
-  const hasEntries = entries.length > 0
+export default function StoolSection({ entries = [], symptoms = [], onOpenSheet, onOpenEntry }) {
+  const hasEntries = entries.length > 0 || symptoms.length > 0
+  const items = sortSelles([...entries, ...symptoms])
+
+  let subtitle = 'Rien noté pour ce jour'
+  if (hasEntries) {
+    const bits = []
+    if (entries.length) bits.push(`${entries.length} passage${entries.length > 1 ? 's' : ''}`)
+    if (symptoms.length) bits.push(`${symptoms.length} symptôme${symptoms.length > 1 ? 's' : ''}`)
+    subtitle = bits.join(' · ')
+  }
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('stool-collapsed')) ?? false }
@@ -42,7 +54,7 @@ export default function StoolSection({ entries = [], onOpenSheet, onOpenEntry })
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Droplets size={14} color="var(--amber)" />
               <span style={{ fontWeight: 700, fontSize: 14 }}>Transit</span>
-              {hasEntries && (
+              {entries.length > 0 && (
                 <span style={{
                   fontSize: 11, fontWeight: 600,
                   background: 'var(--amber-light)', color: 'var(--amber)',
@@ -53,7 +65,7 @@ export default function StoolSection({ entries = [], onOpenSheet, onOpenEntry })
               )}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
-              {hasEntries ? 'Voir le détail des passages' : 'Rien noté pour ce jour'}
+              {subtitle}
             </div>
           </div>
         </button>
@@ -75,7 +87,39 @@ export default function StoolSection({ entries = [], onOpenSheet, onOpenEntry })
           <div style={{ padding: '10px 14px 12px' }}>
             {hasEntries ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {entries.map((s) => {
+                {items.map((s) => {
+                  if (Array.isArray(s.symptomes)) {
+                    const intensity = symptomIntensityLabel(s.intensite)
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => onOpenEntry(s)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                          padding: '9px 11px', borderRadius: 10, background: 'var(--amber-light)', textAlign: 'left',
+                          fontFamily: 'var(--font)',
+                        }}
+                      >
+                        <span style={{
+                          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                          background: 'var(--amber)', color: 'white',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <Activity size={14} />
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: 13, fontWeight: 700 }}>
+                            {s.symptomes.map(digestiveSymptomLabel).join(', ')}
+                          </span>
+                          <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>
+                            {formatHeureSelle(s.heure) || 'Heure non notée'}
+                            {intensity ? ` · ${intensity.toLowerCase()}` : ''}
+                          </span>
+                        </span>
+                        <ChevronRight size={15} color="var(--text-hint)" style={{ flexShrink: 0 }} />
+                      </button>
+                    )
+                  }
                   const bristol = bristolType(s.bristol)
                   const couleur = stoolCouleur(s.couleur)
                   return (
@@ -113,7 +157,7 @@ export default function StoolSection({ entries = [], onOpenSheet, onOpenEntry })
               </div>
             ) : (
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                Aucun passage noté pour ce jour.
+                Aucun passage ni symptôme noté pour ce jour.
               </div>
             )}
 
@@ -125,7 +169,7 @@ export default function StoolSection({ entries = [], onOpenSheet, onOpenEntry })
                   fontSize: 12, fontWeight: 700, color: 'var(--amber)', fontFamily: 'var(--font)',
                 }}
               >
-                <Plus size={14} /> Ajouter un passage
+                <Plus size={14} /> Ajouter un passage ou un symptôme
               </button>
             )}
           </div>
