@@ -54,6 +54,10 @@ export function mapOFFProduct(p) {
     vit_k1: parseFloat(((n['vitamin-k_100g'] || 0) * 1000000).toFixed(2)),
     folates: parseFloat(((n['folates_100g'] || 0) * 1000000).toFixed(1)),
     portions: p.serving_size ? [{ label: 'Portion recommandée', g: parseFloat(p.serving_size) || 100 }] : [],
+    // Liste d'ingrédients et additifs, pour repérer les sources de FODMAP
+    // (analyzeIngredients, src/lib/fodmap.js). Non enregistrés au journal.
+    _ingredientsText: p.ingredients_text_fr || p.ingredients_text || '',
+    _additives: Array.isArray(p.additives_tags) ? p.additives_tags : [],
     _source: 'off',
   }
 }

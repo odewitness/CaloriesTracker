@@ -11,6 +11,9 @@ import FoodPicker from '../components/FoodPicker'
 import Loader from '../components/Loader'
 import FieldLabel from '../components/FieldLabel'
 import EmptyState from '../components/EmptyState'
+import FodmapPill from '../components/FodmapPill'
+import { useSettings } from '../hooks/useSettings'
+import { useShoppingFodmap } from '../hooks/useFodmapProfile'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NameModal — création / renommage d'une liste
@@ -140,7 +143,18 @@ function AddMenu({ onClose, onQuickAdd, onFromFood, onFromRecipe, onFromMeal, on
 // ─────────────────────────────────────────────────────────────────────────────
 // ItemRow
 // ─────────────────────────────────────────────────────────────────────────────
-function ItemRow({ item, onToggle, onDelete }) {
+// Pastille FODMAP d'un article (chantier FODMAP, Palier 5), seulement si
+// l'affichage est activé : jusqu'où l'aliment reste faible, ou « probable »
+// quand le nom trahit une source de FODMAP sans valeur chiffrée.
+function FodmapHintPill({ hint }) {
+  if (!hint) return null
+  const text = hint.kind === 'probable'
+    ? 'FODMAP probables'
+    : hint.grams < 5 ? 'FODMAP même en petite quantité' : `FODMAP au-delà de ~${hint.grams} g`
+  return <FodmapPill small level={hint.level} text={text} />
+}
+
+function ItemRow({ item, onToggle, onDelete, fodmapHint = null }) {
   return (
     <div className="card" style={{ marginBottom: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
       <button
@@ -168,6 +182,9 @@ function ItemRow({ item, onToggle, onDelete }) {
           <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 2 }}>
             {item.recette_noms.join(', ')}
           </div>
+        )}
+        {fodmapHint && !item.checked && (
+          <div style={{ marginTop: 4 }}><FodmapHintPill hint={fodmapHint} /></div>
         )}
       </div>
 
@@ -238,6 +255,8 @@ function ListeDetail({ liste, onBack }) {
   const [recipeModalOpen, setRecipeModalOpen] = useState(false)
   const [mealModalOpen, setMealModalOpen] = useState(false)
   const [plannedModalOpen, setPlannedModalOpen] = useState(false)
+  const { settings } = useSettings()
+  const fodmapHints = useShoppingFodmap(items, !!settings.fodmap?.enabled)
 
   const grouped = useMemo(() => {
     const map = new Map()
@@ -311,7 +330,7 @@ function ListeDetail({ liste, onBack }) {
               {cat}
             </div>
             {catItems.map(item => (
-              <ItemRow key={item.id} item={item} onToggle={toggleChecked} onDelete={deleteItem} />
+              <ItemRow key={item.id} item={item} onToggle={toggleChecked} onDelete={deleteItem} fodmapHint={fodmapHints?.[item.id] ?? null} />
             ))}
           </div>
         ))}

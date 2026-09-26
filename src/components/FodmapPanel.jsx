@@ -169,7 +169,24 @@ function FoodFodmap({ food, qty }) {
           {profile.note}
         </div>
       )}
+      <IngredientHits hits={profile.ingredientHits} />
     </PanelShell>
+  )
+}
+
+// Sources de FODMAP repérées dans la liste d'ingrédients d'un produit scanné
+// (Open Food Facts) : principales (début de liste, ≥ 5 %, additifs) et
+// secondaires (plus bas dans la liste, donc en plus petite quantité).
+function IngredientHits({ hits }) {
+  if (!hits?.length) return null
+  const main = hits.filter(h => h.main).map(h => h.label)
+  const minor = hits.filter(h => !h.main).map(h => h.label)
+  return (
+    <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, background: 'var(--gray-bg)', borderRadius: 8, padding: '9px 11px', marginTop: 6 }}>
+      <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>Repéré dans les ingrédients</div>
+      {main.length > 0 && <div>{main.join(', ')}</div>}
+      {minor.length > 0 && <div>Plus bas dans la liste, donc en plus petite quantité : {minor.join(', ')}</div>}
+    </div>
   )
 }
 

@@ -272,7 +272,7 @@ export default function FoodPicker({
         // (search.openfoodfacts.org) est plus fiable mais ne renvoie pas
         // d'en-tête CORS pour notre origine : inutilisable depuis le navigateur.
         const data = await fetchOFFWithRetry(
-          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=product_name,product_name_fr,categories,brands,nutriments,serving_size`
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=product_name,product_name_fr,categories,brands,nutriments,serving_size,ingredients_text_fr,ingredients_text,additives_tags`
         )
         if (seq !== searchSeq.current) return   // une recherche plus récente a démarré
         const products = (data.products || [])

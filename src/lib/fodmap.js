@@ -66,6 +66,65 @@ const KEYWORD_RULES = [
   { group: 'fructose', part: null, re: /(\bmiel\b|agave|mangue|pasteque|sirop de glucose-fructose)/ },
 ]
 
+// ── Liste d'ingrédients (produits Open Food Facts, Palier 5) ────────────────
+// Repère dans la liste d'ingrédients d'un produit les sources de FODMAP.
+// Qualitatif : la liste ne donne presque jamais de quantités. Un ingrédient
+// compte comme « principal » s'il est parmi les 3 premiers (la liste est
+// triée par quantité décroissante) ou annoncé à 5 % ou plus ; les additifs
+// polyols et l'inuline comptent toujours (ajoutés pour leur effet, à dose
+// notable). Seuls les ingrédients principaux font passer une famille non
+// chiffrée en « probablement élevé ».
+const INGREDIENT_RULES = [
+  { group: 'polyols', label: 'polyols (édulcorants)', always: true, re: /\b(e ?420|e ?421|e ?953|e ?965|e ?966|e ?967|sorbitol|mannitol|isomalt|maltitol|lactitol|xylitol)\b/ },
+  { group: 'oligo', label: 'inuline / FOS', always: true, re: /(inuline|fructo-?oligosaccharide|oligofructose|\bfos\b|fibres? de chicoree|racine de chicoree)/ },
+  { group: 'oligo', label: 'ail ou oignon', re: /\b(ail|oignons?|echalotes?)\b/ },
+  { group: 'oligo', label: 'blé, seigle ou orge', re: /(\bble\b|froment|seigle|\borge\b|epeautre)/, strip: /(amidon[^,]*|sirop de glucose[^,]*|dextrose[^,]*|maltodextrine[^,]*|gluten[^,]*|proteines? de ble[^,]*|malt d'orge[^,]*|extrait de malt[^,]*)/g },
+  { group: 'oligo', label: 'légumineuses', re: /(pois chiches?|lentilles?|haricots?(?! verts)|\bfeves?\b|farine de pois|farine de soja|graines? de soja)/ },
+  { group: 'lactose', label: 'lait ou lactose', re: /(\blait\b|lactose|lactoserum|petit-lait|poudre de lait|\bcreme\b|fromage blanc|fromage frais|yaourt|babeurre)/, strip: /(sans lactose|lait de coco|lait d'amande|lait d'avoine|lait de riz|lait de soja|creme de coco|beurre de cacao|proteines? de lait|proteines? laitieres)/g },
+  { group: 'fructose', label: 'fructose, miel ou agave', re: /(fructose|sirop d'agave|\bagave\b|\bmiel\b|jus de pomme|jus de poire|concentre de pomme|concentre de poire)/ },
+]
+
+// Découpe au premier niveau (les sous-ingrédients entre parenthèses restent
+// attachés à leur ingrédient) et s'arrête aux mentions de traces.
+function splitIngredients(text) {
+  // OFF marque les allergènes par des _soulignés_ ; apostrophes typographiques unifiées.
+  const t = normalize(text).replace(/_/g, ' ').replace(/[’`]/g, "'").split(/(peut contenir|traces? (eventuelles|possibles|de))/)[0]
+  const out = []
+  let depth = 0, cur = ''
+  for (const ch of t) {
+    if ('([{'.includes(ch)) depth++
+    if (')]}'.includes(ch)) depth = Math.max(0, depth - 1)
+    if ((ch === ',' || ch === ';') && depth === 0) { out.push(cur.trim()); cur = '' }
+    else cur += ch
+  }
+  if (cur.trim()) out.push(cur.trim())
+  return out.filter(Boolean)
+}
+
+export function analyzeIngredients(text, additivesTags = []) {
+  if (!text && !additivesTags?.length) return []
+  const parts = splitIngredients(text || '')
+  const hits = new Map() // label -> { label, group, main }
+  const add = (rule, main) => {
+    const prev = hits.get(rule.label)
+    hits.set(rule.label, { label: rule.label, group: rule.group, main: !!(main || prev?.main) })
+  }
+  parts.forEach((seg, i) => {
+    const pct = seg.match(/(\d+(?:[.,]\d+)?)\s*%/)
+    const main = i < 3 || (pct && parseFloat(pct[1].replace(',', '.')) >= 5)
+    for (const rule of INGREDIENT_RULES) {
+      const clean = rule.strip ? seg.replace(rule.strip, ' ') : seg
+      if (rule.re.test(clean)) add(rule, rule.always || main)
+    }
+  })
+  const tags = (additivesTags || []).map(t => String(t).replace(/^[a-z]{2}:/, '')).join(' ')
+  if (tags) {
+    const polyols = INGREDIENT_RULES[0]
+    if (polyols.re.test(tags)) add(polyols, true)
+  }
+  return [...hits.values()]
+}
+
 // ── Profil /100 g ───────────────────────────────────────────────────────────
 // `food` : objet aliment tel que manipulé par FoodPicker / l'explorateur
 // (alim_nom, categorie, alim_code, _source, colonnes nutriments /100 g).
@@ -104,6 +163,13 @@ export function buildFodmapProfile(food, ciqualRow = null, override = undefined)
     if (rule.re.test(name) && !(rule.unless && rule.unless.test(name))) {
       ;(keywordHits[rule.group] ||= new Set()).add(rule.part)
     }
+  }
+  // Produit Open Food Facts : ingrédients principaux repérés dans la liste.
+  const ingredientHits = food._ingredientsText || food._additives?.length
+    ? analyzeIngredients(food._ingredientsText, food._additives)
+    : []
+  for (const h of ingredientHits) {
+    if (h.main) (keywordHits[h.group] ||= new Set()).add(h.label)
   }
 
   const groups = {}
@@ -205,6 +271,7 @@ export function buildFodmapProfile(food, ciqualRow = null, override = undefined)
     groups,
     note: curated?.note || null,
     curated: !!curated,
+    ingredientHits,
   }
 }
 
@@ -420,4 +487,20 @@ export function passesFodmapFilter(food, qtyG, keys) {
   return keys.every(k => (k === 'all'
     ? LOWISH.has(ev.overall)
     : LOWISH.has(ev.rows.find(r => r.key === k)?.level)))
+}
+
+// ── Liste de courses (Palier 5) ─────────────────────────────────────────────
+// Repère d'un article : la quantité achetée n'est pas celle d'un repas, on
+// indique donc jusqu'où l'aliment reste faible plutôt qu'un niveau. null =
+// rien à signaler (faible jusqu'à au moins 100 g, ou données inconnues).
+export function shoppingFodmapHint(profile) {
+  if (!profile) return null
+  const sp = safePortion(profile)
+  if (sp && Number.isFinite(sp.grams) && sp.grams < 100) {
+    const g = roundPortion(sp.grams)
+    return { kind: 'limit', grams: g, level: g < 5 ? 'high' : 'moderate' }
+  }
+  const ev = evaluateFodmap(profile, 100)
+  if (ev?.overall === 'likely-high') return { kind: 'probable', level: 'likely-high' }
+  return null
 }
