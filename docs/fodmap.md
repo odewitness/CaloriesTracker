@@ -362,6 +362,34 @@ légumineuses / noix → 0,30 g, sinon 0,20 g). Résultat par sous-groupe :
 vert / orange / rouge / inconnu. Le niveau global de l'entrée = le pire des
 sous-groupes connus, avec mention explicite des groupes inconnus.
 
+**Règles fixées en testant la table sur les aliments réels (2026-09-26)** :
+
+1. **Borne basse** : un groupe composé (oligosaccharides = fructanes + GOS ;
+   polyols = sorbitol + mannitol) dont une partie est inconnue reste calculé
+   avec la partie connue. Si cette borne basse dépasse déjà le seuil → la
+   couleur est acquise (pain au seigle : rouge sur ses seuls fructanes, GOS
+   inconnus). Sinon → « probablement faible, données incomplètes », jamais
+   vert franc.
+2. **Polyols** : ordre de priorité = sorbitol + mannitol de `fodmapData.js`
+   (connus seulement si les deux le sont) > colonne Ciqual `polyols` > inconnu.
+   La colonne Ciqual est ignorée pour les entrées marquées
+   `ignoreCiqualPolyols` : les « < 0,5 g/100 g » de Ciqual, convertis en 0 par
+   le correctif, sont trop grossiers pour les fruits (seuil 0,2 g par portion).
+   Plus généralement, pour un **fruit ou légume absent de `fodmapData.js`**,
+   un 0 Ciqual en polyols s'affiche « probablement faible », pas « vert ».
+   Ce n'est pas une erreur du correctif (« < x » → 0 est la convention
+   habituelle pour les totaux nutritionnels), c'est une limite de précision
+   de la donnée ANSES, gérée à l'affichage.
+3. **Fructose en excès depuis Ciqual = bruité** pour les aliments où fructose
+   et glucose sont proches : une petite différence de mesure suffit à faire
+   passer une grosse portion au rouge. Ex. carotte : Ciqual 2025 donne 1,51 /
+   0,89 g (→ rouge), l'USDA 0,55 / 0,59 (→ aucun excès, conforme à toutes les
+   listes FODMAP). Règle : quand une **deuxième source mesurée** contredit
+   Ciqual, `fodmapData.js` remplace fructose/glucose, avec la raison en note
+   (fait pour carotte, raisin, tomate, concombre).
+4. **Seuil fructose à 0,40 g** si le fructose en excès est le seul FODMAP de
+   l'aliment (fruit), 0,15 g sinon (§3.1).
+
 ### 5.3 « Portion sûre »
 
 ```
@@ -548,7 +576,7 @@ Toute feuille/modale montée depuis `TodayPage` → `createPortal(…, document.
 
 | Palier | Contenu | Migration BDD | Taille |
 |---|---|---|---|
-| **0 — Audit données** | ✅ Remplissage Ciqual mesuré, ✅ problème des 0 diagnostiqué (§4.1), ✅ correction `supabase/sql/ciqual_sucres_fix.sql` exécutée et vérifiée en production le 2026-09-26. Reste : lister les ~50 aliments les plus consommés ; constituer `fodmapData.js` (publications + AFCD + livre pour vérifier) | Non | S |
+| **0 — Audit données** | ✅ Remplissage Ciqual mesuré, ✅ problème des 0 diagnostiqué (§4.1), ✅ correction `supabase/sql/ciqual_sucres_fix.sql` exécutée et vérifiée en production le 2026-09-26, ✅ top 60 des aliments consommés relevé, ✅ `src/lib/fodmapData.js` constitué (60 aliments ; 6 codes Ciqual anciens absents de Ciqual 2025 — huile d'olive 20100, carotte 11200, skyr 17010, ail 11420, yaourt 19400, miel 16010 — reçoivent des valeurs complètes). Vérification dans un livre impossible (pas de grammages) : valeurs estimées gardées avec leur niveau de confiance | Non | S |
 | **1 — Fiche aliment** | `fodmap.js` + `fodmapData.js`, bloc FODMAP réactif à la quantité + portion sûre + niveau de confiance, texte d'explication, interrupteur dans le Profil | `settings.fodmap` | M |
 | **2 — Repas & journée** | Pastilles journal, empilement par repas, carte page du jour (réordonnable) | Non | M |
 | **3 — Recettes & explorateur** | Score recette + ingrédient responsable + substitutions, filtres explorateur, override aliments perso, champs OFF | `aliments_custom.fodmap` | M |
