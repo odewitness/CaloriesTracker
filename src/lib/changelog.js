@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
+    title: 'Un planificateur de repas plus simple à régler',
+    description: "Quand tu prépares un plan, tout est maintenant visible sur un seul écran, en 4 étapes : quand, comment choisir les plats, quels repas, quelles recettes. Tu peux choisir de coller à tes objectifs ou de tirer tes plats au hasard, voir combien de recettes passent tes filtres, et imposer ou interdire des recettes au même endroit. Dans l'aperçu, « Ne plus jamais proposer » écarte une recette pour de bon, et après « Régénérer », le bouton « Retour » te rend le plan d'avant. La collation est aussi toujours proposée, même si tu ne l'actives que certains jours.",
+  },
+  {
+    date: '2026-09-26',
     title: 'Retrouve les ingrédients d’une recette ajoutée au journal',
     description: "Quand tu ajoutes une recette à ton journal depuis la recherche, tu peux maintenant ouvrir son détail nutritionnel et voir en dessous la liste de ses ingrédients avec leur grammage. Si tu avais corrigé certaines quantités au moment de l'ajout, l'ancien grammage apparaît barré à côté du nouveau. Un bouton « Voir la fiche » t'amène directement à la recette complète, et la flèche retour te ramène bien à l'écran d'où tu venais.",
   },

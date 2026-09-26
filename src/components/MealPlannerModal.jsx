@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown, Save, FolderOpen, Pencil } from 'lucide-react'
+import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown, Save, FolderOpen, Pencil, Undo2, Ban, Shuffle, Target } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner, MAX_MANUAL_PORTIONS } from '../hooks/useMealPlanner'
 import { useMealPlans } from '../hooks/useMealPlans'
@@ -7,12 +7,13 @@ import { useShoppingLists, useShoppingListItems } from '../hooks/useShoppingList
 import { useBatchCooking } from '../hooks/useBatchCooking'
 import { useBatchCookingSteps } from '../hooks/useBatchCookingSteps'
 import { useToast } from '../lib/toast'
-import { deviationLevel, batchSummary, slotGroupKey, buildVivier, MACRO_STRICTNESS_LEVELS, MACRO_STRICTNESS_LABELS } from '../lib/mealPlanner'
+import { deviationLevel, batchSummary, slotGroupKey, MACRO_STRICTNESS_LEVELS, MACRO_STRICTNESS_LABELS } from '../lib/mealPlanner'
 import { addDaysStr, stashAppliedPlan, removeAppliedPlan } from '../lib/mealPlannerApply'
 import { mondayOf } from '../lib/dates'
 import { SEASONS, getSeasonIcon } from '../lib/seasons'
 import { RECIPE_CATEGORIES } from '../lib/recipeCategories'
 import Loader from './Loader'
+import PlannerRecipeRulesSheet from './PlannerRecipeRulesSheet'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MealPlannerModal — chantier « Planificateur automatique de repas de la
@@ -93,125 +94,82 @@ function MacroRow({ totals, target }) {
   )
 }
 
-// Sélecteur de recettes imposées pour une brique (slot.pinnedIds). Une recette
-// imposée est forcément dans le pool de sa catégorie à la génération, et n'est
-// jamais remplacée par la recherche locale ni par « Régénérer ».
-function PinPicker({ options, pinnedIds, onChange }) {
-  const [open, setOpen] = useState(false)
-  const pinned = new Set(pinnedIds || [])
-  const toggle = (id) => {
-    const next = new Set(pinned)
-    next.has(id) ? next.delete(id) : next.add(id)
-    onChange([...next])
-  }
-  const count = pinned.size
-  return (
-    <div style={{ marginTop: 2 }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: count ? 'var(--green-dark)' : 'var(--text-hint)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '2px 0' }}
-      >
-        <Pin size={11} />
-        {count ? `${count} recette${count > 1 ? 's' : ''} imposée${count > 1 ? 's' : ''}` : 'Imposer une recette'}
-        <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
-      </button>
-      {count > 0 && !open && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-          {[...pinned].map(id => {
-            const o = options.find(x => x.id === id)
-            return (
-              <button
-                key={id}
-                onClick={() => toggle(id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 6, padding: '3px 7px', fontFamily: 'var(--font)' }}
-              >
-                {o?.nom || 'recette supprimée'} <X size={10} />
-              </button>
-            )
-          })}
-        </div>
-      )}
-      {open && (
-        <div style={{ maxHeight: 168, overflowY: 'auto', margin: '4px 0 2px', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px' }}>
-          {options.length === 0 ? (
-            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', padding: '4px 2px' }}>
-              Aucune recette dans cette catégorie.
-            </div>
-          ) : options.map(o => (
-            <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, padding: '4px 2px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={pinned.has(o.id)} onChange={() => toggle(o.id)} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {o.nom}
-                {o.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · repas type</span>}
-              </span>
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Éditeur de composition d'un repas ──────────────────────────────────────
-function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange, pinOptionsFor }) {
+// Une carte par repas : case « dans ce plan », puis ses briques (catégorie +
+// nombre de recettes différentes sur la période). Sous chaque brique, l'effet
+// des filtres (recettes possibles), les imposées qui y tombent, et le partage
+// du pool avec les autres repas de même catégorie.
+function MealSlotsEditor({ meal, slots, included, offInProfile, onToggleIncluded, onChange, possibleByCategory, pinnedByCategory, mealsByCategory }) {
   const setSlot = (i, patch) => onChange(slots.map((s, si) => si === i ? { ...s, ...patch } : s))
   const removeSlot = (i) => onChange(slots.filter((_, si) => si !== i))
-  const addSlot = () => onChange([...slots, { categorie: 'Plat', nbDifferentes: 2 }])
+  const addSlot = () => onChange([...slots, { categorie: 'Dessert', nbDifferentes: 2 }])
 
   return (
-    <div className="card" style={{ padding: '10px 12px', marginBottom: 8, opacity: included ? 1 : 0.55 }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, marginBottom: included ? 6 : 0, cursor: 'pointer' }}>
-        <input type="checkbox" checked={included} onChange={onToggleIncluded} />
+    <div className="card" style={{ padding: '11px 12px', marginBottom: 8, opacity: included ? 1 : 0.6 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>
+        <input type="checkbox" checked={included} onChange={onToggleIncluded} style={{ width: 18, height: 18 }} />
         {meal}
-        {!included && <span style={{ fontWeight: 500, color: 'var(--text-hint)', fontSize: 11 }}>— pas dans ce plan</span>}
+        {!included && <span style={{ fontWeight: 500, color: 'var(--text-hint)', fontSize: 11.5 }}>— pas dans ce plan</span>}
       </label>
+      {offInProfile && (
+        <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.45, margin: '4px 0 0 27px' }}>
+          {included
+            ? 'Désactivée d’habitude : elle sera activée sur les jours du plan, et ses calories prises sur les autres repas.'
+            : 'Désactivée dans ton profil. Coche-la pour l’ajouter à ce plan.'}
+        </div>
+      )}
       {included && (
-        <>
+        <div style={{ marginTop: 10 }}>
           {slots.map((slot, i) => {
-            const pinCount = (slot.pinnedIds || []).length
+            const n = slot.nbDifferentes || 1
+            const possible = possibleByCategory[slot.categorie]?.length ?? 0
+            const pinned = pinnedByCategory[slot.categorie]?.length || 0
+            const others = (mealsByCategory[slot.categorie] || []).filter(m => m !== meal)
+            const empty = possible === 0 && pinned === 0
             return (
-            <div key={i} style={{ marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <select
-                  className="input"
-                  value={slot.categorie}
-                  onChange={e => setSlot(i, { categorie: e.target.value, pinnedIds: [] })}
-                  style={{ flex: 1, fontSize: 12.5, padding: '6px 8px' }}
-                >
-                  {RECIPE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                  <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.max(1, (slot.nbDifferentes || 1) - 1) })} aria-label="Moins">−</button>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, width: 46, textAlign: 'center' }} title="recettes différentes sur la période">
-                    {slot.nbDifferentes || 1}×
-                  </span>
-                  <button className="btn-icon" style={{ width: 26, height: 26 }} onClick={() => setSlot(i, { nbDifferentes: Math.min(7, (slot.nbDifferentes || 1) + 1) })} aria-label="Plus">+</button>
+              <div key={i} style={{ borderTop: i ? '1px solid var(--border)' : 'none', paddingTop: i ? 9 : 0, marginTop: i ? 9 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <select
+                    className="input"
+                    value={slot.categorie}
+                    onChange={e => setSlot(i, { categorie: e.target.value })}
+                    aria-label={`Catégorie de la brique ${i + 1} du ${meal}`}
+                    style={{ flex: 1, fontSize: 13, padding: '7px 8px' }}
+                  >
+                    {RECIPE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {slots.length > 1 && (
+                    <button className="btn-icon" style={{ width: 30, height: 30, color: 'var(--coral)', flexShrink: 0 }} onClick={() => removeSlot(i)} aria-label="Retirer la brique">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
-                {slots.length > 1 && (
-                  <button className="btn-icon" style={{ width: 26, height: 26, color: 'var(--coral)' }} onClick={() => removeSlot(i)} aria-label="Retirer la brique">
-                    <Trash2 size={13} />
-                  </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 7 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Recettes différentes sur la période</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                    <button className="btn-icon" style={{ width: 28, height: 28 }} onClick={() => setSlot(i, { nbDifferentes: Math.max(1, n - 1) })} disabled={n <= 1} aria-label="Moins de recettes différentes">−</button>
+                    <span style={{ fontSize: 14, fontWeight: 800, width: 22, textAlign: 'center' }}>{n}</span>
+                    <button className="btn-icon" style={{ width: 28, height: 28 }} onClick={() => setSlot(i, { nbDifferentes: Math.min(7, n + 1) })} disabled={n >= 7} aria-label="Plus de recettes différentes">+</button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 3, lineHeight: 1.45 }}>
+                  {empty
+                    ? <span style={{ color: 'var(--coral)', fontWeight: 600 }}>Aucune recette ne passe tes filtres ici</span>
+                    : `${possible} recette${possible > 1 ? 's' : ''} possible${possible > 1 ? 's' : ''}`}
+                  {pinned > 0 && ` · ${pinned} imposée${pinned > 1 ? 's' : ''}`}
+                  {pinned > n && ` (donc au moins ${pinned} différentes)`}
+                  {others.length > 0 && ` · mêmes recettes que le ${others.join(' et le ')}`}
+                </div>
               </div>
-              <PinPicker
-                options={pinOptionsFor(slot.categorie)}
-                pinnedIds={slot.pinnedIds}
-                onChange={ids => setSlot(i, { pinnedIds: ids })}
-              />
-              {pinCount > (slot.nbDifferentes || 1) && (
-                <div style={{ fontSize: 10.5, color: 'var(--text-hint)', marginTop: 2 }}>
-                  {pinCount} recettes imposées → au moins {pinCount}× sur la période.
-                </div>
-              )}
-            </div>
-          )})}
+            )
+          })}
           <button
             onClick={addSlot}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--green-dark)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '2px 0' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--green-dark)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '8px 0 0' }}
           >
-            <Plus size={13} /> Ajouter une brique
+            <Plus size={13} /> Ajouter un élément à ce repas (dessert, accompagnement…)
           </button>
-        </>
+        </div>
       )}
     </div>
   )
@@ -225,7 +183,7 @@ function shortDate(dateStr) {
 
 // ── Liste des plans enregistrés (vue configuration) ───────────────────────
 function SavedPlansSection({ plans, onLoad, onRename, onDelete }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [draft, setDraft] = useState('')
   if (!plans.length) return null
@@ -374,44 +332,133 @@ function SavePlanCard({ savedPlanId, savedPlanName, defaultName, onSave }) {
 }
 
 // ── Vue configuration ─────────────────────────────────────────────────────
-function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan, onDeletePlan }) {
+// Un seul écran, sans section repliée, en 4 questions dans l'ordre où on se
+// les pose : Quand ? → Comment choisir ? → Quels repas ? → Quelles recettes ?
+// Le bouton « Générer » vit dans un pied de page fixe (MealPlannerModal).
+const STRICTNESS_HINTS = {
+  strict: 'Colle au plus près de tes calories et macros, quitte à écarter des recettes.',
+  normal: 'Bon compromis entre tes objectifs et la variété.',
+  loose: 'Tolère plus d’écart pour piocher dans davantage de recettes.',
+}
+
+function ConfigSection({ step, title, subtitle, children }) {
+  return (
+    <section style={{ marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9 }}>
+        <span style={{ width: 24, height: 24, borderRadius: 12, background: 'var(--green-light)', color: 'var(--green-dark)', fontSize: 12.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {step}
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 15.5, fontWeight: 800 }}>{title}</div>
+          {subtitle && <div style={{ fontSize: 11.5, color: 'var(--text-hint)', marginTop: 1 }}>{subtitle}</div>}
+        </div>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function FieldLabel({ children, style }) {
+  return <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, ...style }}>{children}</div>
+}
+
+function ToggleRow({ checked, onChange, label, hint }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', padding: '6px 0' }}>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ width: 18, height: 18, flexShrink: 0, marginTop: 1 }} />
+      <span style={{ fontSize: 12.5, lineHeight: 1.4 }}>
+        <span style={{ fontWeight: 600 }}>{label}</span>
+        {hint && <span style={{ display: 'block', fontSize: 11, color: 'var(--text-hint)' }}>{hint}</span>}
+      </span>
+    </label>
+  )
+}
+
+function ModeCard({ active, icon, title, text, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        flex: 1, minWidth: 0, textAlign: 'left', padding: '11px 11px', borderRadius: 14, fontFamily: 'var(--font)',
+        border: `1.5px solid ${active ? 'var(--green)' : 'var(--border)'}`,
+        background: active ? 'var(--green-light)' : 'var(--white)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 800, color: active ? 'var(--green-dark)' : 'var(--text)', marginBottom: 4 }}>
+        {icon} {title}
+      </div>
+      <div style={{ fontSize: 11, lineHeight: 1.4, color: 'var(--text-muted)' }}>{text}</div>
+    </button>
+  )
+}
+
+function ConfigView({ planner, savedPlans, onLoadPlan, onRenamePlan, onDeletePlan }) {
   const {
-    config, mealConfig, baseMealConfig, excludedMeals, setConfig, setMealConfig, toggleMeal,
-    recipeCount, templateCount, favoriteCount, recettes, repasTypes,
+    config, baseMealConfig, excludedMeals, mealsOffInProfile, setConfig, setMealConfig, toggleMeal,
+    setRecipeRule, clearRecipeRules, recettes, repasTypes,
+    possibleByCategory, pinnedByCategory, unplacedPinnedIds,
   } = planner
   const excluded = new Set(excludedMeals)
+  const randomMode = config.randomMode === true
+  const [rulesOpen, setRulesOpen] = useState(false)
 
-  // Options d'épinglage par catégorie : toutes les recettes (+ repas types si
-  // l'option est active) de la catégorie, sans filtre saison/temps — une
-  // recette imposée l'emporte même hors saison. Mémoïsé par catégorie.
-  const pinOptionsCache = useMemo(() => new Map(), [recettes, repasTypes, config.includeRepasTypes])
-  const pinOptionsFor = (categorie) => {
-    if (pinOptionsCache.has(categorie)) return pinOptionsCache.get(categorie)
-    const list = buildVivier(categorie, {
-      recettes, repasTypes, season: null, seasonMode: 'bonus',
-      includeRepasTypes: config.includeRepasTypes !== false,
-    })
-      .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
-      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-    pinOptionsCache.set(categorie, list)
-    return list
-  }
+  // Repas (inclus) qui utilisent chaque catégorie → « mêmes recettes que le
+  // Dîner » sous une brique Plat du Déjeuner.
+  const mealsByCategory = useMemo(() => {
+    const out = {}
+    for (const [meal, slots] of Object.entries(baseMealConfig)) {
+      if (excluded.has(meal)) continue
+      for (const sl of slots) {
+        const list = out[sl.categorie] = out[sl.categorie] || []
+        if (!list.includes(meal)) list.push(meal)
+      }
+    }
+    return out
+  }, [baseMealConfig, excludedMeals]) // eslint-disable-line react-hooks/exhaustive-deps
+  const plannedCategories = useMemo(() => new Set(Object.keys(mealsByCategory)), [mealsByCategory])
 
-  // Change les slots d'un repas ET synchronise « N× » + recettes imposées entre
-  // tous les slots qui partagent la même clé de groupe (ex. « Plat » au déjeuner
-  // et au dîner — un seul vivier, un seul pool).
+  // Change les slots d'un repas ET synchronise « recettes différentes » entre
+  // tous les slots de même catégorie (un seul vivier, un seul pool).
   const changeMealSlots = (meal, nextSlots) => setMealConfig(mc => {
     const updated = { ...mc, [meal]: nextSlots }
     const byKey = {}
-    for (const s of nextSlots) byKey[slotGroupKey(s)] = { nbDifferentes: s.nbDifferentes, pinnedIds: s.pinnedIds }
+    for (const sl of nextSlots) byKey[slotGroupKey(sl)] = sl.nbDifferentes
     for (const [mn, slots] of Object.entries(updated)) {
-      updated[mn] = slots.map(s => {
-        const shared = byKey[slotGroupKey(s)]
-        return shared ? { ...s, nbDifferentes: shared.nbDifferentes, pinnedIds: shared.pinnedIds } : s
-      })
+      updated[mn] = slots.map(sl => byKey[slotGroupKey(sl)] != null ? { ...sl, nbDifferentes: byKey[slotGroupKey(sl)] } : sl)
     }
     return updated
   })
+
+  const entityById = useMemo(() => new Map([...recettes, ...repasTypes].map(e => [e.id, e])), [recettes, repasTypes])
+  const unplaced = new Set(unplacedPinnedIds)
+  const pinnedIds = (config.pinnedIds || []).filter(id => entityById.has(id))
+  const bannedIds = (config.bannedIds || []).filter(id => entityById.has(id))
+
+  const ruleChip = (id, kind) => {
+    const e = entityById.get(id)
+    const isPin = kind === 'pinned'
+    const warn = isPin && unplaced.has(id)
+    return (
+      <button
+        key={`${kind}:${id}`}
+        onClick={() => setRecipeRule(id, null)}
+        aria-label={isPin ? `Ne plus imposer ${e.nom}` : `Autoriser de nouveau ${e.nom}`}
+        title={warn ? 'Aucune brique de sa catégorie dans tes repas : elle ne sera pas utilisée' : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5, maxWidth: '100%',
+          fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', border: 'none', borderRadius: 8, padding: '5px 8px',
+          color: warn ? 'var(--amber)' : isPin ? 'var(--green-dark)' : 'var(--coral)',
+          background: warn ? 'var(--amber-light)' : isPin ? 'var(--green-light)' : 'var(--coral-light)',
+          textDecoration: isPin ? 'none' : 'line-through',
+        }}
+      >
+        {isPin ? <Pin size={11} style={{ flexShrink: 0 }} /> : <Ban size={11} style={{ flexShrink: 0 }} />}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.nom}</span>
+        <X size={11} style={{ flexShrink: 0 }} />
+      </button>
+    )
+  }
 
   return (
     <>
@@ -422,105 +469,102 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
         onDelete={onDeletePlan}
       />
 
-      {/* Jours */}
-      <SectionLabel>Nombre de jours</SectionLabel>
-      <div style={{ display: 'flex', gap: 5, marginBottom: 14, flexWrap: 'wrap' }}>
-        {[1, 2, 3, 4, 5, 6, 7].map(n => (
-          <button key={n} onClick={() => setConfig({ days: n })} style={segBtn(config.days === n)}>{n}</button>
-        ))}
-      </div>
-
-      {/* Jour de début */}
-      <SectionLabel>À partir du</SectionLabel>
-      <input
-        type="date"
-        className="input"
-        value={config.startDateStr}
-        onChange={e => setConfig({ startDateStr: e.target.value })}
-        style={{ marginBottom: 4, fontSize: 13 }}
-      />
-      <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 4 }}>
-        {rangeLabel(config.startDateStr, config.days)}
-      </div>
-
-      <Collapsible label="Options avancées" defaultOpen={false}>
-        {/* Personnes */}
-        <SectionLabel>Personnes</SectionLabel>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <button className="btn-icon" onClick={() => setConfig({ people: Math.max(1, config.people - 1) })} aria-label="Moins">−</button>
-          <span style={{ fontSize: 15, fontWeight: 700, width: 24, textAlign: 'center' }}>{config.people}</span>
-          <button className="btn-icon" onClick={() => setConfig({ people: Math.min(12, config.people + 1) })} aria-label="Plus">+</button>
+      {/* 1 ─ Quand ? */}
+      <ConfigSection step={1} title="Quand ?" subtitle={rangeLabel(config.startDateStr, config.days)}>
+        <div className="card" style={{ padding: '12px 14px' }}>
+          <FieldLabel>Nombre de jours</FieldLabel>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {[1, 2, 3, 4, 5, 6, 7].map(n => (
+              <button key={n} onClick={() => setConfig({ days: n })} style={{ ...segBtn(config.days === n), flex: 1, padding: '8px 0' }}>{n}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <FieldLabel>À partir du</FieldLabel>
+              <input
+                type="date"
+                className="input"
+                value={config.startDateStr}
+                onChange={e => setConfig({ startDateStr: e.target.value })}
+                style={{ fontSize: 13 }}
+              />
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              <FieldLabel>Personnes</FieldLabel>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 42 }}>
+                <button className="btn-icon" onClick={() => setConfig({ people: Math.max(1, config.people - 1) })} disabled={config.people <= 1} aria-label="Moins de personnes">−</button>
+                <span style={{ fontSize: 15, fontWeight: 800, width: 22, textAlign: 'center' }}>{config.people}</span>
+                <button className="btn-icon" onClick={() => setConfig({ people: Math.min(12, config.people + 1) })} aria-label="Plus de personnes">+</button>
+              </div>
+            </div>
+          </div>
+          {config.people > 1 && (
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6 }}>
+              Les quantités de la liste de courses seront multipliées par {config.people}. Les portions du plan restent les tiennes.
+            </div>
+          )}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 16 }}>Pour les quantités de la liste de courses.</div>
+      </ConfigSection>
 
-        {/* Saison */}
-        <SectionLabel>Saison</SectionLabel>
-        <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
-          {SEASONS.map(s => (
-            <button key={s} onClick={() => setConfig({ season: config.season === s ? null : s })} style={segBtn(config.season === s)}>
-              {getSeasonIcon(s)} {s}
-            </button>
-          ))}
-        </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 18 }}>
-          <input
-            type="checkbox"
-            checked={config.seasonMode === 'filter'}
-            onChange={e => setConfig({ seasonMode: e.target.checked ? 'filter' : 'bonus' })}
-            disabled={!config.season}
+      {/* 2 ─ Comment choisir ? */}
+      <ConfigSection step={2} title="Comment choisir les plats ?">
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <ModeCard
+            active={!randomMode}
+            icon={<Target size={15} />}
+            title="Selon mes objectifs"
+            text="Le plan cherche à coller à tes calories et macros."
+            onClick={() => setConfig({ randomMode: false })}
           />
-          Saison stricte
-        </label>
-
-        {/* Temps de cuisine */}
-        <SectionLabel>Temps de cuisine max</SectionLabel>
-        <div style={{ display: 'flex', gap: 5, marginBottom: 18, flexWrap: 'wrap' }}>
-          {[null, 15, 30, 45, 60].map(v => (
-            <button
-              key={v ?? 'any'}
-              onClick={() => setConfig({ maxCookMinutes: v })}
-              style={segBtn((config.maxCookMinutes ?? null) === v)}
-            >
-              {v == null ? 'Peu importe' : `≤ ${v} min`}
-            </button>
-          ))}
+          <ModeCard
+            active={randomMode}
+            icon={<Shuffle size={15} />}
+            title="Au hasard"
+            text="Tirage au sort parmi tes recettes, sans regarder les macros."
+            onClick={() => setConfig({ randomMode: true })}
+          />
         </div>
+        {randomMode ? (
+          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.45, padding: '0 2px' }}>
+            Tes filtres (saison, temps de cuisine) et tes recettes imposées ou interdites restent respectés. Régénère autant que tu veux : le bouton « Retour » ramène le tirage d’avant.
+          </div>
+        ) : (
+          <div className="card" style={{ padding: '12px 14px' }}>
+            <FieldLabel>Précision</FieldLabel>
+            <div style={{ display: 'flex', gap: 5 }}>
+              {MACRO_STRICTNESS_LEVELS.map(v => (
+                <button
+                  key={v}
+                  onClick={() => setConfig({ macroStrictness: v })}
+                  style={{ ...segBtn((config.macroStrictness || 'normal') === v), flex: 1, padding: '8px 4px' }}
+                >
+                  {MACRO_STRICTNESS_LABELS[v]}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '6px 0 6px' }}>
+              {STRICTNESS_HINTS[config.macroStrictness || 'normal']}
+            </div>
+            <ToggleRow
+              checked={config.allowDoublePortions !== false}
+              onChange={v => setConfig({ allowDoublePortions: v })}
+              label="Ajuster les portions"
+              hint="Une demi-part ou une part et demie quand ça rapproche de tes objectifs."
+            />
+            <ToggleRow
+              checked={config.fillMicros !== false}
+              onChange={v => setConfig({ fillMicros: v })}
+              label="Compléter vitamines et minéraux"
+              hint="Ajoute un ou deux de tes favoris quand il manque quelque chose dans la journée."
+            />
+          </div>
+        )}
+      </ConfigSection>
 
-        {/* Précision macros */}
-        <SectionLabel>Précision macros</SectionLabel>
-        <div style={{ display: 'flex', gap: 5, marginBottom: 6, flexWrap: 'wrap' }}>
-          {MACRO_STRICTNESS_LEVELS.map(v => (
-            <button
-              key={v}
-              onClick={() => setConfig({ macroStrictness: v })}
-              style={segBtn((config.macroStrictness || 'normal') === v)}
-            >
-              {MACRO_STRICTNESS_LABELS[v]}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text-hint)', marginBottom: 18 }}>
-          « Souple » tolère plus d'écart aux cibles pour piocher dans davantage de tes recettes ; « Stricte » colle fort aux calories/macros quitte à en écarter certaines.
-        </div>
-
-        {/* Bascules */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-          <input type="checkbox" checked={config.includeRepasTypes !== false} onChange={e => setConfig({ includeRepasTypes: e.target.checked })} />
-          Aussi mes repas types
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-          <input type="checkbox" checked={config.fillMicros !== false} onChange={e => setConfig({ fillMicros: e.target.checked })} />
-          Compléter vitamines &amp; minéraux
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-          <input type="checkbox" checked={config.allowDoublePortions !== false} onChange={e => setConfig({ allowDoublePortions: e.target.checked })} />
-          Ajuster les portions (demi, double...) pour mieux coller aux macros
-        </label>
-
-        {/* Composition des repas */}
-        <SectionLabel>Repas &amp; composition</SectionLabel>
+      {/* 3 ─ Quels repas ? */}
+      <ConfigSection step={3} title="Quels repas ?" subtitle="Coche les repas à planifier et ce qui les compose.">
         {Object.keys(baseMealConfig).length === 0 && (
-          <div className="card" style={{ padding: 14, fontSize: 12.5, color: 'var(--text-hint)', textAlign: 'center', marginBottom: 8 }}>
+          <div className="card" style={{ padding: 14, fontSize: 12.5, color: 'var(--text-hint)', textAlign: 'center' }}>
             Aucun repas activé. Active des repas depuis Profil.
           </div>
         )}
@@ -530,31 +574,111 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
             meal={meal}
             slots={slots}
             included={!excluded.has(meal)}
+            offInProfile={mealsOffInProfile.includes(meal)}
             onToggleIncluded={() => toggleMeal(meal)}
             onChange={next => changeMealSlots(meal, next)}
-            pinOptionsFor={pinOptionsFor}
+            possibleByCategory={possibleByCategory}
+            pinnedByCategory={pinnedByCategory}
+            mealsByCategory={mealsByCategory}
           />
         ))}
-      </Collapsible>
+      </ConfigSection>
 
-      <div style={{ fontSize: 11, color: 'var(--text-hint)', margin: '0 0 12px' }}>
-        {recipeCount} recette{recipeCount > 1 ? 's' : ''} · {templateCount} repas type{templateCount > 1 ? 's' : ''} · {favoriteCount} favori{favoriteCount > 1 ? 's' : ''}
-      </div>
+      {/* 4 ─ Quelles recettes ? */}
+      <ConfigSection step={4} title="Quelles recettes ?" subtitle="Ce dans quoi le plan a le droit de piocher.">
+        <div className="card" style={{ padding: '12px 14px', marginBottom: 8 }}>
+          <FieldLabel>Saison</FieldLabel>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            <button onClick={() => setConfig({ season: null })} style={segBtn(!config.season)}>Toutes</button>
+            {SEASONS.map(se => (
+              <button key={se} onClick={() => setConfig({ season: se })} style={segBtn(config.season === se)}>
+                {getSeasonIcon(se)} {se}
+              </button>
+            ))}
+          </div>
+          {config.season && (
+            <div style={{ display: 'flex', gap: 5, marginTop: 7 }}>
+              <button onClick={() => setConfig({ seasonMode: 'bonus' })} style={{ ...segBtn(config.seasonMode !== 'filter'), flex: 1, fontSize: 12 }}>
+                De saison en priorité
+              </button>
+              <button onClick={() => setConfig({ seasonMode: 'filter' })} style={{ ...segBtn(config.seasonMode === 'filter'), flex: 1, fontSize: 12 }}>
+                Uniquement de saison
+              </button>
+            </div>
+          )}
 
-      <button
-        className="btn-primary"
-        onClick={onGenerate}
-        disabled={Object.keys(mealConfig).length === 0}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: Object.keys(mealConfig).length === 0 ? 0.5 : 1 }}
-      >
-        <Wand2 size={16} /> Générer le plan
-      </button>
+          <FieldLabel style={{ marginTop: 14 }}>Temps de cuisine max (préparation + cuisson)</FieldLabel>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            {[null, 15, 30, 45, 60].map(v => (
+              <button
+                key={v ?? 'any'}
+                onClick={() => setConfig({ maxCookMinutes: v })}
+                style={segBtn((config.maxCookMinutes ?? null) === v)}
+              >
+                {v == null ? 'Peu importe' : `${v} min`}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 8 }}>
+            <ToggleRow
+              checked={config.includeRepasTypes !== false}
+              onChange={v => setConfig({ includeRepasTypes: v })}
+              label="Piocher aussi dans mes repas types"
+            />
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '12px 14px' }}>
+          <FieldLabel>Imposées et interdites</FieldLabel>
+          {pinnedIds.length === 0 && bannedIds.length === 0 ? (
+            <div style={{ fontSize: 11.5, color: 'var(--text-hint)', lineHeight: 1.45, marginBottom: 10 }}>
+              Impose une recette que tu veux absolument dans ce plan, ou interdis celles dont tu ne veux plus.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+                {pinnedIds.map(id => ruleChip(id, 'pinned'))}
+                {bannedIds.map(id => ruleChip(id, 'banned'))}
+              </div>
+              {pinnedIds.some(id => unplaced.has(id)) && (
+                <div style={{ display: 'flex', gap: 5, fontSize: 11, color: 'var(--amber)', fontWeight: 600, marginBottom: 8 }}>
+                  <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+                  En orange : aucun repas ne contient sa catégorie, elle ne sera pas utilisée.
+                </div>
+              )}
+            </>
+          )}
+          <button
+            onClick={() => setRulesOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%',
+              padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--gray-bg)', color: 'var(--text)',
+              border: '1px solid var(--border)', fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+            }}
+          >
+            <Pin size={14} color="var(--green-dark)" /><Ban size={14} color="var(--coral)" /> Imposer ou interdire des recettes
+          </button>
+        </div>
+      </ConfigSection>
+
+      {rulesOpen && (
+        <PlannerRecipeRulesSheet
+          recettes={recettes}
+          repasTypes={repasTypes}
+          config={config}
+          plannedCategories={plannedCategories}
+          onSetRule={setRecipeRule}
+          onClearAll={clearRecipeRules}
+          onClose={() => setRulesOpen(false)}
+        />
+      )}
     </>
   )
 }
 
 // Panneau d'édition d'une brique / d'un aliment « en + » dans l'aperçu.
-function ItemEditor({ item, candidates, onSwap, onRemove, onSetPortions }) {
+function ItemEditor({ item, candidates, onSwap, onRemove, onBan, onSetPortions }) {
   const isAddon = item.kind === 'ajout'
   const portions = item.portions || 1
   return (
@@ -595,8 +719,16 @@ function ItemEditor({ item, candidates, onSwap, onRemove, onSetPortions }) {
         onClick={onRemove}
         style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--coral)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '4px 2px' }}
       >
-        <Trash2 size={12} /> Retirer {isAddon ? 'cet aliment' : 'cette recette'}
+        <Trash2 size={12} /> Retirer {isAddon ? 'cet aliment' : 'de ce repas'}
       </button>
+      {!isAddon && (
+        <button
+          onClick={onBan}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '4px 2px' }}
+        >
+          <Ban size={12} /> Ne plus jamais proposer {item.kind === 'repas_type' ? 'ce repas type' : 'cette recette'}
+        </button>
+      )}
     </div>
   )
 }
@@ -671,9 +803,9 @@ function ShoppingListPicker({ lists, valueId, onChange, onCreate, creating }) {
 // ── Vue aperçu ────────────────────────────────────────────────────────────
 function PreviewView({
   plan, startDateStr, recettesById, templatesById, people,
-  onBack, onRegenerate, generating, onApply, applying, result, applied,
+  onBack, onRegenerate, canUndo, onUndo, generating, onApply, applying, result, applied,
   lockedKeys, onToggleLock, onToggleLockDay,
-  swapCandidates, onSwapItem, onRemoveItem, onSetItemPortions,
+  swapCandidates, onSwapItem, onRemoveItem, onBanItem, onSetItemPortions,
   onAddToBatch, batchState,
   savedPlanId, savedPlanName, defaultPlanName, onSavePlan, replacing,
 }) {
@@ -710,13 +842,25 @@ function PreviewView({
         <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', fontFamily: 'var(--font)' }}>
           <ChevronLeft size={15} /> Réglages
         </button>
-        <button
-          onClick={onRegenerate}
-          disabled={generating}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 8, padding: '7px 12px', fontFamily: 'var(--font)' }}
-        >
-          <RefreshCw size={13} /> Régénérer
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {canUndo && (
+            <button
+              onClick={onUndo}
+              disabled={generating}
+              aria-label="Revenir au plan précédent"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--gray-bg)', border: 'none', borderRadius: 8, padding: '7px 12px', fontFamily: 'var(--font)' }}
+            >
+              <Undo2 size={13} /> Retour
+            </button>
+          )}
+          <button
+            onClick={onRegenerate}
+            disabled={generating}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 8, padding: '7px 12px', fontFamily: 'var(--font)' }}
+          >
+            <RefreshCw size={13} /> Régénérer
+          </button>
+        </div>
       </div>
 
       {plan.warnings?.length > 0 && (
@@ -833,6 +977,7 @@ function PreviewView({
                       candidates={it.kind === 'ajout' ? [] : swapCandidates(di, m.meal, ii)}
                       onSwap={(cid) => { onSwapItem(di, m.meal, ii, cid); setEditing(null) }}
                       onRemove={() => { onRemoveItem(di, m.meal, ii); setEditing(null) }}
+                      onBan={() => { onBanItem(di, m.meal, ii); setEditing(null) }}
                       onSetPortions={(n) => onSetItemPortions(di, m.meal, ii, n)}
                     />
                   )}
@@ -1009,26 +1154,6 @@ function segBtn(active) {
   }
 }
 
-// Section repliable — dépliée par défaut ici (réglages « avancés » visibles
-// d'emblée), repliable pour dégager la vue.
-function Collapsible({ label, children, defaultOpen = true }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div style={{ margin: '4px 0 16px', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}
-      >
-        {label}
-        <ChevronDown size={15} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
-      </button>
-      {open && <div style={{ marginTop: 12 }}>{children}</div>}
-    </div>
-  )
-}
-
-// kcal courant / cible, coloré par l'écart. Remplace les 5 pastilles de macros
-// dans l'aperçu — le détail P/G/L/fibres s'ouvre au tap.
 function KcalPill({ kcal, target }) {
   const level = deviationLevel(kcal, target)
   return (
@@ -1105,6 +1230,19 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
   // rattachement (on continue d'éditer le même plan enregistré).
   const handleGenerate = () => { planner.generate(); setSavedPlanId(null); resetApply(); setStep('preview') }
   const handleRegenerate = () => { planner.regenerate(); resetApply() }
+  // « Ne plus jamais proposer » depuis l'aperçu : interdit la recette pour les
+  // générations suivantes et la remplace tout de suite par une autre de la
+  // même catégorie (ou la retire s'il n'y en a pas).
+  const handleBanItem = (di, meal, ii) => {
+    const it = planner.plan?.days[di]?.meals.find(m => m.meal === meal)?.items[ii]
+    if (!it) return
+    const alts = planner.swapCandidates(di, meal, ii)
+    planner.setRecipeRule(it.id, 'banned')
+    if (alts.length) planner.swapItem(di, meal, ii, alts[Math.floor(Math.random() * alts.length)].id)
+    else planner.removeItem(di, meal, ii)
+    toast(`« ${it.nom} » ne sera plus proposée`)
+  }
+  const handleUndo = () => { if (planner.undoGenerate()) { resetApply(); toast('Plan précédent rétabli') } }
 
   const defaultPlanName = `Plan du ${shortDate(planner.config.startDateStr)} · ${planner.config.days} j`
 
@@ -1275,7 +1413,6 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
         ) : step === 'config' ? (
           <ConfigView
             planner={planner}
-            onGenerate={handleGenerate}
             savedPlans={savedPlans}
             onLoadPlan={handleLoadPlan}
             onRenamePlan={renamePlan}
@@ -1295,6 +1432,7 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
             swapCandidates={planner.swapCandidates}
             onSwapItem={planner.swapItem}
             onRemoveItem={planner.removeItem}
+            onBanItem={handleBanItem}
             onSetItemPortions={planner.setItemPortions}
             onAddToBatch={() => addPlanRecipesToBatch()}
             batchState={batchState}
@@ -1305,6 +1443,8 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
             replacing={replacingWeekPlan}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
+            canUndo={planner.canUndo}
+            onUndo={handleUndo}
             onApply={handleApply}
             applying={applying}
             result={applyResult}
@@ -1324,6 +1464,25 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
           />
         )}
       </div>
+      {!planner.dataLoading && step === 'config' && (() => {
+        const nMeals = Object.keys(planner.mealConfig).length
+        const random = planner.config.randomMode === true
+        return (
+          <div style={{ flexShrink: 0, padding: '10px 16px calc(12px + env(safe-area-inset-bottom))', borderTop: '0.5px solid var(--border)', background: 'var(--white)' }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 7 }}>
+              {planner.config.days} jour{planner.config.days > 1 ? 's' : ''} · {nMeals} repas par jour · {planner.possibleCount} recette{planner.possibleCount > 1 ? 's' : ''} possible{planner.possibleCount > 1 ? 's' : ''}
+            </div>
+            <button
+              className="btn-primary"
+              onClick={handleGenerate}
+              disabled={nMeals === 0}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: nMeals === 0 ? 0.5 : 1 }}
+            >
+              {random ? <Shuffle size={16} /> : <Wand2 size={16} />} {random ? 'Tirer un plan au hasard' : 'Générer le plan'}
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 }

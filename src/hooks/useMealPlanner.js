@@ -5,7 +5,7 @@ import { useRecipes, sumIngredients, calcPer100g } from './useRecipes'
 import { useMealTemplatesList } from './useMealTemplates'
 import { useFavorites } from './useFavorites'
 import { useSettings } from './useSettings'
-import { computeMealTargets } from '../lib/nutrients'
+import { computeMealTargets, MEAL_ENABLED_DEFAULTS, MEALS_ORDER } from '../lib/nutrients'
 import { todayStr } from '../lib/dates'
 import { getCurrentSeason } from '../lib/seasons'
 import {
@@ -47,6 +47,49 @@ function saveStoredConfig(config) {
   }
 }
 
+// Recettes imposées : avant, une liste par brique (slot.pinnedIds). Désormais
+// une liste unique `config.pinnedIds`, symétrique de `config.bannedIds`, et
+// répartie automatiquement dans les briques au moment de générer (voir
+// distributePinned). Convertit une config enregistrée à l'ancien format.
+function normalizeConfig(c) {
+  if (!c) return c
+  const pinned = new Set(c.pinnedIds || [])
+  let mealConfig = c.mealConfig
+  if (mealConfig) {
+    mealConfig = Object.fromEntries(Object.entries(mealConfig).map(([meal, slots]) => [
+      meal,
+      (slots || []).map(({ pinnedIds, ...slot }) => {
+        for (const id of pinnedIds || []) pinned.add(id)
+        return slot
+      }),
+    ]))
+  }
+  const banned = new Set(c.bannedIds || [])
+  return { ...c, mealConfig, pinnedIds: [...pinned].filter(id => !banned.has(id)) }
+}
+
+// Place chaque recette imposée dans la brique de SA catégorie : la première de
+// ses catégories qui correspond à une brique prévue dans le plan. Une imposée
+// dont aucune catégorie n'est prévue est renvoyée dans `unplaced` (l'écran le
+// signale). Le solveur, lui, continue de lire slot.pinnedIds.
+function distributePinned(mealConfig, pinnedIds, entityById) {
+  const plannedCats = new Set(Object.values(mealConfig).flat().map(s => s.categorie))
+  const byCat = {}
+  const unplaced = []
+  for (const id of pinnedIds || []) {
+    const entity = entityById.get(id)
+    if (!entity) continue
+    const cat = (entity.categories || []).find(c => plannedCats.has(c))
+    if (!cat) { unplaced.push(id); continue }
+    ;(byCat[cat] = byCat[cat] || []).push(id)
+  }
+  const withPins = Object.fromEntries(Object.entries(mealConfig).map(([meal, slots]) => [
+    meal,
+    slots.map(s => ({ ...s, pinnedIds: byCat[s.categorie] || [] })),
+  ]))
+  return { mealConfig: withPins, byCat, unplaced }
+}
+
 // Plafond du réglage manuel de portions dans l'aperçu (ItemEditor). Plus haut
 // que le plafond du solveur automatique (2) pour couvrir un vrai batch
 // cooking (« je cuisine ce plat une fois pour toute la semaine »).
@@ -62,7 +105,10 @@ export function useMealPlanner({ defaultStartDate } = {}) {
 
   const dataLoading = loadingRecipes || loadingTemplates || loadingFav || loadingSettings
 
-  const mealTargets = useMemo(() => computeMealTargets(settings), [settings])
+  const globalEnabled = useMemo(
+    () => ({ ...MEAL_ENABLED_DEFAULTS, ...(settings?.meal_enabled || {}) }),
+    [settings],
+  )
 
   // ── Configuration ────────────────────────────────────────────────────────
   // Repart des derniers réglages utilisés (localStorage) quand ils existent —
@@ -78,9 +124,13 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     fillMicros: true,     // compléter les manques vitamines / minéraux du jour
     allowDoublePortions: true, // autoriser plusieurs portions d'un même plat sur un repas
     macroStrictness: 'normal', // 'strict' | 'normal' | 'loose' — précision aux macros, voir mealPlanner.js
+    randomMode: false,    // true : recettes tirées au hasard, sans tenir compte des macros
+    bannedIds: [],        // recettes / repas types interdits (jamais tirés)
+    pinnedIds: [],        // recettes / repas types imposés (forcément dans le plan)
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
-    ...loadStoredConfig(),
+    forcedMeals: [],      // Collation désactivée dans le profil mais incluse dans CE plan
+    ...normalizeConfig(loadStoredConfig()),
     startDateStr: defaultStartDate || todayStr(),
   }))
 
@@ -88,20 +138,73 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   // réglages utilisés » pour la prochaine ouverture du planificateur.
   useEffect(() => { saveStoredConfig(config) }, [config])
 
-  // mealConfig par défaut dès que les cibles par repas sont connues (repas
-  // actifs), sauf si l'utilisatrice l'a déjà personnalisé. Les repas exclus de
-  // ce plan (config.excludedMeals) sont retirés.
-  const effectiveMealConfig = useMemo(() => {
-    const base = config.mealConfig || defaultMealConfig(mealTargets, config.days)
-    const excluded = new Set(config.excludedMeals || [])
-    return Object.fromEntries(Object.entries(base).filter(([meal]) => !excluded.has(meal)))
-  }, [config.mealConfig, config.excludedMeals, config.days, mealTargets])
+  // Repas proposés dans l'écran de réglages : ceux activés dans le profil,
+  // plus TOUJOURS la Collation — elle s'active aussi jour par jour depuis la
+  // page du jour, la cacher quand elle est désactivée par défaut empêchait de
+  // la planifier. Une collation désactivée dans le profil est proposée
+  // décochée ; la cocher la « force » pour ce plan (config.forcedMeals).
+  const plannerMeals = useMemo(
+    () => MEALS_ORDER.filter(m => m in MEAL_ENABLED_DEFAULTS && (globalEnabled[m] || m === 'Collation')),
+    [globalEnabled],
+  )
+  const excludedSet = useMemo(() => {
+    const forced = new Set(config.forcedMeals || [])
+    return new Set([
+      ...(config.excludedMeals || []),
+      ...plannerMeals.filter(m => !globalEnabled[m] && !forced.has(m)),
+    ])
+  }, [config.excludedMeals, config.forcedMeals, plannerMeals, globalEnabled])
 
-  // Config complète (repas exclus INCLUS) pour l'écran de configuration —
-  // chaque repas y a une case « inclure ».
-  const baseMealConfig = useMemo(
-    () => config.mealConfig || defaultMealConfig(mealTargets, config.days),
-    [config.mealConfig, config.days, mealTargets],
+  // Cibles par repas : celles du profil, en activant les repas forcés — comme
+  // l'interrupteur « Collation ce jour » de la page du jour, qui prend ses
+  // calories sur les autres repas.
+  const mealTargets = useMemo(() => {
+    const forcedOn = Object.fromEntries((config.forcedMeals || []).map(m => [m, true]))
+    return computeMealTargets({ ...settings, meal_enabled: { ...globalEnabled, ...forcedOn } })
+  }, [settings, globalEnabled, config.forcedMeals])
+
+  // Composition complète (repas exclus INCLUS) pour l'écran de réglages : la
+  // composition personnalisée enregistrée, complétée par les valeurs par
+  // défaut pour les repas qu'elle ne contient pas (ex. une Collation activée
+  // après avoir personnalisé la composition — avant, elle n'apparaissait plus).
+  const baseMealConfig = useMemo(() => {
+    const defaults = defaultMealConfig(config.days)
+    const stored = config.mealConfig || {}
+    return Object.fromEntries(plannerMeals.map(m => [m, stored[m] || defaults[m]]))
+  }, [config.mealConfig, config.days, plannerMeals])
+
+  const entityById = useMemo(
+    () => new Map([...recettes, ...repasTypes].map(e => [e.id, e])),
+    [recettes, repasTypes],
+  )
+
+  const pinPlacement = useMemo(() => {
+    const included = Object.fromEntries(Object.entries(baseMealConfig).filter(([meal]) => !excludedSet.has(meal)))
+    return distributePinned(included, config.pinnedIds, entityById)
+  }, [baseMealConfig, excludedSet, config.pinnedIds, entityById])
+  const effectiveMealConfig = pinPlacement.mealConfig
+
+  // Recettes réellement tirables par catégorie prévue, avec les filtres du
+  // moment (saison, temps, repas types, interdites) — affiché à côté de chaque
+  // brique et en pied d'écran pour voir l'effet des filtres avant de générer.
+  const possibleByCategory = useMemo(() => {
+    const out = {}
+    for (const slots of Object.values(effectiveMealConfig)) {
+      for (const s of slots) {
+        if (out[s.categorie]) continue
+        out[s.categorie] = buildVivier(s.categorie, {
+          recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
+          includeRepasTypes: config.includeRepasTypes !== false,
+          maxCookMinutes: config.maxCookMinutes || null,
+          bannedIds: config.bannedIds || [],
+        }).map(c => c.id)
+      }
+    }
+    return out
+  }, [effectiveMealConfig, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes, config.maxCookMinutes, config.bannedIds])
+  const possibleCount = useMemo(
+    () => new Set(Object.values(possibleByCategory).flat()).size,
+    [possibleByCategory],
   )
 
   // ── Plan généré ─────────────────────────────────────────────────────────
@@ -111,6 +214,9 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   // régénération. Vidé dès que la config change (les index de jour / repas
   // pourraient ne plus correspondre).
   const [lockedKeys, setLockedKeys] = useState(() => new Set())
+  // Plans précédents (avec leurs verrous), du plus ancien au plus récent : chaque
+  // (re)génération y empile le plan qu'elle remplace, « Retour » le dépile.
+  const [history, setHistory] = useState([])
 
   const setConfig = useCallback((patch) => {
     setConfigState(c => ({ ...c, ...patch }))
@@ -121,20 +227,39 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     setConfigState(c => ({
       ...c,
       mealConfig: typeof updater === 'function'
-        ? updater(c.mealConfig || defaultMealConfig(mealTargets, c.days))
+        ? updater(baseMealConfig)
         : updater,
     }))
     setLockedKeys(new Set())
-  }, [mealTargets])
+  }, [baseMealConfig])
 
   // Exclure / réinclure un repas de CE plan (n'affecte pas meal_enabled).
   const toggleMeal = useCallback((meal) => {
     setConfigState(c => {
       const ex = new Set(c.excludedMeals || [])
-      ex.has(meal) ? ex.delete(meal) : ex.add(meal)
-      return { ...c, excludedMeals: [...ex] }
+      const forced = new Set(c.forcedMeals || [])
+      const onInProfile = !!globalEnabled[meal]
+      const included = !ex.has(meal) && (onInProfile || forced.has(meal))
+      if (included) { ex.add(meal); forced.delete(meal) } else { ex.delete(meal); if (!onInProfile) forced.add(meal) }
+      return { ...c, excludedMeals: [...ex], forcedMeals: [...forced] }
     })
     setLockedKeys(new Set())
+  }, [globalEnabled])
+
+  // Règle d'une recette / d'un repas type pour les générations suivantes :
+  // 'pinned' (imposée), 'banned' (interdite) ou null (libre). Les deux listes
+  // s'excluent. Ne touche pas aux verrous : la structure du plan ne change pas.
+  const setRecipeRule = useCallback((id, rule) => {
+    setConfigState(c => {
+      const pinned = (c.pinnedIds || []).filter(x => x !== id)
+      const banned = (c.bannedIds || []).filter(x => x !== id)
+      if (rule === 'pinned') pinned.push(id)
+      if (rule === 'banned') banned.push(id)
+      return { ...c, pinnedIds: pinned, bannedIds: banned }
+    })
+  }, [])
+  const clearRecipeRules = useCallback(() => {
+    setConfigState(c => ({ ...c, pinnedIds: [], bannedIds: [] }))
   }, [])
 
   const toggleLock = useCallback((dayIndex, meal) => {
@@ -160,6 +285,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   // celui qui colle le mieux aux cibles (weekScore le plus bas). Évite d'avoir
   // à « régénérer » plusieurs fois à la main pour tomber sur un bon résultat.
   const BEST_OF = 4
+  const MAX_HISTORY = 10
 
   const buildOne = useCallback((seed) => {
     // Repas figés depuis le plan courant, pour les clés verrouillées.
@@ -185,8 +311,9 @@ export function useMealPlanner({ defaultStartDate } = {}) {
       maxCookMinutes: config.maxCookMinutes || null,
       fillMicros: config.fillMicros !== false,
       allowDoublePortions: config.allowDoublePortions !== false,
+      bannedIds: config.bannedIds || [],
       settings,
-      options: { seasonMode: config.seasonMode, seed, strictness: config.macroStrictness },
+      options: { seasonMode: config.seasonMode, seed, strictness: config.macroStrictness, randomMode: config.randomMode === true },
       locked,
     })
   }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings, plan, lockedKeys])
@@ -195,23 +322,37 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     setGenerating(true)
     try {
       let best = null
-      for (let i = 0; i < BEST_OF; i++) {
+      // Mode aléatoire : un seul tirage — garder « le meilleur de N » selon le
+      // score macro rétablirait justement la contrainte qu'on veut lever.
+      const tries = config.randomMode ? 1 : BEST_OF
+      for (let i = 0; i < tries; i++) {
         const r = buildOne((baseSeed + i * 0x9e3779b9) >>> 0)
         if (!best || r.weekScore < best.weekScore) best = r
       }
+      if (plan) setHistory(h => [...h.slice(-(MAX_HISTORY - 1)), { plan, lockedKeys }])
       setPlan(best)
       return best
     } finally {
       setGenerating(false)
     }
-  }, [buildOne])
+  }, [buildOne, config.randomMode, plan, lockedKeys])
 
   // Première génération : base de seed aléatoire.
   const generate = useCallback(() => runGenerate((Math.random() * 2 ** 31) >>> 0), [runGenerate])
   // Régénérer : nouvelle base de seed → nouveaux tirages (garde les verrous).
   const regenerate = generate
 
-  const reset = useCallback(() => { setPlan(null); setLockedKeys(new Set()) }, [])
+  // Revient au plan d'avant la dernière (re)génération.
+  const undoGenerate = useCallback(() => {
+    const prev = history[history.length - 1]
+    if (!prev) return false
+    setHistory(h => h.slice(0, -1))
+    setPlan(prev.plan)
+    setLockedKeys(prev.lockedKeys)
+    return true
+  }, [history])
+
+  const reset = useCallback(() => { setPlan(null); setLockedKeys(new Set()); setHistory([]) }, [])
 
   // Recharge un plan enregistré (table plans_repas) : restaure sa config et son
   // aperçu tels quels. `recomputePlanAggregates` rafraîchit les totaux/scores au
@@ -219,8 +360,9 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   const loadSavedPlan = useCallback((saved) => {
     if (!saved) return false
     const hasPlan = Array.isArray(saved.plan?.days) && saved.plan.days.length > 0
-    setConfigState(c => ({ ...c, ...(saved.config || {}) }))
+    setConfigState(c => ({ ...c, ...normalizeConfig(saved.config || {}) }))
     setLockedKeys(new Set())
+    setHistory([])
     setPlan(hasPlan ? recomputePlanAggregates(saved.plan) : null)
     return hasPlan
   }, [])
@@ -261,11 +403,12 @@ export function useMealPlanner({ defaultStartDate } = {}) {
       recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
       includeRepasTypes: config.includeRepasTypes !== false,
       maxCookMinutes: config.maxCookMinutes || null,
+      bannedIds: config.bannedIds || [],
     })
       .filter(c => c.id !== it.id && !usedToday.has(c.id))
       .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes, config.maxCookMinutes])
+  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes, config.maxCookMinutes, config.bannedIds])
 
   const swapItem = useCallback((dayIndex, meal, itemIndex, candidateId) => {
     const rec = recettes.find(r => r.id === candidateId)
@@ -378,10 +521,23 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     const payload = finalRows.map(r => ({ ...r, user_id: user.id, recurrence_group_id: groupId }))
     const { error } = await supabase.from('repas_planifies').insert(payload)
     if (error) return { error }
+    // Collation désactivée dans le profil mais planifiée : on l'active pour
+    // chacun de ces jours (même interrupteur « ce jour » que la page du jour),
+    // sinon ses repas prévus resteraient cachés sous une collation éteinte.
+    if (!globalEnabled.Collation) {
+      const collationDates = [...new Set(finalRows.filter(r => r.meal === 'Collation').map(r => r.date))]
+      if (collationDates.length) {
+        const now = new Date().toISOString()
+        await supabase.from('collation_jours').upsert(
+          collationDates.map(date => ({ user_id: user.id, date, active: true, updated_at: now })),
+          { onConflict: 'user_id,date' },
+        )
+      }
+    }
     // `rows` = lignes insérées, items d'ingrédients déjà développés → prêtes
     // pour addPlannedItems (liste de courses).
     return { inserted: finalRows.length, rows: finalRows, skippedExcluded, skippedConflict, groupId, error: null }
-  }, [plan, user?.id, recettes, repasTypes])
+  }, [plan, user?.id, recettes, repasTypes, globalEnabled])
 
   // Retire d'un coup toutes les lignes d'un plan appliqué (même
   // recurrence_group_id).
@@ -408,15 +564,24 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     config,
     mealConfig: effectiveMealConfig,
     baseMealConfig,
-    excludedMeals: config.excludedMeals || [],
+    excludedMeals: [...excludedSet],
+    mealsOffInProfile: plannerMeals.filter(m => !globalEnabled[m]),
     setConfig,
     setMealConfig,
     toggleMeal,
+    setRecipeRule,
+    clearRecipeRules,
+    unplacedPinnedIds: pinPlacement.unplaced,
+    pinnedByCategory: pinPlacement.byCat,
+    possibleByCategory,
+    possibleCount,
     // plan
     plan,
     generating,
     generate,
     regenerate,
+    undoGenerate,
+    canUndo: history.length > 0,
     loadSavedPlan,
     reset,
     lockedKeys,
