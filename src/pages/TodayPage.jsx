@@ -17,6 +17,7 @@ import AddWaterSheet from '../components/AddWaterSheet'
 import SportSection from '../components/SportSection'
 import SportEntrySheet from '../components/SportEntrySheet'
 import StoolSection from '../components/StoolSection'
+import FodmapDayCard from '../components/FodmapDayCard'
 import StoolEntrySheet from '../components/StoolEntrySheet'
 import StepsSheet from '../components/StepsSheet'
 import SportEnergySheet from '../components/SportEnergySheet'
@@ -35,6 +36,7 @@ import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCollationDay } from '../hooks/useCollationDay'
 import { useSport } from '../hooks/useSport'
 import { useSelles, useLieuxSelles } from '../hooks/useSelles'
+import { useDayFodmap } from '../hooks/useFodmapProfile'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { isWaterEntry, buildWaterEntry, pickDefaultBeverage } from '../lib/water'
 import { saveMealTemplate } from '../hooks/useMealTemplates'
@@ -223,6 +225,10 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   const nonMangesPlanifies = useMemo(() => repasPlanifies.filter(r => !r.mange), [repasPlanifies])
 
   const totals = useMemo(() => computeTotals(entries), [entries])
+  // Charge en FODMAP par repas (chantier FODMAP, Palier 2) — calculée
+  // seulement si l'utilisatrice a activé l'affichage (Profil > FODMAP).
+  const fodmapEnabled = !!settings.fodmap?.enabled
+  const { meals: fodmapMeals } = useDayFodmap(entries, MEALS, fodmapEnabled)
 
   // Énergie d'activité du jour, DÉDOUBLONNÉE (Palier 10) : pas + séances, en
   // écartant les séances marquées « déjà dans mes pas » quand un total de pas
@@ -560,6 +566,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
             onAddFromTemplate={setTemplateAddMeal}
             onCreateTemplate={setTemplateCreateMeal}
             onCopyFromDay={setCopyFromDayMeal}
+            fodmap={fodmapMeals?.[m] ?? null}
           />
         ))}
       </div>
@@ -600,6 +607,9 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
         onOpenPas={() => setPasSheet(true)}
         onShareWeek={handleShareWeek}
       />
+    ) : null,
+    fodmap: fodmapEnabled ? (
+      <FodmapDayCard meals={fodmapMeals} mealOrder={MEALS} />
     ) : null,
     transit: isStoolTracker ? (
       <StoolSection

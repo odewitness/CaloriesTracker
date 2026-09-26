@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
+    title: 'Les FODMAP de tes repas',
+    description: "Si l'affichage des FODMAP est activé, chaque repas de ta page du jour indique maintenant sa charge en FODMAP, en additionnant ses aliments : plusieurs aliments faibles peuvent ensemble dépasser le seuil, et c'est précisé. Les aliments modérés ou élevés portent une petite pastille, et une nouvelle carte « FODMAP » résume ta journée repas par repas (tu peux la déplacer depuis Profil > Page du jour). Les recettes ne sont pas encore comptées.",
+  },
+  {
+    date: '2026-09-26',
     title: 'Vois les FODMAP de tes aliments',
     description: "Si ton ventre réagit à certains aliments, tu peux maintenant activer l'affichage des FODMAP dans Profil > FODMAP. Quand tu ajoutes ou ouvres un aliment, une carte t'indique si la quantité choisie est faible, modérée ou élevée en FODMAP, famille par famille (blé et oignon, fructose, polyols, lactose), et jusqu'à combien de grammes il reste faible. Quand une donnée manque ou est estimée, c'est écrit.",
   },

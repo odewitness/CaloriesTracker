@@ -17,6 +17,8 @@ import { useBackButton } from '../hooks/useBackButton'
 //   onSave(patch) — si fourni, affiche le crayon et permet l'édition inline
 //   onDelete()    — si fourni, affiche le bouton de suppression
 //   onOpenDetail()— si fourni, la ligne (hors édition) devient cliquable
+//   badge         — optionnel, petit élément affiché à droite du nom (ex:
+//                   pastille FODMAP du journal)
 //   bare          — true : pas de "card" ni de padding externe (le parent gère déjà
 //                   sa propre carte/diviseur, ex: MealSection). false (défaut) :
 //                   la ligne s'affiche comme une carte autonome (ex: RecipeFormModal).
@@ -91,7 +93,7 @@ function EditForm({ entry, onSave, onCancel }) {
   )
 }
 
-export default function EditableFoodRow({ entry, onSave, onDelete, onOpenDetail, bare = false }) {
+export default function EditableFoodRow({ entry, onSave, onDelete, onOpenDetail, badge = null, bare = false }) {
   const [editing, setEditing] = useState(false)
 
   if (editing) {
@@ -110,7 +112,10 @@ export default function EditableFoodRow({ entry, onSave, onDelete, onOpenDetail,
         onClick={onOpenDetail}
         style={{ flex: 1, minWidth: 0, cursor: onOpenDetail ? 'pointer' : 'default' }}
       >
-        <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.food_name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{entry.food_name}</div>
+          {badge}
+        </div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
           {entry.qty_g}g &nbsp;·&nbsp;
           <span className="c-prot">P {Math.round(entry.proteines || 0)}g</span>&nbsp;

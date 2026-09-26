@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { buildFodmapProfile } from '../lib/fodmap'
+import { buildFodmapProfile, evaluateMeal } from '../lib/fodmap'
+import { entryToFood } from '../lib/journalEntry'
 
 // Colonnes Ciqual utiles au calcul FODMAP. Relues en base plutôt que prises
 // sur l'objet aliment : un aliment venant d'une entrée de journal (récents,
@@ -38,4 +39,62 @@ export function useFodmapProfile(food, enabled = true) {
     [enabled, food, row, loading],
   )
   return { profile, loading }
+}
+
+// ── Journal d'un jour (Palier 2) ────────────────────────────────────────────
+// Profils FODMAP de toutes les entrées des repas d'un jour, avec une seule
+// requête Ciqual pour les codes pas encore en cache, puis cumul par repas.
+// Renvoie { meals: { [repas]: evaluateMeal(...) }, loading } ; meals = null
+// tant que c'est désactivé ou en chargement.
+export function useDayFodmap(entries, mealNames, enabled) {
+  const mealEntries = useMemo(
+    () => (enabled ? entries.filter(e => mealNames.includes(e.meal)) : []),
+    [entries, mealNames, enabled],
+  )
+  const codes = useMemo(() => [...new Set(
+    mealEntries.filter(e => e.food_source === 'ciqual' && e.food_ref_id != null).map(e => String(e.food_ref_id)),
+  )].sort(), [mealEntries])
+  const codesKey = codes.join(',')
+  const [version, setVersion] = useState(0)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    const missing = codes.filter(c => !rowCache.has(c))
+    if (!missing.length) return
+    let cancelled = false
+    supabase.from('ciqual').select(CIQUAL_COLS).in('alim_code', missing)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        // En cas d'erreur réseau, on calcule quand même avec les valeurs
+        // portées par les entrées (sans les mettre en cache).
+        if (error) { setFailed(true); return }
+        for (const c of missing) rowCache.set(c, null)
+        for (const r of data || []) rowCache.set(String(r.alim_code), r)
+        setVersion(v => v + 1)
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codesKey])
+
+  const loading = enabled && !failed && codes.some(c => !rowCache.has(c))
+
+  const meals = useMemo(() => {
+    if (!enabled || loading) return null
+    const out = {}
+    for (const meal of mealNames) {
+      const items = mealEntries.filter(e => e.meal === meal).map(e => ({
+        id: e.id,
+        name: e.food_name,
+        qtyG: e.qty_g,
+        profile: e.food_source === 'recette'
+          ? null
+          : buildFodmapProfile(entryToFood(e), e.food_source === 'ciqual' ? rowCache.get(String(e.food_ref_id)) ?? null : null),
+      }))
+      if (items.length) out[meal] = evaluateMeal(items)
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, loading, mealEntries, mealNames, version])
+
+  return { meals, loading }
 }

@@ -5,6 +5,7 @@ import { useFodmapProfile } from '../hooks/useFodmapProfile'
 import {
   FODMAP_GROUPS, evaluateFodmap, safePortion, roundPortion, formatGrams,
 } from '../lib/fodmap'
+import FodmapPill, { FODMAP_LEVEL_STYLE } from './FodmapPill'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FodmapPanel — charge en FODMAP d'un aliment à la quantité saisie (chantier
@@ -17,14 +18,7 @@ import {
 // ingrédient d'une recette arrive au Palier 3.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LEVEL_STYLE = {
-  low: { label: 'Faible', dot: 'var(--green)', bg: 'var(--green-light)', color: 'var(--green-dark)' },
-  'likely-low': { label: 'Probablement faible', dot: 'var(--green)', bg: 'var(--gray-bg)', color: 'var(--text-muted)' },
-  unknown: { label: 'Inconnu', dot: 'var(--text-hint)', bg: 'var(--gray-bg)', color: 'var(--text-muted)' },
-  'likely-high': { label: 'Probablement élevé', dot: 'var(--amber)', bg: 'var(--amber-light)', color: 'var(--amber)' },
-  moderate: { label: 'Modéré', dot: 'var(--amber)', bg: 'var(--amber-light)', color: 'var(--amber)' },
-  high: { label: 'Élevé', dot: 'var(--coral)', bg: 'var(--coral-light)', color: 'var(--coral)' },
-}
+const LEVEL_STYLE = FODMAP_LEVEL_STYLE
 const OVERALL_LABEL = { unknown: 'Données incomplètes' }
 
 const CONFIDENCE_LABEL = {
@@ -37,18 +31,6 @@ const CONFIDENCE_LABEL = {
 }
 
 const GROUP_LABEL_LOWER = Object.fromEntries(FODMAP_GROUPS.map(g => [g.key, g.label.toLowerCase()]))
-
-function Pill({ level, text }) {
-  const s = LEVEL_STYLE[level] || LEVEL_STYLE.unknown
-  return (
-    <span style={{
-      fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 999,
-      background: s.bg, color: s.color, whiteSpace: 'nowrap', flexShrink: 0,
-    }}>
-      {text || s.label}
-    </span>
-  )
-}
 
 function portionText(sp) {
   if (!sp) return null
@@ -103,7 +85,7 @@ export default function FodmapPanel({ food, qty }) {
             pour {Math.round(qtyG)} g
           </span>
         </span>
-        <Pill level={ev.overall} text={OVERALL_LABEL[ev.overall]} />
+        <FodmapPill level={ev.overall} text={OVERALL_LABEL[ev.overall]} />
         <ChevronDown size={18} color="var(--text-muted)" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
       </button>
 
