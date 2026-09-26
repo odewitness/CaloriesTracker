@@ -1,8 +1,19 @@
 import React, { useState, useMemo } from 'react'
-import { X, ChevronLeft } from 'lucide-react'
+import { X, ChevronLeft, BookOpen } from 'lucide-react'
 import NutrientPanel from './NutrientPanel'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
+
+// Re-scale une liste d'ingrédients (voir journal.ingredients_detail) au
+// grammage total en cours d'édition, en conservant l'ancien grammage barré
+// (`qty_g_avant`) au prorata si présent.
+function rescaleIngredients(list, factor) {
+  return (list || []).map(i => ({
+    food_name: i.food_name,
+    qty_g: Math.round(i.qty_g * factor * 10) / 10,
+    ...(i.qty_g_avant != null ? { qty_g_avant: Math.round(i.qty_g_avant * factor * 10) / 10 } : {}),
+  }))
+}
 
 function MacroGrid({ live }) {
   const items = [
@@ -24,7 +35,7 @@ function MacroGrid({ live }) {
   )
 }
 
-export default function FoodDetailModal({ entry, onUpdate, onClose, onBack }) {
+export default function FoodDetailModal({ entry, onUpdate, onClose, onBack, onOpenRecipe }) {
   // Si on vient d'un drill-down (ex: liste des aliments riches en tel nutriment),
   // le bouton matériel "retour" doit remonter d'un niveau (onBack) plutôt que
   // fermer toute la pile de modaux (onClose).
@@ -58,6 +69,17 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack }) {
     return t
   }, [entry, f])
 
+  // Aliment ajouté depuis une recette via la recherche (FoodPicker) : seul
+  // chemin d'ajout où le journal garde un lien vers la recette (food_ref_id)
+  // — voir CLAUDE.md / RecipeQuantityAdjustModal. Le bouton "Voir la fiche"
+  // s'appuie uniquement sur ce lien (disponible même sur les entrées
+  // anciennes) ; la liste d'ingrédients, elle, n'existe que si l'entrée porte
+  // un `ingredients_detail` (ajoutée après l'introduction de cette fonctionnalité).
+  const isRecipeEntry = entry.food_source === 'recette' && !!entry.food_ref_id
+  const liveIngredients = useMemo(() => (
+    entry.ingredients_detail?.length ? rescaleIngredients(entry.ingredients_detail, f) : null
+  ), [entry, f])
+
   const dirty = parseFloat(qty) !== entry.qty_g
 
   const save = async () => {
@@ -75,6 +97,9 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack }) {
     for (const key of ALL_NUTRIENT_KEYS) {
       const raw = live[key]
       patch[key] = raw != null ? parseFloat(raw.toFixed(4)) : null
+    }
+    if (entry.ingredients_detail?.length) {
+      patch.ingredients_detail = rescaleIngredients(entry.ingredients_detail, f)
     }
     const { error } = await onUpdate(entry.id, patch)
     setSaving(false)
@@ -121,6 +146,54 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack }) {
           )}
 
           <NutrientPanel totals={live} hasEntries={true} defaultOpen={true} />
+
+          {isRecipeEntry && (
+            <div style={{ marginTop: 16 }}>
+              {liveIngredients && (
+                <>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Ingrédients</div>
+                  {liveIngredients.map((ing, idx) => {
+                    const changed = ing.qty_g_avant != null && Math.round(ing.qty_g_avant) !== Math.round(ing.qty_g)
+                    return (
+                      <div
+                        key={idx}
+                        className="card"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', marginBottom: 6 }}
+                      >
+                        <span style={{ fontSize: 13, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
+                          {ing.food_name}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
+                          {changed && (
+                            <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontWeight: 400, marginRight: 6 }}>
+                              {Math.round(ing.qty_g_avant)} g
+                            </span>
+                          )}
+                          {Math.round(ing.qty_g)} g
+                        </span>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
+
+              {typeof onOpenRecipe === 'function' && (
+                <button
+                  onClick={() => onOpenRecipe(entry.food_ref_id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                    width: '100%', padding: '9px 12px', marginTop: liveIngredients ? 4 : 0,
+                    background: 'var(--gray-bg)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-muted)', fontSize: 12.5, fontWeight: 600,
+                    fontFamily: 'var(--font)',
+                  }}
+                >
+                  <BookOpen size={14} /> Voir la fiche
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

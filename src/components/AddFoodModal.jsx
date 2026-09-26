@@ -15,6 +15,7 @@ export default function AddFoodModal({ initialMeal, top10Gaps, onAdd, onClose })
 
   const handleConfirm = async (food, qty) => {
     const entry = { meal, ...scaleFood(food, qty) }
+    if (food._ingredientsDetail) entry.ingredients_detail = food._ingredientsDetail
     await onAdd(entry)
   }
 

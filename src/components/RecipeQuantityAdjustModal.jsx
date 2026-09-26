@@ -19,7 +19,9 @@ import Loader from './Loader'
 //   recetteId, recetteNom
 //   currentQtyG — grammage actuellement affiché dans FoodPicker, sert de
 //                 point de départ pour mettre les ingrédients à l'échelle
-//   onApply(newQtyG, newPer100)
+//   onApply(newQtyG, newPer100, ingredientsSnapshot) — ingredientsSnapshot =
+//                 [{ food_name, qty_g, qty_g_base }], grammage final et
+//                 grammage avant correction pour chaque ingrédient
 //   onClose()
 // ─────────────────────────────────────────────────────────────────────────────
 export default function RecipeQuantityAdjustModal({ recetteId, recetteNom, currentQtyG, onApply, onClose }) {
@@ -59,6 +61,7 @@ export default function RecipeQuantityAdjustModal({ recetteId, recetteNom, curre
         id:           i.id,
         food_name:    i.food_name,
         qty_g:        baseQty * adjustFactor,
+        qty_g_base:   baseQty,
         energie_kcal: (i.energie_kcal || 0) * totalFactor,
         proteines:    (i.proteines    || 0) * totalFactor,
         glucides:     (i.glucides     || 0) * totalFactor,
@@ -89,7 +92,15 @@ export default function RecipeQuantityAdjustModal({ recetteId, recetteNom, curre
     if (!ingredients || totalQtyG <= 0) return
     const totaux = sumIngredients(scaledIngredients)
     const per100 = calcPer100g(totaux, totalQtyG)
-    onApply(Math.round(totalQtyG * 10) / 10, per100)
+    // Instantané ingrédient par ingrédient (grammage avant/après correction),
+    // pour que le journal puisse plus tard afficher "nouveau grammage, ancien
+    // grammage barré" — voir FoodDetailModal.
+    const ingredientsSnapshot = scaledIngredients.map(i => ({
+      food_name: i.food_name,
+      qty_g: Math.round(i.qty_g * 10) / 10,
+      qty_g_base: Math.round(i.qty_g_base * 10) / 10,
+    }))
+    onApply(Math.round(totalQtyG * 10) / 10, per100, ingredientsSnapshot)
     onClose()
   }
 

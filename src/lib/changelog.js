@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-26',
+    title: 'Retrouve les ingrédients d’une recette ajoutée au journal',
+    description: "Quand tu ajoutes une recette à ton journal depuis la recherche, tu peux maintenant ouvrir son détail nutritionnel et voir en dessous la liste de ses ingrédients avec leur grammage. Si tu avais corrigé certaines quantités au moment de l'ajout, l'ancien grammage apparaît barré à côté du nouveau. Un bouton « Voir la fiche » t'amène directement à la recette complète, et la flèche retour te ramène bien à l'écran d'où tu venais.",
+  },
+  {
     date: '2026-09-25',
     title: 'Choisis ta fournée en connaissance de cause',
     description: "Quand tu ajoutes des recettes ou des repas types à « Ma fournée », tu retrouves la même vue que dans « Mes aliments » : recherche (même par ingrédient), tri et filtres par catégorie, saison ou temps, et les calories et macros d'une portion sur chaque carte. Tu vois le total de ta sélection avant de valider, et en haut de ta fournée, un récap te montre quelle part de tes objectifs de la semaine elle couvre.",
