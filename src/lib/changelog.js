@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
+    title: 'Les FODMAP de tes recettes',
+    description: "Avec l'affichage des FODMAP activé, tes recettes ont maintenant leur carte FODMAP : dans l'onglet Nutriments de la recette, quand tu l'ajoutes au journal et dans le détail d'une recette déjà notée. Elle t'indique jusqu'à combien de grammes la recette reste faible, quels ingrédients pèsent le plus et ce qu'on utilise souvent à la place (par exemple de l'huile infusée à l'ail au lieu de l'ail). Tes recettes comptent aussi dans la charge de tes repas. Dans l'explorateur, les filtres ont une nouvelle section « FODMAP à la portion » pour ne garder que les aliments faibles, en tout ou famille par famille.",
+  },
+  {
+    date: '2026-09-26',
     title: 'Les FODMAP de tes repas',
     description: "Si l'affichage des FODMAP est activé, chaque repas de ta page du jour indique maintenant sa charge en FODMAP, en additionnant ses aliments : plusieurs aliments faibles peuvent ensemble dépasser le seuil, et c'est précisé. Les aliments modérés ou élevés portent une petite pastille, et une nouvelle carte « FODMAP » résume ta journée repas par repas (tu peux la déplacer depuis Profil > Page du jour). Les recettes ne sont pas encore comptées.",
   },

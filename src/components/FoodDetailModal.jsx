@@ -83,7 +83,8 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack, onOp
   ), [entry, f])
 
   // Aliment /100 g reconstruit depuis l'entrée, pour le bloc FODMAP (qui relit
-  // lui-même la ligne Ciqual à jour quand l'entrée vient de Ciqual).
+  // lui-même la ligne Ciqual à jour quand l'entrée vient de Ciqual, ou les
+  // ingrédients quand c'est une recette).
   const fodmapFood = useMemo(() => entryToFood(entry), [entry])
 
   const dirty = parseFloat(qty) !== entry.qty_g
@@ -153,7 +154,7 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack, onOp
 
           <NutrientPanel totals={live} hasEntries={true} defaultOpen={true} />
 
-          <FodmapPanel food={fodmapFood} qty={qty} />
+          <FodmapPanel food={fodmapFood} qty={qty} ingredientsDetail={entry.ingredients_detail} />
 
           {isRecipeEntry && (
             <div style={{ marginTop: 16 }}>

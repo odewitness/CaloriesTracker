@@ -10,7 +10,8 @@ import { LEVEL_RANK } from '../lib/fodmap'
 // Rendue par TodayPage uniquement si settings.fodmap.enabled.
 //
 // Props :
-//   meals     — { [repas]: evaluateMeal(...) } (useDayFodmap), null en chargement
+//   meals     — { [repas]: evaluateMeal(...) } (useDayFodmap), null en chargement.
+//               Les recettes y comptent pour leurs ingrédients.
 //   mealOrder — ordre d'affichage des repas
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ function MealBlock({ meal, ev }) {
       ))}
       {ev.skipped > 0 && (
         <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 4 }}>
-          {ev.skipped === 1 ? '1 recette n’est pas comptée' : `${ev.skipped} recettes ne sont pas comptées`} (pas encore de calcul par ingrédient).
+          {ev.skipped === 1 ? '1 élément n’a pas pu être compté' : `${ev.skipped} éléments n’ont pas pu être comptés`} faute de données.
         </div>
       )}
     </div>
@@ -78,7 +79,7 @@ export default function FodmapDayCard({ meals, mealOrder }) {
   let subtitle
   if (loading) subtitle = 'Calcul en cours…'
   else if (!list.length) subtitle = 'Rien noté pour ce jour'
-  else if (!worst) subtitle = 'Les recettes ne sont pas encore prises en compte'
+  else if (!worst) subtitle = 'Pas assez de données pour ce jour'
   else if (FODMAP_NOTABLE.has(worst.ev.overall)) subtitle = `Repas le plus chargé : ${worst.meal}`
   else if (worst.ev.overall === 'low') subtitle = 'Tous tes repas restent sous les seuils'
   else subtitle = 'Sous les seuils d’après les données connues'
@@ -112,7 +113,7 @@ export default function FodmapDayCard({ meals, mealOrder }) {
               : (
                 <div key={meal} style={{ padding: '10px 0', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{meal}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>recette non comptée</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>non compté</span>
                 </div>
               )
           ))}

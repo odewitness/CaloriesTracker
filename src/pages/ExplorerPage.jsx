@@ -28,6 +28,13 @@ import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
 import { useToast } from '../lib/toast'
 import { todayStr } from '../lib/dates'
+import { passesFodmapFilter, memoFodmapProfile, evaluateFodmap } from '../lib/fodmap'
+import FodmapPill, { FODMAP_NOTABLE } from '../components/FodmapPill'
+
+const FODMAP_ROW_LABEL = {
+  low: 'FODMAP faible', 'likely-low': 'FODMAP prob. faible', 'likely-high': 'FODMAP prob. élevé',
+  moderate: 'FODMAP modéré', high: 'FODMAP élevé',
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerPage — parcours de la base Ciqual pour trouver des aliments adaptés
@@ -90,7 +97,11 @@ function ControlButton({ icon, label, badge, active, onClick }) {
 // une carte tient ensemble un aliment et TOUT ce qui le décrit (catégorie,
 // badge, valeur du tri), là où une suite de filets donnait un mur de texte où
 // rien n'accrochait l'œil.
-function ExplorerRow({ food, sortField, sort, isFav, onSelect, onToggleFav, gapFields, remainingKcal, usage, onQuickAdd }) {
+// fodmapMode (optionnel, affichage FODMAP activé) : 'notable' = pastille
+// seulement pour les aliments modérés/élevés à la portion ; 'all' = pour tous
+// les niveaux connus (quand un filtre FODMAP est actif, pour voir pourquoi
+// l'aliment passe).
+function ExplorerRow({ food, sortField, sort, isFav, onSelect, onToggleFav, gapFields, remainingKcal, usage, onQuickAdd, fodmapMode = null }) {
   const { base, kcalRef } = sort
   const val = fieldValue(food, sortField, base, kcalRef)
   const portion = getPortion(food)
@@ -118,6 +129,11 @@ function ExplorerRow({ food, sortField, sort, isFav, onSelect, onToggleFav, gapF
   // micro-nutriment, qui n'est visible nulle part ailleurs.
   const badge = getNutriBadge(food)
   const micro = getRichMicroClaims(food, 1)[0]
+
+  // Niveau FODMAP à la portion usuelle (la même que l'ajout rapide).
+  const fodmapLevel = fodmapMode ? evaluateFodmap(memoFodmapProfile(food), portion.g)?.overall : null
+  const showFodmap = !!fodmapLevel && FODMAP_ROW_LABEL[fodmapLevel] &&
+    (fodmapMode === 'all' || FODMAP_NOTABLE.has(fodmapLevel))
 
   const category = getCategoryLabel(food.categorie)
   const catColor = getFoodCategoryColor(category)
@@ -162,8 +178,9 @@ function ExplorerRow({ food, sortField, sort, isFav, onSelect, onToggleFav, gapF
           )}
         </div>
 
-        {(badge || micro) && (
+        {(badge || micro || showFodmap) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+            {showFodmap && <FodmapPill small level={fodmapLevel} text={FODMAP_ROW_LABEL[fodmapLevel]} />}
             {badge && (
               <span style={{ background: badge.bg, color: badge.color, borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 600 }}>
                 {badge.emoji} {badge.label}
@@ -256,6 +273,7 @@ export default function ExplorerPage() {
   const { foods, loading, error } = useCiqualCatalog()
   const { favorites, isFavorite, toggleFavorite } = useFavorites()
   const { settings } = useSettings()
+  const fodmapEnabled = !!settings.fodmap?.enabled
   const toast = useToast()
 
   const today = useMemo(() => todayStr(), [])
@@ -340,6 +358,11 @@ export default function ExplorerPage() {
 
   const results = useMemo(() => {
     let list = filterFoods(foods, filters, { isFavorite, remainingKcal: remaining })
+    // Filtres FODMAP : à la portion usuelle de chaque aliment (100 g sans
+    // portion renseignée, comme le filtre calories restantes).
+    if (fodmapEnabled && filters.fodmap?.length) {
+      list = list.filter(f => passesFodmapFilter(f, getPortion(f).g, filters.fodmap))
+    }
     // Classement par portion : seuls les aliments ayant une portion renseignée
     // en base sont comparables entre eux (voir hasDeclaredPortion). Ne
     // s'applique qu'aux nutriments réels : `base` peut valoir 'portion' en
@@ -350,7 +373,7 @@ export default function ExplorerPage() {
     // un critère invisible et sans rapport avec le tri affiché.
     if (sort.base === 'portion' && !sortField.virtual) list = list.filter(hasDeclaredPortion)
     return sortFoods(list, sort, getUsage)
-  }, [foods, filters, sort, isFavorite, remaining, usageMap, sortField])
+  }, [foods, filters, sort, isFavorite, remaining, usageMap, sortField, fodmapEnabled])
 
   // Suggestion à deux aliments (voir suggestCombo) : reste réservée à « tient
   // dans mes calories restantes » coché, c'est le seul cas où combiner deux
@@ -456,6 +479,7 @@ export default function ExplorerPage() {
 
   const activeFilterCount =
     filters.claims.length + filters.categories.length + filters.cooking.length +
+    (fodmapEnabled ? filters.fodmap.length : 0) +
     (filters.favoritesOnly ? 1 : 0) + (filters.fitsRemainingKcal ? 1 : 0)
 
   return (
@@ -589,6 +613,7 @@ export default function ExplorerPage() {
               remainingKcal={filters.fitsRemainingKcal ? remaining : null}
               usage={getUsage(food)}
               onQuickAdd={handleQuickAdd}
+              fodmapMode={fodmapEnabled ? (filters.fodmap.length ? 'all' : 'notable') : null}
             />
           ))}
           {visible < results.length && (
@@ -607,6 +632,7 @@ export default function ExplorerPage() {
         <ExplorerFilterSheet
           filters={filters}
           categories={categories}
+          fodmapEnabled={fodmapEnabled}
           onChange={setFilters}
           onClose={() => setFilterOpen(false)}
         />

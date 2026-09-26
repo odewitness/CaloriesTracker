@@ -408,15 +408,23 @@ probablement **la fonctionnalité la plus utile** au quotidien.
 
 ### 5.4 Repas, journée, recette
 
-- **Repas** : cumul par famille des entrées du même `meal` (§3.3). Les
-  recettes ne sont pas comptées avant le Palier 3 (signalé à l'écran).
+- **Repas** : cumul par famille des entrées du même `meal` (§3.3). Depuis
+  le Palier 3, une recette du journal compte pour ses ingrédients.
 - **Journée** : résumé repas par repas (niveau, familles en cause, aliments
   qui pèsent le plus). Décision Palier 2 : **pas de total journalier** comparé
   aux ~3 g/j du régime pauvre en FODMAP — c'est un repère de régime (hors
   périmètre, §1), et Monash raisonne par repas espacés de 2–3 h.
-- **Recette** : somme des ingrédients (`recette_ingredients`, qui ont
-  `food_ref_id`), rapportée au poids cuit (`poids_cuit_g`), puis à la portion.
-  Montrer **quel ingrédient pèse le plus** et une substitution possible.
+- **Recette** (Palier 3, `recipeFodmapItems` dans
+  `src/hooks/useFodmapProfile.js`) : une portion de P g = chaque ingrédient
+  à sa quantité crue × P ÷ poids de référence (`poids_cuit_g`, sinon
+  `poids_cru_g`, sinon somme des ingrédients — même référence que l'ajout au
+  journal), puis cumul comme un repas (`evaluateMeal`). Une entrée de journal
+  avec `ingredients_detail` (grammages corrigés à l'ajout) garde les
+  proportions de cet instantané, appariées par nom. Portion sûre : charges
+  calculées pour 100 g, proportionnelles à la portion (`mealSafePortion`).
+  Affiché : niveau par famille en « × le seuil », ingrédients qui pèsent le
+  plus, et alternatives couramment citées (`fodmapSubstitution`) pour les
+  ingrédients des familles modérées ou élevées.
 - **Fructose en excès** : à calculer **aliment par aliment**, pas sur des
   totaux (sinon le glucose d'un aliment « compense » artificiellement le
   fructose d'un autre). Conséquence : pour une recette, le fructose en excès
@@ -588,7 +596,7 @@ Toute feuille/modale montée depuis `TodayPage` → `createPortal(…, document.
 | **0 — Audit données** | ✅ Remplissage Ciqual mesuré, ✅ problème des 0 diagnostiqué (§4.1), ✅ correction `supabase/sql/ciqual_sucres_fix.sql` exécutée et vérifiée en production le 2026-09-26, ✅ top 60 des aliments consommés relevé, ✅ `src/lib/fodmapData.js` constitué (60 aliments ; 6 codes Ciqual anciens absents de Ciqual 2025 — huile d'olive 20100, carotte 11200, skyr 17010, ail 11420, yaourt 19400, miel 16010 — reçoivent des valeurs complètes). Vérification dans un livre impossible (pas de grammages) : valeurs estimées gardées avec leur niveau de confiance | Non | S |
 | **1 — Fiche aliment** | ✅ Mergé sur main le 2026-09-26 (commit 339856c, colonne `settings.fodmap` créée en prod) : `src/lib/fodmap.js` (calcul), `src/hooks/useFodmapProfile.js` (relit la ligne Ciqual à jour), `src/components/FodmapPanel.jsx` (bloc dans l'ajout d'aliment, la fiche d'une entrée du journal et la fiche de l'explorateur ; masqué pour recettes et compléments), Profil > FODMAP (`FodmapSection.jsx`). Mots-clés du nom pour les aliments hors table (« probablement élevé ») | `settings.fodmap` | M |
 | **2 — Repas & journée** | ✅ Mergé sur main le 2026-09-26 : `evaluateMeal` (cumul par repas, §3.3), `useDayFodmap` (une requête Ciqual groupée par jour), ligne « FODMAP du repas » sous l'en-tête de chaque repas, pastille sur les aliments modérés/élevés/probablement élevés du journal (`FodmapPill.jsx`), carte « FODMAP » de la page du jour (`FodmapDayCard.jsx`, clé `fodmap` de `todaySections.js`, affichée seulement si activé). Recettes non comptées | Non | M |
-| **3 — Recettes & explorateur** | Score recette + ingrédient responsable + substitutions, filtres explorateur, override aliments perso, champs OFF | `aliments_custom.fodmap` | M |
+| **3 — Recettes & explorateur** | 🚧 Branche `feature/fodmap-recettes-explorateur` : carte FODMAP des recettes (fiche recette onglet Nutriments, ajout d'une recette, fiche d'une recette du journal) avec ingrédients responsables et alternatives ; recettes comptées dans le cumul des repas ; explorateur : section « FODMAP à la portion » dans les filtres (faibles en FODMAP / par famille, à la portion usuelle, familles inconnues écartées) et pastille sur les aliments modérés/élevés. **Reste (3b)** : override par aliment perso (`aliments_custom.fodmap`) et champs OFF | `aliments_custom.fodmap` (3b) | M |
 | **4 — Transit** | Symptômes sans passage dans le tracker de transit, corrélations FODMAP ↔ transit/symptômes (J et J+1) avec la phase du cycle en regard | `symptomes_digestifs` | M |
 | **5 — Extensions** | Scanner (additifs/ingrédients), liste de courses ; planificateur à rediscuter | Non | M |
 

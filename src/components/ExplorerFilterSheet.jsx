@@ -2,6 +2,7 @@ import React from 'react'
 import { useBackButton } from '../hooks/useBackButton'
 import { CLAIM_GROUPS, DEFAULT_FILTERS, chipLabel, COOKING_OPTIONS } from '../lib/ciqualExplorer'
 import ExplorerSheetSection from './ExplorerSheetSection'
+import { FODMAP_FILTERS } from '../lib/fodmap'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ExplorerFilterSheet — filtres de l'explorateur Ciqual.
@@ -37,7 +38,7 @@ function ChipGrid({ children }) {
   return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{children}</div>
 }
 
-export default function ExplorerFilterSheet({ filters, categories, onChange, onClose }) {
+export default function ExplorerFilterSheet({ filters, categories, fodmapEnabled = false, onChange, onClose }) {
   useBackButton(onClose)
 
   const toggleIn = (list, value) =>
@@ -47,6 +48,7 @@ export default function ExplorerFilterSheet({ filters, categories, onChange, onC
 
   const activeCount =
     filters.claims.length + filters.categories.length + filters.cooking.length +
+    (fodmapEnabled ? filters.fodmap.length : 0) +
     (filters.favoritesOnly ? 1 : 0) + (filters.showSeasonings ? 1 : 0) +
     (filters.fitsRemainingKcal ? 1 : 0)
 
@@ -95,6 +97,34 @@ export default function ExplorerFilterSheet({ filters, categories, onChange, onC
             </ExplorerSheetSection>
           )
         })}
+
+        {/* ── FODMAP ──
+            Seulement si l'affichage FODMAP est activé (Profil > FODMAP).
+            Calculé à la portion usuelle de l'aliment ; une famille dont on
+            ne connaît pas la teneur ne passe jamais le filtre. */}
+        {fodmapEnabled && (
+          <ExplorerSheetSection
+            title="FODMAP à la portion"
+            count={filters.fodmap.length}
+            collapsible
+            defaultOpen={filters.fodmap.length > 0}
+          >
+            <ChipGrid>
+              {FODMAP_FILTERS.map(f => (
+                <Chip
+                  key={f.key}
+                  label={f.label}
+                  active={filters.fodmap.includes(f.key)}
+                  onClick={() => set({ fodmap: toggleIn(filters.fodmap, f.key) })}
+                />
+              ))}
+            </ChipGrid>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6 }}>
+              Calculé sur la portion affichée (100 g quand l'aliment n'en a pas).
+              Les aliments dont la teneur n'est pas connue sont écartés.
+            </div>
+          </ExplorerSheetSection>
+        )}
 
         {/* ── Cuisson ──
             Déduite du libellé de l'aliment, pas d'une colonne : environ deux
