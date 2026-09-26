@@ -47,6 +47,49 @@ function saveStoredConfig(config) {
   }
 }
 
+// Recettes imposées : avant, une liste par brique (slot.pinnedIds). Désormais
+// une liste unique `config.pinnedIds`, symétrique de `config.bannedIds`, et
+// répartie automatiquement dans les briques au moment de générer (voir
+// distributePinned). Convertit une config enregistrée à l'ancien format.
+function normalizeConfig(c) {
+  if (!c) return c
+  const pinned = new Set(c.pinnedIds || [])
+  let mealConfig = c.mealConfig
+  if (mealConfig) {
+    mealConfig = Object.fromEntries(Object.entries(mealConfig).map(([meal, slots]) => [
+      meal,
+      (slots || []).map(({ pinnedIds, ...slot }) => {
+        for (const id of pinnedIds || []) pinned.add(id)
+        return slot
+      }),
+    ]))
+  }
+  const banned = new Set(c.bannedIds || [])
+  return { ...c, mealConfig, pinnedIds: [...pinned].filter(id => !banned.has(id)) }
+}
+
+// Place chaque recette imposée dans la brique de SA catégorie : la première de
+// ses catégories qui correspond à une brique prévue dans le plan. Une imposée
+// dont aucune catégorie n'est prévue est renvoyée dans `unplaced` (l'écran le
+// signale). Le solveur, lui, continue de lire slot.pinnedIds.
+function distributePinned(mealConfig, pinnedIds, entityById) {
+  const plannedCats = new Set(Object.values(mealConfig).flat().map(s => s.categorie))
+  const byCat = {}
+  const unplaced = []
+  for (const id of pinnedIds || []) {
+    const entity = entityById.get(id)
+    if (!entity) continue
+    const cat = (entity.categories || []).find(c => plannedCats.has(c))
+    if (!cat) { unplaced.push(id); continue }
+    ;(byCat[cat] = byCat[cat] || []).push(id)
+  }
+  const withPins = Object.fromEntries(Object.entries(mealConfig).map(([meal, slots]) => [
+    meal,
+    slots.map(s => ({ ...s, pinnedIds: byCat[s.categorie] || [] })),
+  ]))
+  return { mealConfig: withPins, byCat, unplaced }
+}
+
 // Plafond du réglage manuel de portions dans l'aperçu (ItemEditor). Plus haut
 // que le plafond du solveur automatique (2) pour couvrir un vrai batch
 // cooking (« je cuisine ce plat une fois pour toute la semaine »).
@@ -80,9 +123,10 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     macroStrictness: 'normal', // 'strict' | 'normal' | 'loose' — précision aux macros, voir mealPlanner.js
     randomMode: false,    // true : recettes tirées au hasard, sans tenir compte des macros
     bannedIds: [],        // recettes / repas types interdits (jamais tirés)
+    pinnedIds: [],        // recettes / repas types imposés (forcément dans le plan)
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
-    ...loadStoredConfig(),
+    ...normalizeConfig(loadStoredConfig()),
     startDateStr: defaultStartDate || todayStr(),
   }))
 
@@ -93,11 +137,41 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   // mealConfig par défaut dès que les cibles par repas sont connues (repas
   // actifs), sauf si l'utilisatrice l'a déjà personnalisé. Les repas exclus de
   // ce plan (config.excludedMeals) sont retirés.
-  const effectiveMealConfig = useMemo(() => {
+  const entityById = useMemo(
+    () => new Map([...recettes, ...repasTypes].map(e => [e.id, e])),
+    [recettes, repasTypes],
+  )
+
+  const pinPlacement = useMemo(() => {
     const base = config.mealConfig || defaultMealConfig(mealTargets, config.days)
     const excluded = new Set(config.excludedMeals || [])
-    return Object.fromEntries(Object.entries(base).filter(([meal]) => !excluded.has(meal)))
-  }, [config.mealConfig, config.excludedMeals, config.days, mealTargets])
+    const included = Object.fromEntries(Object.entries(base).filter(([meal]) => !excluded.has(meal)))
+    return distributePinned(included, config.pinnedIds, entityById)
+  }, [config.mealConfig, config.excludedMeals, config.days, config.pinnedIds, mealTargets, entityById])
+  const effectiveMealConfig = pinPlacement.mealConfig
+
+  // Recettes réellement tirables par catégorie prévue, avec les filtres du
+  // moment (saison, temps, repas types, interdites) — affiché à côté de chaque
+  // brique et en pied d'écran pour voir l'effet des filtres avant de générer.
+  const possibleByCategory = useMemo(() => {
+    const out = {}
+    for (const slots of Object.values(effectiveMealConfig)) {
+      for (const s of slots) {
+        if (out[s.categorie]) continue
+        out[s.categorie] = buildVivier(s.categorie, {
+          recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
+          includeRepasTypes: config.includeRepasTypes !== false,
+          maxCookMinutes: config.maxCookMinutes || null,
+          bannedIds: config.bannedIds || [],
+        }).map(c => c.id)
+      }
+    }
+    return out
+  }, [effectiveMealConfig, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes, config.maxCookMinutes, config.bannedIds])
+  const possibleCount = useMemo(
+    () => new Set(Object.values(possibleByCategory).flat()).size,
+    [possibleByCategory],
+  )
 
   // Config complète (repas exclus INCLUS) pour l'écran de configuration —
   // chaque repas y a une case « inclure ».
@@ -142,23 +216,20 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     setLockedKeys(new Set())
   }, [])
 
-  // Remplace la liste des recettes / repas types interdits. Une recette
-  // interdite est aussi retirée des recettes imposées (contradictoire).
-  const setBannedIds = useCallback((ids) => {
-    const banned = new Set(ids)
-    setConfigState(c => ({
-      ...c,
-      bannedIds: ids,
-      mealConfig: c.mealConfig
-        ? Object.fromEntries(Object.entries(c.mealConfig).map(([meal, slots]) => [
-          meal,
-          slots.map(s => (s.pinnedIds || []).some(id => banned.has(id))
-            ? { ...s, pinnedIds: s.pinnedIds.filter(id => !banned.has(id)) }
-            : s),
-        ]))
-        : c.mealConfig,
-    }))
-    setLockedKeys(new Set())
+  // Règle d'une recette / d'un repas type pour les générations suivantes :
+  // 'pinned' (imposée), 'banned' (interdite) ou null (libre). Les deux listes
+  // s'excluent. Ne touche pas aux verrous : la structure du plan ne change pas.
+  const setRecipeRule = useCallback((id, rule) => {
+    setConfigState(c => {
+      const pinned = (c.pinnedIds || []).filter(x => x !== id)
+      const banned = (c.bannedIds || []).filter(x => x !== id)
+      if (rule === 'pinned') pinned.push(id)
+      if (rule === 'banned') banned.push(id)
+      return { ...c, pinnedIds: pinned, bannedIds: banned }
+    })
+  }, [])
+  const clearRecipeRules = useCallback(() => {
+    setConfigState(c => ({ ...c, pinnedIds: [], bannedIds: [] }))
   }, [])
 
   const toggleLock = useCallback((dayIndex, meal) => {
@@ -259,7 +330,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   const loadSavedPlan = useCallback((saved) => {
     if (!saved) return false
     const hasPlan = Array.isArray(saved.plan?.days) && saved.plan.days.length > 0
-    setConfigState(c => ({ ...c, ...(saved.config || {}) }))
+    setConfigState(c => ({ ...c, ...normalizeConfig(saved.config || {}) }))
     setLockedKeys(new Set())
     setHistory([])
     setPlan(hasPlan ? recomputePlanAggregates(saved.plan) : null)
@@ -454,7 +525,12 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     setConfig,
     setMealConfig,
     toggleMeal,
-    setBannedIds,
+    setRecipeRule,
+    clearRecipeRules,
+    unplacedPinnedIds: pinPlacement.unplaced,
+    pinnedByCategory: pinPlacement.byCat,
+    possibleByCategory,
+    possibleCount,
     // plan
     plan,
     generating,

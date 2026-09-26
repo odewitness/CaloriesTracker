@@ -764,7 +764,11 @@ export function buildMealPlan(p) {
     while (chosen.length < n && cpool.length) {
       const cand = pickWeighted(
         cpool.filter(c => !chosen.some(x => x.id === c.id)),
-        c => 1 / (1 + (scored.find(s => s.c.id === c.id)?.dist ?? 1) * strictness.pickPower),
+        // Mode aléatoire : tirage uniforme, sauf les recettes de la saison
+        // choisie qui pèsent double (saison « en priorité »).
+        randomMode
+          ? c => (seasonBonus(c.entity, season) > 0 ? 2 : 1)
+          : c => 1 / (1 + (scored.find(s => s.c.id === c.id)?.dist ?? 1) * strictness.pickPower),
         rng,
       )
       if (!cand) break

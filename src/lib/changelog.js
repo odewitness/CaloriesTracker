@@ -8,8 +8,8 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
-    title: 'Planificateur : au hasard, recettes interdites et retour arrière',
-    description: "Dans le planificateur, tu peux maintenant cocher « Au hasard, sans contrainte de macros » : les plats sont tirés au sort parmi tes recettes, en respectant seulement tes filtres (saison, temps de cuisine…). Dans les options avancées, tu peux aussi interdire des recettes pour qu'elles ne sortent jamais. Et quand tu appuies sur « Régénérer », un bouton « Retour » te permet de revenir au plan d'avant.",
+    title: 'Un planificateur de repas plus simple à régler',
+    description: "Quand tu prépares un plan, tout est maintenant visible sur un seul écran, en 4 étapes : quand, comment choisir les plats, quels repas, quelles recettes. Tu peux choisir de coller à tes objectifs ou de tirer tes plats au hasard, voir combien de recettes passent tes filtres, et imposer ou interdire des recettes au même endroit. Dans l'aperçu, « Ne plus jamais proposer » écarte une recette pour de bon, et après « Régénérer », le bouton « Retour » te rend le plan d'avant.",
   },
   {
     date: '2026-09-26',

@@ -558,23 +558,60 @@ Branche `feature/planner-random-ban-undo`.
   `options.randomMode` de `buildMealPlan`). Les filtres restent appliqués
   (catégorie du slot, saison, temps de cuisine, repas types, interdites,
   imposées, `nbDifferentes`, anti-répétition dans la journée). Ce qui est
-  coupé : note macro des candidats (tirage uniforme dans tout le vivier),
-  ajustement de portions, aliments « en + », passe micros, recherche locale, et
+  coupé : note macro des candidats (tirage dans tout le vivier, uniforme sauf
+  les recettes de la saison choisie qui pèsent double → « de saison en
+  priorité » garde un sens), ajustement de portions, aliments « en + », passe micros, recherche locale, et
   le « meilleur de N » du hook (1 seul tirage). Le score / feu tricolore restent
   calculés et affichés à titre indicatif. Les recettes sans valeurs
   nutritionnelles ou sans poids de portion restent hors vivier (les macros
   servent encore à l'affichage).
 - ✅ **Recettes interdites** (`config.bannedIds`, mémorisé avec les autres
   réglages) : `buildVivier({ bannedIds })` les exclut de tous les viviers, y
-  compris des remplacements proposés dans l'aperçu (`swapCandidates`) et des
-  imposées (`setBannedIds` retire aussi l'id des `pinnedIds`). Un repas
-  verrouillé qui en contient une la garde (le verrou prime). UI :
-  `BanPicker` dans les options avancées.
+  compris des remplacements proposés dans l'aperçu (`swapCandidates`). Un repas
+  verrouillé qui en contient une la garde (le verrou prime).
 - ✅ **Retour après « Régénérer »** : pile `history` (10 max) dans
   `useMealPlanner`, chaque (re)génération y empile le plan remplacé + ses
   verrous ; `undoGenerate()` le rétablit (bouton « Retour » de l'aperçu, visible
   quand la pile n'est pas vide). Vidée par `reset` et `loadSavedPlan`. Ne
   restaure que le plan, pas la config.
+
+#### Refonte de l'écran de réglages (même branche, 2026-09-26)
+
+Retour utilisatrice : « Options avancées » repliée alors qu'elle s'en sert à
+chaque fois, imposées (dans chaque brique) et interdites (dans les options)
+éparpillées. Nouveau parcours, un seul écran sans section repliée :
+
+1. **Quand ?** — jours, date de début, personnes (sous-titre = plage de dates).
+2. **Comment choisir les plats ?** — deux cartes « Selon mes objectifs » /
+   « Au hasard ». Les réglages macros (précision, ajuster les portions,
+   vitamines) ne s'affichent que sous « Selon mes objectifs ».
+3. **Quels repas ?** — une carte par repas (case « dans ce plan » + briques).
+   Sous chaque brique : nombre de recettes possibles avec les filtres du
+   moment (`possibleByCategory`, 0 → alerte), imposées qui y tombent, partage
+   du pool avec les autres repas de même catégorie.
+4. **Quelles recettes ?** — saison (Toutes / 4 saisons, puis « en priorité » /
+   « uniquement » au lieu d'une case « stricte »), temps de cuisine, repas
+   types ; puis un bloc « Imposées et interdites » (pastilles retirables d'un
+   tap) et un bouton vers la page **`PlannerRecipeRulesSheet`** : toutes les
+   recettes + repas types, recherche, onglets Toutes / Imposées / Interdites,
+   chips de catégorie, deux boutons 📌 / 🚫 par ligne, et la raison pour
+   laquelle une recette ne sortirait pas d'elle-même (hors saison, trop longue,
+   aucune brique de sa catégorie, sans valeurs nutritionnelles…).
+
+Pied de page fixe : résumé (jours · repas/jour · recettes possibles) + bouton
+« Générer le plan » / « Tirer un plan au hasard ». « Reprendre un plan
+enregistré » est désormais replié par défaut (usage ponctuel).
+
+**Modèle de données** : les imposées ne sont plus par brique mais une liste
+unique `config.pinnedIds`, symétrique de `config.bannedIds` (exclusives,
+`setRecipeRule(id, 'pinned' | 'banned' | null)`). `useMealPlanner`
+(`distributePinned`) les place dans la brique de la première de leurs
+catégories présente dans le plan, et remplit `slot.pinnedIds` pour le solveur
+(inchangé). Une imposée sans brique de sa catégorie → `unplacedPinnedIds`
+(pastille orange). `normalizeConfig` convertit les configs enregistrées à
+l'ancien format (localStorage et `plans_repas.config`). Dans l'aperçu,
+l'éditeur d'une brique propose aussi « Ne plus jamais proposer » : interdit la
+recette et la remplace aussitôt par une autre de sa catégorie.
 
 ---
 
