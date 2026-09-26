@@ -264,3 +264,63 @@ export function formatGrams(x) {
   if (x < 0.01) return '< 0,01 g'
   return `${x.toFixed(x < 1 ? 2 : 1).replace('.', ',')} g`
 }
+
+// ── Cumul d'un repas (Palier 2) ─────────────────────────────────────────────
+// Les FODMAP de plusieurs aliments mangés ensemble s'additionnent : trois
+// aliments « faibles » peuvent faire un repas « modéré ». Il n'existe pas de
+// seuil officiel par repas ; on additionne, famille par famille, la part de
+// son seuil que chaque aliment consomme (quantité ÷ seuil propre à
+// l'aliment). Un repas d'un seul aliment retombe exactement sur la pastille de
+// cet aliment ; une charge cumulée > 1 = au-dessus du seuil, > 2 = élevée.
+//
+// `items` : [{ id, name, profile, qtyG }] ; `profile` null = aliment non
+// évaluable (recette, dont le calcul par ingrédient n'existe pas encore) →
+// compté dans `skipped`.
+export function evaluateMeal(items) {
+  const evaluated = []
+  let skipped = 0
+  for (const it of items) {
+    if (!it.profile) { skipped++; continue }
+    evaluated.push({ ...it, ev: evaluateFodmap(it.profile, it.qtyG) })
+  }
+  if (!evaluated.length) return { rows: [], overall: null, stacked: false, skipped, byId: {} }
+
+  const rows = FODMAP_GROUPS.map(({ key, label }) => {
+    let load = 0
+    let anyKnown = false
+    let complete = true
+    let keyword = false
+    let singleOver = false
+    const contributors = []
+    for (const it of evaluated) {
+      const r = it.ev.rows.find(x => x.key === key)
+      if (r.amount != null) {
+        anyKnown = true
+        const share = r.threshold > 0 ? r.amount / r.threshold : 0
+        load += share
+        if (share > 1) singleOver = true
+        if (r.amount > 0) contributors.push({ id: it.id, name: it.name, share })
+      }
+      if (!r.complete) complete = false
+      if (r.keyword) {
+        keyword = true
+        if (r.amount == null) contributors.push({ id: it.id, name: it.name, share: null })
+      }
+    }
+    let level
+    if (load > 2) level = 'high'
+    else if (load > 1) level = 'moderate'
+    else if (keyword) level = 'likely-high'
+    else if (!anyKnown) level = 'unknown'
+    else level = complete ? 'low' : 'likely-low'
+    contributors.sort((a, b) => (b.share ?? Infinity) - (a.share ?? Infinity))
+    // « Cumul » : le repas dépasse le seuil alors qu'aucun aliment ne le
+    // dépasse seul.
+    const stacked = (level === 'moderate' || level === 'high') && !singleOver
+    return { key, label, level, load, complete, contributors, stacked }
+  })
+
+  const overall = rows.reduce((w, r) => (LEVEL_RANK[r.level] > LEVEL_RANK[w] ? r.level : w), 'low')
+  const byId = Object.fromEntries(evaluated.map(it => [it.id, it.ev]))
+  return { rows, overall, stacked: rows.some(r => r.stacked), skipped, byId }
+}

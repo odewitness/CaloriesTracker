@@ -5,7 +5,7 @@
 // Seuls ces blocs de contenu sont réordonnables. La barre de raccourcis et la
 // pastille de phase du cycle restent fixées en haut.
 
-export const TODAY_SECTION_KEYS = ['phase', 'bilan', 'nutriments', 'manques', 'repas', 'sport', 'complements', 'eau', 'transit']
+export const TODAY_SECTION_KEYS = ['phase', 'bilan', 'nutriments', 'manques', 'repas', 'fodmap', 'sport', 'complements', 'eau', 'transit']
 
 export const TODAY_SECTION_LABELS = {
   phase: 'Phase du cycle',
@@ -13,6 +13,7 @@ export const TODAY_SECTION_LABELS = {
   nutriments: 'Détail des nutriments',
   manques: 'À combler aujourd\'hui',
   repas: 'Repas du jour',
+  fodmap: 'FODMAP',
   sport: 'Activité',
   complements: 'Compléments',
   eau: 'Eau',

@@ -2,6 +2,35 @@ import React, { useState } from 'react'
 import { Plus, ChevronDown, Share2, MoreVertical, BookOpen, BookmarkPlus, CalendarDays } from 'lucide-react'
 import EditableFoodRow from './EditableFoodRow'
 import PlannedMealCard from './PlannedMealCard'
+import FodmapPill, { FODMAP_LEVEL_STYLE, FODMAP_NOTABLE } from './FodmapPill'
+
+// Libellés courts des familles FODMAP pour la ligne de résumé d'un repas.
+const FODMAP_SHORT = { oligo: 'fructanes et GOS', fructose: 'fructose', polyols: 'polyols', lactose: 'lactose' }
+const FODMAP_MEAL_LABEL = {
+  low: 'faible', 'likely-low': 'probablement faible', unknown: 'données incomplètes',
+  'likely-high': 'probablement élevé', moderate: 'modéré', high: 'élevé',
+}
+
+// Ligne « FODMAP du repas » sous l'en-tête (chantier FODMAP, Palier 2) :
+// niveau cumulé des aliments du repas, familles en cause, et mention du cumul
+// quand aucun aliment ne dépasse le seuil seul.
+function FodmapMealLine({ fodmap }) {
+  const s = FODMAP_LEVEL_STYLE[fodmap.overall] || FODMAP_LEVEL_STYLE.unknown
+  const over = fodmap.rows.filter(r => FODMAP_NOTABLE.has(r.level)).map(r => FODMAP_SHORT[r.key])
+  let text = `FODMAP ${FODMAP_MEAL_LABEL[fodmap.overall]}`
+  if (over.length) text += ` · ${over.join(', ')}`
+  return (
+    <div style={{ padding: '0 14px 10px', display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 11, lineHeight: 1.4 }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.dot, flexShrink: 0, marginTop: 4 }} />
+      <span style={{ color: FODMAP_NOTABLE.has(fodmap.overall) ? s.color : 'var(--text-muted)', fontWeight: FODMAP_NOTABLE.has(fodmap.overall) ? 600 : 400 }}>
+        {text}
+        {fodmap.stacked && (
+          <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> — chaque aliment reste sous le seuil, c’est leur cumul qui le dépasse</span>
+        )}
+      </span>
+    </div>
+  )
+}
 
 // Interrupteur on/off « ce repas, ce jour » — même look que celui de
 // MealSplitSection (Profil › Répartition par repas). Rendu seulement quand
@@ -38,7 +67,10 @@ function EnabledToggle({ enabled, onToggle, label }) {
 // des aliments déjà enregistrés dans ce repas (masqué si le repas est vide).
 // onCopyFromDay(name) — optionnel ; ouvre le choix d'un jour + repas dont on
 // copie les aliments directement dans ce repas de ce jour.
-export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare, onAddFromTemplate, onCreateTemplate, onCopyFromDay, onToggleEnabled }) {
+// fodmap — optionnel, résultat de evaluateMeal (src/lib/fodmap.js) pour ce
+// repas, fourni seulement si l'affichage FODMAP est activé : ligne de résumé
+// sous l'en-tête + pastille sur les aliments modérés ou élevés.
+export default function MealSection({ name, entries, target, plannedItems = [], onAdd, onDelete, onUpdate, onOpenDetail, onMarkPlannedEaten, onDeletePlanned, onDeleteSeries, onOpenPlannedSource, onShare, onAddFromTemplate, onCreateTemplate, onCopyFromDay, onToggleEnabled, fodmap = null }) {
   const enabled = target?.enabled !== false
   const toggleLabel = enabled ? `Désactiver ${name} ce jour` : `Réactiver ${name} ce jour`
   const storageKey = `meal-collapsed:${name}`
@@ -199,6 +231,8 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
         </button>
       </div>
 
+      {fodmap?.overall && entries.length > 0 && <FodmapMealLine fodmap={fodmap} />}
+
       {/* Planifiés, pas encore mangés — au-dessus, distincts, toujours visibles */}
       {plannedItems.length > 0 && (
         <div style={{ padding: '0 10px' }}>
@@ -224,6 +258,9 @@ export default function MealSection({ name, entries, target, plannedItems = [], 
             onSave={patch => onUpdate(entry.id, patch)}
             onDelete={() => onDelete(entry.id)}
             onOpenDetail={() => onOpenDetail(entry)}
+            badge={fodmap && FODMAP_NOTABLE.has(fodmap.byId[entry.id]?.overall)
+              ? <FodmapPill small level={fodmap.byId[entry.id].overall} text={`FODMAP ${FODMAP_MEAL_LABEL[fodmap.byId[entry.id].overall]}`} />
+              : null}
             bare
           />
         </div>

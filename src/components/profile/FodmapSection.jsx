@@ -4,7 +4,8 @@ import { mergeFodmapSettings } from '../../lib/fodmap'
 import { ToggleSwitch, SectionScreen } from './primitives'
 
 // Écran de détail « FODMAP » (chantier FODMAP, Palier 1 — docs/fodmap.md) :
-// active l'affichage de la charge en FODMAP dans les fiches aliments.
+// active l'affichage de la charge en FODMAP (fiches aliments, journal, carte
+// de la page du jour).
 // Information uniquement : pas d'accompagnement de régime.
 export default function FodmapSection({ fodmap, onPatch, onBack }) {
   const f = mergeFodmapSettings(fodmap)
@@ -17,7 +18,7 @@ export default function FodmapSection({ fodmap, onPatch, onBack }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 500 }}>Afficher les FODMAP</div>
             <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.4 }}>
-              dans la fiche d’un aliment, selon la quantité
+              dans les fiches aliments, le journal et la page du jour
             </div>
           </div>
           <ToggleSwitch checked={f.enabled} onClick={() => onPatch({ enabled: !f.enabled })} />
@@ -35,6 +36,11 @@ export default function FodmapSection({ fodmap, onPatch, onBack }) {
           Tout dépend de la quantité : un même aliment peut être bien toléré en petite portion et
           beaucoup moins en grosse. La fiche compare chaque famille à un seuil par portion et
           t’indique jusqu’à combien de grammes l’aliment reste faible.
+        </p>
+        <p style={{ margin: '0 0 10px' }}>
+          Les aliments d’un même repas s’additionnent : sur la page du jour, chaque repas affiche
+          sa charge cumulée, les aliments modérés ou élevés portent une pastille, et une carte
+          « FODMAP » résume ta journée (tu peux la déplacer depuis Profil &gt; Page du jour).
         </p>
         <p style={{ margin: 0 }}>
           Les valeurs viennent de tables de composition et de publications scientifiques ; certaines
