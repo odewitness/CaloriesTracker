@@ -131,6 +131,12 @@ create table if not exists ciqual (
   folates_intrinseques numeric,
   acide_folique numeric
 );
+-- Données = Table Ciqual 2025 (ANSES, fichiers du 2025-11-03). Pour les
+-- colonnes fructose / glucose / galactose / lactose / polyols, corrigées le
+-- 2026-09-26 par supabase/sql/ciqual_sucres_fix.sql : null = non mesuré
+-- (« - » chez l'ANSES), 0 = absent ou « traces » / « < x ». Les autres
+-- colonnes gardent la conversion de l'import initial, où « - » a pu devenir
+-- 0 : un 0 n'y garantit pas une mesure. Voir docs/fodmap.md §4.1.
 
 -- Index pour la recherche rapide
 create index if not exists idx_ciqual_nom on ciqual using gin(to_tsvector('french', alim_nom));
