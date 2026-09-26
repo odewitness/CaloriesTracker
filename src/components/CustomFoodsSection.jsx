@@ -18,6 +18,9 @@ import BrandCombobox from './BrandCombobox'
 import ComplementNutrientPills from './ComplementNutrientPills'
 import ComplementReminderEditor from './ComplementReminderEditor'
 import { usePushSubscription } from '../hooks/usePushSubscription'
+import { useSettings } from '../hooks/useSettings'
+import { forgetCustomFodmap } from '../hooks/useFodmapProfile'
+import { FODMAP_GROUPS } from '../lib/fodmap'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes formulaire aliment personnalisé
@@ -95,6 +98,84 @@ function MacroField({ label, id, value, onChange, unit = 'g', required = false, 
           {unit}
         </span>
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FodmapOverrideSection — réglage FODMAP d'un aliment perso
+// (aliments_custom.fodmap, chantier FODMAP Palier 3b — docs/fodmap.md).
+// Par famille : « Auto » (clé absente : calcul d'après le nom et les sucres
+// saisis), « Absent » ou « Présent ». Affichée seulement si l'affichage FODMAP
+// est activé dans le Profil.
+// ─────────────────────────────────────────────────────────────────────────────
+const FODMAP_CHOICES = [
+  { key: null, label: 'Auto' },
+  { key: 'absent', label: 'Absent' },
+  { key: 'present', label: 'Présent' },
+]
+
+function FodmapOverrideSection({ value, onChange }) {
+  const count = Object.keys(value).length
+  const [open, setOpen] = useState(count > 0)
+  const setGroup = (group, choice) => {
+    const next = { ...value }
+    if (choice) next[group] = choice
+    else delete next[group]
+    onChange(next)
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}
+      >
+        <span style={{ fontWeight: 600, fontSize: 14 }}>
+          FODMAP{count > 0 && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> · {count} réglé{count > 1 ? 's' : ''}</span>}
+        </span>
+        <ChevronDown
+          size={18}
+          color="var(--text-muted)"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
+        />
+      </button>
+      {open && (
+        <div style={{ padding: '0 16px 16px' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 10 }}>
+            « Auto » calcule d’après le nom et les sucres saisis (fructose, glucose, lactose et
+            polyols, dans « Sucres »). Choisis « Absent » si tu sais que l’aliment n’en contient
+            pas (produit sans lactose, sans blé…), ou « Présent » si l’étiquette en mentionne.
+          </div>
+          {FODMAP_GROUPS.map(g => (
+            <div key={g.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: '0.5px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{g.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>{g.hint}</div>
+              </div>
+              <div style={{ display: 'flex', background: 'var(--gray-bg)', borderRadius: 8, padding: 2, flexShrink: 0 }}>
+                {FODMAP_CHOICES.map(c => {
+                  const active = (value[g.key] || null) === c.key
+                  return (
+                    <button
+                      key={c.label}
+                      onClick={() => setGroup(g.key, c.key)}
+                      style={{
+                        fontSize: 11.5, fontWeight: 600, padding: '5px 8px', borderRadius: 6,
+                        background: active ? 'var(--white)' : 'transparent',
+                        color: active ? 'var(--text)' : 'var(--text-muted)',
+                        boxShadow: active ? '0 1px 2px rgba(0,0,0,.08)' : 'none',
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -258,6 +339,8 @@ function FoodCard({ aliment, onEdit, onDelete }) {
 const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFormOpenChange }, ref) {
   const toast    = useToast()
   const { user } = useAuth()
+  const { settings } = useSettings()
+  const fodmapOn = !!settings.fodmap?.enabled
 
   const [view,      setView]      = useState('list') // list | form
   const [aliments,  setAliments]  = useState([])
@@ -267,6 +350,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   const [extra,     setExtra]     = useState({})
   const [portions,  setPortions]  = useState([{ label: '', g: '' }])
   const [reminder,  setReminder]  = useState(null) // aliments_custom.rappel (compléments)
+  const [fodmapOverride, setFodmapOverride] = useState({}) // aliments_custom.fodmap
   const [saving,    setSaving]    = useState(false)
 
   const { permission: pushPermission } = usePushSubscription()
@@ -411,6 +495,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
   const resetForm = () => {
     setForm(EMPTY_FORM); setExtra({}); setPortions([{ label: '', g: '' }]); setEditingId(null)
     setDoseType(DOSE_TYPES[0].key); setDoseLabel(''); setComplementPortions([]); setReminder(null)
+    setFodmapOverride({})
   }
   const startNew  = () => { resetForm(); setView('form') }
 
@@ -438,6 +523,7 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
       setDoseType(DOSE_TYPES[0].key); setDoseLabel(''); setComplementPortions([])
     }
     setReminder(isComp ? (aliment.rappel || null) : null)
+    setFodmapOverride(aliment.fodmap && typeof aliment.fodmap === 'object' ? aliment.fodmap : {})
 
     const scale = v => v == null ? '' : String(round(v * factor))
     setForm({
@@ -503,13 +589,19 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
       ...extraValues,
       portions: cleanPortions,
       rappel: isComplement ? (reminder || null) : null,
+      // Écrit seulement quand la section est visible : sinon on ne touche pas
+      // au réglage existant (et la sauvegarde reste possible sans la colonne).
+      ...(fodmapOn && !isComplement ? { fodmap: Object.keys(fodmapOverride).length ? fodmapOverride : null } : {}),
     }
     if (payload.marque) await ensureMarque(payload.marque)
     const { error } = editingId
       ? await supabase.from('aliments_custom').update(payload).eq('id', editingId).eq('user_id', user.id)
       : await supabase.from('aliments_custom').insert([{ ...payload, user_id: user.id }])
     setSaving(false)
-    if (!error) { toast(editingId ? '✓ Aliment modifié !' : '✓ Aliment sauvegardé !'); resetForm(); setView('list'); load() }
+    if (!error) {
+      forgetCustomFodmap(editingId)
+      toast(editingId ? '✓ Aliment modifié !' : '✓ Aliment sauvegardé !'); resetForm(); setView('list'); load()
+    }
     else toast('Erreur lors de la sauvegarde')
   }
 
@@ -647,6 +739,10 @@ const CustomFoodsSection = forwardRef(function CustomFoodsSection({ active, onFo
             setExtraField={setExtraField}
           />
         ))}
+
+        {fodmapOn && !isComplement && (
+          <FodmapOverrideSection value={fodmapOverride} onChange={setFodmapOverride} />
+        )}
 
         {/* ── Portions courantes — pour les compléments, exprimées en nombre de
               doses (ex: "2" → "2 gélules") plutôt qu'en grammes, en plus de la

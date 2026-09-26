@@ -31,6 +31,7 @@ const CONFIDENCE_LABEL = {
   derived: 'déduit d’une portion publiée',
   estimated: 'estimé',
   absent: 'absent de ce type d’aliment',
+  user: 'indiqué dans ta fiche',
 }
 
 const GROUP_LABEL_LOWER = Object.fromEntries(FODMAP_GROUPS.map(g => [g.key, g.label.toLowerCase()]))
