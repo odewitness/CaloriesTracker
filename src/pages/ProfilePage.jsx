@@ -9,7 +9,7 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../lib/toast'
 import {
   User, Scale, Target, UtensilsCrossed, Droplet, Bell, Lightbulb,
-  LogOut, ChevronRight, ChevronDown, Info, HeartPulse, Dumbbell, Camera,
+  LogOut, ChevronRight, ChevronDown, Info, HeartPulse, Dumbbell, Camera, Wheat,
 } from 'lucide-react'
 import { litres } from '../lib/water'
 import Loader from '../components/Loader'
@@ -24,6 +24,7 @@ import ComplementRemindersSection from '../components/profile/ComplementReminder
 import TodaySection from '../components/profile/TodaySection'
 import CycleSection from '../components/profile/CycleSection'
 import SportSection from '../components/profile/SportSection'
+import FodmapSection from '../components/profile/FodmapSection'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 
 // Champs de `settings` réellement pilotés par les écrans Objectifs / Répartition.
@@ -306,6 +307,16 @@ export default function ProfilePage() {
     )
   }
 
+  if (section === 'fodmap') {
+    return (
+      <FodmapSection
+        fodmap={settings.fodmap}
+        onPatch={(patch) => updateSettings({ fodmap: { ...settings.fodmap, ...patch } })}
+        onBack={back}
+      />
+    )
+  }
+
   // ── Hub ──────────────────────────────────────────────────────────────────
   const infosSummary = (age || tailleCm)
     ? [age && `${age} ans`, tailleCm && `${tailleCm} cm`].filter(Boolean).join(' · ')
@@ -320,6 +331,7 @@ export default function ProfilePage() {
   const jourSummary = settings.afficher_manques_jour !== false ? 'Manques affichés' : 'Manques masqués'
   const cycleSummary = settings.cycle?.enabled ? 'Activé' : 'À activer'
   const sportSummary = settings.sport?.enabled ? 'Activé' : 'À activer'
+  const fodmapSummary = settings.fodmap?.enabled ? 'Affichés' : 'Masqués'
 
   return (
     <div className="page-content">
@@ -377,6 +389,7 @@ export default function ProfilePage() {
         <NavRow icon={<Droplet size={18} />} label="Hydratation" value={hydrationSummary} onClick={() => setSection('hydratation')} />
         <NavRow icon={<HeartPulse size={18} />} label="Cycle & alimentation" value={cycleSummary} onClick={() => setSection('cycle')} />
         <NavRow icon={<Dumbbell size={18} />} label="Sport" value={sportSummary} onClick={() => setSection('sport')} />
+        <NavRow icon={<Wheat size={18} />} label="FODMAP" value={fodmapSummary} onClick={() => setSection('fodmap')} />
         <NavRow icon={<Bell size={18} />} label="Notifications" value={notifSummary} onClick={() => setSection('notifications')} />
         <NavRow icon={<Lightbulb size={18} />} label="Page du jour" value={jourSummary} onClick={() => setSection('jour')} />
       </div>

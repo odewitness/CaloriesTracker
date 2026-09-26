@@ -15,6 +15,7 @@ import { mapOFFProduct } from '../lib/openFoodFacts'
 import { COMPLEMENT_CATEGORY } from '../lib/foodCategories'
 import { getComplementNutrients } from '../lib/complementNutrients'
 import MacroPreview from './MacroPreview'
+import FodmapPanel from './FodmapPanel'
 import ComplementNutrientPills from './ComplementNutrientPills'
 import RecipeQuantityAdjustModal from './RecipeQuantityAdjustModal'
 import FoodHistorySection from './FoodHistorySection'
@@ -1213,6 +1214,9 @@ const selectHistoryQty = (g) => {
 
                 {/* Macro preview */}
                 <MacroPreview food={selected} qty={qty} />
+
+                {/* FODMAP à la quantité saisie (si activé dans le Profil) */}
+                <FodmapPanel food={selected} qty={qty} />
               </>
             )}
 

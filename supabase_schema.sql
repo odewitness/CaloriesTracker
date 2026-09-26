@@ -335,7 +335,13 @@ create table if not exists settings (
   -- valeurs, mais seulement pour un calcul ponctuel, jamais persisté).
   -- { poids_desire: number | null, date_objectif: "YYYY-MM-DD" | null }.
   -- Fusionné côté client avec GOAL_WEIGHT_DEFAULTS (src/lib/poidsObjectif.js).
-  poids_objectif jsonb not null default '{"poids_desire":null,"date_objectif":null}'::jsonb
+  poids_objectif jsonb not null default '{"poids_desire":null,"date_objectif":null}'::jsonb,
+  -- Ajoutée le 2026-09-26 (chantier FODMAP, Palier 1 — voir
+  -- supabase/sql/fodmap_settings_setup.sql et docs/fodmap.md).
+  -- { enabled } : affiche la charge en FODMAP dans les fiches aliments.
+  -- Fusionné côté client avec FODMAP_DEFAULTS (src/lib/fodmap.js). Défaut =
+  -- désactivé (opt-in).
+  fodmap jsonb not null default '{"enabled":false}'::jsonb
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
