@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { buildFodmapProfile, evaluateMeal } from '../lib/fodmap'
+import { buildFodmapProfile, evaluateMeal, shoppingFodmapHint } from '../lib/fodmap'
 import { entryToFood } from '../lib/journalEntry'
 
 // Colonnes Ciqual utiles au calcul FODMAP. Relues en base plutôt que prises
@@ -34,21 +34,27 @@ async function ensureCiqualRows(codes) {
 // Réglages FODMAP des aliments perso (aliments_custom.fodmap). Cache de
 // session vidé par forgetCustomFodmap() quand la fiche est enregistrée.
 const customCache = new Map()
+// Ligne complète utile au calcul (catégorie, sucres), pour les listes où
+// l'aliment perso n'arrive qu'avec son nom (liste de courses).
+const customRowCache = new Map()
 const pendingCustom = new Map()
 
 export function forgetCustomFodmap(id) {
-  if (id != null) customCache.delete(String(id))
+  if (id != null) { customCache.delete(String(id)); customRowCache.delete(String(id)) }
 }
 
 async function ensureCustomOverrides(ids) {
   const missing = ids.filter(c => !customCache.has(c) && !pendingCustom.has(c))
   if (missing.length) {
-    const p = supabase.from('aliments_custom').select('id, fodmap').in('id', missing)
+    const p = supabase.from('aliments_custom').select('id, nom, categorie, fructose, glucose, lactose, polyols, fodmap').in('id', missing)
       .then(({ data, error }) => {
         for (const c of missing) pendingCustom.delete(c)
         if (error) throw error
-        for (const c of missing) customCache.set(c, null)
-        for (const r of data || []) customCache.set(String(r.id), r.fodmap || null)
+        for (const c of missing) { customCache.set(c, null); customRowCache.set(c, null) }
+        for (const r of data || []) {
+          customCache.set(String(r.id), r.fodmap || null)
+          customRowCache.set(String(r.id), r)
+        }
       })
     for (const c of missing) pendingCustom.set(c, p)
   }
@@ -302,4 +308,52 @@ export function usePeriodFodmap(days, mealNames, enabled) {
     return out
   }, [enabled, loading, mealEntries, mealNames, recipes])
   return { byDate, loading }
+}
+
+// ── Liste de courses (Palier 5) ─────────────────────────────────────────────
+// `items` : liste_courses_items ({ id, nom, food_source, food_ref_id }).
+// Renvoie { [item.id]: shoppingFodmapHint(...) } (null = rien à signaler), ou
+// null tant que c'est désactivé / en chargement. Un article libre (sans
+// aliment lié) n'est jugé que sur son nom.
+export function useShoppingFodmap(items, enabled) {
+  const rows = useMemo(() => (enabled ? items : []), [items, enabled])
+  const codes = useMemo(() => [...new Set(
+    rows.filter(i => i.food_source === 'ciqual' && i.food_ref_id != null).map(i => String(i.food_ref_id)),
+  )].sort(), [rows])
+  const customIds = useMemo(() => customIdsOf(rows), [rows])
+  const loadKey = `${codes.join(',')}|${customIds.join(',')}`
+  const [loadedKey, setLoadedKey] = useState(null)
+
+  useEffect(() => {
+    if (!enabled) return
+    let cancelled = false
+    Promise.all([
+      ensureCiqualRows(codes).catch(() => {}),
+      ensureCustomOverrides(customIds).catch(() => {}),
+    ]).then(() => { if (!cancelled) setLoadedKey(loadKey) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadKey, enabled])
+
+  const loading = enabled && loadedKey !== loadKey
+  return useMemo(() => {
+    if (!enabled || loading) return null
+    const out = {}
+    for (const i of rows) {
+      let profile
+      if (i.food_source === 'ciqual' && i.food_ref_id != null) {
+        profile = buildFodmapProfile(
+          { alim_code: String(i.food_ref_id), alim_nom: i.nom, _source: 'ciqual' },
+          rowCache.get(String(i.food_ref_id)) ?? null,
+        )
+      } else if (i.food_source === 'custom' && customRowCache.get(String(i.food_ref_id))) {
+        const row = customRowCache.get(String(i.food_ref_id))
+        profile = buildFodmapProfile({ ...row, alim_nom: i.nom, _source: 'custom' })
+      } else {
+        profile = buildFodmapProfile({ alim_nom: i.nom, _source: 'custom' }, null, null)
+      }
+      out[i.id] = shoppingFodmapHint(profile)
+    }
+    return out
+  }, [enabled, loading, rows])
 }

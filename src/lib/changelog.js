@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
+    title: 'Les FODMAP des produits scannés et de ta liste de courses',
+    description: "Avec l'affichage des FODMAP activé, quand tu scannes ou cherches un produit dans Open Food Facts, sa carte FODMAP te montre ce qu'elle a repéré dans la liste d'ingrédients : édulcorants comme le sorbitol ou le maltitol, inuline, sirop de glucose-fructose, blé, oignon, lait… Et dans ta liste de courses, une petite pastille signale les articles riches en FODMAP, avec la quantité jusqu'à laquelle ils restent faibles.",
+  },
+  {
+    date: '2026-09-26',
     title: 'Note tes symptômes et vois le lien avec les FODMAP',
     description: "Dans la carte Transit de la page du jour, le + te propose maintenant « Passage » ou « Symptôme sans passage » : tu peux noter un ballonnement, une douleur, des gaz ou une urgence, avec son intensité et l'heure, même sans aller aux toilettes. Dans Historique > Digestion, tu retrouves ces symptômes, et si l'affichage des FODMAP est activé, une comparaison entre les jours où tu as mangé des repas chargés en FODMAP et les autres : ton transit et tes symptômes le jour même et le lendemain. C'est une observation, pas un diagnostic.",
   },
