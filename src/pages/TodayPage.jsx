@@ -1010,6 +1010,7 @@ export default function TodayPage() {
             entry={detailEntry.entry}
             onUpdate={detailEntry.onUpdate}
             onClose={() => setDetailEntry(null)}
+            onOpenRecipe={(recetteId) => setSourceDetail({ source_type: 'recette', source_id: recetteId })}
           />
         )
       )}

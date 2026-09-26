@@ -118,6 +118,14 @@ export default function FoodPicker({
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [adjustingRecipeQty, setAdjustingRecipeQty] = useState(false)
+  // Ingrédients de la recette sélectionnée (bruts, non ajustés) — sert à
+  // construire l'instantané `ingredients_detail` du journal à la validation,
+  // même si "Modifier les quantités des ingrédients" n'a pas été utilisé.
+  const [recipeIngredientsRaw, setRecipeIngredientsRaw] = useState(null)
+  const [recipeIngredientsPoidsRef, setRecipeIngredientsPoidsRef] = useState(0)
+  // Instantané posé par RecipeQuantityAdjustModal si l'utilisateur a corrigé
+  // certains grammages — { totalQtyG, ingredients: [{food_name, qty_g, qty_g_base}] }.
+  const [recipeAdjustSnapshot, setRecipeAdjustSnapshot] = useState(null)
   const [searchSource, setSearchSource] = useState('ciqual') // 'ciqual' | 'off'
   const [offBrandFilter, setOffBrandFilter] = useState('')
   const [offCategoryFilter, setOffCategoryFilter] = useState('')
@@ -428,6 +436,13 @@ const selectFood = async (food) => {
     const poidsRef = food.poids_cuit_g || food.poids_cru_g
     const per100 = calcPer100g(totaux, poidsRef)
     if (per100) enriched = { ...food, ...per100 }
+    setRecipeIngredientsRaw(ingredients || [])
+    setRecipeIngredientsPoidsRef((ingredients || []).reduce((s, i) => s + (parseFloat(i.qty_g) || 0), 0))
+    setRecipeAdjustSnapshot(null)
+  } else {
+    setRecipeIngredientsRaw(null)
+    setRecipeIngredientsPoidsRef(0)
+    setRecipeAdjustSnapshot(null)
   }
 
   // Un aliment perso venant des Favoris (snapshot figé à la création du
@@ -560,9 +575,42 @@ const selectHistoryQty = (g) => {
     fetchBarcode(code)
   }
 
+  // Reconstruit la liste des ingrédients (grammage final, + grammage avant
+  // correction si "Modifier les quantités des ingrédients" a été utilisé) à
+  // la quantité totale réellement validée — qui peut différer de celle du
+  // dernier `onApply` si l'utilisateur retouche ensuite le champ grammage
+  // principal, d'où le re-scaling par `factor` dans les deux branches.
+  const buildRecipeIngredientsDetail = (finalQty) => {
+    if (!finalQty || finalQty <= 0) return null
+    if (recipeAdjustSnapshot && recipeAdjustSnapshot.totalQtyG > 0) {
+      const factor = finalQty / recipeAdjustSnapshot.totalQtyG
+      return recipeAdjustSnapshot.ingredients.map(i => {
+        const qty_g = Math.round(i.qty_g * factor * 10) / 10
+        const qty_g_base = Math.round(i.qty_g_base * factor * 10) / 10
+        return Math.abs(qty_g - qty_g_base) >= 0.5
+          ? { food_name: i.food_name, qty_g, qty_g_avant: qty_g_base }
+          : { food_name: i.food_name, qty_g }
+      })
+    }
+    if (recipeIngredientsRaw && recipeIngredientsPoidsRef > 0) {
+      const factor = finalQty / recipeIngredientsPoidsRef
+      return recipeIngredientsRaw.map(i => ({
+        food_name: i.food_name,
+        qty_g: Math.round((i.qty_g || 0) * factor * 10) / 10,
+      }))
+    }
+    return null
+  }
+
   const confirm = async () => {
     if (!selected) return
-    await onConfirm(selected, parseFloat(qty) || 0)
+    const finalQty = parseFloat(qty) || 0
+    let foodToConfirm = selected
+    if (selected._source === 'recette') {
+      const ingredientsDetail = buildRecipeIngredientsDetail(finalQty)
+      if (ingredientsDetail?.length) foodToConfirm = { ...selected, _ingredientsDetail: ingredientsDetail }
+    }
+    await onConfirm(foodToConfirm, finalQty)
     onClose()
   }
 
@@ -1210,9 +1258,10 @@ const selectHistoryQty = (g) => {
           recetteId={selected.id}
           recetteNom={selected.alim_nom}
           currentQtyG={parseFloat(qty) || 0}
-          onApply={(newQtyG, newPer100) => {
+          onApply={(newQtyG, newPer100, ingredientsSnapshot) => {
             setQty(String(newQtyG))
             if (newPer100) setSelected(prev => ({ ...prev, ...newPer100 }))
+            if (ingredientsSnapshot) setRecipeAdjustSnapshot({ totalQtyG: newQtyG, ingredients: ingredientsSnapshot })
           }}
           onClose={() => setAdjustingRecipeQty(false)}
         />

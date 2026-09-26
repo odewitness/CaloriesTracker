@@ -213,7 +213,15 @@ create table if not exists journal (
   vit_b3 numeric,
   vit_b5 numeric,
   folates_intrinseques numeric,
-  acide_folique numeric
+  acide_folique numeric,
+  -- Instantané des ingrédients au moment de l'ajout, uniquement pour une
+  -- entrée venant d'une recette ajoutée via la recherche (food_source =
+  -- 'recette') : [{ food_name, qty_g, qty_g_avant? }]. `qty_g_avant` n'est
+  -- présent que si l'ingrédient a été corrigé via "Modifier les quantités
+  -- des ingrédients" (RecipeQuantityAdjustModal) — sert à afficher l'ancien
+  -- grammage barré dans FoodDetailModal. Absent/null pour toute entrée
+  -- ajoutée avant cette fonctionnalité ou ne venant pas d'une recette.
+  ingredients_detail jsonb
 );
 
 create index if not exists idx_journal_date on journal(date desc);
