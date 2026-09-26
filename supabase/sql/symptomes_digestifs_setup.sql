@@ -11,6 +11,7 @@
 -- Réservé, comme `selles`, au compte STOOL_TRACKER_USER_ID côté client
 -- (src/lib/featureFlags.js) ; la vraie barrière est la RLS « own » ci-dessous.
 --
+-- EXÉCUTÉ en production le 2026-09-26 — ne pas relancer (les create policy échoueraient).
 -- Écrit le 2026-09-26. À exécuter une fois, à la main, dans le SQL editor
 -- Supabase, AVANT le merge sur main de la branche feature/fodmap-transit.
 -- =============================================
