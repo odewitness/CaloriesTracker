@@ -73,7 +73,13 @@ const KEYWORD_RULES = [
 // l'aliment vient de Ciqual — prioritaire sur les valeurs portées par `food`,
 // qui peuvent venir d'une entrée de journal figée avant la correction des
 // données Ciqual du 2026-09-26.
-export function buildFodmapProfile(food, ciqualRow = null) {
+//
+// `override` : réglage de l'utilisatrice pour un aliment perso
+// (aliments_custom.fodmap, voir FODMAP_OVERRIDE_VALUES) — par défaut lu sur
+// `food.fodmap`. Prioritaire sur tout le reste pour les familles renseignées.
+export const FODMAP_OVERRIDE_VALUES = ['absent', 'present']
+
+export function buildFodmapProfile(food, ciqualRow = null, override = undefined) {
   if (!food) return null
   const src = { ...food, ...(ciqualRow || {}) }
   const isCiqual = (food._source || 'ciqual') === 'ciqual' && src.alim_code != null
@@ -173,6 +179,19 @@ export function buildFodmapProfile(food, ciqualRow = null) {
     if (g.keyword && !g.keyword.length) g.keyword = [key]
   }
 
+  // Réglage de l'utilisatrice (aliment perso) : « absent » = teneur nulle
+  // connue, « présent » = probablement élevé, quantité non mesurée.
+  const ov = override !== undefined ? override : (food._source === 'custom' ? food.fodmap : null)
+  if (ov && typeof ov === 'object') {
+    for (const key of Object.keys(groups)) {
+      if (ov[key] === 'absent') {
+        groups[key] = { ...groups[key], value: 0, complete: true, parts: [], confidence: 'user', keyword: null, single: false }
+      } else if (ov[key] === 'present') {
+        groups[key] = { ...groups[key], value: null, complete: false, parts: [], confidence: 'user', keyword: ['selon ta fiche'], single: false }
+      }
+    }
+  }
+
   // Seuils propres à l'aliment.
   const oligoThreshold = family === CEREALES || GRAIN_LEGUME_NUT_RE.test(name)
     ? OLIGO_GRAIN_THRESHOLD : OLIGO_THRESHOLD
@@ -189,7 +208,7 @@ export function buildFodmapProfile(food, ciqualRow = null) {
   }
 }
 
-const CONFIDENCE_RANK = { absent: 0, measured: 1, ciqual: 1, label: 2, derived: 3, estimated: 4 }
+const CONFIDENCE_RANK = { absent: 0, user: 0, measured: 1, ciqual: 1, label: 2, derived: 3, estimated: 4 }
 function worstConfidence(list) {
   const known = list.filter(Boolean)
   if (!known.length) return null

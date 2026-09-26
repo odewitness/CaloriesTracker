@@ -429,7 +429,13 @@ create table if not exists aliments_custom (
   -- tous les jours. stop_si_pris (défaut true) : pas de rappel si déjà noté ce
   -- jour. null / enabled:false = aucun rappel. Délivré par l'Edge Function
   -- complements-reminder. Normalisé côté client par src/lib/complementReminders.js.
-  rappel jsonb
+  rappel jsonb,
+  -- Ajoutée le 2026-09-26 (chantier FODMAP, Palier 3b — voir
+  -- supabase/sql/fodmap_aliments_custom_setup.sql et docs/fodmap.md). Réglage
+  -- FODMAP saisi par l'utilisatrice : null = tout calculé ; sinon une clé par
+  -- famille réglée { "oligo" | "fructose" | "polyols" | "lactose": "absent" | "present" }.
+  -- Lu par buildFodmapProfile (src/lib/fodmap.js), prioritaire sur le calcul.
+  fodmap jsonb
 );
 
 -- 6. TABLE PROFILES (infos utilisateur, 1 ligne par compte auth)

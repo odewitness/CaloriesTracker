@@ -31,6 +31,35 @@ async function ensureCiqualRows(codes) {
   await Promise.all(codes.map(c => pendingRows.get(c)).filter(Boolean))
 }
 
+// Réglages FODMAP des aliments perso (aliments_custom.fodmap). Cache de
+// session vidé par forgetCustomFodmap() quand la fiche est enregistrée.
+const customCache = new Map()
+const pendingCustom = new Map()
+
+export function forgetCustomFodmap(id) {
+  if (id != null) customCache.delete(String(id))
+}
+
+async function ensureCustomOverrides(ids) {
+  const missing = ids.filter(c => !customCache.has(c) && !pendingCustom.has(c))
+  if (missing.length) {
+    const p = supabase.from('aliments_custom').select('id, fodmap').in('id', missing)
+      .then(({ data, error }) => {
+        for (const c of missing) pendingCustom.delete(c)
+        if (error) throw error
+        for (const c of missing) customCache.set(c, null)
+        for (const r of data || []) customCache.set(String(r.id), r.fodmap || null)
+      })
+    for (const c of missing) pendingCustom.set(c, p)
+  }
+  await Promise.all(ids.map(c => pendingCustom.get(c)).filter(Boolean))
+}
+
+const isUuid = (v) => typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v)
+const customIdsOf = (rows) => [...new Set(rows
+  .filter(r => r.food_source === 'custom' && isUuid(String(r.food_ref_id)))
+  .map(r => String(r.food_ref_id)))].sort()
+
 // Recettes + ingrédients (colonnes utiles au calcul FODMAP). Pas de cache de
 // session : une recette peut être modifiée entre deux ouvertures. Seules les
 // requêtes identiques en cours sont partagées.
@@ -47,9 +76,12 @@ function loadRecipes(ids) {
         supabase.from('recette_ingredients').select(INGREDIENT_COLS).in('recette_id', ids).order('created_at', { ascending: true }),
       ])
       if (e1 || e2) throw e1 || e2
-      await ensureCiqualRows([...new Set((ings || [])
-        .filter(i => i.food_source === 'ciqual' && i.food_ref_id != null)
-        .map(i => String(i.food_ref_id)))])
+      await Promise.all([
+        ensureCiqualRows([...new Set((ings || [])
+          .filter(i => i.food_source === 'ciqual' && i.food_ref_id != null)
+          .map(i => String(i.food_ref_id)))]),
+        ensureCustomOverrides(customIdsOf(ings || [])).catch(() => {}),
+      ])
       const out = {}
       for (const r of recs || []) out[r.id] = { recette: r, ingredients: [] }
       for (const i of ings || []) out[i.recette_id]?.ingredients.push(i)
@@ -67,7 +99,10 @@ function profileForRow(row) {
   const ciq = row.food_source === 'ciqual' && row.food_ref_id != null
     ? rowCache.get(String(row.food_ref_id)) ?? null
     : null
-  return buildFodmapProfile(entryToFood(row), ciq)
+  const override = row.food_source === 'custom' && row.food_ref_id != null
+    ? customCache.get(String(row.food_ref_id)) ?? null
+    : undefined
+  return buildFodmapProfile(entryToFood(row), ciq, override)
 }
 
 // Ingrédients d'une portion de `portionG` grammes de recette, au format
@@ -103,27 +138,38 @@ export function recipeFodmapItems(data, portionG, snapshot = null) {
 export function useFodmapProfile(food, enabled = true) {
   const isCiqual = !!food && (food._source || 'ciqual') === 'ciqual' && food.alim_code != null
   const code = isCiqual ? String(food.alim_code) : null
-  const [row, setRow] = useState(() => (code ? rowCache.get(code) ?? null : null))
-  const [loading, setLoading] = useState(() => !!code && enabled && !rowCache.has(code))
+  // Aliment perso reconstruit depuis le journal (pas de `fodmap` porté) :
+  // son réglage FODMAP est relu dans aliments_custom.
+  const customId = !!food && food._source === 'custom' && !('fodmap' in food) && isUuid(String(food.id))
+    ? String(food.id) : null
+  const key = `${code}|${customId}`
+  const ready = (!code || rowCache.has(code)) && (!customId || customCache.has(customId))
+  // Clé dont le chargement a été tenté (réussi ou non) : en cas d'erreur
+  // réseau, on calcule quand même avec les valeurs portées par l'aliment.
+  const [settledKey, setSettledKey] = useState(null)
+  const loading = enabled && !ready && settledKey !== key
 
   useEffect(() => {
-    if (!code || !enabled) { setRow(null); setLoading(false); return }
-    if (rowCache.has(code)) { setRow(rowCache.get(code)); setLoading(false); return }
+    if (!enabled || ready) return
     let cancelled = false
-    setLoading(true)
-    ensureCiqualRows([code])
-      .catch(() => {})
-      .then(() => {
-        if (cancelled) return
-        setRow(rowCache.get(code) ?? null)
-        setLoading(false)
-      })
+    Promise.all([
+      code ? ensureCiqualRows([code]).catch(() => {}) : null,
+      customId ? ensureCustomOverrides([customId]).catch(() => {}) : null,
+    ]).then(() => { if (!cancelled) setSettledKey(key) })
     return () => { cancelled = true }
-  }, [code, enabled])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, enabled])
 
   const profile = useMemo(
-    () => (enabled && food && !loading ? buildFodmapProfile(food, row) : null),
-    [enabled, food, row, loading],
+    () => (enabled && food && !loading
+      ? buildFodmapProfile(
+        food,
+        code ? rowCache.get(code) ?? null : null,
+        customId ? customCache.get(customId) ?? null : undefined,
+      )
+      : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enabled, food, loading, settledKey, code, customId],
   )
   return { profile, loading }
 }
@@ -163,7 +209,8 @@ export function useDayFodmap(entries, mealNames, enabled) {
   const recipeIds = useMemo(() => [...new Set(
     mealEntries.filter(e => e.food_source === 'recette' && e.food_ref_id).map(e => String(e.food_ref_id)),
   )].sort(), [mealEntries])
-  const loadKey = `${codes.join(',')}|${recipeIds.join(',')}`
+  const customIds = useMemo(() => customIdsOf(mealEntries), [mealEntries])
+  const loadKey = `${codes.join(',')}|${recipeIds.join(',')}|${customIds.join(',')}`
   const [loaded, setLoaded] = useState({ key: null, recipes: {} })
 
   useEffect(() => {
@@ -171,8 +218,9 @@ export function useDayFodmap(entries, mealNames, enabled) {
     let cancelled = false
     Promise.all([
       ensureCiqualRows(codes).catch(() => {}),
+      ensureCustomOverrides(customIds).catch(() => {}),
       recipeIds.length ? loadRecipes(recipeIds).catch(() => ({})) : {},
-    ]).then(([, recipes]) => {
+    ]).then(([, , recipes]) => {
       // En cas d'erreur réseau, on calcule quand même : les aliments
       // retombent sur les valeurs portées par les entrées, les recettes
       // introuvables ne sont pas comptées.

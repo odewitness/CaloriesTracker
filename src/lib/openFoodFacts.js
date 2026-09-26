@@ -1,6 +1,14 @@
 // Convertit un produit brut de l'API Open Food Facts vers le même format
 // qu'un aliment Ciqual/custom, pour que FoodRow/MacroPreview/scaleFood
 // puissent le traiter sans distinction de source.
+// Valeur /100 g d'OFF, ou null si le produit ne la déclare pas : pour les
+// sucres utiles au calcul FODMAP, « non déclaré » ne doit pas devenir 0
+// (voir docs/fodmap.md, null ≠ 0).
+function declared(n, key) {
+  const v = n[key]
+  return v == null || v === '' || Number.isNaN(Number(v)) ? null : parseFloat(Number(v).toFixed(2))
+}
+
 export function mapOFFProduct(p) {
   const n = p.nutriments || {}
   return {
@@ -17,6 +25,10 @@ export function mapOFFProduct(p) {
     calcium: parseFloat(((n['calcium_100g'] || 0) * 1000).toFixed(1)),
     fer: parseFloat(((n['iron_100g'] || 0) * 1000).toFixed(2)),
     sucres: parseFloat((n['sugars_100g'] || 0).toFixed(1)),
+    fructose: declared(n, 'fructose_100g'),
+    glucose: declared(n, 'glucose_100g'),
+    lactose: declared(n, 'lactose_100g'),
+    polyols: declared(n, 'polyols_100g'),
     acides_gras_satures: parseFloat((n['saturated-fat_100g'] || 0).toFixed(2)),
     ag_monoinsatures: parseFloat((n['monounsaturated-fat_100g'] || 0).toFixed(2)),
     ag_polyinsatures: parseFloat((n['polyunsaturated-fat_100g'] || 0).toFixed(2)),

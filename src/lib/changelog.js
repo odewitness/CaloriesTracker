@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
+    title: 'Précise les FODMAP de tes aliments perso',
+    description: "Quand l'affichage des FODMAP est activé, le formulaire de tes aliments perso a une nouvelle section « FODMAP » : pour chaque famille, tu peux laisser le calcul automatique ou indiquer que l'aliment n'en contient pas (un yaourt sans lactose, un pain sans blé…) ou qu'il en contient. Et quand tu scannes un produit, ses sucres détaillés (lactose, fructose, polyols) sont repris s'il les indique.",
+  },
+  {
+    date: '2026-09-26',
     title: 'Les FODMAP de tes recettes',
     description: "Avec l'affichage des FODMAP activé, tes recettes ont maintenant leur carte FODMAP : dans l'onglet Nutriments de la recette, quand tu l'ajoutes au journal et dans le détail d'une recette déjà notée. Elle t'indique jusqu'à combien de grammes la recette reste faible, quels ingrédients pèsent le plus et ce qu'on utilise souvent à la place (par exemple de l'huile infusée à l'ail au lieu de l'ail). Tes recettes comptent aussi dans la charge de tes repas. Dans l'explorateur, les filtres ont une nouvelle section « FODMAP à la portion » pour ne garder que les aliments faibles, en tout ou famille par famille.",
   },
