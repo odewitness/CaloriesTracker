@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
+    title: 'Planificateur : au hasard, recettes interdites et retour arrière',
+    description: "Dans le planificateur, tu peux maintenant cocher « Au hasard, sans contrainte de macros » : les plats sont tirés au sort parmi tes recettes, en respectant seulement tes filtres (saison, temps de cuisine…). Dans les options avancées, tu peux aussi interdire des recettes pour qu'elles ne sortent jamais. Et quand tu appuies sur « Régénérer », un bouton « Retour » te permet de revenir au plan d'avant.",
+  },
+  {
+    date: '2026-09-26',
     title: 'Retrouve les ingrédients d’une recette ajoutée au journal',
     description: "Quand tu ajoutes une recette à ton journal depuis la recherche, tu peux maintenant ouvrir son détail nutritionnel et voir en dessous la liste de ses ingrédients avec leur grammage. Si tu avais corrigé certaines quantités au moment de l'ajout, l'ancien grammage apparaît barré à côté du nouveau. Un bouton « Voir la fiche » t'amène directement à la recette complète, et la flèche retour te ramène bien à l'écran d'où tu venais.",
   },

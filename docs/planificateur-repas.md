@@ -550,6 +550,32 @@ puces de catégorie) est remplacé pour choisir ses recettes « intelligemment �
   rapide », stepper de portions au pas de 0,5, « Compléter la fournée »
   (suggestions du solveur).
 
+### Palier 6 — Mode aléatoire, recettes interdites, retour arrière (2026-09-26)
+
+Branche `feature/planner-random-ban-undo`.
+
+- ✅ **Mode « Au hasard, sans contrainte de macros »** (`config.randomMode` →
+  `options.randomMode` de `buildMealPlan`). Les filtres restent appliqués
+  (catégorie du slot, saison, temps de cuisine, repas types, interdites,
+  imposées, `nbDifferentes`, anti-répétition dans la journée). Ce qui est
+  coupé : note macro des candidats (tirage uniforme dans tout le vivier),
+  ajustement de portions, aliments « en + », passe micros, recherche locale, et
+  le « meilleur de N » du hook (1 seul tirage). Le score / feu tricolore restent
+  calculés et affichés à titre indicatif. Les recettes sans valeurs
+  nutritionnelles ou sans poids de portion restent hors vivier (les macros
+  servent encore à l'affichage).
+- ✅ **Recettes interdites** (`config.bannedIds`, mémorisé avec les autres
+  réglages) : `buildVivier({ bannedIds })` les exclut de tous les viviers, y
+  compris des remplacements proposés dans l'aperçu (`swapCandidates`) et des
+  imposées (`setBannedIds` retire aussi l'id des `pinnedIds`). Un repas
+  verrouillé qui en contient une la garde (le verrou prime). UI :
+  `BanPicker` dans les options avancées.
+- ✅ **Retour après « Régénérer »** : pile `history` (10 max) dans
+  `useMealPlanner`, chaque (re)génération y empile le plan remplacé + ses
+  verrous ; `undoGenerate()` le rétablit (bouton « Retour » de l'aperçu, visible
+  quand la pile n'est pas vide). Vidée par `reset` et `loadSavedPlan`. Ne
+  restaure que le plan, pas la config.
+
 ---
 
 ## 8. Alertes / points de vigilance

@@ -78,6 +78,8 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     fillMicros: true,     // compléter les manques vitamines / minéraux du jour
     allowDoublePortions: true, // autoriser plusieurs portions d'un même plat sur un repas
     macroStrictness: 'normal', // 'strict' | 'normal' | 'loose' — précision aux macros, voir mealPlanner.js
+    randomMode: false,    // true : recettes tirées au hasard, sans tenir compte des macros
+    bannedIds: [],        // recettes / repas types interdits (jamais tirés)
     mealConfig: null,     // rempli au premier rendu utile (voir effectiveConfig)
     excludedMeals: [],    // repas exclus de CE plan (sans toucher meal_enabled global)
     ...loadStoredConfig(),
@@ -111,6 +113,9 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   // régénération. Vidé dès que la config change (les index de jour / repas
   // pourraient ne plus correspondre).
   const [lockedKeys, setLockedKeys] = useState(() => new Set())
+  // Plans précédents (avec leurs verrous), du plus ancien au plus récent : chaque
+  // (re)génération y empile le plan qu'elle remplace, « Retour » le dépile.
+  const [history, setHistory] = useState([])
 
   const setConfig = useCallback((patch) => {
     setConfigState(c => ({ ...c, ...patch }))
@@ -137,6 +142,25 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     setLockedKeys(new Set())
   }, [])
 
+  // Remplace la liste des recettes / repas types interdits. Une recette
+  // interdite est aussi retirée des recettes imposées (contradictoire).
+  const setBannedIds = useCallback((ids) => {
+    const banned = new Set(ids)
+    setConfigState(c => ({
+      ...c,
+      bannedIds: ids,
+      mealConfig: c.mealConfig
+        ? Object.fromEntries(Object.entries(c.mealConfig).map(([meal, slots]) => [
+          meal,
+          slots.map(s => (s.pinnedIds || []).some(id => banned.has(id))
+            ? { ...s, pinnedIds: s.pinnedIds.filter(id => !banned.has(id)) }
+            : s),
+        ]))
+        : c.mealConfig,
+    }))
+    setLockedKeys(new Set())
+  }, [])
+
   const toggleLock = useCallback((dayIndex, meal) => {
     setLockedKeys(s => {
       const n = new Set(s)
@@ -160,6 +184,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
   // celui qui colle le mieux aux cibles (weekScore le plus bas). Évite d'avoir
   // à « régénérer » plusieurs fois à la main pour tomber sur un bon résultat.
   const BEST_OF = 4
+  const MAX_HISTORY = 10
 
   const buildOne = useCallback((seed) => {
     // Repas figés depuis le plan courant, pour les clés verrouillées.
@@ -185,8 +210,9 @@ export function useMealPlanner({ defaultStartDate } = {}) {
       maxCookMinutes: config.maxCookMinutes || null,
       fillMicros: config.fillMicros !== false,
       allowDoublePortions: config.allowDoublePortions !== false,
+      bannedIds: config.bannedIds || [],
       settings,
-      options: { seasonMode: config.seasonMode, seed, strictness: config.macroStrictness },
+      options: { seasonMode: config.seasonMode, seed, strictness: config.macroStrictness, randomMode: config.randomMode === true },
       locked,
     })
   }, [config, effectiveMealConfig, mealTargets, recettes, repasTypes, favorites, settings, plan, lockedKeys])
@@ -195,23 +221,37 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     setGenerating(true)
     try {
       let best = null
-      for (let i = 0; i < BEST_OF; i++) {
+      // Mode aléatoire : un seul tirage — garder « le meilleur de N » selon le
+      // score macro rétablirait justement la contrainte qu'on veut lever.
+      const tries = config.randomMode ? 1 : BEST_OF
+      for (let i = 0; i < tries; i++) {
         const r = buildOne((baseSeed + i * 0x9e3779b9) >>> 0)
         if (!best || r.weekScore < best.weekScore) best = r
       }
+      if (plan) setHistory(h => [...h.slice(-(MAX_HISTORY - 1)), { plan, lockedKeys }])
       setPlan(best)
       return best
     } finally {
       setGenerating(false)
     }
-  }, [buildOne])
+  }, [buildOne, config.randomMode, plan, lockedKeys])
 
   // Première génération : base de seed aléatoire.
   const generate = useCallback(() => runGenerate((Math.random() * 2 ** 31) >>> 0), [runGenerate])
   // Régénérer : nouvelle base de seed → nouveaux tirages (garde les verrous).
   const regenerate = generate
 
-  const reset = useCallback(() => { setPlan(null); setLockedKeys(new Set()) }, [])
+  // Revient au plan d'avant la dernière (re)génération.
+  const undoGenerate = useCallback(() => {
+    const prev = history[history.length - 1]
+    if (!prev) return false
+    setHistory(h => h.slice(0, -1))
+    setPlan(prev.plan)
+    setLockedKeys(prev.lockedKeys)
+    return true
+  }, [history])
+
+  const reset = useCallback(() => { setPlan(null); setLockedKeys(new Set()); setHistory([]) }, [])
 
   // Recharge un plan enregistré (table plans_repas) : restaure sa config et son
   // aperçu tels quels. `recomputePlanAggregates` rafraîchit les totaux/scores au
@@ -221,6 +261,7 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     const hasPlan = Array.isArray(saved.plan?.days) && saved.plan.days.length > 0
     setConfigState(c => ({ ...c, ...(saved.config || {}) }))
     setLockedKeys(new Set())
+    setHistory([])
     setPlan(hasPlan ? recomputePlanAggregates(saved.plan) : null)
     return hasPlan
   }, [])
@@ -261,11 +302,12 @@ export function useMealPlanner({ defaultStartDate } = {}) {
       recettes, repasTypes, season: config.season, seasonMode: config.seasonMode,
       includeRepasTypes: config.includeRepasTypes !== false,
       maxCookMinutes: config.maxCookMinutes || null,
+      bannedIds: config.bannedIds || [],
     })
       .filter(c => c.id !== it.id && !usedToday.has(c.id))
       .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
-  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes, config.maxCookMinutes])
+  }, [plan, recettes, repasTypes, config.season, config.seasonMode, config.includeRepasTypes, config.maxCookMinutes, config.bannedIds])
 
   const swapItem = useCallback((dayIndex, meal, itemIndex, candidateId) => {
     const rec = recettes.find(r => r.id === candidateId)
@@ -412,11 +454,14 @@ export function useMealPlanner({ defaultStartDate } = {}) {
     setConfig,
     setMealConfig,
     toggleMeal,
+    setBannedIds,
     // plan
     plan,
     generating,
     generate,
     regenerate,
+    undoGenerate,
+    canUndo: history.length > 0,
     loadSavedPlan,
     reset,
     lockedKeys,

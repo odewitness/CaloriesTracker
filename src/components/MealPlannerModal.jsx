@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown, Save, FolderOpen, Pencil } from 'lucide-react'
+import { X, Wand2, RefreshCw, ChevronLeft, Plus, Trash2, AlertTriangle, CalendarPlus, Check, ShoppingCart, ChefHat, Lock, LockOpen, Pin, ChevronDown, Save, FolderOpen, Pencil, Undo2, Ban, Shuffle, Search } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
 import { useMealPlanner, MAX_MANUAL_PORTIONS } from '../hooks/useMealPlanner'
 import { useMealPlans } from '../hooks/useMealPlans'
@@ -146,6 +146,84 @@ function PinPicker({ options, pinnedIds, onChange }) {
               </span>
             </label>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Recettes / repas types interdits pour ce plan (config.bannedIds) : jamais
+// tirés, jamais proposés en remplacement dans l'aperçu. Recherche + cases à
+// cocher sur TOUTES les recettes et repas types.
+function BanPicker({ options, bannedIds, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const banned = new Set(bannedIds || [])
+  const toggle = (id) => {
+    const next = new Set(banned)
+    next.has(id) ? next.delete(id) : next.add(id)
+    onChange([...next])
+  }
+  const norm = (t) => (t || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+  const filtered = useMemo(() => {
+    const nq = norm(q.trim())
+    return nq ? options.filter(o => norm(o.nom).includes(nq)) : options
+  }, [options, q])
+  const count = banned.size
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, color: count ? 'var(--coral)' : 'var(--text-muted)', background: 'none', border: 'none', fontFamily: 'var(--font)', padding: '2px 0' }}
+      >
+        <Ban size={13} />
+        {count ? `${count} recette${count > 1 ? 's' : ''} interdite${count > 1 ? 's' : ''}` : 'Interdire des recettes'}
+        <ChevronDown size={13} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {count > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+          {[...banned].map(id => {
+            const o = options.find(x => x.id === id)
+            return (
+              <button
+                key={id}
+                onClick={() => toggle(id)}
+                aria-label={`Autoriser de nouveau ${o?.nom || 'cette recette'}`}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--coral)', background: 'var(--coral-light)', border: 'none', borderRadius: 6, padding: '3px 7px', fontFamily: 'var(--font)' }}
+              >
+                {o?.nom || 'recette supprimée'} <X size={10} />
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {open && (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ position: 'relative', marginBottom: 6 }}>
+            <Search size={13} color="var(--text-hint)" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              className="input"
+              placeholder="Rechercher une recette à interdire"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              style={{ paddingLeft: 28, fontSize: 12.5 }}
+            />
+          </div>
+          <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px' }}>
+            {filtered.length === 0 ? (
+              <div style={{ fontSize: 11.5, color: 'var(--text-hint)', padding: '4px 2px' }}>
+                {options.length === 0 ? 'Aucune recette.' : 'Aucun résultat.'}
+              </div>
+            ) : filtered.map(o => (
+              <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, padding: '4px 2px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={banned.has(o.id)} onChange={() => toggle(o.id)} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {o.nom}
+                  {o.kind === 'repas_type' && <span style={{ color: 'var(--text-hint)' }}> · repas type</span>}
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -376,7 +454,7 @@ function SavePlanCard({ savedPlanId, savedPlanName, defaultName, onSave }) {
 // ── Vue configuration ─────────────────────────────────────────────────────
 function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan, onDeletePlan }) {
   const {
-    config, mealConfig, baseMealConfig, excludedMeals, setConfig, setMealConfig, toggleMeal,
+    config, mealConfig, baseMealConfig, excludedMeals, setConfig, setMealConfig, toggleMeal, setBannedIds,
     recipeCount, templateCount, favoriteCount, recettes, repasTypes,
   } = planner
   const excluded = new Set(excludedMeals)
@@ -384,18 +462,26 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
   // Options d'épinglage par catégorie : toutes les recettes (+ repas types si
   // l'option est active) de la catégorie, sans filtre saison/temps — une
   // recette imposée l'emporte même hors saison. Mémoïsé par catégorie.
-  const pinOptionsCache = useMemo(() => new Map(), [recettes, repasTypes, config.includeRepasTypes])
+  const pinOptionsCache = useMemo(() => new Map(), [recettes, repasTypes, config.includeRepasTypes, config.bannedIds])
   const pinOptionsFor = (categorie) => {
     if (pinOptionsCache.has(categorie)) return pinOptionsCache.get(categorie)
     const list = buildVivier(categorie, {
       recettes, repasTypes, season: null, seasonMode: 'bonus',
       includeRepasTypes: config.includeRepasTypes !== false,
+      bannedIds: config.bannedIds || [],
     })
       .map(c => ({ id: c.id, nom: c.nom, kind: c.kind }))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
     pinOptionsCache.set(categorie, list)
     return list
   }
+
+  // Toutes les recettes + repas types, pour choisir ce qu'on interdit.
+  const banOptions = useMemo(() => [
+    ...recettes.map(r => ({ id: r.id, nom: r.nom, kind: 'recette' })),
+    ...repasTypes.map(t => ({ id: t.id, nom: t.nom, kind: 'repas_type' })),
+  ].sort((a, b) => a.nom.localeCompare(b.nom, 'fr')), [recettes, repasTypes])
+  const randomMode = config.randomMode === true
 
   // Change les slots d'un repas ET synchronise « N× » + recettes imposées entre
   // tous les slots qui partagent la même clé de groupe (ex. « Plat » au déjeuner
@@ -443,6 +529,20 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
         {rangeLabel(config.startDateStr, config.days)}
       </div>
 
+      {/* Mode aléatoire : ignore les macros, respecte les filtres */}
+      <label
+        className="card"
+        style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', margin: '8px 0 6px', cursor: 'pointer', border: `1px solid ${randomMode ? 'var(--green)' : 'transparent'}`, background: randomMode ? 'var(--green-light)' : undefined }}
+      >
+        <input type="checkbox" checked={randomMode} onChange={e => setConfig({ randomMode: e.target.checked })} style={{ marginTop: 2 }} />
+        <span style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700 }}><Shuffle size={13} /> Au hasard, sans contrainte de macros</span>
+          <span style={{ color: 'var(--text-muted)' }}>
+            Les plats sont tirés au sort, sans chercher à coller à tes calories ni à tes macros. Les filtres restent respectés (saison, temps de cuisine, catégories, recettes interdites ou imposées).
+          </span>
+        </span>
+      </label>
+
       <Collapsible label="Options avancées" defaultOpen={false}>
         {/* Personnes */}
         <SectionLabel>Personnes</SectionLabel>
@@ -486,7 +586,17 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
           ))}
         </div>
 
+        {/* Recettes interdites */}
+        <SectionLabel>Recettes interdites</SectionLabel>
+        <BanPicker options={banOptions} bannedIds={config.bannedIds} onChange={setBannedIds} />
+
         {/* Précision macros */}
+        {randomMode && (
+          <div style={{ fontSize: 11.5, color: 'var(--text-hint)', marginBottom: 12 }}>
+            Mode « au hasard » actif : les réglages de macros ci-dessous sont ignorés.
+          </div>
+        )}
+        <div style={{ opacity: randomMode ? 0.4 : 1, pointerEvents: randomMode ? 'none' : 'auto' }}>
         <SectionLabel>Précision macros</SectionLabel>
         <div style={{ display: 'flex', gap: 5, marginBottom: 6, flexWrap: 'wrap' }}>
           {MACRO_STRICTNESS_LEVELS.map(v => (
@@ -505,16 +615,17 @@ function ConfigView({ planner, onGenerate, savedPlans, onLoadPlan, onRenamePlan,
 
         {/* Bascules */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-          <input type="checkbox" checked={config.includeRepasTypes !== false} onChange={e => setConfig({ includeRepasTypes: e.target.checked })} />
-          Aussi mes repas types
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
           <input type="checkbox" checked={config.fillMicros !== false} onChange={e => setConfig({ fillMicros: e.target.checked })} />
           Compléter vitamines &amp; minéraux
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
           <input type="checkbox" checked={config.allowDoublePortions !== false} onChange={e => setConfig({ allowDoublePortions: e.target.checked })} />
           Ajuster les portions (demi, double...) pour mieux coller aux macros
+        </label>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+          <input type="checkbox" checked={config.includeRepasTypes !== false} onChange={e => setConfig({ includeRepasTypes: e.target.checked })} />
+          Aussi mes repas types
         </label>
 
         {/* Composition des repas */}
@@ -671,7 +782,7 @@ function ShoppingListPicker({ lists, valueId, onChange, onCreate, creating }) {
 // ── Vue aperçu ────────────────────────────────────────────────────────────
 function PreviewView({
   plan, startDateStr, recettesById, templatesById, people,
-  onBack, onRegenerate, generating, onApply, applying, result, applied,
+  onBack, onRegenerate, canUndo, onUndo, generating, onApply, applying, result, applied,
   lockedKeys, onToggleLock, onToggleLockDay,
   swapCandidates, onSwapItem, onRemoveItem, onSetItemPortions,
   onAddToBatch, batchState,
@@ -710,13 +821,25 @@ function PreviewView({
         <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', fontFamily: 'var(--font)' }}>
           <ChevronLeft size={15} /> Réglages
         </button>
-        <button
-          onClick={onRegenerate}
-          disabled={generating}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 8, padding: '7px 12px', fontFamily: 'var(--font)' }}
-        >
-          <RefreshCw size={13} /> Régénérer
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {canUndo && (
+            <button
+              onClick={onUndo}
+              disabled={generating}
+              aria-label="Revenir au plan précédent"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--gray-bg)', border: 'none', borderRadius: 8, padding: '7px 12px', fontFamily: 'var(--font)' }}
+            >
+              <Undo2 size={13} /> Retour
+            </button>
+          )}
+          <button
+            onClick={onRegenerate}
+            disabled={generating}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 8, padding: '7px 12px', fontFamily: 'var(--font)' }}
+          >
+            <RefreshCw size={13} /> Régénérer
+          </button>
+        </div>
       </div>
 
       {plan.warnings?.length > 0 && (
@@ -1105,6 +1228,7 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
   // rattachement (on continue d'éditer le même plan enregistré).
   const handleGenerate = () => { planner.generate(); setSavedPlanId(null); resetApply(); setStep('preview') }
   const handleRegenerate = () => { planner.regenerate(); resetApply() }
+  const handleUndo = () => { if (planner.undoGenerate()) { resetApply(); toast('Plan précédent rétabli') } }
 
   const defaultPlanName = `Plan du ${shortDate(planner.config.startDateStr)} · ${planner.config.days} j`
 
@@ -1305,6 +1429,8 @@ export default function MealPlannerModal({ onClose, onApplied, defaultStartDate,
             replacing={replacingWeekPlan}
             onBack={() => setStep('config')}
             onRegenerate={handleRegenerate}
+            canUndo={planner.canUndo}
+            onUndo={handleUndo}
             onApply={handleApply}
             applying={applying}
             result={applyResult}

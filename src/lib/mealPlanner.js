@@ -355,11 +355,16 @@ function recetteCandidates(recettes, categorie, season, seasonMode, maxCookMinut
 // même catégorie si `includeRepasTypes`), avec valeurs nutritionnelles
 // exploitables et portion dimensionnable. Exporté : réutilisé par
 // useMealPlanner pour proposer un remplacement de brique dans l'aperçu.
-export function buildVivier(categorie, { recettes, repasTypes, season, seasonMode, includeRepasTypes = true, maxCookMinutes = null }) {
+// `bannedIds` : recettes / repas types interdits par l'utilisatrice — jamais dans
+// le vivier (ni proposées en remplacement dans l'aperçu).
+export function buildVivier(categorie, { recettes, repasTypes, season, seasonMode, includeRepasTypes = true, maxCookMinutes = null, bannedIds = null }) {
   const recs = recetteCandidates(recettes, categorie, season, seasonMode, maxCookMinutes)
-  return includeRepasTypes
+  const all = includeRepasTypes
     ? [...recs, ...repasTypeCandidates(repasTypes, categorie, season, seasonMode)]
     : recs
+  if (!bannedIds || !bannedIds.length) return all
+  const banned = new Set(bannedIds)
+  return all.filter(c => !banned.has(c.id))
 }
 
 // Candidat construit à partir d'un id de recette / repas type — sert aux
@@ -641,7 +646,11 @@ function leftoverPortionPenalty(dayList, recettesById, templatesById) {
  * @param {boolean} [p.fillMicros=true]  compléter les manques vitamines / minéraux du jour avec des favoris
  * @param {boolean} [p.allowDoublePortions=true]  autoriser l'ajustement de portion (demi/double/triple) d'une brique sur un repas quand ça rapproche des cibles
  * @param {object} [p.settings]      settings (pour getNutrientGaps : goal_proteines / goal_fibres ; VNR micro = fixes)
- * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number, strictness:'strict'|'normal'|'loose' }
+ * @param {Array<string>} [p.bannedIds]  recettes / repas types interdits : exclus de tous les viviers, même imposées.
+ * @param {object} [p.options]       { seasonMode:'bonus'|'filter', seed:number, strictness:'strict'|'normal'|'loose', randomMode:boolean }
+ *                                   randomMode : tirage au hasard parmi les recettes qui passent les filtres
+ *                                   (catégorie, saison, temps, interdites) — aucune optimisation sur les macros :
+ *                                   ni note, ni portions ajustées, ni aliments « en + », ni recherche locale.
  *                                   strictness (voir STRICTNESS_PRESETS) règle la précision aux macros :
  *                                   'loose' tolère plus d'écart pour élargir le vivier de recettes exploitables.
  * @param {object} [p.locked]        { `${dayIndex}|${meal}`: <objet repas figé de l'aperçu> }
@@ -653,10 +662,12 @@ export function buildMealPlan(p) {
     days, people = 1, season = null, mealConfig, recettes = [], repasTypes = [],
     favorites = [], mealTargets = {}, goalFibres = 0, includeRepasTypes = true,
     maxCookMinutes = null, fillMicros = true, allowDoublePortions = true,
-    settings = {}, options = {}, locked = {},
+    settings = {}, options = {}, locked = {}, bannedIds = [],
   } = p
   const seasonMode = options.seasonMode === 'filter' ? 'filter' : 'bonus'
-  const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes, maxCookMinutes }
+  const vivierCtx = { recettes, repasTypes, season, seasonMode, includeRepasTypes, maxCookMinutes, bannedIds }
+  const bannedSet = new Set(bannedIds || [])
+  const randomMode = options.randomMode === true
   const rng = makeRng(options.seed || 1)
   // Précision macros demandée (voir STRICTNESS_PRESETS) : mêmes fonctions,
   // tolérances différentes — capturées ici en closures pour éviter de faire
@@ -699,7 +710,7 @@ export function buildMealPlan(p) {
     // Recettes imposées pour ce groupe (une ou plusieurs briques de même
     // catégorie mutualisent leur pinnedIds), reprises même si le vivier les a
     // écartées (saison stricte / temps de cuisine).
-    const wantPinned = new Set(entries.flatMap(e => e.slot.pinnedIds || []))
+    const wantPinned = new Set(entries.flatMap(e => e.slot.pinnedIds || []).filter(id => !bannedSet.has(id)))
     const chosen = []
     for (const id of wantPinned) {
       const fc = viv.find(c => c.id === id) || candidateFromId(id, vivierCtx)
@@ -725,7 +736,8 @@ export function buildMealPlan(p) {
     // part la rapproche. Pour les autres catégories, pénalité si la portion
     // dépasse déjà la cible (le solveur ne peut pas les ajuster).
     const scaleEligible = PORTION_SCALE_CATEGORIES.has(key)
-    const scored = viv
+    // Mode aléatoire : pas de note macro, tous les candidats pèsent pareil.
+    const scored = (randomMode ? viv.map(c => ({ c, dist: 0 })) : viv
       .map(c => {
         const fit = scaleEligible ? scaleFit(c.macros, avgTarget) : null
         const dist = fit ? fit.dist : macroDistance(c.macros, avgTarget)
@@ -734,18 +746,20 @@ export function buildMealPlan(p) {
           : 0
         return { c, dist: dist - seasonBonus(c.entity, season) + overshoot }
       })
-      .sort((a, b) => a.dist - b.dist)
+      .sort((a, b) => a.dist - b.dist))
     vivierScored[key] = scored
     // Il faut au moins autant de recettes différentes que d'imposées.
     const nWanted = Math.max(...entries.map(e => e.slot.nbDifferentes || 1))
     const n = Math.max(1, nWanted, chosen.length)
     // Peu de choix dans cette catégorie → le plan a peu de marge pour ajuster.
-    if (viv.length >= 1 && viv.length < n + 2) {
+    if (!randomMode && viv.length >= 1 && viv.length < n + 2) {
       warnings.push(
         `Peu de recettes « ${key} » (${viv.length}) — le plan a peu de marge pour coller aux calories. En ajouter quelques-unes, plutôt légères, améliorera le résultat.`,
       )
     }
-    const poolSize = Math.min(scored.length, Math.max(n + 3, Math.ceil(scored.length * 0.5)))
+    const poolSize = randomMode
+      ? scored.length
+      : Math.min(scored.length, Math.max(n + 3, Math.ceil(scored.length * 0.5)))
     const cpool = scored.slice(0, poolSize).map(x => x.c).filter(c => !chosen.some(x => x.id === c.id))
     while (chosen.length < n && cpool.length) {
       const cand = pickWeighted(
@@ -825,7 +839,7 @@ export function buildMealPlan(p) {
         // sa cible, on ajuste À LA HAUSSE OU À LA BAISSE (demi-portions, voir
         // PORTION_SCALE_OPTIONS) la brique éligible qui l'en rapproche le
         // plus — une seule par repas, sans faire déborder les calories.
-        if (allowDoublePortions && items.length) {
+        if (allowDoublePortions && !randomMode && items.length) {
           const base1 = items.reduce((acc, it) => addMacros(acc, it.macros), { ...EMPTY_MACROS })
           const dist1 = macroDistance(base1, target)
           let best = null // { idx, scale, dist }
@@ -857,7 +871,7 @@ export function buildMealPlan(p) {
           lip: target.lip - recipeTotals.lip,
           fibres: target.fibres - recipeTotals.fibres,
         }
-        const addons = fillWithAddons(residual, target, foods, rng, usedAddonKeys)
+        const addons = randomMode ? [] : fillWithAddons(residual, target, foods, rng, usedAddonKeys)
         for (const a of addons) usedAddonKeys.add(foodKey(a.food))
         const allItems = [...items, ...addons]
         const totals = allItems.reduce((acc, it) => addMacros(acc, it.macros), { ...EMPTY_MACROS })
@@ -870,7 +884,7 @@ export function buildMealPlan(p) {
       // Passe vitamines / minéraux : on répartit 0..2 favoris sur les repas non
       // verrouillés du jour pour combler les manques micro, sans déborder les
       // calories restantes de la journée.
-      if (fillMicros) {
+      if (fillMicros && !randomMode) {
         const dayMicros = {}
         for (const m of dayMeals) {
           for (const it of m.items) addMicroContribution(dayMicros, it, { recettesById, templatesById })
@@ -922,7 +936,7 @@ export function buildMealPlan(p) {
   //    touchées. Deux phases : (a) balayage glouton — pour chaque position
   //    libre, on essaie les meilleures alternatives et on garde la meilleure ;
   //    (b) passes aléatoires pour sortir des optima locaux.
-  const swappableKeys = Object.keys(picks).filter(k => {
+  const swappableKeys = randomMode ? [] : Object.keys(picks).filter(k => {
     const free = picks[k].filter(c => !pinnedByKey[k]?.has(c.id)).length
     return free > 0 && (viviers[k] || []).length > picks[k].length
   })
