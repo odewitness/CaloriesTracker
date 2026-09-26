@@ -12,6 +12,7 @@ import { getPortion, getCategoryLabel, findBetterAlternative, formatValue } from
 import { patchCachedPortions } from '../hooks/useCiqualCatalog'
 import MacroPreview from './MacroPreview'
 import NutrientPanel from './NutrientPanel'
+import FodmapPanel from './FodmapPanel'
 import AddToJournalSheet from './AddToJournalSheet'
 import Loader from './Loader'
 
@@ -326,6 +327,8 @@ export default function ExplorerFoodModal({ food, onClose, foods, gaps, onPickFo
             <MacroPreview food={full} qty={qty} />
 
             <NutrientPanel totals={live} hasEntries={true} defaultOpen={true} />
+
+            <FodmapPanel food={full} qty={qty} />
 
             <button
               className="btn-primary"

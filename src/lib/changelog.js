@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-26',
+    title: 'Vois les FODMAP de tes aliments',
+    description: "Si ton ventre réagit à certains aliments, tu peux maintenant activer l'affichage des FODMAP dans Profil > FODMAP. Quand tu ajoutes ou ouvres un aliment, une carte t'indique si la quantité choisie est faible, modérée ou élevée en FODMAP, famille par famille (blé et oignon, fructose, polyols, lactose), et jusqu'à combien de grammes il reste faible. Quand une donnée manque ou est estimée, c'est écrit.",
+  },
+  {
+    date: '2026-09-26',
     title: 'Un planificateur de repas plus simple à régler',
     description: "Quand tu prépares un plan, tout est maintenant visible sur un seul écran, en 4 étapes : quand, comment choisir les plats, quels repas, quelles recettes. Tu peux choisir de coller à tes objectifs ou de tirer tes plats au hasard, voir combien de recettes passent tes filtres, et imposer ou interdire des recettes au même endroit. Dans l'aperçu, « Ne plus jamais proposer » écarte une recette pour de bon, et après « Régénérer », le bouton « Retour » te rend le plan d'avant. La collation est aussi toujours proposée, même si tu ne l'actives que certains jours.",
   },

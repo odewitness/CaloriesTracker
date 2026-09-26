@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react'
 import { X, ChevronLeft, BookOpen } from 'lucide-react'
 import NutrientPanel from './NutrientPanel'
+import FodmapPanel from './FodmapPanel'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
+import { entryToFood } from '../lib/journalEntry'
 import { useBackButton } from '../hooks/useBackButton'
 
 // Re-scale une liste d'ingrédients (voir journal.ingredients_detail) au
@@ -80,6 +82,10 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack, onOp
     entry.ingredients_detail?.length ? rescaleIngredients(entry.ingredients_detail, f) : null
   ), [entry, f])
 
+  // Aliment /100 g reconstruit depuis l'entrée, pour le bloc FODMAP (qui relit
+  // lui-même la ligne Ciqual à jour quand l'entrée vient de Ciqual).
+  const fodmapFood = useMemo(() => entryToFood(entry), [entry])
+
   const dirty = parseFloat(qty) !== entry.qty_g
 
   const save = async () => {
@@ -146,6 +152,8 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack, onOp
           )}
 
           <NutrientPanel totals={live} hasEntries={true} defaultOpen={true} />
+
+          <FodmapPanel food={fodmapFood} qty={qty} />
 
           {isRecipeEntry && (
             <div style={{ marginTop: 16 }}>
