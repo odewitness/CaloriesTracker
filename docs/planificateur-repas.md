@@ -613,6 +613,19 @@ l'ancien format (localStorage et `plans_repas.config`). Dans l'aperçu,
 l'éditeur d'une brique propose aussi « Ne plus jamais proposer » : interdit la
 recette et la remplace aussitôt par une autre de sa catégorie.
 
+**Collation toujours proposée** (bug : elle n'apparaissait pas). Deux causes :
+(1) seuls les repas activés dans le profil étaient proposés, or la Collation
+s'active souvent jour par jour (`collation_jours`) ; (2) une composition
+personnalisée (`config.mealConfig`, mémorisée) figeait la liste des repas.
+Désormais `defaultMealConfig(days)` renvoie les 4 repas, `baseMealConfig`
+complète la composition enregistrée par les défauts, et la Collation est
+toujours listée : décochée si désactivée dans le profil, cochable
+(`config.forcedMeals`). Forcée, elle est activée dans les cibles du plan
+(`computeMealTargets` avec `meal_enabled.Collation = true`, ses calories prises
+sur les autres repas comme sur la page du jour) et, à l'application,
+`collation_jours` est mis à `active = true` pour les jours où elle est
+planifiée. Retirer le plan ne remet pas ces jours à « désactivée ».
+
 ---
 
 ## 8. Alertes / points de vigilance

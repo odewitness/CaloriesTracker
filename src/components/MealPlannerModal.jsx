@@ -99,7 +99,7 @@ function MacroRow({ totals, target }) {
 // nombre de recettes différentes sur la période). Sous chaque brique, l'effet
 // des filtres (recettes possibles), les imposées qui y tombent, et le partage
 // du pool avec les autres repas de même catégorie.
-function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange, possibleByCategory, pinnedByCategory, mealsByCategory }) {
+function MealSlotsEditor({ meal, slots, included, offInProfile, onToggleIncluded, onChange, possibleByCategory, pinnedByCategory, mealsByCategory }) {
   const setSlot = (i, patch) => onChange(slots.map((s, si) => si === i ? { ...s, ...patch } : s))
   const removeSlot = (i) => onChange(slots.filter((_, si) => si !== i))
   const addSlot = () => onChange([...slots, { categorie: 'Dessert', nbDifferentes: 2 }])
@@ -111,6 +111,13 @@ function MealSlotsEditor({ meal, slots, included, onToggleIncluded, onChange, po
         {meal}
         {!included && <span style={{ fontWeight: 500, color: 'var(--text-hint)', fontSize: 11.5 }}>— pas dans ce plan</span>}
       </label>
+      {offInProfile && (
+        <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.45, margin: '4px 0 0 27px' }}>
+          {included
+            ? 'Désactivée d’habitude : elle sera activée sur les jours du plan, et ses calories prises sur les autres repas.'
+            : 'Désactivée dans ton profil. Coche-la pour l’ajouter à ce plan.'}
+        </div>
+      )}
       {included && (
         <div style={{ marginTop: 10 }}>
           {slots.map((slot, i) => {
@@ -388,7 +395,7 @@ function ModeCard({ active, icon, title, text, onClick }) {
 
 function ConfigView({ planner, savedPlans, onLoadPlan, onRenamePlan, onDeletePlan }) {
   const {
-    config, baseMealConfig, excludedMeals, setConfig, setMealConfig, toggleMeal,
+    config, baseMealConfig, excludedMeals, mealsOffInProfile, setConfig, setMealConfig, toggleMeal,
     setRecipeRule, clearRecipeRules, recettes, repasTypes,
     possibleByCategory, pinnedByCategory, unplacedPinnedIds,
   } = planner
@@ -567,6 +574,7 @@ function ConfigView({ planner, savedPlans, onLoadPlan, onRenamePlan, onDeletePla
             meal={meal}
             slots={slots}
             included={!excluded.has(meal)}
+            offInProfile={mealsOffInProfile.includes(meal)}
             onToggleIncluded={() => toggleMeal(meal)}
             onChange={next => changeMealSlots(meal, next)}
             possibleByCategory={possibleByCategory}

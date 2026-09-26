@@ -1053,18 +1053,15 @@ export function batchSummary(plan, { recettesById = {}, templatesById = {} } = {
 // contrainte de batch-cooking — quelqu'un avec beaucoup de recettes ne veut pas
 // revoir les 2 mêmes plats toute la semaine. Qui veut du batch-cooking peut
 // redescendre le curseur « N× » dans Options avancées.
-export function defaultMealConfig(mealTargets, days = 7) {
+//
+// Renvoie les 4 repas (dans l'ordre de la journée) : c'est useMealPlanner qui
+// décide lesquels sont proposés / cochés selon les réglages du profil.
+export function defaultMealConfig(days = 7) {
   const n = Math.max(1, Math.min(7, days || 7))
-  const map = {
-    'Petit-déjeuner': { categorie: 'Petit-déjeuner', nbDifferentes: n },
-    'Déjeuner': { categorie: 'Plat', nbDifferentes: n },
-    'Dîner': { categorie: 'Plat', nbDifferentes: n },
-    'Collation': { categorie: 'Collation', nbDifferentes: n },
+  return {
+    'Petit-déjeuner': [{ categorie: 'Petit-déjeuner', nbDifferentes: n }],
+    'Déjeuner': [{ categorie: 'Plat', nbDifferentes: n }],
+    'Collation': [{ categorie: 'Collation', nbDifferentes: n }],
+    'Dîner': [{ categorie: 'Plat', nbDifferentes: n }],
   }
-  const cfg = {}
-  for (const [meal, slot] of Object.entries(map)) {
-    if (mealTargets?.[meal]?.enabled === false) continue
-    cfg[meal] = [{ ...slot }]
-  }
-  return cfg
 }

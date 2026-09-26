@@ -9,7 +9,7 @@ export const CHANGELOG = [
   {
     date: '2026-09-26',
     title: 'Un planificateur de repas plus simple à régler',
-    description: "Quand tu prépares un plan, tout est maintenant visible sur un seul écran, en 4 étapes : quand, comment choisir les plats, quels repas, quelles recettes. Tu peux choisir de coller à tes objectifs ou de tirer tes plats au hasard, voir combien de recettes passent tes filtres, et imposer ou interdire des recettes au même endroit. Dans l'aperçu, « Ne plus jamais proposer » écarte une recette pour de bon, et après « Régénérer », le bouton « Retour » te rend le plan d'avant.",
+    description: "Quand tu prépares un plan, tout est maintenant visible sur un seul écran, en 4 étapes : quand, comment choisir les plats, quels repas, quelles recettes. Tu peux choisir de coller à tes objectifs ou de tirer tes plats au hasard, voir combien de recettes passent tes filtres, et imposer ou interdire des recettes au même endroit. Dans l'aperçu, « Ne plus jamais proposer » écarte une recette pour de bon, et après « Régénérer », le bouton « Retour » te rend le plan d'avant. La collation est aussi toujours proposée, même si tu ne l'actives que certains jours.",
   },
   {
     date: '2026-09-26',
