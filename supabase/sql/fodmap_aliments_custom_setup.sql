@@ -2,6 +2,7 @@
 -- ALIMENTS_CUSTOM.FODMAP — réglage FODMAP d'un aliment perso (chantier
 -- FODMAP, Palier 3b — voir docs/fodmap.md).
 --
+-- EXÉCUTÉ en production le 2026-09-26 — ne pas relancer (sans danger : if not exists).
 -- Écrit le 2026-09-26. À exécuter une fois, à la main, dans le SQL editor
 -- Supabase, AVANT le merge sur main de la branche feature/fodmap-aliments-perso :
 -- le formulaire d'aliment perso écrit la clé `fodmap` quand l'affichage FODMAP
