@@ -324,3 +324,81 @@ export function evaluateMeal(items) {
   const byId = Object.fromEntries(evaluated.map(it => [it.id, it.ev]))
   return { rows, overall, stacked: rows.some(r => r.stacked), skipped, byId }
 }
+
+// ── Recette (Palier 3) ──────────────────────────────────────────────────────
+// Une portion de recette = un « repas » de ses ingrédients : chaque
+// ingrédient pèse sa quantité crue × (portion ÷ poids de référence de la
+// recette), et evaluateMeal fait le cumul. Portion sûre : les charges sont
+// proportionnelles à la portion, on les calcule donc pour 100 g et on en
+// déduit le grammage où la famille la plus chargée atteint son seuil.
+export function mealSafePortion(evalAt100g) {
+  if (!evalAt100g?.overall) return null
+  let best = { grams: Infinity, groupKey: null }
+  let partial = false
+  for (const r of evalAt100g.rows) {
+    if (!r.complete) partial = true
+    if (r.load > 0) {
+      const grams = 100 / r.load
+      if (grams < best.grams) best = { grams, groupKey: r.key }
+    }
+  }
+  return { ...best, partial }
+}
+
+// Alternatives couramment citées pour les ingrédients riches en FODMAP
+// (Monash, listes diététiques publiques). Information, pas prescription :
+// affichées seulement pour les ingrédients qui pèsent dans une famille
+// modérée ou élevée.
+const SUBSTITUTIONS = [
+  { re: /\bail\b/, text: 'huile infusée à l’ail (les fructanes ne passent pas dans l’huile), ciboulette' },
+  { re: /\b(oignons?|echalotes?)\b/, text: 'vert de ciboule ou d’oignon nouveau, ciboulette' },
+  { re: /\bpoireaux?\b/, text: 'vert de poireau (le blanc en contient davantage)' },
+  { re: /(pois chiche|lentille)/, text: 'en conserve, égouttés et rincés : une partie des GOS reste dans le jus' },
+  { re: /\blait\b/, unless: /sans lactose/, text: 'lait sans lactose ou boisson d’amande' },
+  { re: /(yaourt|fromage blanc|petit-suisse|creme fraiche|skyr|ricotta)/, unless: /sans lactose/, text: 'version sans lactose' },
+  { re: /(\bpain|\bpates\b|farine|semoule|couscous)/, unless: /(sans gluten|epeautre|riz|mais|sarrasin)/, text: 'pain au levain d’épeautre, pâtes ou farine sans gluten' },
+  { re: /(\bmiel\b|agave)/, text: 'sirop d’érable' },
+  { re: /champignon/, text: 'pleurotes, champignons de Paris en conserve égouttés' },
+  { re: /chou-fleur/, text: 'têtes de brocoli' },
+  { re: /(cajou|pistache)/, text: 'noix de macadamia, noix de pécan, cacahuètes' },
+  { re: /(\bpommes?\b(?! de terre)|\bpoires?\b|mangue)/, text: 'orange, kiwi, fraises' },
+]
+
+export function fodmapSubstitution(name) {
+  const n = normalize(name)
+  const s = SUBSTITUTIONS.find(x => x.re.test(n) && !(x.unless && x.unless.test(n)))
+  return s ? s.text : null
+}
+
+// ── Explorateur (Palier 3) ──────────────────────────────────────────────────
+// Profil mémorisé par objet aliment : le catalogue de l'explorateur (3 500
+// lignes, objets stables pour la session) est refiltré à chaque frappe.
+const profileMemo = new WeakMap()
+export function memoFodmapProfile(food) {
+  if (!food) return null
+  let p = profileMemo.get(food)
+  if (!p) { p = buildFodmapProfile(food); profileMemo.set(food, p) }
+  return p
+}
+
+export const FODMAP_FILTERS = [
+  { key: 'all', label: 'Faibles en FODMAP' },
+  { key: 'oligo', label: 'Fructanes et GOS faibles' },
+  { key: 'fructose', label: 'Fructose faible' },
+  { key: 'polyols', label: 'Polyols faibles' },
+  { key: 'lactose', label: 'Lactose faible' },
+]
+
+const LOWISH = new Set(['low', 'likely-low'])
+
+// `keys` : clés de FODMAP_FILTERS (ET logique). L'aliment passe si, à la
+// quantité donnée, chaque famille demandée est faible ou probablement faible
+// (« all » = toutes les familles). Une famille inconnue ne passe jamais.
+export function passesFodmapFilter(food, qtyG, keys) {
+  if (!keys?.length) return true
+  const ev = evaluateFodmap(memoFodmapProfile(food), qtyG)
+  if (!ev) return false
+  return keys.every(k => (k === 'all'
+    ? LOWISH.has(ev.overall)
+    : LOWISH.has(ev.rows.find(r => r.key === k)?.level)))
+}

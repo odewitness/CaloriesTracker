@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Share2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen, ChefHat } from 'lucide-react'
 import NutrientPanel from './NutrientPanel'
+import FodmapPanel from './FodmapPanel'
 import FoodDetailModal from './FoodDetailModal'
 import RecipePhoto from './RecipePhoto'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
@@ -169,6 +170,10 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
     : poidsRef > 0 ? poidsRef * (portionsSouhaitees / nbPortionsBase) : 0
 
   const factor = poidsRef > 0 && displayQtyG > 0 ? displayQtyG / poidsRef : 0
+
+  // Recette vue comme un aliment pour le bloc FODMAP, qui relit lui-même ses
+  // ingrédients (avec les lignes Ciqual à jour).
+  const fodmapFood = useMemo(() => ({ _source: 'recette', id: recette.id, alim_nom: recette.nom }), [recette.id, recette.nom])
 
   // Ingrédients mis à l'échelle affichée — nom, grammage et TOUS les
   // nutriments (macros + micronutriments). Sert à l'affichage, aux
@@ -580,6 +585,10 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
           ) : per100 ? (
             <>
               <NutrientPanel totals={displayTotals} hasEntries={true} defaultOpen />
+              {/* FODMAP à l'échelle affichée (si activé dans le Profil) */}
+              <div style={{ marginTop: 12 }}>
+                <FodmapPanel food={fodmapFood} qty={displayQtyG} />
+              </div>
             </>
           ) : (
             <div style={{ fontSize: 13, color: 'var(--text-hint)' }}>Aucun ingrédient renseigné.</div>

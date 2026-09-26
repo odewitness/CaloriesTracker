@@ -1215,8 +1215,14 @@ const selectHistoryQty = (g) => {
                 {/* Macro preview */}
                 <MacroPreview food={selected} qty={qty} />
 
-                {/* FODMAP à la quantité saisie (si activé dans le Profil) */}
-                <FodmapPanel food={selected} qty={qty} />
+                {/* FODMAP à la quantité saisie (si activé dans le Profil) —
+                    pour une recette, avec les grammages d'ingrédients
+                    corrigés via « Modifier les quantités » s'il y en a */}
+                <FodmapPanel
+                  food={selected}
+                  qty={qty}
+                  ingredientsDetail={selected._source === 'recette' ? recipeAdjustSnapshot?.ingredients ?? null : null}
+                />
               </>
             )}
 

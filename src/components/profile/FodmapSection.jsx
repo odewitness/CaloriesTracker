@@ -18,7 +18,7 @@ export default function FodmapSection({ fodmap, onPatch, onBack }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 500 }}>Afficher les FODMAP</div>
             <div style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.4 }}>
-              dans les fiches aliments, le journal et la page du jour
+              aliments, recettes, journal, page du jour et explorateur
             </div>
           </div>
           <ToggleSwitch checked={f.enabled} onClick={() => onPatch({ enabled: !f.enabled })} />
@@ -41,6 +41,11 @@ export default function FodmapSection({ fodmap, onPatch, onBack }) {
           Les aliments d’un même repas s’additionnent : sur la page du jour, chaque repas affiche
           sa charge cumulée, les aliments modérés ou élevés portent une pastille, et une carte
           « FODMAP » résume ta journée (tu peux la déplacer depuis Profil &gt; Page du jour).
+        </p>
+        <p style={{ margin: '0 0 10px' }}>
+          Une recette est calculée à partir de ses ingrédients : sa carte montre ceux qui pèsent le
+          plus et ce qu’on utilise souvent à la place. Dans l’explorateur, les filtres « FODMAP à
+          la portion » ne gardent que les aliments faibles.
         </p>
         <p style={{ margin: 0 }}>
           Les valeurs viennent de tables de composition et de publications scientifiques ; certaines

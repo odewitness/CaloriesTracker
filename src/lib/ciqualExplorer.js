@@ -60,6 +60,8 @@ export const ALL_SORT_FIELDS = SORT_GROUPS.flatMap(g => g.fields)
 // Dérivée des listes de champs, jamais recopiée à la main.
 export const EXPLORER_SELECT = Array.from(new Set([
   'id', 'alim_code', 'alim_nom', 'categorie', 'portions',
+  // Sucres utiles au calcul FODMAP (filtres FODMAP, voir src/lib/fodmap.js).
+  'fructose', 'glucose', 'lactose', 'polyols',
   ...ALL_SORT_FIELDS.filter(f => !f.virtual).flatMap(f => f.sumKeys || [f.key]),
 ])).join(',')
 
@@ -429,6 +431,20 @@ export const DEFAULT_FILTERS = {
   favoritesOnly: false,
   fitsRemainingKcal: false,
   showSeasonings: false,
+  // Filtres FODMAP à la portion (clés de FODMAP_FILTERS, src/lib/fodmap.js),
+  // proposés seulement si l'affichage FODMAP est activé. Appliqués par
+  // ExplorerPage (le calcul vit dans fodmap.js).
+  fodmap: [],
+}
+
+// Libellés des pastilles FODMAP actives (recopiés de FODMAP_FILTERS pour ne
+// pas importer fodmap.js, qui dépend déjà de ce fichier).
+const FODMAP_FILTER_LABELS = {
+  all: 'Faibles en FODMAP',
+  oligo: 'Fructanes et GOS faibles',
+  fructose: 'Fructose faible',
+  polyols: 'Polyols faibles',
+  lactose: 'Lactose faible',
 }
 
 // La page s'ouvre sur un tri par nom : aucun nutriment n'est privilégié tant
@@ -502,6 +518,9 @@ export function describeActiveFilters(filters, remainingKcal) {
     const opt = COOKING_OPTIONS.find(o => o.key === k)
     if (opt) out.push({ id: `cook:${k}`, kind: 'cooking', value: k, label: opt.label })
   }
+  for (const k of filters.fodmap || []) {
+    out.push({ id: `fodmap:${k}`, kind: 'fodmap', value: k, label: FODMAP_FILTER_LABELS[k] || k })
+  }
   if (filters.favoritesOnly) out.push({ id: 'fav', kind: 'favoritesOnly', label: 'Mes favoris' })
   if (filters.fitsRemainingKcal) {
     out.push({
@@ -517,6 +536,7 @@ export function removeFilter(filters, item) {
   if (item.kind === 'claim')    return { ...filters, claims: filters.claims.filter(k => k !== item.value) }
   if (item.kind === 'category') return { ...filters, categories: filters.categories.filter(c => c !== item.value) }
   if (item.kind === 'cooking')  return { ...filters, cooking: filters.cooking.filter(k => k !== item.value) }
+  if (item.kind === 'fodmap')   return { ...filters, fodmap: (filters.fodmap || []).filter(k => k !== item.value) }
   return { ...filters, [item.kind]: false }
 }
 
