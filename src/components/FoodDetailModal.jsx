@@ -151,9 +151,9 @@ export default function FoodDetailModal({ entry, onUpdate, onClose, onBack, onOp
             </button>
           )}
 
-          <FodmapPanel food={fodmapFood} qty={qty} />
-
           <NutrientPanel totals={live} hasEntries={true} defaultOpen={true} />
+
+          <FodmapPanel food={fodmapFood} qty={qty} />
 
           {isRecipeEntry && (
             <div style={{ marginTop: 16 }}>

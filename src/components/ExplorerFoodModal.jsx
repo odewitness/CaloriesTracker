@@ -326,9 +326,9 @@ export default function ExplorerFoodModal({ food, onClose, foods, gaps, onPickFo
 
             <MacroPreview food={full} qty={qty} />
 
-            <FodmapPanel food={full} qty={qty} />
-
             <NutrientPanel totals={live} hasEntries={true} defaultOpen={true} />
+
+            <FodmapPanel food={full} qty={qty} />
 
             <button
               className="btn-primary"
