@@ -3,10 +3,9 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-09-27.
 
-**État au 2026-09-27 : Paliers 1-2 mergés et poussés sur `main`. Paliers 3 à
-6 codés sur la branche `feature/sommeil-croisements`** (build OK, aucun SQL
-supplémentaire), en attente du test manuel. Seul reste ouvert : le rappel push
-d'heure de coucher (non codé, à confirmer). Voir §11.
+**État au 2026-09-27 : chantier terminé.** Paliers 1 à 6 mergés et poussés
+sur `main`, testés par l'utilisatrice. Rappel push d'heure de coucher
+**abandonné** (décision utilisatrice : pas de rappels). Voir §11.
 
 ---
 
@@ -592,7 +591,7 @@ colonne `settings.sommeil`, tous les réglages échouent), test manuel, merge.
   chronotype, profil par jour de réveil).
 - Entrée `changelog.js` ajoutée.
 
-### Paliers 3 à 6 — branche `feature/sommeil-croisements` (2026-09-27)
+### Paliers 3 à 6 — mergés sur `main` le 2026-09-27
 
 Build OK, aucune migration (les colonnes `facteurs`, `sieste_min` et les
 réglages `conseils_jour` / `afficher_calendrier` existaient dès le Palier 1).
@@ -627,9 +626,8 @@ strates.
   endormissement = coucher + 15 min) ; point bleu « nuit courte » (≥ 1 h sous
   l'objectif) au coin bas-gauche du calendrier, option Profil › Sommeil ;
   carte « Sommeil & transit » dans l'onglet Digestion (compte transit).
-- **Non fait** : rappel push d'heure de coucher (même friction cron / Edge
-  Function que les rappels sport abandonnés) — à confirmer avec
-  l'utilisatrice.
+- **Abandonné** (décision utilisatrice, 2026-09-27) : rappel push d'heure de
+  coucher.
 
 ## Sources
 
