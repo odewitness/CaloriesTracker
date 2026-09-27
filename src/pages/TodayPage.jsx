@@ -17,6 +17,8 @@ import AddWaterSheet from '../components/AddWaterSheet'
 import SportSection from '../components/SportSection'
 import SportEntrySheet from '../components/SportEntrySheet'
 import StoolSection from '../components/StoolSection'
+import SleepSection from '../components/SleepSection'
+import SleepEntrySheet from '../components/SleepEntrySheet'
 import FodmapDayCard from '../components/FodmapDayCard'
 import StoolEntrySheet from '../components/StoolEntrySheet'
 import StepsSheet from '../components/StepsSheet'
@@ -35,6 +37,7 @@ import { useJournal } from '../hooks/useJournal'
 import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCollationDay } from '../hooks/useCollationDay'
 import { useSport } from '../hooks/useSport'
+import { useSleep } from '../hooks/useSleep'
 import { useSelles, useLieuxSelles, useSymptomesDigestifs } from '../hooks/useSelles'
 import { useDayFodmap } from '../hooks/useFodmapProfile'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
@@ -49,6 +52,7 @@ import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
 import { sportAdjustedSettings, dayActivityKcal, dayEnergyBalance, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
+import { usualTimes } from '../lib/sleep'
 import { fmt, dateLabel } from '../lib/dates'
 import { hapticTap, hapticRemove, hapticNav, hapticSuccess } from '../lib/haptics'
 import { useSetTodayHeaderInfo, useTodayShortcuts, useRequestTodayDate } from '../lib/TodayHeaderContext'
@@ -91,6 +95,11 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   const { lieux: stoolLieux, ensureLieu: ensureStoolLieu } = useLieuxSelles()
   const { entries: symptomEntries, add: addSymptom, update: updateSymptom, remove: removeSymptom } = useSymptomesDigestifs(dateStr)
   const { repas: repasPlanifies, refetch: refetchPlanifies } = usePlannedMealsForDate(dateStr)
+  // Nuit rattachée à la date du réveil : la carte du jour D montre la nuit
+  // qui s'est terminée le matin de D (voir src/lib/sleep.js).
+  const { night: sleepNight, nights: sleepNights, save: saveSleep, update: updateSleep, remove: removeSleep } = useSleep(dateStr)
+  const sleepUsual = useMemo(() => usualTimes(sleepNights, dateStr), [sleepNights, dateStr])
+  const isFutureDay = dateStr > fmt(new Date())
 
   // Données non datées, montées une seule fois pour les 3 slots (voir
   // TodayDataContext). Destructuration identique à l'ancien appel direct des
@@ -112,6 +121,7 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   const [sportSheet, setSportSheet] = useState(null) // { initial: activite|null } | null
   const [stoolSheet, setStoolSheet] = useState(null) // { initial: passage|null } | null
   const [pasSheet, setPasSheet] = useState(false)
+  const [sleepSheetOpen, setSleepSheetOpen] = useState(false)
   const [energyInfoOpen, setEnergyInfoOpen] = useState(false)
   const [planMealOpen, setPlanMealOpen] = useState(false)
   const [shareImageOpen, setShareImageOpen] = useState(false)
@@ -209,6 +219,35 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
     toast('Supprimé')
     setStoolSheet(null)
   }
+  // ── Sommeil ─────────────────────────────────────────────────────────────
+  const handleQuickSleep = async () => {
+    if (!sleepUsual) return
+    const { error } = await saveSleep({
+      heure_endormissement: sleepUsual.heure_endormissement,
+      heure_reveil: sleepUsual.heure_reveil,
+      duree_min: sleepUsual.duree_min,
+      reveil_naturel: sleepUsual.reveil_naturel,
+    })
+    if (error) toast('Erreur')
+    else { hapticTap(); toast('✓ Nuit notée !') }
+  }
+  const handleSetSleepQualite = async (qualite) => {
+    const { error } = await updateSleep({ qualite })
+    if (error) toast('Erreur')
+    else hapticTap()
+  }
+  const handleSaveSleep = async (payload) => {
+    const { error } = await saveSleep(payload)
+    if (error) toast('Erreur')
+    else toast(sleepNight ? '✓ Nuit modifiée !' : '✓ Nuit notée !')
+    setSleepSheetOpen(false)
+  }
+  const handleDeleteSleep = async () => {
+    await removeSleep()
+    toast('Supprimé')
+    setSleepSheetOpen(false)
+  }
+
   const handleShareSeance = (a) => {
     setSportSheet(null)
     setShareSportTarget({
@@ -626,6 +665,19 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
         onShareWeek={handleShareWeek}
       />
     ) : null,
+    sommeil: settings.sommeil?.card_visible !== false ? (
+      <SleepSection
+        dateStr={dateStr}
+        night={sleepNight}
+        nights={sleepNights}
+        usual={sleepUsual}
+        objectifMin={Number(settings.sommeil?.objectif_min) || 480}
+        isFuture={isFutureDay}
+        onQuickLog={handleQuickSleep}
+        onSetQualite={handleSetSleepQualite}
+        onOpenSheet={() => setSleepSheetOpen(true)}
+      />
+    ) : null,
     fodmap: fodmapEnabled ? (
       <FodmapDayCard meals={fodmapMeals} mealOrder={MEALS} />
     ) : null,
@@ -714,6 +766,17 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
           onSaveSymptom={handleSaveSymptom}
           onDeleteSymptom={handleDeleteSymptom}
           onClose={() => setStoolSheet(null)}
+        />
+      )}
+
+      {sleepSheetOpen && (
+        <SleepEntrySheet
+          dateStr={dateStr}
+          initial={sleepNight}
+          usual={sleepUsual}
+          onSave={handleSaveSleep}
+          onDelete={handleDeleteSleep}
+          onClose={() => setSleepSheetOpen(false)}
         />
       )}
 

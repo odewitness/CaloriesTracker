@@ -9,6 +9,7 @@ import { useCycle } from '../hooks/useCycle'
 import { useSportRange, useSportStreak } from '../hooks/useSport'
 import { useProfile } from '../hooks/useProfile'
 import { useSellesRange, useSymptomesDigestifsRange } from '../hooks/useSelles'
+import { useSleepRange } from '../hooks/useSleep'
 import { usePeriodFodmap } from '../hooks/useFodmapProfile'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { dayActivityKcal } from '../lib/sport'
@@ -36,6 +37,7 @@ import MonthCard from '../components/history/MonthCard'
 import SportHistorySection from '../components/history/SportHistorySection'
 import SportPhaseSection from '../components/history/SportPhaseSection'
 import DigestionSection from '../components/history/DigestionSection'
+import SleepHistorySection from '../components/history/SleepHistorySection'
 
 const TABS = [
   { key: 'semaine', label: 'Semaine' },
@@ -49,6 +51,7 @@ const VIEWS = [
   { key: 'resume', label: 'Résumé' },
   { key: 'nutrition', label: 'Nutrition' },
   { key: 'activite', label: 'Activité', need: 'sport' },
+  { key: 'sommeil', label: 'Sommeil', need: 'sleep' },
   { key: 'cycle', label: 'Cycle', need: 'cycle' },
   { key: 'digestion', label: 'Digestion', need: 'stool' },
 ]
@@ -110,6 +113,15 @@ export default function HistoryPage() {
   const isStoolUser = user?.id === STOOL_TRACKER_USER_ID
   const { entries: sellesEntries } = useSellesRange(bounds.start, bounds.end)
   const { entries: symptomEntries } = useSymptomesDigestifsRange(bounds.start, bounds.end)
+
+  // Nuits de la période (onglet Sommeil). Onglet visible tant que la carte
+  // Sommeil est affichée, ou dès qu'il y a des nuits notées sur la période.
+  const { nights: sleepNights } = useSleepRange(bounds.start, bounds.end)
+  const hasSleep = sleepNights.length > 0
+  const sleepDayKeys = useMemo(
+    () => eachDay(bounds.start, bounds.end < today ? bounds.end : today),
+    [bounds.start, bounds.end, today],
+  )
 
   // ── Chargement du journal (période affichée + précédente) ─────────────────
   useEffect(() => {
@@ -455,9 +467,10 @@ export default function HistoryPage() {
       v.need === 'sport' ? !!settings.sport?.enabled
         : v.need === 'cycle' ? cycleView
         : v.need === 'stool' ? user?.id === STOOL_TRACKER_USER_ID
+        : v.need === 'sleep' ? (settings.sommeil?.card_visible !== false || hasSleep)
         : true,
     ),
-    [settings.sport?.enabled, cycleView, user?.id],
+    [settings.sport?.enabled, cycleView, user?.id, settings.sommeil?.card_visible, hasSleep],
   )
   const activeView = availableViews.some(v => v.key === view) ? view : 'resume'
 
@@ -528,11 +541,11 @@ export default function HistoryPage() {
 
       {loading && <Loader />}
 
-      {!loading && !hasEntries && !hasSport && !isStoolUser && (
+      {!loading && !hasEntries && !hasSport && !hasSleep && !isStoolUser && (
         <EmptyState icon={<TrendingDown size={40} />} title="Aucune donnée sur cette période" description="Logge tes repas pour voir tes stats ici" />
       )}
 
-      {!loading && (hasEntries || hasSport || isStoolUser) && (
+      {!loading && (hasEntries || hasSport || hasSleep || isStoolUser) && (
         <>
           {/* Onglets thématiques (2ᵉ rangée) — un seul thème visible à la fois. */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
@@ -740,6 +753,16 @@ export default function HistoryPage() {
                 : "Pas encore assez de jours notés sur cette période pour comparer ta phase lutéale au reste du cycle."}
             </div>
           ))}
+
+          {/* ── Sommeil : durée, qualité, régularité, rythme ─────────────── */}
+          {activeView === 'sommeil' && (
+            <SleepHistorySection
+              nights={sleepNights}
+              periodDayKeys={sleepDayKeys}
+              tab={tab}
+              objectifMin={Number(settings.sommeil?.objectif_min) || 480}
+            />
+          )}
 
           {/* ── Digestion : fréquence, Bristol, corrélations transit ──────── */}
           {activeView === 'digestion' && (

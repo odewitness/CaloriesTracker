@@ -8,6 +8,11 @@
 export const CHANGELOG = [
   {
     date: '2026-09-27',
+    title: 'Note tes nuits de sommeil',
+    description: "Une nouvelle carte Sommeil sur la page du jour : chaque matin, note ta nuit en un appui avec « Comme d'habitude », ou détaille ton heure d'endormissement, ton réveil, la durée et comment tu te sens. Dans Historique > Sommeil, tu retrouves tes nuits une par une, ta régularité et la différence entre la semaine et le week-end. Tu peux déplacer la carte depuis Profil > Page du jour et régler ton objectif dans Profil > Sommeil.",
+  },
+  {
+    date: '2026-09-27',
     title: "L'écran reste allumé pendant ta fournée",
     description: "Dans Ma fournée et dans le Plan de cuisine, touche la petite toque en haut à gauche : elle passe au vert et ton téléphone ne se met plus en veille pendant que tu cuisines. Elle reste active quand tu passes de la fournée au plan, et se coupe quand tu fermes Ma fournée.",
   },

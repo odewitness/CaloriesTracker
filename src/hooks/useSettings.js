@@ -9,6 +9,7 @@ import { SPORT_DEFAULTS, mergeSportSettings } from '../lib/sport'
 import { GOAL_WEIGHT_DEFAULTS, mergeGoalWeightSettings } from '../lib/poidsObjectif'
 import { DEFAULT_TODAY_SECTIONS_ORDER, normalizeTodaySectionsOrder } from '../lib/todaySections'
 import { FODMAP_DEFAULTS, mergeFodmapSettings } from '../lib/fodmap'
+import { SLEEP_DEFAULTS, mergeSleepSettings } from '../lib/sleep'
 
 export const GOAL_AUTO_ADJUST_DEFAULTS = { enabled: false, last_prompt: null }
 
@@ -30,6 +31,9 @@ const DEFAULTS = {
   // exister en base AVANT le déploiement de ce code, sinon chaque upsert de
   // réglages échoue (colonne inconnue).
   fodmap: { ...FODMAP_DEFAULTS },
+  // Colonne settings.sommeil (supabase/sql/sommeil_setup.sql) : même contrainte
+  // que `fodmap`, elle doit exister en base avant le déploiement.
+  sommeil: { ...SLEEP_DEFAULTS },
 }
 
 // Applique le même traitement que meal_enabled/meal_overrides aux blocs `water`,
@@ -37,7 +41,7 @@ const DEFAULTS = {
 // si la colonne `settings.water` / `settings.cycle` / `settings.sport` est
 // absente (base pas encore migrée) ou partielle.
 function withWater(row) {
-  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), goal_auto_adjust: { ...GOAL_AUTO_ADJUST_DEFAULTS, ...(row?.goal_auto_adjust && typeof row.goal_auto_adjust === 'object' ? row.goal_auto_adjust : {}) }, water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle), sport: mergeSportSettings(row?.sport), poids_objectif: mergeGoalWeightSettings(row?.poids_objectif), fodmap: mergeFodmapSettings(row?.fodmap) }
+  return { ...DEFAULTS, ...row, meal_overrides: row?.meal_overrides || {}, meal_enabled: { ...MEAL_ENABLED_DEFAULTS, ...(row?.meal_enabled || {}) }, ordre_sections_jour: normalizeTodaySectionsOrder(row?.ordre_sections_jour), goal_auto_adjust: { ...GOAL_AUTO_ADJUST_DEFAULTS, ...(row?.goal_auto_adjust && typeof row.goal_auto_adjust === 'object' ? row.goal_auto_adjust : {}) }, water: mergeWaterSettings(row?.water), cycle: mergeCycleSettings(row?.cycle), sport: mergeSportSettings(row?.sport), poids_objectif: mergeGoalWeightSettings(row?.poids_objectif), fodmap: mergeFodmapSettings(row?.fodmap), sommeil: mergeSleepSettings(row?.sommeil) }
 }
 
 export function useSettings() {

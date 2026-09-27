@@ -341,7 +341,13 @@ create table if not exists settings (
   -- { enabled } : affiche la charge en FODMAP dans les fiches aliments.
   -- Fusionné côté client avec FODMAP_DEFAULTS (src/lib/fodmap.js). Défaut =
   -- désactivé (opt-in).
-  fodmap jsonb not null default '{"enabled":false}'::jsonb
+  fodmap jsonb not null default '{"enabled":false}'::jsonb,
+  -- Ajoutée le 2026-09-27 (chantier « Suivi du sommeil », Paliers 1-2 — voir
+  -- supabase/sql/sommeil_setup.sql et docs/suivi-sommeil.md).
+  -- { card_visible, objectif_min, seuil_nuit_courte_min, conseils_jour,
+  --   afficher_calendrier }. Fusionné côté client avec SLEEP_DEFAULTS
+  -- (src/lib/sleep.js). Carte visible par défaut.
+  sommeil jsonb not null default '{"card_visible":true,"objectif_min":480,"seuil_nuit_courte_min":45,"conseils_jour":true,"afficher_calendrier":false}'::jsonb
 );
 
 insert into settings (id) values (1) on conflict (id) do nothing;
@@ -1203,6 +1209,27 @@ create table if not exists symptomes_digestifs (
 );
 create index if not exists idx_symptomes_digestifs_user_date on symptomes_digestifs (user_id, date desc);
 
+-- Ajoutée le 2026-09-27 (chantier « Suivi du sommeil » — voir
+-- supabase/sql/sommeil_setup.sql et docs/suivi-sommeil.md). UNE LIGNE = UNE
+-- NUIT, rattachée à la DATE DU RÉVEIL (nuit du 26 au 27 → 27). Visible pour
+-- les deux comptes.
+create table if not exists sommeil (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null references auth.users(id),
+  date date not null, -- date du réveil
+  heure_endormissement time,
+  heure_reveil time,
+  duree_min smallint not null, -- check (duree_min between 0 and 1440) ; source de vérité des stats
+  qualite smallint, -- 1 😫 → 5 😄, check (qualite between 1 and 5), nullable
+  reveil_naturel boolean, -- réveil sans alarme, nullable = non renseigné
+  facteurs text[] not null default '{}', -- clés SLEEP_FACTORS (src/lib/sleep.js), Palier 4
+  sieste_min smallint, -- sieste de la journée `date`, check (sieste_min between 0 and 600), Palier 6
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, date)
+);
+
 -- =============================================
 -- RLS
 -- =============================================
@@ -1358,6 +1385,10 @@ alter table lieux_selles enable row level security;
 -- RLS activé sur symptomes_digestifs dès sa création (2026-09-26), policies
 -- « own » select/insert/update/delete — voir supabase/sql/symptomes_digestifs_setup.sql.
 alter table symptomes_digestifs enable row level security;
+
+-- RLS activé sur sommeil dès sa création (2026-09-27), policies « own »
+-- select/insert/update/delete — voir supabase/sql/sommeil_setup.sql.
+alter table sommeil enable row level security;
 
 -- =============================================
 -- DONNÉES CIQUAL (extrait - voir README pour import complet)

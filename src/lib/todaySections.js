@@ -5,7 +5,7 @@
 // Seuls ces blocs de contenu sont réordonnables. La barre de raccourcis et la
 // pastille de phase du cycle restent fixées en haut.
 
-export const TODAY_SECTION_KEYS = ['phase', 'bilan', 'nutriments', 'manques', 'repas', 'fodmap', 'sport', 'complements', 'eau', 'transit']
+export const TODAY_SECTION_KEYS = ['phase', 'bilan', 'nutriments', 'manques', 'repas', 'fodmap', 'sommeil', 'sport', 'complements', 'eau', 'transit']
 
 export const TODAY_SECTION_LABELS = {
   phase: 'Phase du cycle',
@@ -14,6 +14,7 @@ export const TODAY_SECTION_LABELS = {
   manques: 'À combler aujourd\'hui',
   repas: 'Repas du jour',
   fodmap: 'FODMAP',
+  sommeil: 'Sommeil',
   sport: 'Activité',
   complements: 'Compléments',
   eau: 'Eau',
@@ -24,10 +25,13 @@ export const DEFAULT_TODAY_SECTIONS_ORDER = [...TODAY_SECTION_KEYS]
 
 // Fusion défensive, même esprit que mergeWaterSettings : on garde les clés
 // connues de `raw` dans l'ordre fourni (en dédupliquant), puis on réinsère les
-// clés manquantes à leur position par défaut (pas en fin — pour qu'un bloc
-// ajouté après coup, comme « phase », arrive à sa place attendue chez les
-// utilisatrices ayant déjà un ordre enregistré). Une valeur corrompue ou `null`
-// retombe sur l'ordre par défaut complet.
+// clés manquantes à leur place attendue (pas en fin — pour qu'un bloc ajouté
+// après coup, comme « phase » ou « sommeil », arrive au bon endroit chez les
+// utilisatrices ayant déjà un ordre enregistré) : juste AVANT le premier bloc
+// qui le suit dans l'ordre par défaut et qui est déjà placé (« sommeil » se
+// cale ainsi avant « sport » même si l'ordre a été personnalisé), en fin de
+// liste s'il n'y en a aucun. Une valeur corrompue ou `null` retombe sur
+// l'ordre par défaut complet.
 export function normalizeTodaySectionsOrder(raw) {
   const seen = new Set()
   const out = []
@@ -40,10 +44,11 @@ export function normalizeTodaySectionsOrder(raw) {
     }
   }
   DEFAULT_TODAY_SECTIONS_ORDER.forEach((k, di) => {
-    if (!seen.has(k)) {
-      seen.add(k)
-      out.splice(Math.min(di, out.length), 0, k)
-    }
+    if (seen.has(k)) return
+    const anchor = DEFAULT_TODAY_SECTIONS_ORDER.slice(di + 1).find(a => seen.has(a))
+    const at = anchor ? out.indexOf(anchor) : out.length
+    seen.add(k)
+    out.splice(at, 0, k)
   })
   return out
 }
