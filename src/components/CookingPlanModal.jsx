@@ -11,6 +11,7 @@ import { useToast } from '../lib/toast'
 import { parseInstructionSteps, annotateInstructionSteps } from '../lib/recipeInstructions'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
+import CookModeButton from './CookModeButton'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CookingPlanModal — « Plan de cuisine » de Ma fournée (roadmap §M9).
@@ -23,7 +24,7 @@ import EmptyState from './EmptyState'
 // recette listés dans un panneau dépliable.
 //
 // Données propres : table batch_cooking_steps (useBatchCookingSteps).
-// Props : onClose()
+// Props : onClose(), cookMode (useWakeLock() de Ma fournée, partagé)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const RECIPE_BADGES = [
@@ -36,7 +37,7 @@ const RECIPE_BADGES = [
 
 function r0(n) { return Math.round(n || 0) }
 
-export default function CookingPlanModal({ onClose, semaine }) {
+export default function CookingPlanModal({ onClose, semaine, cookMode }) {
   useBackButton(onClose)
   const { user } = useAuth()
   const toast = useToast()
@@ -201,7 +202,7 @@ export default function CookingPlanModal({ onClose, semaine }) {
   return (
     <div className="page-modal" style={{ zIndex: 70 }}>
       <div className="page-modal-header">
-        <div style={{ width: 32, flexShrink: 0 }} />
+        {cookMode?.supported ? <CookModeButton cookMode={cookMode} /> : <div style={{ width: 32, flexShrink: 0 }} />}
         <h2>Plan de cuisine</h2>
         <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
       </div>

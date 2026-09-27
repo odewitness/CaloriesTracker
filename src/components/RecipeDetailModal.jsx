@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { ArrowLeft, Pencil, MoreVertical, Trash2, Share2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen, ChefHat } from 'lucide-react'
+import { ArrowLeft, Pencil, MoreVertical, Trash2, Share2, Minus, Plus, CalendarPlus, Clock, Flame, Hourglass, Link2, BookOpen } from 'lucide-react'
 import NutrientPanel from './NutrientPanel'
 import FodmapPanel from './FodmapPanel'
 import FoodDetailModal from './FoodDetailModal'
 import RecipePhoto from './RecipePhoto'
+import CookModeButton from './CookModeButton'
 import { ALL_NUTRIENT_KEYS } from '../lib/nutrients'
 import { useBackButton } from '../hooks/useBackButton'
 import { useWakeLock } from '../hooks/useWakeLock'
@@ -106,7 +107,7 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
   const [selectedIngredient, setSelectedIngredient] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('ingredients') // 'ingredients' | 'preparation' | 'nutriments'
-  const { active: cookModeOn, supported: wakeLockSupported, toggle: toggleCookMode } = useWakeLock()
+  const cookMode = useWakeLock()
 
   // Totaux bruts (plat entier, à l'échelle de base de la recette)
   const totaux = useMemo(() => sumIngredients(ingredients), [ingredients])
@@ -271,21 +272,7 @@ export default function RecipeDetailModal({ recette, ingredients, ingredientsLoa
           )}
         </div>
         <div style={{ display: 'flex', gap: 2, flexShrink: 0, position: 'relative' }}>
-          {wakeLockSupported && (
-            <button
-              className="btn-icon"
-              onClick={toggleCookMode}
-              style={{
-                color: cookModeOn ? 'var(--green-dark)' : 'var(--text-hint)',
-                background: cookModeOn ? 'var(--green-light)' : undefined,
-                borderRadius: 10,
-              }}
-              aria-label={cookModeOn ? 'Désactiver le mode cuisine' : 'Activer le mode cuisine'}
-              title={cookModeOn ? 'Mode cuisine actif — l\'écran reste allumé' : 'Mode cuisine — garder l\'écran allumé'}
-            >
-              <ChefHat size={18} />
-            </button>
-          )}
+          <CookModeButton cookMode={cookMode} />
           {onEdit && (
             <button className="btn-icon" onClick={onEdit} style={{ color: 'var(--text-hint)' }}><Pencil size={18} /></button>
           )}

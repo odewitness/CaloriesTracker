@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { X, Plus, Trash2, ChefHat, Check, ChevronRight, ListChecks, History } from 'lucide-react'
 import { useBackButton } from '../hooks/useBackButton'
+import { useWakeLock } from '../hooks/useWakeLock'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useBatchCooking } from '../hooks/useBatchCooking'
@@ -13,6 +14,7 @@ import { recipePortionMacros, templateServingMacros } from '../lib/mealPlanner'
 import RecipeDetailWrapper from './RecipeDetailWrapper'
 import MealTemplateDetailWrapper from './MealTemplateDetailWrapper'
 import CookingPlanModal from './CookingPlanModal'
+import CookModeButton from './CookModeButton'
 import BatchSourcePicker from './BatchSourcePicker'
 import Loader from './Loader'
 import EmptyState from './EmptyState'
@@ -31,6 +33,9 @@ const keyOf = (kind, id) => `${kind}:${id}`
 
 export default function BatchCookingModal({ onClose, semaine }) {
   useBackButton(onClose)
+  // Mode cuisine partagé avec le Plan de cuisine : reste actif quand on
+  // passe de la fournée au plan et inversement.
+  const cookMode = useWakeLock()
   const { user } = useAuth()
   const toast = useToast()
   const { items, loading, addSources, toggleFait, setPortions, removeItem, clearDone } = useBatchCooking(semaine)
@@ -140,7 +145,7 @@ export default function BatchCookingModal({ onClose, semaine }) {
     <>
     <div className="page-modal" style={{ zIndex: 60 }}>
       <div className="page-modal-header">
-        <div style={{ width: 32, flexShrink: 0 }} />
+        {cookMode?.supported ? <CookModeButton cookMode={cookMode} /> : <div style={{ width: 32, flexShrink: 0 }} />}
         <h2>Ma fournée</h2>
         <button className="btn-icon" onClick={onClose}><X size={20} color="var(--text-muted)" /></button>
       </div>
@@ -371,7 +376,7 @@ export default function BatchCookingModal({ onClose, semaine }) {
       />
     )}
 
-    {planOpen && <CookingPlanModal semaine={semaine} onClose={() => setPlanOpen(false)} />}
+    {planOpen && <CookingPlanModal semaine={semaine} cookMode={cookMode} onClose={() => setPlanOpen(false)} />}
 
     {picking && (
       <BatchSourcePicker

@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-27',
+    title: "L'écran reste allumé pendant ta fournée",
+    description: "Dans Ma fournée et dans le Plan de cuisine, touche la petite toque en haut à gauche : elle passe au vert et ton téléphone ne se met plus en veille pendant que tu cuisines. Elle reste active quand tu passes de la fournée au plan, et se coupe quand tu fermes Ma fournée.",
+  },
+  {
     date: '2026-09-26',
     title: 'Les FODMAP des produits scannés et de ta liste de courses',
     description: "Avec l'affichage des FODMAP activé, quand tu scannes ou cherches un produit dans Open Food Facts, sa carte FODMAP te montre ce qu'elle a repéré dans la liste d'ingrédients : édulcorants comme le sorbitol ou le maltitol, inuline, sirop de glucose-fructose, blé, oignon, lait… Et dans ta liste de courses, une petite pastille signale les articles riches en FODMAP, avec la quantité jusqu'à laquelle ils restent faibles.",
