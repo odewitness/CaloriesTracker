@@ -58,7 +58,7 @@ export default function CalendarMonthGrid({
   monthDate, onChangeMonth, selectedDate, onSelectDate,
   dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
   selectedDates, onToggleDate, minDate,
-  cycleByDate, sportByDate, legend = false, onGoToday,
+  cycleByDate, sportByDate, shortNightDates, legend = false, onGoToday,
 }) {
   const cells = useMemo(() => buildMonthCells(monthDate), [monthDate.getFullYear(), monthDate.getMonth()])
   const todayStr = fmt(new Date())
@@ -111,6 +111,7 @@ export default function CalendarMonthGrid({
           const isPeriodDay = !!cyc?.isPeriod
           const phaseColor = cyc && cyc.phase !== 'inconnue' && !isPeriodDay ? PHASES[cyc.phase]?.color : null
           const hasSport = !!(sportByDate?.[dStr]?.length)
+          const shortNight = !!shortNightDates?.has(dStr)
 
           return (
             <button
@@ -136,7 +137,7 @@ export default function CalendarMonthGrid({
                 {date.getDate()}
               </span>
               <CalendarDayMarkers marks={{
-                planned: plannedStatus, hasSport, phaseColor,
+                planned: plannedStatus, hasSport, shortNight, phaseColor,
                 isPeriod: isPeriodDay, isSelected, compact: true,
               }} />
             </button>
@@ -148,6 +149,7 @@ export default function CalendarMonthGrid({
         <CalendarLegend
           showCycle={!!cycleByDate}
           showSport={!!sportByDate}
+          showSleep={!!shortNightDates}
           open={showLegend}
           onToggle={() => setShowLegend(o => !o)}
         />

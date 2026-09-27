@@ -38,6 +38,7 @@ import { useExcludedDay } from '../hooks/useExcludedDays'
 import { useCollationDay } from '../hooks/useCollationDay'
 import { useSport } from '../hooks/useSport'
 import { useSleep } from '../hooks/useSleep'
+import { useSleepInsights } from '../hooks/useSleepInsights'
 import { useSelles, useLieuxSelles, useSymptomesDigestifs } from '../hooks/useSelles'
 import { useDayFodmap } from '../hooks/useFodmapProfile'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
@@ -52,7 +53,7 @@ import { getNutrientGaps, getGapAmount } from '../lib/ciqualExplorer'
 import { cycleAdjustedSettings, phaseForDate, microFocusForPhase } from '../lib/cycle'
 import { sportAdjustedSettings, dayActivityKcal, dayEnergyBalance, weekStart, sportTypeLabel, formatDuree } from '../lib/sport'
 import { normalizeTodaySectionsOrder } from '../lib/todaySections'
-import { usualTimes } from '../lib/sleep'
+import { usualTimes, isShortVsHabit, bedtimeAdvice } from '../lib/sleep'
 import { fmt, dateLabel } from '../lib/dates'
 import { hapticTap, hapticRemove, hapticNav, hapticSuccess } from '../lib/haptics'
 import { useSetTodayHeaderInfo, useTodayShortcuts, useRequestTodayDate } from '../lib/TodayHeaderContext'
@@ -121,11 +122,29 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
   const [sportSheet, setSportSheet] = useState(null) // { initial: activite|null } | null
   const [stoolSheet, setStoolSheet] = useState(null) // { initial: passage|null } | null
   const [pasSheet, setPasSheet] = useState(false)
-  const [sleepSheetOpen, setSleepSheetOpen] = useState(false)
+  const [sleepSheet, setSleepSheet] = useState(null) // { prefill } | null
   const [energyInfoOpen, setEnergyInfoOpen] = useState(false)
   const [planMealOpen, setPlanMealOpen] = useState(false)
   const [shareImageOpen, setShareImageOpen] = useState(false)
   const { open: shortcutsOpen } = useTodayShortcuts()
+
+  // ── Sommeil : conseils du jour (Paliers 5-6) ─────────────────────────────
+  // Après une nuit courte (vs l'habitude du même type de jour), sur le slot
+  // aujourd'hui : croisements chargés à la demande, MÊME calcul que l'onglet
+  // Sommeil de l'Historique (useSleepInsights → computeSleepInsights).
+  const sleepObjectif = Number(settings.sommeil?.objectif_min) || 480
+  const sleepTipsOn = isToday && settings.sommeil?.conseils_jour !== false
+  const shortNightToday = sleepTipsOn && isShortVsHabit(sleepNight, sleepUsual?.duree_min)
+  const { insights: sleepInsights } = useSleepInsights(dateStr, { enabled: shortNightToday, settings, cycleDays })
+  const sleepTip = shortNightToday
+    ? {
+        kcal: sleepInsights?.outcomes.find(o => o.key === 'kcal')?.byDuration || null,
+        collation: sleepInsights?.outcomes.find(o => o.key === 'collation')?.byDuration || null,
+      }
+    : null
+  const sleepBedtime = sleepTipsOn && new Date().getHours() >= 19
+    ? bedtimeAdvice(sleepNights, dateStr, sleepObjectif)
+    : null
 
   const waterEntries = useMemo(() => entries.filter(isWaterEntry), [entries])
   const waterCfg = settings.water
@@ -240,12 +259,12 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
     const { error } = await saveSleep(payload)
     if (error) toast('Erreur')
     else toast(sleepNight ? '✓ Nuit modifiée !' : '✓ Nuit notée !')
-    setSleepSheetOpen(false)
+    setSleepSheet(null)
   }
   const handleDeleteSleep = async () => {
     await removeSleep()
     toast('Supprimé')
-    setSleepSheetOpen(false)
+    setSleepSheet(null)
   }
 
   const handleShareSeance = (a) => {
@@ -671,11 +690,14 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
         night={sleepNight}
         nights={sleepNights}
         usual={sleepUsual}
-        objectifMin={Number(settings.sommeil?.objectif_min) || 480}
+        objectifMin={sleepObjectif}
         isFuture={isFutureDay}
+        isToday={isToday}
+        tip={sleepTip}
+        bedtime={sleepBedtime}
         onQuickLog={handleQuickSleep}
         onSetQualite={handleSetSleepQualite}
-        onOpenSheet={() => setSleepSheetOpen(true)}
+        onOpenSheet={(prefill) => setSleepSheet({ prefill: prefill || null })}
       />
     ) : null,
     fodmap: fodmapEnabled ? (
@@ -769,14 +791,15 @@ function DaySlot({ date, onOpenModal, onOpenDetail, onOpenSource, onNavigate, fo
         />
       )}
 
-      {sleepSheetOpen && (
+      {sleepSheet && (
         <SleepEntrySheet
           dateStr={dateStr}
           initial={sleepNight}
           usual={sleepUsual}
+          prefill={sleepSheet.prefill}
           onSave={handleSaveSleep}
           onDelete={handleDeleteSleep}
-          onClose={() => setSleepSheetOpen(false)}
+          onClose={() => setSleepSheet(null)}
         />
       )}
 

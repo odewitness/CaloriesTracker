@@ -380,3 +380,76 @@ export function durationByWeekday(nights) {
   }
   return sum.map((s, i) => (count[i] ? s / count[i] : null))
 }
+
+// ── Nuit courte ────────────────────────────────────────────────────────────
+// Deux définitions, chacune à sa place :
+//   • isShortNight (calendrier, transit) : repère simple et stable, au moins
+//     1 h sous l'objectif ;
+//   • isShortVsHabit (conseil du jour, Palier 5) : au moins 1 h sous la durée
+//     habituelle du même type de jour, ou moins de 6 h dans tous les cas.
+// Les croisements de l'Historique (sleepInsights.js) ont leur propre seuil
+// relatif à l'habitude de la strate (settings.sommeil.seuil_nuit_courte_min).
+export function isShortNight(night, objectifMin) {
+  return !!night && night.duree_min <= objectifMin - 60
+}
+export function isShortVsHabit(night, usualDureeMin) {
+  if (!night) return false
+  if (night.duree_min < 360) return true
+  return usualDureeMin != null && night.duree_min <= usualDureeMin - 60
+}
+
+// ── Heure d'endormissement conseillée (Palier 5) ───────────────────────────
+// Réveil habituel du LENDEMAIN (même type de jour) − objectif. `nights` doit
+// inclure la nuit du jour si elle est notée. null sans réveil habituel connu.
+export const SLEEP_LATENCY_MIN = 15 // temps moyen pour s'endormir une fois au lit
+export function bedtimeAdvice(nights, dateStr, objectifMin) {
+  const tomorrow = addDaysStr(dateStr, 1)
+  const u = usualTimes(nights, tomorrow)
+  if (!u?.heure_reveil) return null
+  const wake = timeToMin(u.heure_reveil)
+  return {
+    reveil: u.heure_reveil,
+    endormissement: minToTime(wake - objectifMin),
+    coucher: minToTime(wake - objectifMin - SLEEP_LATENCY_MIN),
+  }
+}
+
+// ── « Je vais dormir » / « Je suis réveillée » (Palier 6) ──────────────────
+// Le coucher est mémorisé sur l'appareil (localStorage) : la ligne `sommeil`
+// ne peut exister qu'une fois la durée connue. `date` = date du réveil visé
+// (lendemain si on se couche après midi, jour même sinon).
+const PENDING_KEY = 'sleep-bedtime-pending'
+export function getPendingBedtime() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY))
+    if (!p?.at || !p?.date) return null
+    // Oubliée depuis plus de 20 h : on l'ignore.
+    if (Date.now() - new Date(p.at).getTime() > 20 * 3600 * 1000) return null
+    return p
+  } catch { return null }
+}
+export function setPendingBedtime(now = new Date()) {
+  const date = now.getHours() >= 12
+    ? fmt(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12))
+    : fmt(now)
+  const p = { at: now.toISOString(), date }
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)) } catch { /* ignore */ }
+  return p
+}
+export function clearPendingBedtime() {
+  try { localStorage.removeItem(PENDING_KEY) } catch { /* ignore */ }
+}
+// Coucher mémorisé → pré-remplissage de la feuille : endormissement = coucher
+// + latence, réveil = maintenant (arrondis à 5 min).
+export function prefillFromPending(p, now = new Date()) {
+  const at = new Date(p.at)
+  const round5 = (m) => Math.round(m / 5) * 5
+  return {
+    heure_endormissement: minToTime(round5(at.getHours() * 60 + at.getMinutes() + SLEEP_LATENCY_MIN)),
+    heure_reveil: minToTime(round5(now.getHours() * 60 + now.getMinutes())),
+  }
+}
+export function formatClock(iso) {
+  const d = new Date(iso)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}

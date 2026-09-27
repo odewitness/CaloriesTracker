@@ -3,10 +3,9 @@
 Document de conception + suivi d'avancement. À faire évoluer au fil du chantier.
 Créé le 2026-09-27.
 
-**État au 2026-09-27 : Paliers 1 et 2 codés sur la branche
-`feature/suivi-sommeil`** (build OK), en attente du SQL
-`supabase/sql/sommeil_setup.sql` et du test manuel. Questions de cadrage
-toutes tranchées (§10).
+**État au 2026-09-27 : chantier terminé.** Paliers 1 à 6 mergés et poussés
+sur `main`, testés par l'utilisatrice. Rappel push d'heure de coucher
+**abandonné** (décision utilisatrice : pas de rappels). Voir §11.
 
 ---
 
@@ -309,9 +308,10 @@ dans Profil › Sommeil :
 
 ## 5. Algorithmes
 
-Tout vit dans **`src/lib/sleep.js`**, fonctions pures, testables, **une seule
-source de vérité** partagée entre la carte du jour (Palier 5) et l'Historique
-(Palier 3) — cf. leçon n°1 de `feedback-calcul-poids-calories`.
+Tout vit dans **`src/lib/sleep.js`** (nuits, horaires, régularité) et
+**`src/lib/sleepInsights.js`** (croisements), fonctions pures, testables,
+**une seule source de vérité** partagée entre la carte du jour (Palier 5) et
+l'Historique (Palier 3) — cf. leçon n°1 de `feedback-calcul-poids-calories`.
 
 ### 5.1 Horaires habituels (pré-remplissage, « Comme d'habitude »)
 
@@ -590,6 +590,44 @@ colonne `settings.sommeil`, tous les réglages échouent), test manuel, merge.
   SRI, une barre par nuit / moyennes mensuelles, semaine vs jours libres +
   chronotype, profil par jour de réveil).
 - Entrée `changelog.js` ajoutée.
+
+### Paliers 3 à 6 — mergés sur `main` le 2026-09-27
+
+Build OK, aucune migration (les colonnes `facteurs`, `sieste_min` et les
+réglages `conseils_jour` / `afficher_calendrier` existaient dès le Palier 1).
+Moteur testé en script sur données simulées : effet injecté de +300 kcal
+retrouvé (« lien net »), effet nul → « pas de différence », le piège
+« week-end = plus de sommeil ET plus de calories » est bien neutralisé par les
+strates.
+
+- **P3** — `src/lib/sleepInsights.js` (`sleepEffect`, `computeSleepInsights`,
+  indicateurs kcal / collations / part du soir / sucres / lipides / protéines
+  / pas / jours avec séance, prédicteur durée OU qualité), hook
+  `src/hooks/useSleepInsights.js` (90 j, journal paginé, chargé seulement à
+  l'ouverture de l'onglet), `history/SleepInsightsSection.jsx` (carte
+  principale kcal + barres de progression tant qu'il manque des données,
+  autres indicateurs filtrés sur ce qui ressort). La journée en cours n'est
+  jamais comptée (incomplète).
+- **P4** — `factorEffect`, facteurs automatiques (séance la veille, séance
+  après 19 h, beaucoup de pas, dîner > 40 % de la journée, alcool détecté
+  dans le journal par mots-clés `isAlcoholFood`, sieste > 30 min, règles,
+  phase lutéale) + puces « Contexte de la nuit » dans la feuille
+  (`SLEEP_FACTORS`). Carte « Ce qui accompagne tes nuits ».
+- **P5** — conseil après une nuit courte (`isShortVsHabit` : ≥ 1 h sous la
+  durée habituelle du même type de jour, ou < 6 h) sur le slot aujourd'hui,
+  personnel si P3 a trouvé un lien/tendance (même `computeSleepInsights`),
+  générique sinon ; heure d'endormissement conseillée après 19 h
+  (`bedtimeAdvice`) ; phrase sur le manque de sommeil ≥ 5 h ; phrase neutre
+  « en parler à un·e médecin » si moyenne < 5 h 30 sur ≥ 14 nuits (hors vue
+  Semaine). Réglage Profil › Sommeil › Conseils du jour.
+- **P6** — sieste (champ de la feuille, affichée dans la carte, facteur de la
+  nuit suivante) ; « Je vais dormir » / « Je suis réveillée » (coucher
+  mémorisé en localStorage sur l'appareil, feuille pré-remplie :
+  endormissement = coucher + 15 min) ; point bleu « nuit courte » (≥ 1 h sous
+  l'objectif) au coin bas-gauche du calendrier, option Profil › Sommeil ;
+  carte « Sommeil & transit » dans l'onglet Digestion (compte transit).
+- **Abandonné** (décision utilisatrice, 2026-09-27) : rappel push d'heure de
+  coucher.
 
 ## Sources
 

@@ -9,6 +9,8 @@ import { PHASES } from '../lib/cycle'
 //
 //   • coin haut-droite  → repas / complément prévu   (violet = à venir, corail = raté)
 //   • coin haut-gauche  → séance de sport ce jour-là (vert)
+//   • coin bas-gauche   → nuit courte (au moins 1 h sous l'objectif de sommeil,
+//                         nuit rattachée à la date du réveil ; bleu)
 //   • barre pleine largeur en bas → phase de cycle (couleur de la phase ;
 //                          jour de règles = barre corail plus épaisse)
 //
@@ -19,13 +21,14 @@ import { PHASES } from '../lib/cycle'
 // Props — `marks` :
 //   planned    : 'planned' | 'missed' | falsy
 //   hasSport   : bool
+//   shortNight : bool            nuit courte (option Profil › Sommeil)
 //   phaseColor : string | null   couleur CSS de la phase (hors règles)
 //   isPeriod   : bool            jour de règles → barre corail épaisse
 //   isSelected : bool            case sélectionnée → repères en blanc, pas de barre
 //   compact    : bool            cases de mois (petites) → tailles réduites
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CalendarDayMarkers({ marks }) {
-  const { planned, hasSport, phaseColor, isPeriod, isSelected, compact } = marks
+  const { planned, hasSport, shortNight, phaseColor, isPeriod, isSelected, compact } = marks
   const dot = compact ? 5 : 6
   const inset = compact ? 3 : 4
   const white = isSelected
@@ -46,6 +49,13 @@ export default function CalendarDayMarkers({ marks }) {
           background: white ? '#fff' : 'var(--green)',
         }} />
       )}
+      {shortNight && (
+        <span style={{
+          position: 'absolute', left: inset, bottom: compact ? 6 : 8,
+          width: dot, height: dot, borderRadius: '50%',
+          background: white ? '#fff' : 'var(--blue)',
+        }} />
+      )}
       {(isPeriod || phaseColor) && !isSelected && (
         <span style={{
           position: 'absolute', left: inset, right: inset, bottom: compact ? 2 : 3,
@@ -63,7 +73,7 @@ export default function CalendarDayMarkers({ marks }) {
 // ne pas alourdir la carte. Les blocs cycle / sport n'apparaissent que si les
 // options correspondantes sont actives (props showCycle / showSport).
 // ─────────────────────────────────────────────────────────────────────────────
-export function CalendarLegend({ showCycle, showSport, open, onToggle }) {
+export function CalendarLegend({ showCycle, showSport, showSleep, open, onToggle }) {
   return (
     <div style={{ marginTop: 12 }}>
       <button
@@ -95,6 +105,12 @@ export function CalendarLegend({ showCycle, showSport, open, onToggle }) {
             <Row>
               <Dot color="var(--green)" /> séance de sport
               <span style={{ fontSize: 10, color: 'var(--text-hint)', marginLeft: 4 }}>(coin haut-gauche)</span>
+            </Row>
+          )}
+          {showSleep && (
+            <Row>
+              <Dot color="var(--blue)" /> nuit courte
+              <span style={{ fontSize: 10, color: 'var(--text-hint)', marginLeft: 4 }}>(coin bas-gauche, au jour du réveil)</span>
             </Row>
           )}
           {showCycle && (

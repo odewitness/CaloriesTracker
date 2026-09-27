@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
-import { Moon, ChevronDown, Plus, Pencil } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Moon, ChevronDown, Plus, Pencil, Sun, Lightbulb, BedDouble } from 'lucide-react'
 import {
   sleepQualite, formatHeureSommeil, formatDureeSommeil, formatEcart, nightLabel,
-  lastNights, sleepDebt,
+  lastNights, sleepDebt, getPendingBedtime, setPendingBedtime, clearPendingBedtime,
+  prefillFromPending, formatClock,
 } from '../lib/sleep'
 import { QualitePicker } from './SleepEntrySheet'
 
@@ -24,9 +25,33 @@ const WEEKDAY_INITIALS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'] // index = getDay()
 //   isFuture          — jour à venir : rien à noter
 //   onQuickLog()      — enregistre « comme d'habitude »
 //   onSetQualite(v)   — met à jour la qualité de la nuit
-//   onOpenSheet()     — ouvre la feuille (ajout ou édition)
+//   onOpenSheet(prefill?) — ouvre la feuille (ajout ou édition), avec un
+//                     pré-remplissage éventuel (« Je suis réveillée »)
+//   isToday           — slot « aujourd'hui » : conseils et boutons
+//                       « Je vais dormir » / « Je suis réveillée » (Paliers 5-6)
+//   tip               — conseil après une nuit courte (Palier 5) :
+//                       { kcal, collation } = effets byDuration issus de
+//                       computeSleepInsights (null s'ils manquent), ou null
+//   bedtime           — bedtimeAdvice() à afficher le soir, ou null
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SleepSection({ dateStr, night, nights = [], usual, objectifMin = 480, isFuture, onQuickLog, onSetQualite, onOpenSheet }) {
+export default function SleepSection({ dateStr, night, nights = [], usual, objectifMin = 480, isFuture, isToday, tip, bedtime, onQuickLog, onSetQualite, onOpenSheet }) {
+  // Coucher mémorisé sur l'appareil (« Je vais dormir », Palier 6).
+  const [pending, setPending] = useState(() => (isToday ? getPendingBedtime() : null))
+  const goToBed = () => setPending(setPendingBedtime())
+  const cancelPending = () => { clearPendingBedtime(); setPending(null) }
+  const wakeUp = () => onOpenSheet(prefillFromPending(pending))
+  const hour = new Date().getHours()
+  const canGoToBed = isToday && !pending && (hour >= 19 || hour < 5)
+  const pendingForThisNight = isToday && pending && pending.date === dateStr && !night
+  const pendingForTonight = isToday && pending && pending.date > dateStr
+  // Nuit enregistrée (ou coucher d'une date déjà passée) : le coucher mémorisé
+  // a servi, on l'oublie.
+  useEffect(() => {
+    if (pending && (pending.date < dateStr || (pending.date === dateStr && night))) {
+      clearPendingBedtime()
+      setPending(null)
+    }
+  }, [pending, night, dateStr])
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sleep-collapsed')) ?? false }
     catch { return false }
@@ -68,7 +93,7 @@ export default function SleepSection({ dateStr, night, nights = [], usual, objec
         </button>
         {!isFuture && (
           <button
-            onClick={onOpenSheet}
+            onClick={() => onOpenSheet()}
             style={{
               width: 30, height: 30, borderRadius: '50%', background: 'var(--purple-light)', color: 'var(--purple)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: 6,
@@ -84,6 +109,26 @@ export default function SleepSection({ dateStr, night, nights = [], usual, objec
         <div style={{ padding: '0 14px 14px' }}>
           {isFuture ? (
             <div style={{ fontSize: 12.5, color: 'var(--text-hint)' }}>Tu pourras noter cette nuit à ton réveil.</div>
+          ) : pendingForThisNight ? (
+            <>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>
+                Tu t'es couchée à <strong>{formatClock(pending.at)}</strong>. Bien dormi ?
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  onClick={wakeUp}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: 10, background: 'var(--purple-light)', color: 'var(--purple)',
+                    fontSize: 13.5, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <Sun size={15} /> Je suis réveillée
+                </button>
+                <button onClick={cancelPending} style={{ fontSize: 12, color: 'var(--text-hint)', fontWeight: 600, background: 'none', padding: '0 4px' }}>
+                  Annuler
+                </button>
+              </div>
+            </>
           ) : !night ? (
             <>
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>Comment as-tu dormi ?</div>
@@ -103,7 +148,7 @@ export default function SleepSection({ dateStr, night, nights = [], usual, objec
                   </button>
                 )}
                 <button
-                  onClick={onOpenSheet}
+                  onClick={() => onOpenSheet()}
                   style={{
                     flex: usual ? '0 0 auto' : 1, padding: '9px 14px', borderRadius: 10,
                     background: usual ? 'var(--gray-bg)' : 'var(--purple-light)',
@@ -117,7 +162,7 @@ export default function SleepSection({ dateStr, night, nights = [], usual, objec
             </>
           ) : (
             <>
-              <button onClick={onOpenSheet} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', padding: 0 }}>
+              <button onClick={() => onOpenSheet()} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', padding: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                   <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--purple)' }}>{formatDureeSommeil(night.duree_min)}</span>
                   {q && <span style={{ fontSize: 18 }} title={q.label}>{q.emoji}</span>}
@@ -126,7 +171,14 @@ export default function SleepSection({ dateStr, night, nights = [], usual, objec
                   {bed && wake ? `${bed} → ${wake} · ` : ''}objectif {formatDureeSommeil(objectifMin)}
                   {ecart !== 0 && <> ({formatEcart(ecart)})</>}
                 </div>
+                {Number(night.sieste_min) > 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                    + sieste de {formatDureeSommeil(night.sieste_min)} dans la journée
+                  </div>
+                )}
               </button>
+
+              {tip && <ShortNightTip tip={tip} />}
 
               {q == null && onSetQualite && (
                 <div style={{ marginTop: 10 }}>
@@ -140,12 +192,69 @@ export default function SleepSection({ dateStr, night, nights = [], usual, objec
               {debt && debt.minutes >= 60 && (
                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
                   Manque de sommeil sur les 7 dernières nuits : <strong>{formatDureeSommeil(debt.minutes)}</strong>
+                  {debt.minutes >= 300 && (
+                    <> · se coucher un peu plus tôt plusieurs soirs de suite aide plus qu'une grasse matinée.</>
+                  )}
                 </div>
               )}
             </>
           )}
+
+          {/* ── Ce soir (slot aujourd'hui seulement) ── */}
+          {isToday && !isFuture && (bedtime || canGoToBed || pendingForTonight) && (
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '0.5px solid var(--border)' }}>
+              {bedtime && !pendingForTonight && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: canGoToBed ? 8 : 0 }}>
+                  <BedDouble size={13} color="var(--purple)" style={{ verticalAlign: '-2px', marginRight: 4 }} />
+                  Ce soir : pour dormir {formatDureeSommeil(objectifMin)} avant ton réveil habituel de {bedtime.reveil},
+                  vise l'endormissement vers <strong>{bedtime.endormissement}</strong> (au lit vers {bedtime.coucher}).
+                </div>
+              )}
+              {pendingForTonight ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-muted)' }}>
+                  <span style={{ flex: 1 }}>🌙 Bonne nuit ! Couchée à {formatClock(pending.at)}.</span>
+                  <button onClick={cancelPending} style={{ fontSize: 12, color: 'var(--text-hint)', fontWeight: 600, background: 'none' }}>Annuler</button>
+                </div>
+              ) : canGoToBed && (
+                <button
+                  onClick={goToBed}
+                  style={{
+                    width: '100%', padding: '9px', borderRadius: 10, background: 'var(--gray-bg)', color: 'var(--purple)',
+                    fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <Moon size={14} /> Je vais dormir
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+// Conseil après une nuit courte (Palier 5). Personnel si les croisements de
+// l'Historique (même calcul, computeSleepInsights) ont trouvé un lien ou une
+// tendance, générique sinon. JAMAIS de modification de l'objectif calorique.
+function ShortNightTip({ tip }) {
+  const e = tip.kcal
+  const shows = (x) => x && (x.confidence === 'net' || x.confidence === 'tendance')
+  let text
+  if (shows(e) && Math.abs(e.diff) >= 50) {
+    const d = Math.round(Math.abs(e.diff) / 10) * 10
+    text = e.diff > 0
+      ? <>Après une nuit comme celle-ci, tu manges d'habitude environ <strong>{d} kcal de plus</strong>{shows(tip.collation) && tip.collation.diff >= 30 ? ', surtout en collation' : ''}. C'est la fatigue qui parle, pas un manque de volonté : des protéines au petit-déjeuner et une collation prévue à l'avance aident à garder le cap.</>
+      : <>Après une nuit comme celle-ci, tu manges d'habitude plutôt moins (environ {d} kcal). Rien à changer, c'est juste bon à savoir.</>
+  } else if (e?.confidence === 'aucun') {
+    text = <>Nuit courte. D'habitude, ça ne change pas grand-chose à ce que tu manges le lendemain. Si la faim se fait plus forte aujourd'hui, c'est normal : la fatigue l'augmente.</>
+  } else {
+    text = <>Nuit courte. La fatigue augmente souvent la faim, surtout pour le sucré en fin de journée : des protéines au petit-déjeuner et une collation prévue à l'avance aident à garder le cap.</>
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 10, padding: '9px 11px', borderRadius: 10, background: 'var(--purple-light)', fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
+      <Lightbulb size={15} color="var(--purple)" style={{ flexShrink: 0, marginTop: 1 }} />
+      <div>{text}</div>
     </div>
   )
 }

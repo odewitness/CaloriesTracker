@@ -57,6 +57,15 @@ export default function SleepHistorySection({ nights = [], periodDayKeys = [], t
         ))}
       </div>
 
+      {/* Pas de diagnostic : une seule phrase neutre si les nuits restent très
+          courtes sur une période longue (même esprit que amenorrheaNotice). */}
+      {tab !== 'semaine' && stats.n >= 14 && stats.meanDur < 330 && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, margin: '0 2px 12px' }}>
+          Tes nuits sont en moyenne sous 5 h 30 sur cette période. Si ça dure ou que tu te sens souvent fatiguée,
+          ça vaut le coup d'en parler à un·e médecin.
+        </div>
+      )}
+
       {/* ── Régularité ── */}
       <div className="card" style={{ padding: '12px 14px', marginBottom: 12, borderLeft: '3px solid var(--purple)' }}>
         <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>Régularité</div>

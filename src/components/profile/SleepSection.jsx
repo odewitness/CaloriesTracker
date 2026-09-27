@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Moon, Target, Sparkles } from 'lucide-react'
+import { Moon, Target, Sparkles, Lightbulb, CalendarDays } from 'lucide-react'
 import { Row, ToggleSwitch, Stepper, SectionScreen } from './primitives'
 import { useSleepRange } from '../../hooks/useSleep'
 import { todayStr } from '../../lib/dates'
@@ -35,6 +35,18 @@ export default function SleepSection({ sommeil, onPatch, onBack }) {
             min={300}
             max={600}
             wide
+          />
+        </Row>
+        <Row icon={<Lightbulb size={18} />} label="Conseils du jour (nuit courte, heure de coucher)">
+          <ToggleSwitch
+            checked={sommeil?.conseils_jour !== false}
+            onClick={() => onPatch({ conseils_jour: sommeil?.conseils_jour === false })}
+          />
+        </Row>
+        <Row icon={<CalendarDays size={18} />} label="Nuits courtes sur le calendrier">
+          <ToggleSwitch
+            checked={!!sommeil?.afficher_calendrier}
+            onClick={() => onPatch({ afficher_calendrier: !sommeil?.afficher_calendrier })}
           />
         </Row>
       </div>
