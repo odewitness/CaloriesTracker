@@ -14,6 +14,8 @@ import { useSettings } from '../hooks/useSettings'
 import { useRequestTodayDate } from '../lib/TodayHeaderContext'
 import { useCycle } from '../hooks/useCycle'
 import { useSportRange } from '../hooks/useSport'
+import { useSleepRange } from '../hooks/useSleep'
+import { isShortNight } from '../lib/sleep'
 import { computeTotals, getDayStatus } from '../lib/nutrients'
 import { phasesForRange } from '../lib/cycle'
 import { isWaterEntry } from '../lib/water'
@@ -76,6 +78,7 @@ export default function CalendarPage() {
   const { excludedDates, refetch: refetchExcluded } = useExcludedDaysRange(rangeStart, rangeEnd)
   const { days: cycleDays } = useCycle()
   const { byDate: sportByDateRaw } = useSportRange(rangeStart, rangeEnd)
+  const { nights: sleepNights } = useSleepRange(fmt(rangeStart), fmt(rangeEnd))
 
   const cycleByDate = useMemo(() => {
     const cfg = settings.cycle
@@ -88,6 +91,15 @@ export default function CalendarPage() {
     if (!cfg?.enabled || cfg.afficher_calendrier === false) return undefined
     return sportByDateRaw
   }, [settings.sport, sportByDateRaw])
+
+  // Nuits courtes (≥ 1 h sous l'objectif), au jour du réveil — option
+  // Profil › Sommeil › « Nuits courtes sur le calendrier ».
+  const shortNightDates = useMemo(() => {
+    const cfg = settings.sommeil
+    if (!cfg?.afficher_calendrier) return undefined
+    const obj = Number(cfg.objectif_min) || 480
+    return new Set(sleepNights.filter(n => isShortNight(n, obj)).map(n => n.date))
+  }, [settings.sommeil, sleepNights])
 
   // Un jour ne se colore (vert / corail) que s'il contient de vrais aliments :
   // l'eau seule (ou rien) reste neutre, sinon une journée où seule l'eau est
@@ -207,6 +219,7 @@ export default function CalendarPage() {
           excludedDates={excludedDates}
           cycleByDate={cycleByDate}
           sportByDate={sportByDate}
+          shortNightDates={shortNightDates}
           legend
         />
       ) : (
@@ -221,6 +234,7 @@ export default function CalendarPage() {
           excludedDates={excludedDates}
           cycleByDate={cycleByDate}
           sportByDate={sportByDate}
+          shortNightDates={shortNightDates}
           legend
         />
       )}

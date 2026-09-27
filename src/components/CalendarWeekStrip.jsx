@@ -29,7 +29,7 @@ function startOfWeek(date) {
 export default function CalendarWeekStrip({
   weekDate, onChangeWeek, selectedDate, onSelectDate,
   dayStatusByDate = {}, hasPlannedByDate = {}, excludedDates,
-  cycleByDate, sportByDate, legend = false, onGoToday,
+  cycleByDate, sportByDate, shortNightDates, legend = false, onGoToday,
 }) {
   const days = useMemo(() => {
     const start = startOfWeek(weekDate)
@@ -85,6 +85,7 @@ export default function CalendarWeekStrip({
           const isPeriodDay = !!cyc?.isPeriod
           const phaseColor = cyc && cyc.phase !== 'inconnue' && !isPeriodDay ? PHASES[cyc.phase]?.color : null
           const hasSport = !!(sportByDate?.[dStr]?.length)
+          const shortNight = !!shortNightDates?.has(dStr)
 
           return (
             <button
@@ -109,7 +110,7 @@ export default function CalendarWeekStrip({
                 {date.getDate()}
               </span>
               <CalendarDayMarkers marks={{
-                planned: plannedStatus, hasSport, phaseColor,
+                planned: plannedStatus, hasSport, shortNight, phaseColor,
                 isPeriod: isPeriodDay, isSelected, compact: false,
               }} />
             </button>
@@ -121,6 +122,7 @@ export default function CalendarWeekStrip({
         <CalendarLegend
           showCycle={!!cycleByDate}
           showSport={!!sportByDate}
+          showSleep={!!shortNightDates}
           open={showLegend}
           onToggle={() => setShowLegend(o => !o)}
         />

@@ -8,6 +8,16 @@
 export const CHANGELOG = [
   {
     date: '2026-09-27',
+    title: 'Ton sommeil et ton assiette',
+    description: "Dans Historique > Sommeil, l'app compare maintenant ce que tu manges les jours qui suivent une nuit courte ou une mauvaise nuit avec les autres jours : calories, collations, sucres, pas, sport… Elle regarde aussi ce qui accompagne tes nuits (sport, dîner copieux, alcool, sieste, règles, et le contexte que tu coches : café tardif, stress, écrans…). Il faut quelques semaines de nuits notées pour voir apparaître des résultats, une barre te montre où tu en es.",
+  },
+  {
+    date: '2026-09-27',
+    title: 'Des petits coups de pouce pour tes nuits',
+    description: "Après une nuit courte, la carte Sommeil te prévient que la faim risque d'être plus forte, avec ton propre chiffre dès que l'app en sait assez sur toi. Le soir, elle te dit vers quelle heure t'endormir pour atteindre ton objectif, et tu peux toucher « Je vais dormir » puis « Je suis réveillée » le matin pour noter ta nuit sans rien taper. Tu peux aussi noter une sieste, et afficher tes nuits courtes sur le calendrier depuis Profil > Sommeil.",
+  },
+  {
+    date: '2026-09-27',
     title: 'Note tes nuits de sommeil',
     description: "Une nouvelle carte Sommeil sur la page du jour : chaque matin, note ta nuit en un appui avec « Comme d'habitude », ou détaille ton heure d'endormissement, ton réveil, la durée et comment tu te sens. Dans Historique > Sommeil, tu retrouves tes nuits une par une, ta régularité et la différence entre la semaine et le week-end. Tu peux déplacer la carte depuis Profil > Page du jour et régler ton objectif dans Profil > Sommeil.",
   },

@@ -6,6 +6,7 @@ import {
   SLEEP_QUALITES, DEFAULT_BEDTIME, DEFAULT_WAKE,
   sleepWindow, shiftTime, formatHeureSommeil, formatDureeSommeil, nightLabel,
 } from '../lib/sleep'
+import { SLEEP_FACTORS } from '../lib/sleepInsights'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SleepEntrySheet — feuille « Ma nuit » (page du jour). Rendu via portal sur
@@ -22,19 +23,21 @@ import {
 //   dateStr   — date du RÉVEIL ('YYYY-MM-DD')
 //   initial   — nuit existante à modifier, ou null
 //   usual     — horaires habituels (usualTimes) pour pré-remplir, ou null
+//   prefill   — { heure_endormissement, heure_reveil } venant de « Je vais
+//               dormir » / « Je suis réveillée » (prioritaire sur `usual`)
 //   onSave(payload) / onDelete() / onClose()
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SleepEntrySheet({ dateStr, initial = null, usual = null, onSave, onDelete, onClose }) {
+export default function SleepEntrySheet({ dateStr, initial = null, usual = null, prefill = null, onSave, onDelete, onClose }) {
   useBackButton(onClose)
   const editing = !!initial
 
   const initialHasTimes = editing ? !!(initial.heure_endormissement && initial.heure_reveil) : true
   const [withTimes, setWithTimes] = useState(initialHasTimes)
   const [bed, setBed] = useState(
-    formatHeureSommeil(initial?.heure_endormissement) || usual?.heure_endormissement || DEFAULT_BEDTIME,
+    formatHeureSommeil(initial?.heure_endormissement) || prefill?.heure_endormissement || usual?.heure_endormissement || DEFAULT_BEDTIME,
   )
   const [wake, setWake] = useState(
-    formatHeureSommeil(initial?.heure_reveil) || usual?.heure_reveil || DEFAULT_WAKE,
+    formatHeureSommeil(initial?.heure_reveil) || prefill?.heure_reveil || usual?.heure_reveil || DEFAULT_WAKE,
   )
 
   const win = withTimes ? sleepWindow(dateStr, bed, wake) : null
@@ -42,6 +45,7 @@ export default function SleepEntrySheet({ dateStr, initial = null, usual = null,
   // fenêtre, durée habituelle avec temps éveillé, ou saisie sans heures.
   const [duree, setDuree] = useState(() => {
     if (editing) return initial.duree_min
+    if (prefill) return sleepWindow(dateStr, bed, wake)?.minutes ?? 480
     return usual?.duree_min ?? sleepWindow(dateStr, bed, wake)?.minutes ?? 480
   })
   const [dureeTouched, setDureeTouched] = useState(() => {
@@ -49,6 +53,7 @@ export default function SleepEntrySheet({ dateStr, initial = null, usual = null,
       const w = sleepWindow(dateStr, initial.heure_endormissement, initial.heure_reveil)
       return !w || w.minutes !== initial.duree_min
     }
+    if (prefill) return false
     const w = sleepWindow(dateStr, bed, wake)
     return !!w && usual?.duree_min != null && usual.duree_min !== w.minutes
   })
@@ -60,6 +65,9 @@ export default function SleepEntrySheet({ dateStr, initial = null, usual = null,
     editing ? (initial.reveil_naturel ?? null) : (usual?.reveil_naturel ?? null),
   )
   const [note, setNote] = useState(initial?.note || '')
+  const [facteurs, setFacteurs] = useState(initial?.facteurs || [])
+  const [sieste, setSieste] = useState(Number(initial?.sieste_min) || 0)
+  const toggleFacteur = (key) => setFacteurs(f => (f.includes(key) ? f.filter(k => k !== key) : [...f, key]))
 
   const setDureeManual = (m) => {
     setDureeTouched(true)
@@ -79,6 +87,8 @@ export default function SleepEntrySheet({ dateStr, initial = null, usual = null,
       duree_min: Math.round(effectiveDuree),
       qualite,
       reveil_naturel: reveilNaturel,
+      facteurs,
+      sieste_min: sieste > 0 ? sieste : null,
       note: note.trim() || null,
     })
   }
@@ -155,6 +165,37 @@ export default function SleepEntrySheet({ dateStr, initial = null, usual = null,
           ))}
         </div>
 
+        {/* ── Contexte (croisé avec la durée et la qualité, Historique > Sommeil) ── */}
+        <SheetLabel>Contexte de la nuit <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--text-hint)' }}>· facultatif</span></SheetLabel>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+          {SLEEP_FACTORS.map((f) => {
+            const on = facteurs.includes(f.key)
+            return (
+              <button
+                key={f.key}
+                onClick={() => toggleFacteur(f.key)}
+                className="chip"
+                style={{
+                  background: on ? 'var(--purple)' : 'var(--gray-bg)',
+                  color: on ? 'white' : 'var(--text-muted)',
+                }}
+              >
+                {f.emoji} {f.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── Sieste de la journée (jour du réveil) ── */}
+        <SheetLabel>Sieste dans la journée <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--text-hint)' }}>· facultatif</span></SheetLabel>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <button onClick={() => setSieste(v => Math.max(0, v - 10))} style={roundBtn} aria-label="Moins 10 minutes"><Minus size={14} /></button>
+          <div style={{ minWidth: 70, textAlign: 'center', fontSize: 15, fontWeight: 700, color: sieste ? 'var(--purple)' : 'var(--text-hint)' }}>
+            {sieste ? formatDureeSommeil(sieste) : 'Aucune'}
+          </div>
+          <button onClick={() => setSieste(v => Math.min(600, v + 10))} style={roundBtn} aria-label="Plus 10 minutes"><Plus size={14} /></button>
+        </div>
+
         <SheetLabel>Note <span style={{ textTransform: 'none', fontWeight: 500, color: 'var(--text-hint)' }}>· facultatif</span></SheetLabel>
         <textarea
           value={note}
@@ -184,6 +225,8 @@ export default function SleepEntrySheet({ dateStr, initial = null, usual = null,
     document.body,
   )
 }
+
+const roundBtn = { width: 30, height: 30, borderRadius: '50%', background: 'var(--gray-bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
 
 // Sélecteur de qualité (5 visages), réutilisé en ligne par la carte du jour.
 export function QualitePicker({ value, onChange, compact = false }) {

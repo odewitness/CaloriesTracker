@@ -9,6 +9,7 @@ import { FODMAP_GROUPS } from '../../lib/fodmap'
 import { bristolType, stoolRemarqueLabel, formatHeureSelle } from '../../lib/stool'
 import { waterTotalMl } from '../../lib/water'
 import { phaseForDate } from '../../lib/cycle'
+import { isShortNight } from '../../lib/sleep'
 
 // Carte de corrélation « jours A vs jours B » — même gabarit visuel que les
 // cartes sportPeriodStats/cyclePhaseStats de HistoryPage.jsx (borderLeft
@@ -89,8 +90,11 @@ function FodmapTransitCard({ title, stats, luteal }) {
 //   symptoms        — symptômes sans passage de la période (symptomes_digestifs)
 //   fodmapByDate    — usePeriodFodmap(...).byDate, null si l'affichage FODMAP
 //                     est désactivé ou en chargement
+//   sleepNights / sleepObjectifMin — nuits de la période (useSleepRange) :
+//                     transit après une nuit courte (≥ 1 h sous l'objectif,
+//                     nuit rattachée à la date du réveil) vs les autres nuits
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DigestionSection({ tab, selles, periodDayKeys, days, cycleDays, cycleSettings, sportDates, symptoms = [], fodmapByDate = null }) {
+export default function DigestionSection({ tab, selles, periodDayKeys, days, cycleDays, cycleSettings, sportDates, symptoms = [], fodmapByDate = null, sleepNights = [], sleepObjectifMin = 480 }) {
   const regularity = useMemo(() => regularityStats(selles, periodDayKeys), [selles, periodDayKeys])
   const histogram = useMemo(() => bristolHistogram(selles), [selles])
   const maxCount = Math.max(1, ...histogram.map((h) => h.count))
@@ -153,6 +157,24 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
   const cycleEffort = useMemo(
     () => (hasCycle ? bucketDaysByMetric(selles, periodDayKeys, (d) => phaseForDate(d, cycleDays, cycleSettings) === 'luteale', dayDifficileRate) : null),
     [hasCycle, selles, periodDayKeys, cycleDays, cycleSettings],
+  )
+
+  // Sommeil & transit : seulement les jours dont la nuit est notée.
+  const sleepSplit = useMemo(() => {
+    if (!showCorrelations || !sleepNights.length) return null
+    const byDate = new Map(sleepNights.map((n) => [n.date, n]))
+    return {
+      keys: periodDayKeys.filter((d) => byDate.has(d)),
+      isShort: (d) => isShortNight(byDate.get(d), sleepObjectifMin),
+    }
+  }, [showCorrelations, sleepNights, periodDayKeys, sleepObjectifMin])
+  const sleepBristol = useMemo(
+    () => (sleepSplit ? bucketDaysByMetric(selles, sleepSplit.keys, sleepSplit.isShort, dayMeanBristol) : null),
+    [sleepSplit, selles],
+  )
+  const sleepEffort = useMemo(
+    () => (sleepSplit ? bucketDaysByMetric(selles, sleepSplit.keys, sleepSplit.isShort, dayDifficileRate) : null),
+    [sleepSplit, selles],
   )
 
   const symptomSummary = useMemo(() => symptomStats(symptoms, periodDayKeys), [symptoms, periodDayKeys])
@@ -344,7 +366,7 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
       )}
 
       {/* ── Corrélations ─────────────────────────────────────────────────── */}
-      {showCorrelations && (fibresBristol || waterBristol || sportBristol || cycleBristol) && (
+      {showCorrelations && (fibresBristol || waterBristol || sportBristol || cycleBristol || sleepBristol) && (
         <div className="section-title">Ce qui semble jouer sur ton transit</div>
       )}
       <CorrelationCard
@@ -378,6 +400,16 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
         disclaimer="Simple observation, pas une relation de cause à effet."
       />
       <CorrelationCard
+        color="var(--blue)"
+        title="Sommeil & transit"
+        labelA="après une nuit courte"
+        labelB="après les autres nuits"
+        stats={sleepBristol}
+        effortA={sleepEffort?.meanA}
+        effortB={sleepEffort?.meanB}
+        disclaimer="Nuit courte = au moins 1 h sous ton objectif de sommeil. Simple observation, pas une relation de cause à effet."
+      />
+      <CorrelationCard
         color="var(--purple)"
         title="Cycle & transit"
         labelA="en phase lutéale"
@@ -399,7 +431,7 @@ export default function DigestionSection({ tab, selles, periodDayKeys, days, cyc
           </div>
         </>
       )}
-      {showCorrelations && !fibresBristol && !waterBristol && !sportBristol && !cycleBristol && !fodmapCards.length && (
+      {showCorrelations && !fibresBristol && !waterBristol && !sportBristol && !cycleBristol && !sleepBristol && !fodmapCards.length && (
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 2px 16px' }}>
           Pas encore assez de jours notés à la fois côté transit et côté alimentation/sport/cycle sur cette période pour dégager une tendance.
         </div>

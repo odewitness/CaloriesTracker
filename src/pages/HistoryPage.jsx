@@ -10,6 +10,7 @@ import { useSportRange, useSportStreak } from '../hooks/useSport'
 import { useProfile } from '../hooks/useProfile'
 import { useSellesRange, useSymptomesDigestifsRange } from '../hooks/useSelles'
 import { useSleepRange } from '../hooks/useSleep'
+import { useSleepInsights } from '../hooks/useSleepInsights'
 import { usePeriodFodmap } from '../hooks/useFodmapProfile'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { dayActivityKcal } from '../lib/sport'
@@ -38,6 +39,7 @@ import SportHistorySection from '../components/history/SportHistorySection'
 import SportPhaseSection from '../components/history/SportPhaseSection'
 import DigestionSection from '../components/history/DigestionSection'
 import SleepHistorySection from '../components/history/SleepHistorySection'
+import SleepInsightsSection from '../components/history/SleepInsightsSection'
 
 const TABS = [
   { key: 'semaine', label: 'Semaine' },
@@ -479,6 +481,14 @@ export default function HistoryPage() {
     if (!availableViews.some(v => v.key === view)) setView('resume')
   }, [availableViews, view])
 
+  // Croisements sommeil ↔ journée (onglet Sommeil) : fenêtre de 90 jours qui
+  // finit à la fin de la période affichée (ou aujourd'hui), chargée seulement
+  // quand l'onglet est ouvert.
+  const { insights: sleepInsights, loading: sleepInsightsLoading } = useSleepInsights(
+    bounds.end < today ? bounds.end : today,
+    { enabled: activeView === 'sommeil', settings, cycleDays },
+  )
+
   // FODMAP par jour de la période, pour les corrélations FODMAP ↔ transit de
   // l'onglet Digestion (chantier FODMAP, Palier 4) — calculé seulement quand
   // cet onglet est affiché, hors vue Année, et si l'affichage FODMAP est activé.
@@ -763,6 +773,13 @@ export default function HistoryPage() {
               objectifMin={Number(settings.sommeil?.objectif_min) || 480}
             />
           )}
+          {activeView === 'sommeil' && (
+            <SleepInsightsSection
+              insights={sleepInsights}
+              loading={sleepInsightsLoading}
+              cycleUsed={!!settings.cycle?.enabled && !settings.cycle?.sous_contraception && cycleDays.length > 0}
+            />
+          )}
 
           {/* ── Digestion : fréquence, Bristol, corrélations transit ──────── */}
           {activeView === 'digestion' && (
@@ -776,6 +793,8 @@ export default function HistoryPage() {
               sportDates={settings.sport?.enabled ? sportDates : undefined}
               symptoms={symptomEntries}
               fodmapByDate={fodmapByDate}
+              sleepNights={sleepNights}
+              sleepObjectifMin={Number(settings.sommeil?.objectif_min) || 480}
             />
           )}
         </>
