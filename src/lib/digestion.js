@@ -12,8 +12,7 @@ const mean = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null)
 
 // ── Fréquence & régularité ──────────────────────────────────────────────────
 // periodDayKeys : jours calendaires de la période (eachDay), déjà bornés à
-// aujourd'hui pour la période courante — même construction que `periodDays`
-// dans HistoryPage.
+// aujourd'hui pour la période courante et au premier jour de suivi du transit.
 export function regularityStats(selles, periodDayKeys) {
   if (!periodDayKeys.length || !selles.length) return null
   const distinctDates = [...new Set(selles.map((s) => s.date))].sort()

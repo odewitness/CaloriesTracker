@@ -14,7 +14,8 @@ import {
 //
 // Props :
 //   nights         — nuits de la période (une par date de réveil)
-//   periodDayKeys  — jours calendaires de la période, bornés à aujourd'hui
+//   periodDayKeys  — jours calendaires de la période, bornés à aujourd'hui et
+//                    à la première nuit jamais notée
 //   tab            — 'semaine' | 'mois' | 'annee'
 //   objectifMin    — settings.sommeil.objectif_min
 // ─────────────────────────────────────────────────────────────────────────────

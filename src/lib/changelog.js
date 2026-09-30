@@ -7,6 +7,11 @@
 // push".
 export const CHANGELOG = [
   {
+    date: '2026-09-30',
+    title: 'Des stats Digestion et Sommeil plus justes',
+    description: "Dans Historique > Digestion et Historique > Sommeil, les chiffres commencent maintenant au premier jour où tu as noté un passage ou une nuit. Les jours d'avant ne comptent plus comme des jours « sans », donc tes moyennes et pourcentages reflètent vraiment ce que tu as suivi.",
+  },
+  {
     date: '2026-09-27',
     title: 'Ton sommeil et ton assiette',
     description: "Dans Historique > Sommeil, l'app compare maintenant ce que tu manges les jours qui suivent une nuit courte ou une mauvaise nuit avec les autres jours : calories, collations, sucres, pas, sport… Elle regarde aussi ce qui accompagne tes nuits (sport, dîner copieux, alcool, sieste, règles, et le contexte que tu coches : café tardif, stress, écrans…). Il faut quelques semaines de nuits notées pour voir apparaître des résultats, une barre te montre où tu en es.",

@@ -84,7 +84,8 @@ function FodmapTransitCard({ title, stats, luteal }) {
 // Props :
 //   tab             — 'semaine' | 'mois' | 'annee' (corrélations masquées en Année)
 //   selles          — passages de la période affichée
-//   periodDayKeys   — jours calendaires de la période, jours exclus déjà retirés
+//   periodDayKeys   — jours calendaires de la période à partir du premier jour
+//                     de suivi du transit, jours exclus déjà retirés
 //   days            — { dateStr: entrées journal[] } de la période (fibres, eau)
 //   cycleDays, cycleSettings, sportDates — mêmes données que le reste d'Historique
 //   symptoms        — symptômes sans passage de la période (symptomes_digestifs)

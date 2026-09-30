@@ -11,6 +11,7 @@ import { useProfile } from '../hooks/useProfile'
 import { useSellesRange, useSymptomesDigestifsRange } from '../hooks/useSelles'
 import { useSleepRange } from '../hooks/useSleep'
 import { useSleepInsights } from '../hooks/useSleepInsights'
+import { useFirstEntryDate } from '../hooks/useFirstEntryDate'
 import { usePeriodFodmap } from '../hooks/useFodmapProfile'
 import { STOOL_TRACKER_USER_ID } from '../lib/featureFlags'
 import { dayActivityKcal } from '../lib/sport'
@@ -59,6 +60,14 @@ const VIEWS = [
 ]
 
 const HIST_WINDOW = 365 // jours remontés pour la série en cours + le record
+
+// Jours calendaires [start, end] à partir du premier jour de suivi `firstDate`
+// (useFirstEntryDate) — vide tant qu'il est inconnu (chargement) ou absent.
+function trackedDayKeys(start, end, firstDate) {
+  if (!firstDate) return []
+  const from = firstDate > start ? firstDate : start
+  return from > end ? [] : eachDay(from, end)
+}
 
 // Somme kcal d'une liste d'entrées journal
 const sumKcal = (es) => es.reduce((s, e) => s + (e.energie_kcal || 0), 0)
@@ -120,9 +129,12 @@ export default function HistoryPage() {
   // Sommeil est affichée, ou dès qu'il y a des nuits notées sur la période.
   const { nights: sleepNights } = useSleepRange(bounds.start, bounds.end)
   const hasSleep = sleepNights.length > 0
+  // Stats bornées à la première nuit jamais notée : les jours d'avant ne
+  // comptent pas comme « nuits non notées ».
+  const firstSleepDate = useFirstEntryDate(['sommeil'])
   const sleepDayKeys = useMemo(
-    () => eachDay(bounds.start, bounds.end < today ? bounds.end : today),
-    [bounds.start, bounds.end, today],
+    () => trackedDayKeys(bounds.start, bounds.end < today ? bounds.end : today, firstSleepDate),
+    [bounds.start, bounds.end, today, firstSleepDate],
   )
 
   // ── Chargement du journal (période affichée + précédente) ─────────────────
@@ -237,9 +249,13 @@ export default function HistoryPage() {
 
   // Mêmes jours, en liste et jours exclus retirés — onglet Digestion (fréquence,
   // corrélations fibres/eau/sport/cycle).
+  // Bornés au premier passage ou symptôme jamais noté : avant, ce ne sont pas
+  // des « jours sans passage », juste des jours pas encore suivis.
+  const firstDigestionDate = useFirstEntryDate(['selles', 'symptomes_digestifs'], { enabled: isStoolUser })
   const digestionDayKeys = useMemo(
-    () => eachDay(bounds.start, bounds.end < today ? bounds.end : today).filter(d => !excludedDates.has(d)),
-    [bounds.start, bounds.end, today, excludedDates],
+    () => trackedDayKeys(bounds.start, bounds.end < today ? bounds.end : today, firstDigestionDate)
+      .filter(d => !excludedDates.has(d)),
+    [bounds.start, bounds.end, today, firstDigestionDate, excludedDates],
   )
 
   // Moyenne / jour sur les jours loggés ET non exclus (même construction que le
